@@ -1,23 +1,23 @@
 package core
 
 import (
+	"github.com/stretchr/testify/mock"
 	"testing"
 	"time"
-	"github.com/stretchr/testify/mock"
 )
 
 type statKeeper struct {
 	mock.Mock
 }
 
-func (m *statKeeper) GetStats() [] Datapoint {
+func (m *statKeeper) GetStats() []Datapoint {
 	return []Datapoint{nil}
 }
 
 type datapointStreamingAPI struct {
 	mock.Mock
-    mychan chan bool
-	myDp chan Datapoint
+	mychan chan bool
+	myDp   chan Datapoint
 }
 
 func (api *datapointStreamingAPI) DatapointsChannel() chan<- Datapoint {
@@ -34,5 +34,5 @@ func TestDrainStatsThread(t *testing.T) {
 	keepers := []StatKeeper{&statKeeper{}}
 	apis := []DatapointStreamingAPI{&datapointStreamingAPI{mychan: c, myDp: myDp}}
 	// We signal draining thread to die when we get a point
-	DrainStatsThread(time.Nanosecond * 1, apis, keepers, c)
+	DrainStatsThread(time.Nanosecond*1, apis, keepers, c)
 }

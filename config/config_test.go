@@ -3,11 +3,11 @@ package config
 import (
 	"errors"
 	"fmt"
+	"github.com/cep21/gohelpers/a"
 	"io/ioutil"
 	"os"
 	"testing"
 	"time"
-	"github.com/cep21/gohelpers/a"
 )
 
 func TestInvalidConfig(t *testing.T) {

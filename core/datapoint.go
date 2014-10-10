@@ -78,13 +78,13 @@ type relativeTimeDatapoint struct {
 	relativeTime int64
 }
 
-var time__Now = time.Now
+var timeXXXXNow = time.Now
 
 func (datapoint *relativeTimeDatapoint) Timestamp() time.Time {
 	if datapoint.relativeTime > 0 {
 		return time.Unix(0, datapoint.relativeTime*int64(1000*1000))
 	}
-	return time__Now().Add(time.Millisecond * time.Duration(datapoint.relativeTime))
+	return timeXXXXNow().Add(time.Millisecond * time.Duration(datapoint.relativeTime))
 }
 
 func (datapoint *relativeTimeDatapoint) String() string {
