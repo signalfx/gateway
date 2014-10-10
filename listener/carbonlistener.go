@@ -11,6 +11,7 @@ import (
 	"time"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/cep21/gohelpers/structdefaults"
+	"strings"
 )
 
 type carbonListener struct {
@@ -35,7 +36,7 @@ func (listener *carbonListener) handleConnection(conn net.Conn) {
 			glog.Warningf("Carbon listener pipe closed %s", err)
 			return
 		}
-		line := string(bytes)
+		line := strings.TrimSpace(string(bytes))
 		dp, err := protocoltypes.NewCarbonDatapoint(line)
 		if err != nil {
 			glog.Warningf("Error parsing carbon line: %s", err)
