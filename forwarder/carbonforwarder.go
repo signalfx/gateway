@@ -3,15 +3,15 @@ package forwarder
 import (
 	"bytes"
 	"fmt"
+	"github.com/cep21/gohelpers/structdefaults"
+	"github.com/cep21/gohelpers/workarounds"
+	"github.com/golang/glog"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"net"
 	"strconv"
 	"sync"
 	"time"
-	"github.com/cep21/gohelpers/workarounds"
-	"github.com/cep21/gohelpers/structdefaults"
-	"github.com/golang/glog"
 )
 
 type reconectingGraphiteCarbonConnection struct {
@@ -30,10 +30,10 @@ func NewTcpGraphiteCarbonForwarer(host string, port uint16, timeout time.Duratio
 		return nil, err
 	}
 	ret := &reconectingGraphiteCarbonConnection{
-			basicBufferedForwarder: NewBasicBufferedForwarder(bufferSize, 100, "", 1),
-			openConnection:         conn,
-			connectionTimeout:      timeout,
-			connectionAddress:      connectionAddress}
+		basicBufferedForwarder: NewBasicBufferedForwarder(bufferSize, 100, "", 1),
+		openConnection:         conn,
+		connectionTimeout:      timeout,
+		connectionAddress:      connectionAddress}
 	ret.start(ret.drainDatapointChannel)
 	return ret, nil
 }
@@ -44,11 +44,11 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) GetStats() []core.D
 }
 
 var defaultCarbonConfig = &config.ForwardTo{
-	TimeoutDuration:   workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
-	BufferSize:        workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(10000)),
-	DrainingThreads:   workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(5)),
-	Name:              workarounds.GolangDoesnotAllowPointerToStringLiteral("carbonforwarder"),
-	MaxDrainSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(100)),
+	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
+	BufferSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(10000)),
+	DrainingThreads: workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(5)),
+	Name:            workarounds.GolangDoesnotAllowPointerToStringLiteral("carbonforwarder"),
+	MaxDrainSize:    workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(100)),
 }
 
 // TcpGraphiteCarbonForwarerLoader loads a carbon forwarder
@@ -75,7 +75,7 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) drainDatapointChann
 	}
 	var buf bytes.Buffer
 	for _, datapoint := range datapoints {
-		fmt.Fprintf(&buf, "%s %s %d\n", datapoint.Metric(), datapoint.Value().WireValue(), datapoint.Timestamp().UnixNano() / time.Second.Nanoseconds())
+		fmt.Fprintf(&buf, "%s %s %d\n", datapoint.Metric(), datapoint.Value().WireValue(), datapoint.Timestamp().UnixNano()/time.Second.Nanoseconds())
 	}
 	glog.V(2).Infof("Will write: `%s`", buf.String())
 	_, err = buf.WriteTo(carbonConnection.openConnection)

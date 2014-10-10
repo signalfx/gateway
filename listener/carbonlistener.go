@@ -2,16 +2,16 @@ package listener
 
 import (
 	"bufio"
+	"github.com/cep21/gohelpers/structdefaults"
+	"github.com/cep21/gohelpers/workarounds"
 	"github.com/golang/glog"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"io"
 	"net"
-	"time"
-	"github.com/cep21/gohelpers/workarounds"
-	"github.com/cep21/gohelpers/structdefaults"
 	"strings"
+	"time"
 )
 
 type carbonListener struct {
