@@ -20,7 +20,7 @@ func TestRelativeDatapoint(t *testing.T) {
 	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER, dp.MetricType(), "Unexpected time")
 
 	now := time.Now()
-	time__Now = func() time.Time { return now }
+	timeXXXXNow = func() time.Time { return now }
 
 	a.ExpectEquals(t, now, dp.Timestamp(), "Expected now")
 
