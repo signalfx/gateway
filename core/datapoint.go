@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core/value"
-	"time"
+	time "time"
 )
 
 // A Datapoint is the metric that is saved
@@ -47,15 +47,6 @@ func (datapoint *baseDatapoint) MetricType() com_signalfuse_metrics_protobuf.Met
 	return datapoint.metricType
 }
 
-func newBaseDatapoint(metric string, dimensions map[string]string, value value.DatapointValue, metricType com_signalfuse_metrics_protobuf.MetricType) *baseDatapoint {
-	return &baseDatapoint{
-		metric:     metric,
-		dimensions: dimensions,
-		value:      value,
-		metricType: metricType,
-	}
-}
-
 type absoluteTimeDatapoint struct {
 	baseDatapoint
 	timestamp time.Time
@@ -87,15 +78,17 @@ type relativeTimeDatapoint struct {
 	relativeTime int64
 }
 
+var time__Now = time.Now
+
 func (datapoint *relativeTimeDatapoint) Timestamp() time.Time {
 	if datapoint.relativeTime > 0 {
-		return time.Unix(0, datapoint.relativeTime*int64(1000))
+		return time.Unix(0, datapoint.relativeTime*int64(1000*1000))
 	}
-	return time.Now().Add(time.Millisecond * time.Duration(datapoint.relativeTime))
+	return time__Now().Add(time.Millisecond * time.Duration(datapoint.relativeTime))
 }
 
 func (datapoint *relativeTimeDatapoint) String() string {
-	return fmt.Sprintf("RelDP[%s\t%s\t%s\t%s\t%s]", datapoint.Metric(), datapoint.Dimensions(), datapoint.Value().WireValue(), datapoint.MetricType(), datapoint.Timestamp().String())
+	return fmt.Sprintf("RelDP[%s\t%s\t%s\t%s\t%s(%d)]", datapoint.Metric(), datapoint.Dimensions(), datapoint.Value().WireValue(), datapoint.MetricType(), datapoint.Timestamp().String(), datapoint.relativeTime)
 }
 
 // NewRelativeTimeDatapoint creates a new datapoint who's time is a value relative to when it's recieved

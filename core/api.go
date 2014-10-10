@@ -25,10 +25,16 @@ type StatKeepingStreamingAPI interface {
 
 // DrainStatsThread starts the stats listening thread that sleeps delay amount between gathering
 // and sending stats
-func DrainStatsThread(delay time.Duration, sendTo []DatapointStreamingAPI, listenFrom []StatKeeper) {
+func DrainStatsThread(delay time.Duration, sendTo []DatapointStreamingAPI, listenFrom []StatKeeper, stopChannel <- chan bool) {
 	glog.Infof("Draining stats from %s", listenFrom)
 	for {
-		time.Sleep(delay)
+		select {
+		case _ = <- stopChannel:
+			glog.V(1).Infof("Request to stop stat thread")
+			return
+		case _ = <- time.After(delay):
+			glog.V(3).Infof("Stat thread waking up")
+		}
 
 		points := []Datapoint{}
 		for _, listenFrom := range listenFrom {

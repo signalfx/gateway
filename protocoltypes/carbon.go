@@ -31,7 +31,7 @@ func (carbonDatapoint *carbonDatapointImpl) ToCarbonLine() string {
 }
 
 // NewCarbonDatapoint creates a new datapoint from a line in carbon
-func NewCarbonDatapoint(line string) (core.Datapoint, error) {
+func NewCarbonDatapoint(line string) (CarbonReadyDatapoint, error) {
 	parts := strings.SplitN(line, " ", 3)
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("invalid carbon input line: %s", line)

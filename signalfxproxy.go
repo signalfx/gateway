@@ -65,7 +65,7 @@ func main() {
 
 	glog.Infof("Setup done.  Blocking!\n")
 	if loadedConfig.StatsDelayDuration != nil {
-		go core.DrainStatsThread(*loadedConfig.StatsDelayDuration, allForwarders, allStatKeepers)
+		//		go core.DrainStatsThread(*loadedConfig.StatsDelayDuration, allForwarders, allStatKeepers)
 	}
 
 	// TODO: Replace with something more graceful that allows us to shutdown?

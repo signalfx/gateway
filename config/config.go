@@ -6,8 +6,6 @@ import (
 	"github.com/cep21/xdgbasedir"
 	"github.com/golang/glog"
 	"io/ioutil"
-	"os/user"
-	"path"
 	"time"
 )
 
@@ -97,9 +95,11 @@ func loadConfig(configFile string) (*LoadedConfig, error) {
 	return decodeConfig(configBytes)
 }
 
+var xdgbasedirGetConfigFileLocation = xdgbasedir.GetConfigFileLocation
+
 // LoadConfig loads proxy configuration from a filename that is in an xdg configuration location
 func LoadConfig(configFile string) (*LoadedConfig, error) {
-	filename, err := xdgbasedir.GetConfigFileLocation(configFile)
+	filename, err := xdgbasedirGetConfigFileLocation(configFile)
 	if err != nil {
 		return nil, err
 	}
@@ -113,17 +113,4 @@ func LoadConfig(configFile string) (*LoadedConfig, error) {
 		}
 	}
 	return config, err
-}
-
-func getFilePath(dir string, filename string) (str string, err error) {
-	// Save the result of JSON to a file
-	if dir == "~" {
-		var curUser *user.User
-		if curUser, err = user.Current(); err != nil {
-			return
-		}
-		dir = curUser.HomeDir
-	}
-	str = path.Join(dir, filename)
-	return
 }

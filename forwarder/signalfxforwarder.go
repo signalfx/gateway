@@ -16,21 +16,30 @@ import (
 	"io/ioutil"
 	"net/http"
 	"runtime"
+	"sync"
 	"time"
 )
 
+type metricCreationRequest struct {
+	toCreate        map[string]com_signalfuse_metrics_protobuf.MetricType
+	responseChannel chan (error)
+}
+
 type signalfxJSONConnector struct {
 	*basicBufferedForwarder
-	url               string
-	connectionTimeout time.Duration
-	defaultAuthToken  string
-	tr                *http.Transport
-	sendVersion       int
-	client            *http.Client
-	userAgent         string
+	url                string
+	metricCreationChan chan *metricCreationRequest
+	connectionTimeout  time.Duration
+	defaultAuthToken   string
+	tr                 *http.Transport
+	sendVersion        int
+	client             *http.Client
+	userAgent          string
+	defaultSource      string
 	// Map of all metric names to if we've created them with their metric type
-	v1MetricLoadedCache map[string]struct{}
-	MetricCreationURL   string
+	v1MetricLoadedCache      map[string]struct{}
+	v1MetricLoadedCacheMutex sync.Mutex
+	MetricCreationURL        string
 }
 
 // ValueToSend are values are sent from the proxy to a reciever for the datapoint
@@ -51,6 +60,7 @@ func (bodySendFormat *BodySendFormat) String() string {
 
 var defaultConfig = &config.ForwardTo{
 	URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfuse.com/v1/datapoint"),
+	DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
 	MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfuse.com/v1/metric?bulkupdate=true"),
 	TimeoutDuration:   workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
 	BufferSize:        workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(10000)),
@@ -65,12 +75,13 @@ func SignalfxJSONForwarderLoader(forwardTo *config.ForwardTo) (core.StatKeepingS
 	glog.Infof("Creating signalfx forwarder using final config %s", forwardTo)
 	return NewSignalfxJSONForwarer(*forwardTo.URL, *forwardTo.TimeoutDuration, *forwardTo.BufferSize,
 		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads, *forwardTo.Name, *forwardTo.MetricCreationURL,
-		*forwardTo.MaxDrainSize)
+		*forwardTo.MaxDrainSize, *forwardTo.DefaultSource)
 }
 
 // NewSignalfxJSONForwarer creates a new JSON forwarder
 func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint32,
-	defaultAuthToken string, drainingThreads uint32, name string, MetricCreationURL string, maxDrainSize uint32) (core.StatKeepingStreamingAPI, error) {
+	defaultAuthToken string, drainingThreads uint32, name string, MetricCreationURL string,
+	maxDrainSize uint32, defaultSource string) (core.StatKeepingStreamingAPI, error) {
 	tr := &http.Transport{
 		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
 		MaxIdleConnsPerHost: int(drainingThreads) * 2,
@@ -88,8 +99,11 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint3
 		connectionTimeout:   timeout,
 		v1MetricLoadedCache: map[string]struct{}{},
 		MetricCreationURL:   MetricCreationURL,
+		defaultSource:       defaultSource,
+		metricCreationChan:  make(chan *metricCreationRequest),
 	}
 	ret.start(ret.process)
+	go ret.metricCreationLoop()
 	return ret, nil
 }
 
@@ -150,6 +164,16 @@ type metricCreationResponse struct {
 	Message string `json:"message"`
 }
 
+func (connector *signalfxJSONConnector) metricCreationLoop() {
+	for {
+		glog.V(3).Infof("Waiting for creation request")
+		request := <-connector.metricCreationChan
+		glog.V(3).Infof("Got creation request: %s", request)
+		resp := connector.createMetricsOfType(request.toCreate)
+		request.responseChannel <- resp
+	}
+}
+
 func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[string]com_signalfuse_metrics_protobuf.MetricType) error {
 	if len(metricsToCreate) == 0 {
 		return nil
@@ -198,6 +222,8 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 		glog.Warningf("body=(%s), err=(%s)", respBody, err)
 		return err
 	}
+	connector.v1MetricLoadedCacheMutex.Lock()
+	defer connector.v1MetricLoadedCacheMutex.Unlock()
 	for index, resp := range metricCreationBody {
 		metricName := postBody[index].MetricName
 		if resp.Code == 0 || resp.Code == 409 {
@@ -215,13 +241,15 @@ func (connector *signalfxJSONConnector) figureOutReasonableSource(point core.Dat
 	if thisPointSource != "" {
 		return thisPointSource
 	}
-	glog.Warningf("unable to figure out a reasonable source for %s", point)
-	return ""
+	glog.Warningf("unable to figure out a reasonable source for %s, using %s", point, connector.defaultSource)
+	return connector.defaultSource
 }
 
 func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datapoint) ([]byte, string, error) {
 	var msgBody []byte
 	metricsToBeCreated := make(map[string]com_signalfuse_metrics_protobuf.MetricType)
+	connector.v1MetricLoadedCacheMutex.Lock()
+	defer connector.v1MetricLoadedCacheMutex.Unlock()
 	for _, point := range datapoints {
 		thisPointSource := connector.figureOutReasonableSource(point)
 		if thisPointSource == "" {
@@ -249,10 +277,20 @@ func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datap
 		msgBody = append(msgBody, encodedBytes...)
 	}
 	glog.V(3).Infof("Posting %s", msgBody)
-	// Create metrics if we need to
-	err := connector.createMetricsOfType(metricsToBeCreated)
-	if err != nil {
-		return nil, "", err
+
+	if len(metricsToBeCreated) > 0 {
+		// Create metrics if we need to
+		creationRequest := &metricCreationRequest{
+			toCreate:        metricsToBeCreated,
+			responseChannel: make(chan error),
+		}
+		glog.V(3).Infof("Trying to create metrics first")
+		connector.metricCreationChan <- creationRequest
+		err := <-creationRequest.responseChannel
+		if err != nil {
+			return nil, "", err
+		}
+		glog.V(3).Infof("Metric creation OK")
 	}
 	return msgBody, "application/x-protobuf", nil
 }
