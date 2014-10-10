@@ -10,19 +10,25 @@ database.
 Install
 =======
 
+```
    cd /opt/proxy
    yum install -y golang
    env GOPATH=`pwd` go get github.com/signalfuse/signalfxproxy
+ ```
 
 Running
 =======
 
+```
    /opt/proxy/bin/signalfxproxy --configfile /tmp/sfdbproxy.conf
+ ```
 
 Debug logging
 =============
 
+```
    /opt/proxy/bin/signalfxproxy --configfile /tmp/sfdbproxy.conf -v=3
+ ```
 
 Configuration
 =============
