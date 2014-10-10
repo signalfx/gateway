@@ -9,6 +9,8 @@ import (
 	"io"
 	"net"
 	"time"
+	"github.com/cep21/gohelpers/workarounds"
+	"github.com/cep21/gohelpers/structdefaults"
 )
 
 type carbonListener struct {
@@ -54,8 +56,14 @@ func (listener *carbonListener) startListening() {
 	}
 }
 
+var defaultCarbonConfig = &config.ListenFrom{
+	ListenAddr:      workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12346"),
+	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
+}
+
 // CarbonListenerLoader loads a listener for the carbon/graphite protocol from config
 func CarbonListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, listenFrom *config.ListenFrom) (DatapointListener, error) {
+	structdefaults.FillDefaultFrom(listenFrom, defaultCarbonConfig)
 	return startListeningCarbonOnPort(*listenFrom.ListenAddr, DatapointStreamingAPI, *listenFrom.TimeoutDuration)
 }
 
