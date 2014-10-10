@@ -66,7 +66,7 @@ func (datapoint *absoluteTimeDatapoint) Timestamp() time.Time {
 }
 
 func (datapoint *absoluteTimeDatapoint) String() string {
-	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s", datapoint.Metric(), datapoint.Dimensions(), datapoint.Value(), datapoint.MetricType(), datapoint.Timestamp().String())
+	return fmt.Sprintf("AbsDP[%s\t%s\t%s\t%s\t%s]", datapoint.Metric(), datapoint.Dimensions(), datapoint.Value(), datapoint.MetricType(), datapoint.Timestamp().String())
 }
 
 // NewAbsoluteTimeDatapoint creates a new datapoint who's time is an absolute value
@@ -95,7 +95,7 @@ func (datapoint *relativeTimeDatapoint) Timestamp() time.Time {
 }
 
 func (datapoint *relativeTimeDatapoint) String() string {
-	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s", datapoint.Metric(), datapoint.Dimensions(), datapoint.Value().WireValue(), datapoint.MetricType(), datapoint.Timestamp().String())
+	return fmt.Sprintf("RelDP[%s\t%s\t%s\t%s\t%s]", datapoint.Metric(), datapoint.Dimensions(), datapoint.Value().WireValue(), datapoint.MetricType(), datapoint.Timestamp().String())
 }
 
 // NewRelativeTimeDatapoint creates a new datapoint who's time is a value relative to when it's recieved

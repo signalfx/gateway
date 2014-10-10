@@ -19,6 +19,10 @@ func (wireVal floatWire) IntValue() (int64, error) {
 	return 0, errors.New("no exact integer representation")
 }
 
+func (wireVal floatWire) String() string {
+	return wireVal.WireValue()
+}
+
 // NewFloatWire creates new datapoint value is a float
 func NewFloatWire(val float64) DatapointValue {
 	return floatWire(val)

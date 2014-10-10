@@ -37,12 +37,18 @@ func (listener *carbonListener) handleConnection(conn net.Conn) {
 			return
 		}
 		line := strings.TrimSpace(string(bytes))
+		if line == "" {
+			continue
+		}
 		dp, err := protocoltypes.NewCarbonDatapoint(line)
 		if err != nil {
 			glog.Warningf("Error parsing carbon line: %s", err)
 			return
 		}
 		listener.DatapointStreamingAPI.DatapointsChannel() <- dp
+		if err == io.EOF {
+			break
+		}
 	}
 }
 

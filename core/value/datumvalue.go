@@ -34,6 +34,10 @@ func (wireVal *datumWire) IntValue() (int64, error) {
 	return 0, errors.New("unset int value")
 }
 
+func (wireVal *datumWire) String() string {
+	return wireVal.val.String()
+}
+
 // NewDatumWire creates new datapoint value referenced from a value of the datum
 func NewDatumWire(val *com_signalfuse_metrics_protobuf.Datum) DatapointValue {
 	return &datumWire{val: val}

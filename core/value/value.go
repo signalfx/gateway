@@ -5,4 +5,5 @@ type DatapointValue interface {
 	WireValue() string
 	FloatValue() (float64, error)
 	IntValue() (int64, error)
+	String() string
 }

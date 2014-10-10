@@ -16,6 +16,10 @@ func (wireVal intWire) IntValue() (int64, error) {
 	return int64(wireVal), nil
 }
 
+func (wireVal intWire) String() string {
+	return wireVal.WireValue()
+}
+
 // NewIntWire creates new datapoint value is an integer
 func NewIntWire(val int64) DatapointValue {
 	return intWire(val)

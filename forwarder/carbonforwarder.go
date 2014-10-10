@@ -8,6 +8,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"net"
 	"strconv"
 	"sync"
@@ -75,7 +76,12 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) drainDatapointChann
 	}
 	var buf bytes.Buffer
 	for _, datapoint := range datapoints {
-		fmt.Fprintf(&buf, "%s %s %d\n", datapoint.Metric(), datapoint.Value().WireValue(), datapoint.Timestamp().UnixNano()/time.Second.Nanoseconds())
+		carbonReadyDatapoint, ok := datapoint.(protocoltypes.CarbonReady)
+		if ok {
+			fmt.Fprintf(&buf, "%s\n", carbonReadyDatapoint.ToCarbonLine())
+		} else {
+			fmt.Fprintf(&buf, "%s %s %d\n", datapoint.Metric(), datapoint.Value().WireValue(), datapoint.Timestamp().UnixNano()/time.Second.Nanoseconds())
+		}
 	}
 	glog.V(2).Infof("Will write: `%s`", buf.String())
 	_, err = buf.WriteTo(carbonConnection.openConnection)
