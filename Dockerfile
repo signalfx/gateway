@@ -9,7 +9,7 @@ RUN apt-get update
 RUN apt-get -y upgrade
 
 # Install dependencies
-RUN apt-get -y install golang git hg curl
+RUN apt-get -y install golang git mercurial curl
 
 RUN mkdir -p /opt/sfproxy
 RUN cd /opt/sfproxy && env GOPATH=`pwd` go get -u github.com/signalfuse/signalfxproxy
