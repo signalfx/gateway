@@ -187,7 +187,7 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 			writter.Write([]byte(`{msg:"Invalid creation request"}`))
 			return
 		} else {
-			glog.V(3).Info("Got a metric types: %s", d)
+			glog.V(3).Info("Got metric types: %s", d)
 			metricCreationsMapMutex.Lock()
 			defer metricCreationsMapMutex.Unlock()
 			ret := []protocoltypes.SignalfxMetricCreationResponse{}
@@ -199,7 +199,7 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 					return
 				}
 				metricCreationsMap[m.MetricName] = com_signalfuse_metrics_protobuf.MetricType(metricType)
-				ret = append(ret, protocoltypes.SignalfxMetricCreationResponse{Code: 200})
+				ret = append(ret, protocoltypes.SignalfxMetricCreationResponse{Code: 409})
 			}
 			toWrite, err := json.Marshal(ret)
 			if err != nil {

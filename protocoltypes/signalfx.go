@@ -18,9 +18,9 @@ type SignalfxMetricCreationStruct struct {
 }
 
 type SignalfxMetricCreationResponse struct {
-	Code    int    `json:"code"`
-	Error   bool   `json:"error"`
-	Message string `json:"message"`
+	Code    int    `json:"code,omitempty"`
+	Error   bool   `json:"error,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 // NewProtobufDataPoint creates a new datapoint from SignalFx's protobuf definition
