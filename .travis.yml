@@ -9,6 +9,8 @@ go:
 
 install:
   - go get github.com/golang/lint/golint
+  - go get code.google.com/p/go.tools/cmd/vet
+  - go get github.com/stretchr/testify/mock
   - go get ./...
 
 script:
