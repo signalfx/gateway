@@ -37,7 +37,7 @@ func (streamer *listenerServer) Close() {
 	streamer.listener.Close()
 }
 
-func jsonDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI) func(*http.Request) error {
+func jsonDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI, metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType, metricCreationsMapMutex *sync.Mutex) func(*http.Request) error {
 	return func(req *http.Request) error {
 		dec := json.NewDecoder(req.Body)
 		for {
@@ -52,7 +52,18 @@ func jsonDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI) func(
 					glog.Warningf("Invalid datapoint %s", d)
 					continue
 				}
-				DatapointStreamingAPI.DatapointsChannel() <- core.NewRelativeTimeDatapoint(d.Metric, map[string]string{"sf_source": d.Source}, value.NewFloatWire(d.Value), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
+				mt := func() (com_signalfuse_metrics_protobuf.MetricType) {
+					metricCreationsMapMutex.Lock()
+					defer metricCreationsMapMutex.Unlock()
+					mt, ok := metricCreationsMap[d.Metric]
+					if !ok {
+						return com_signalfuse_metrics_protobuf.MetricType_GAUGE
+					} else {
+						return mt
+					}
+
+				}()
+				DatapointStreamingAPI.DatapointsChannel() <- core.NewRelativeTimeDatapoint(d.Metric, map[string]string{"sf_source": d.Source}, value.NewFloatWire(d.Value), mt, 0)
 			}
 		}
 		return nil
@@ -75,7 +86,7 @@ func fullyReadFromBuffer(buffer *bufio.Reader, numBytes uint64) ([]byte, error) 
 	return buf, nil
 }
 
-func protobufDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI) func(*http.Request) error {
+func protobufDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI, metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType, metricCreationsMapMutex *sync.Mutex) func(*http.Request) error {
 	return func(req *http.Request) error {
 		bufferedBody := bufio.NewReaderSize(req.Body, 32768)
 		for {
@@ -109,7 +120,18 @@ func protobufDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI) f
 			if err != nil {
 				return err
 			}
-			DatapointStreamingAPI.DatapointsChannel() <- protocoltypes.NewProtobufDataPoint(msg)
+			dp := func() (core.Datapoint) {
+				metricCreationsMapMutex.Lock()
+				defer metricCreationsMapMutex.Unlock()
+				mt, ok := metricCreationsMap[msg.GetMetric()]
+				if !ok {
+					return protocoltypes.NewProtobufDataPoint(msg)
+				} else {
+					return protocoltypes.NewProtobufDataPointWithType(msg, mt)
+				}
+
+			}()
+			DatapointStreamingAPI.DatapointsChannel() <- dp
 		}
 		return nil
 	}
@@ -136,9 +158,9 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 		contentType := req.Header.Get("Content-type")
 		var decoderFunc func(*http.Request) error
 		if contentType == "" || contentType == "application/json" {
-			decoderFunc = jsonDecoderFunction(DatapointStreamingAPI)
+			decoderFunc = jsonDecoderFunction(DatapointStreamingAPI, metricCreationsMap, metricCreationsMapMutex)
 		} else if contentType == "" || contentType == "application/x-protobuf" {
-			decoderFunc = protobufDecoderFunction(DatapointStreamingAPI)
+			decoderFunc = protobufDecoderFunction(DatapointStreamingAPI, metricCreationsMap, metricCreationsMapMutex)
 		} else {
 			writter.WriteHeader(http.StatusBadRequest)
 			writter.Write([]byte(`{msg:"Unknown content type"}`))
@@ -168,6 +190,7 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 			glog.V(3).Info("Got a metric types: %s", d)
 			metricCreationsMapMutex.Lock()
 			defer metricCreationsMapMutex.Unlock()
+			ret := []protocoltypes.SignalfxMetricCreationResponse{}
 			for _, m := range d {
 				metricType, ok := com_signalfuse_metrics_protobuf.MetricType_value[m.MetricType]
 				if !ok {
@@ -176,6 +199,7 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 					return
 				}
 				metricCreationsMap[m.MetricName] = com_signalfuse_metrics_protobuf.MetricType(metricType)
+				ret = append(ret, protocoltypes.SignalfxMetricCreationResponse{Code: 200})
 			}
 			writter.WriteHeader(http.StatusOK)
 			writter.Write([]byte(`"OK"`))
