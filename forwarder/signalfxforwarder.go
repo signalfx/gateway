@@ -247,6 +247,10 @@ func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datap
 		}
 		m := point.Metric()
 		ts := point.Timestamp().UnixNano() / time.Millisecond.Nanoseconds()
+		relativeTimeDp, ok := point.(core.TimeRelativeDatapoint)
+		if ok {
+			ts = relativeTimeDp.RelativeTime()
+		}
 		v := &com_signalfuse_metrics_protobuf.DataPoint{
 			Source:    &thisPointSource,
 			Metric:    &m,

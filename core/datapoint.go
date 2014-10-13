@@ -23,6 +23,11 @@ type Datapoint interface {
 	String() string
 }
 
+type TimeRelativeDatapoint interface {
+	Datapoint
+	RelativeTime() int64
+}
+
 type baseDatapoint struct {
 	metric     string
 	dimensions map[string]string
@@ -87,12 +92,16 @@ func (datapoint *relativeTimeDatapoint) Timestamp() time.Time {
 	return timeXXXXNow().Add(time.Millisecond * time.Duration(datapoint.relativeTime))
 }
 
+func (datapoint *relativeTimeDatapoint) RelativeTime() int64 {
+	return datapoint.relativeTime
+}
+
 func (datapoint *relativeTimeDatapoint) String() string {
 	return fmt.Sprintf("RelDP[%s\t%s\t%s\t%s\t%s(%d)]", datapoint.Metric(), datapoint.Dimensions(), datapoint.Value().WireValue(), datapoint.MetricType(), datapoint.Timestamp().String(), datapoint.relativeTime)
 }
 
 // NewRelativeTimeDatapoint creates a new datapoint who's time is a value relative to when it's recieved
-func NewRelativeTimeDatapoint(metric string, dimensions map[string]string, value value.DatapointValue, metricType com_signalfuse_metrics_protobuf.MetricType, relativeTime int64) Datapoint {
+func NewRelativeTimeDatapoint(metric string, dimensions map[string]string, value value.DatapointValue, metricType com_signalfuse_metrics_protobuf.MetricType, relativeTime int64) TimeRelativeDatapoint {
 	return &relativeTimeDatapoint{
 		baseDatapoint: baseDatapoint{
 			metric:     metric,
