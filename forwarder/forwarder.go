@@ -73,7 +73,7 @@ func (forwarder *basicBufferedForwarder) stop() {
 
 func (forwarder *basicBufferedForwarder) start(processor ProcessingFunction) error {
 	if forwarder.started {
-		return errors.New("forwarder already started!")
+		return errors.New("forwarder already started")
 	}
 	forwarder.started = true
 	for i := uint32(0); i < forwarder.numDrainingThreads; i++ {
