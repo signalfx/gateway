@@ -14,6 +14,7 @@ func main() {
 	flag.Parse()
 
 	glog.Infof("Looking for config file %s\n", *configFileName)
+
 	loadedConfig, err := config.LoadConfig(*configFileName)
 	if err != nil {
 		glog.Fatalln("Unable to load config: ", err)
