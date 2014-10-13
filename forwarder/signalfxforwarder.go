@@ -12,6 +12,7 @@ import (
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"io/ioutil"
 	"net/http"
@@ -134,12 +135,6 @@ func (connector *signalfxJSONConnector) encodePostBodyV2(datapoints []core.Datap
 	return jsonBytes, "application/json", err
 }
 
-type jsonDatapoint struct {
-	Source string  `json:"source"`
-	Metric string  `json:"metric"`
-	Value  float64 `json:"value"`
-}
-
 func datumForPoint(pv value.DatapointValue) *com_signalfuse_metrics_protobuf.Datum {
 	i, err := pv.IntValue()
 	if err == nil {
@@ -153,16 +148,6 @@ func datumForPoint(pv value.DatapointValue) *com_signalfuse_metrics_protobuf.Dat
 	return &com_signalfuse_metrics_protobuf.Datum{StrValue: &s}
 }
 
-type metricCreationStruct struct {
-	MetricName string `json:"sf_metric"`
-	MetricType string `json:"sf_metricType"`
-}
-
-type metricCreationResponse struct {
-	Code    int    `json:"code"`
-	Error   bool   `json:"error"`
-	Message string `json:"message"`
-}
 
 func (connector *signalfxJSONConnector) metricCreationLoop() {
 	for {
@@ -178,9 +163,9 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 	if len(metricsToCreate) == 0 {
 		return nil
 	}
-	postBody := []metricCreationStruct{}
+	postBody := []protocoltypes.SignalfxMetricCreationStruct{}
 	for metricName, metricType := range metricsToCreate {
-		postBody = append(postBody, metricCreationStruct{
+		postBody = append(postBody, protocoltypes.SignalfxMetricCreationStruct {
 			MetricName: metricName,
 			MetricType: metricType.String(),
 		})
@@ -216,7 +201,7 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 		glog.Warningf("Metric creation failed: %s", respBody)
 		return fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
-	var metricCreationBody []metricCreationResponse
+	var metricCreationBody []protocoltypes.SignalfxMetricCreationResponse
 	err = json.Unmarshal(respBody, &metricCreationBody)
 	if err != nil {
 		glog.Warningf("body=(%s), err=(%s)", respBody, err)
@@ -241,7 +226,6 @@ func (connector *signalfxJSONConnector) figureOutReasonableSource(point core.Dat
 	if thisPointSource != "" {
 		return thisPointSource
 	}
-	glog.Warningf("unable to figure out a reasonable source for %s, using %s", point, connector.defaultSource)
 	return connector.defaultSource
 }
 
@@ -253,6 +237,7 @@ func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datap
 	for _, point := range datapoints {
 		thisPointSource := connector.figureOutReasonableSource(point)
 		if thisPointSource == "" {
+			glog.Warningf("unable to figure out a reasonable source for %s, skipping", point)
 			continue
 		}
 		if point.MetricType() != com_signalfuse_metrics_protobuf.MetricType_GAUGE {
@@ -276,7 +261,7 @@ func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datap
 		msgBody = append(msgBody, proto.EncodeVarint(uint64(len(encodedBytes)))...)
 		msgBody = append(msgBody, encodedBytes...)
 	}
-	glog.V(3).Infof("Posting %s", msgBody)
+	glog.V(3).Infof("Posting %s len %d", msgBody, len(msgBody))
 
 	if len(metricsToBeCreated) > 0 {
 		// Create metrics if we need to
@@ -317,7 +302,7 @@ func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) err
 		return err
 	}
 	req, _ := http.NewRequest("POST", connector.url, bytes.NewBuffer(jsonBytes))
-	glog.V(3).Infof("Request is %s", req)
+	glog.V(3).Infof("Request: %s from %s", req, string(jsonBytes))
 	req.Header.Set("Content-Type", bodyType)
 	req.Header.Set("X-SF-TOKEN", connector.defaultAuthToken)
 	req.Header.Set("User-Agent", connector.userAgent)

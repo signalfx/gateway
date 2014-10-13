@@ -18,10 +18,14 @@ import (
 	"net"
 	"net/http"
 	"time"
+	"sync"
 )
 
 type listenerServer struct {
 	listener net.Listener
+	metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType
+	metricCreationsMapMutex *sync.Mutex
+
 }
 
 func (streamer *listenerServer) GetStats() []core.Datapoint {
@@ -33,17 +37,11 @@ func (streamer *listenerServer) Close() {
 	streamer.listener.Close()
 }
 
-type jsonDatapointV1 struct {
-	Source string  `json:"source"`
-	Metric string  `json:"metric"`
-	Value  float64 `json:"value"`
-}
-
 func jsonDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI) func(*http.Request) error {
 	return func(req *http.Request) error {
 		dec := json.NewDecoder(req.Body)
 		for {
-			var d jsonDatapointV1
+			var d protocoltypes.SignalfxJsonDatapointV1
 			if err := dec.Decode(&d); err == io.EOF {
 				break
 			} else if err != nil {
@@ -82,7 +80,12 @@ func protobufDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI) f
 		bufferedBody := bufio.NewReaderSize(req.Body, 32768)
 		for {
 			buf, err := bufferedBody.Peek(16) // should be big enough for any varint
+			if err == io.EOF {
+				return nil
+			}
+
 			if err != nil {
+				glog.Infof("Got %s", err)
 				return err
 			}
 			num, bytesRead := proto.DecodeVarint(buf)
@@ -94,14 +97,12 @@ func protobufDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI) f
 				// Sanity check
 				return fmt.Errorf("invalid varint decode from protobuf stream.  Value too large %d", num)
 			}
-			bufferedBody.Read(make([]byte, num)) // What I really want is .Skip(num), but that doens't exist
+			// Get the varint out
+			fullyReadFromBuffer(bufferedBody, uint64(bytesRead))
 			//buf = make([]byte, num)
 			buf, err = fullyReadFromBuffer(bufferedBody, num)
-			if err != nil {
-				return err
-			}
 			if int(num) != len(buf) {
-				return errors.New("unable to fully read protobuf message")
+				return fmt.Errorf("unable to fully read protobuf message: %s", err)
 			}
 			var msg com_signalfuse_metrics_protobuf.DataPoint
 			err = proto.Unmarshal(buf, &msg)
@@ -110,6 +111,7 @@ func protobufDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI) f
 			}
 			DatapointStreamingAPI.DatapointsChannel() <- protocoltypes.NewProtobufDataPoint(msg)
 		}
+		return nil
 	}
 }
 
@@ -128,6 +130,8 @@ func SignalFxListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, li
 // StartServingHTTPOnPort servers http requests for Signalfx datapoints
 func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.DatapointStreamingAPI, clientTimeout time.Duration) (DatapointListener, error) {
 	mux := http.NewServeMux()
+	metricCreationsMap := make(map[string]com_signalfuse_metrics_protobuf.MetricType)
+	metricCreationsMapMutex := &sync.Mutex{}
 	datapointHandler := func(writter http.ResponseWriter, req *http.Request) {
 		contentType := req.Header.Get("Content-type")
 		var decoderFunc func(*http.Request) error
@@ -149,12 +153,43 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 			writter.Write([]byte(`"OK"`))
 		}
 	}
+
+	metricHandler := func(writter http.ResponseWriter, req *http.Request) {
+		dec := json.NewDecoder(req.Body)
+		var d []protocoltypes.SignalfxMetricCreationStruct
+		if err := dec.Decode(&d); err == io.EOF {
+			return
+		} else if err != nil {
+			glog.Infof("Invalid metric creation request: %s", err)
+			writter.WriteHeader(http.StatusBadRequest)
+			writter.Write([]byte(`{msg:"Invalid creation request"}`))
+			return
+		} else {
+			glog.V(3).Info("Got a metric types: %s", d)
+			metricCreationsMapMutex.Lock()
+			defer metricCreationsMapMutex.Unlock()
+			for _, m := range d {
+				metricType, ok := com_signalfuse_metrics_protobuf.MetricType_value[m.MetricType]
+				if !ok {
+					writter.WriteHeader(http.StatusBadRequest)
+					writter.Write([]byte(`{msg:"Invalid metric type"}`))
+					return
+				}
+				metricCreationsMap[m.MetricName] = com_signalfuse_metrics_protobuf.MetricType(metricType)
+			}
+			writter.WriteHeader(http.StatusOK)
+			writter.Write([]byte(`"OK"`))
+		}
+	}
 	mux.HandleFunc(
 		"/datapoint",
 		datapointHandler)
 	mux.HandleFunc(
 		"/v1/datapoint",
 		datapointHandler)
+	mux.HandleFunc(
+		"/v1/metric",
+		metricHandler)
 	server := http.Server{
 		Handler:      mux,
 		Addr:         listenAddr,
@@ -167,6 +202,8 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 	}
 	listenServer := listenerServer{
 		listener: listener,
+		metricCreationsMap: metricCreationsMap,
+		metricCreationsMapMutex: metricCreationsMapMutex,
 	}
 	go server.Serve(listener)
 	return &listenServer, err

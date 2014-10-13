@@ -6,6 +6,23 @@ import (
 	"github.com/signalfuse/signalfxproxy/core/value"
 )
 
+type SignalfxJsonDatapointV1 struct {
+	Source string  `json:"source"`
+	Metric string  `json:"metric"`
+	Value  float64 `json:"value"`
+}
+
+type SignalfxMetricCreationStruct struct {
+	MetricName string `json:"sf_metric"`
+	MetricType string `json:"sf_metricType"`
+}
+
+type SignalfxMetricCreationResponse struct {
+	Code    int    `json:"code"`
+	Error   bool   `json:"error"`
+	Message string `json:"message"`
+}
+
 // NewProtobufDataPoint creates a new datapoint from SignalFx's protobuf definition
 func NewProtobufDataPoint(datapoint com_signalfuse_metrics_protobuf.DataPoint) core.Datapoint {
 	return core.NewRelativeTimeDatapoint(datapoint.GetMetric(),
