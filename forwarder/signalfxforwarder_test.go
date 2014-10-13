@@ -31,6 +31,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	forwarder, err := SignalfxJSONForwarderLoader(&forwardTo)
 	a.ExpectEquals(t, nil, err, "Expect no error")
 	a.ExpectEquals(t, "signalfx-forwarder", forwarder.Name(), "Expect no error")
+	a.ExpectEquals(t, 0, len(forwarder.GetStats()), "Expect no stats")
 	timeToSend := time.Now().Round(time.Second)
 	dpSent := core.NewAbsoluteTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
 	forwarder.DatapointsChannel() <- dpSent

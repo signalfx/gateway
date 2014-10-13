@@ -254,6 +254,7 @@ func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datap
 			Timestamp: &ts,
 			Value:     datumForPoint(point.Value()),
 		}
+		glog.V(3).Infof("Single datapoint to signalfx: %s", v)
 		encodedBytes, err := proto.Marshal(v)
 		if err != nil {
 			return nil, "", err

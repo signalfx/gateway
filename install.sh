@@ -2,4 +2,4 @@
 mkdir -p /opt/sfproxy
 cd /opt/sfproxy
 yum install -y golang
-env GOPATH=`pwd` go get github.com/signalfuse/signalfxproxy
+env GOPATH=`pwd` go get -u github.com/signalfuse/signalfxproxy
