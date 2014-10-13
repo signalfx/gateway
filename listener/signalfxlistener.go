@@ -201,8 +201,15 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 				metricCreationsMap[m.MetricName] = com_signalfuse_metrics_protobuf.MetricType(metricType)
 				ret = append(ret, protocoltypes.SignalfxMetricCreationResponse{Code: 200})
 			}
+			toWrite, err := json.Marshal(ret)
+			if err != nil {
+				glog.Warningf("Unable to marshal json: %s", err)
+				writter.WriteHeader(http.StatusBadRequest)
+				writter.Write([]byte(`{msg:"Unable to marshal json!"}`))
+				return
+			}
 			writter.WriteHeader(http.StatusOK)
-			writter.Write([]byte(`"OK"`))
+			writter.Write([]byte(toWrite))
 		}
 	}
 	mux.HandleFunc(
