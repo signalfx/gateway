@@ -15,8 +15,6 @@ RUN mkdir -p /opt/sfproxy
 RUN cd /opt/sfproxy && env GOPATH=`pwd` go get -u github.com/signalfuse/signalfxproxy
 
 # Add run command
-ADD run.py /opt/docker/.docker/
-ADD dockercommonpy /opt/docker/.docker/dockercommon.py
 VOLUME /var/log/sfproxy
 VOLUME /var/config/sfproxy
 USER root
