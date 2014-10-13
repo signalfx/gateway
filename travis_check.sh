@@ -1,4 +1,5 @@
 #!/bin/bash
+set -x
 rm -f /tmp/a || exit 1
 ./format_all.sh > /tmp/a
 [[ ! -s /tmp/a ]] || cat /tmp/a
