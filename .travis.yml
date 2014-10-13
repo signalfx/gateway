@@ -15,4 +15,3 @@ install:
 
 script:
   - ./travis_check.sh
-  - go test -v ./...
