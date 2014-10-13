@@ -65,8 +65,9 @@ func main() {
 	}
 
 	glog.Infof("Setup done.  Blocking!\n")
+	stopChannel := make(chan bool, 2)
 	if loadedConfig.StatsDelayDuration != nil {
-		//		go core.DrainStatsThread(*loadedConfig.StatsDelayDuration, allForwarders, allStatKeepers)
+		go core.DrainStatsThread(*loadedConfig.StatsDelayDuration, allForwarders, allStatKeepers, stopChannel)
 	}
 
 	// TODO: Replace with something more graceful that allows us to shutdown?
