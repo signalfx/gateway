@@ -310,12 +310,12 @@ func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) err
 		return err
 	}
 	req, _ := http.NewRequest("POST", connector.url, bytes.NewBuffer(jsonBytes))
-	glog.V(3).Infof("Request: %s from %s", req, string(jsonBytes))
 	req.Header.Set("Content-Type", bodyType)
 	req.Header.Set("X-SF-TOKEN", connector.defaultAuthToken)
 	req.Header.Set("User-Agent", connector.userAgent)
 
 	req.Header.Set("Connection", "Keep-Alive")
+	glog.V(3).Infof("Request: %s from %s", req, string(jsonBytes))
 	resp, err := connector.client.Do(req)
 
 	if err != nil {
@@ -323,6 +323,7 @@ func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) err
 		return err
 	}
 
+	glog.V(3).Infof("Response: %s", resp)
 	defer resp.Body.Close()
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
