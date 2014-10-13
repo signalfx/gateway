@@ -1,11 +1,11 @@
 package forwarder
 
 import (
-	"testing"
-	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/cep21/gohelpers/a"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
+	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
+	"testing"
 	"time"
 )
 
@@ -35,4 +35,3 @@ func TestNewStreamingDatapointDemultiplexer(t *testing.T) {
 	a.ExpectEquals(t, value.NewIntWire(2), m.GetStats()[1].Value(), "Expect one dropped point")
 	a.ExpectEquals(t, 2, len(m.GetStats()), "Expect two stats")
 }
-
