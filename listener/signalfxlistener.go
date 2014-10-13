@@ -17,15 +17,14 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"time"
 	"sync"
+	"time"
 )
 
 type listenerServer struct {
-	listener net.Listener
-	metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType
+	listener                net.Listener
+	metricCreationsMap      map[string]com_signalfuse_metrics_protobuf.MetricType
 	metricCreationsMapMutex *sync.Mutex
-
 }
 
 func (streamer *listenerServer) GetStats() []core.Datapoint {
@@ -41,7 +40,7 @@ func jsonDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI, metri
 	return func(req *http.Request) error {
 		dec := json.NewDecoder(req.Body)
 		for {
-			var d protocoltypes.SignalfxJsonDatapointV1
+			var d protocoltypes.SignalfxJSONDatapointV1
 			if err := dec.Decode(&d); err == io.EOF {
 				break
 			} else if err != nil {
@@ -52,15 +51,14 @@ func jsonDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI, metri
 					glog.Warningf("Invalid datapoint %s", d)
 					continue
 				}
-				mt := func() (com_signalfuse_metrics_protobuf.MetricType) {
+				mt := func() com_signalfuse_metrics_protobuf.MetricType {
 					metricCreationsMapMutex.Lock()
 					defer metricCreationsMapMutex.Unlock()
 					mt, ok := metricCreationsMap[d.Metric]
 					if !ok {
 						return com_signalfuse_metrics_protobuf.MetricType_GAUGE
-					} else {
-						return mt
 					}
+					return mt
 
 				}()
 				DatapointStreamingAPI.DatapointsChannel() <- core.NewRelativeTimeDatapoint(d.Metric, map[string]string{"sf_source": d.Source}, value.NewFloatWire(d.Value), mt, 0)
@@ -120,20 +118,18 @@ func protobufDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI, m
 			if err != nil {
 				return err
 			}
-			dp := func() (core.Datapoint) {
+			dp := func() core.Datapoint {
 				metricCreationsMapMutex.Lock()
 				defer metricCreationsMapMutex.Unlock()
 				mt, ok := metricCreationsMap[msg.GetMetric()]
 				if !ok {
 					return protocoltypes.NewProtobufDataPoint(msg)
-				} else {
-					return protocoltypes.NewProtobufDataPointWithType(msg, mt)
 				}
+				return protocoltypes.NewProtobufDataPointWithType(msg, mt)
 
 			}()
 			DatapointStreamingAPI.DatapointsChannel() <- dp
 		}
-		return nil
 	}
 }
 
@@ -235,8 +231,8 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 		return nil, err
 	}
 	listenServer := listenerServer{
-		listener: listener,
-		metricCreationsMap: metricCreationsMap,
+		listener:                listener,
+		metricCreationsMap:      metricCreationsMap,
 		metricCreationsMapMutex: metricCreationsMapMutex,
 	}
 	go server.Serve(listener)

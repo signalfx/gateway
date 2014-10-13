@@ -12,8 +12,8 @@ import (
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
-	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"github.com/signalfuse/signalfxproxy/core/value"
+	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"io/ioutil"
 	"net/http"
 	"runtime"
@@ -148,7 +148,6 @@ func datumForPoint(pv value.DatapointValue) *com_signalfuse_metrics_protobuf.Dat
 	return &com_signalfuse_metrics_protobuf.Datum{StrValue: &s}
 }
 
-
 func (connector *signalfxJSONConnector) metricCreationLoop() {
 	for {
 		glog.V(3).Infof("Waiting for creation request")
@@ -165,7 +164,7 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 	}
 	postBody := []protocoltypes.SignalfxMetricCreationStruct{}
 	for metricName, metricType := range metricsToCreate {
-		postBody = append(postBody, protocoltypes.SignalfxMetricCreationStruct {
+		postBody = append(postBody, protocoltypes.SignalfxMetricCreationStruct{
 			MetricName: metricName,
 			MetricType: metricType.String(),
 		})
