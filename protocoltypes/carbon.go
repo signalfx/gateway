@@ -47,7 +47,7 @@ func NewCarbonDatapoint(line string) (CarbonReadyDatapoint, error) {
 			core.NewAbsoluteTimeDatapoint(
 				metricName, map[string]string{}, value.NewIntWire(metricValueInt),
 				com_signalfuse_metrics_protobuf.MetricType_GAUGE,
-				time.Unix(0, metricTime*int64(time.Millisecond))),
+				time.Unix(0, metricTime*int64(time.Second))),
 			line,
 		}, nil
 	}
@@ -59,7 +59,7 @@ func NewCarbonDatapoint(line string) (CarbonReadyDatapoint, error) {
 		core.NewAbsoluteTimeDatapoint(
 			metricName, map[string]string{}, value.NewFloatWire(metricValueFloat),
 			com_signalfuse_metrics_protobuf.MetricType_GAUGE,
-			time.Unix(0, metricTime*int64(time.Millisecond))),
+			time.Unix(0, metricTime*int64(time.Second))),
 		line,
 	}, nil
 }
