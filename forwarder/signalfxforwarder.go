@@ -177,12 +177,12 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 	glog.V(3).Infof("Posting %s from %s", jsonBytes, postBody)
 
 	req, _ := http.NewRequest("POST", connector.MetricCreationURL, bytes.NewBuffer(jsonBytes))
-	glog.V(3).Infof("Request is %s", req)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-SF-TOKEN", connector.defaultAuthToken)
 	req.Header.Set("User-Agent", connector.userAgent)
 
 	req.Header.Set("Connection", "Keep-Alive")
+	glog.V(3).Infof("Request is %s", req)
 	resp, err := connector.client.Do(req)
 
 	if err != nil {
@@ -231,8 +231,6 @@ func (connector *signalfxJSONConnector) figureOutReasonableSource(point core.Dat
 func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datapoint) ([]byte, string, error) {
 	var msgBody []byte
 	metricsToBeCreated := make(map[string]com_signalfuse_metrics_protobuf.MetricType)
-	connector.v1MetricLoadedCacheMutex.Lock()
-	defer connector.v1MetricLoadedCacheMutex.Unlock()
 	for _, point := range datapoints {
 		thisPointSource := connector.figureOutReasonableSource(point)
 		if thisPointSource == "" {
@@ -240,7 +238,13 @@ func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datap
 			continue
 		}
 		if point.MetricType() != com_signalfuse_metrics_protobuf.MetricType_GAUGE {
-			_, preCreated := connector.v1MetricLoadedCache[point.Metric()]
+			preCreated := func() (bool) {
+				connector.v1MetricLoadedCacheMutex.Lock()
+				defer connector.v1MetricLoadedCacheMutex.Unlock()
+				_, ok := connector.v1MetricLoadedCache[point.Metric()]
+				return ok
+			}()
+
 			if !preCreated {
 				metricsToBeCreated[point.Metric()] = point.MetricType()
 			}
