@@ -11,16 +11,21 @@ Install
 =======
 
 ```
-   cd /opt/proxy
-   yum install -y golang
-   env GOPATH=`pwd` go get github.com/signalfuse/signalfxproxy
+  ./install.sh
  ```
 
 Running
 =======
 
 ```
-   /opt/proxy/bin/signalfxproxy --configfile /tmp/sfdbproxy.conf
+   ./start.sh -logtostderr
+ ```
+ 
+Running as daemon
+=================
+
+```
+   nohup ./start.sh &
  ```
 
 Debug logging
@@ -29,6 +34,14 @@ Debug logging
 ```
    /opt/proxy/bin/signalfxproxy --configfile /tmp/sfdbproxy.conf -v=3
  ```
+ 
+Debugging
+=============
+
+```
+  cd /var/log/sfproxy
+  tail -F *
+```
 
 Configuration
 =============
