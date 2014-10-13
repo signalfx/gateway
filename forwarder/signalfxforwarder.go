@@ -87,7 +87,7 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint3
 		MaxIdleConnsPerHost: int(drainingThreads) * 2,
 	}
 	ret := &signalfxJSONConnector{
-		basicBufferedForwarder: NewBasicBufferedForwarder(bufferSize, maxDrainSize, name, drainingThreads),
+		basicBufferedForwarder: newBasicBufferedForwarder(bufferSize, maxDrainSize, name, drainingThreads),
 		url:              url,
 		defaultAuthToken: defaultAuthToken,
 		sendVersion:      1,

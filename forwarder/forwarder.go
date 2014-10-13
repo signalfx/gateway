@@ -24,9 +24,9 @@ type basicBufferedForwarder struct {
 	blockingDrainStopChan chan bool
 }
 
-// ForwarderLoader is the function definition of a function that can load a config
+// Loader is the function definition of a function that can load a config
 // for a proxy and return the streamer
-type ForwarderLoader func(*config.ForwardTo) (core.StatKeepingStreamingAPI, error)
+type Loader func(*config.ForwardTo) (core.StatKeepingStreamingAPI, error)
 
 func (forwarder *basicBufferedForwarder) DatapointsChannel() chan<- core.Datapoint {
 	return forwarder.datapointsChannel
@@ -97,9 +97,9 @@ func (forwarder *basicBufferedForwarder) Name() string {
 	return forwarder.name
 }
 
-// NewBasicBufferedForwarder is used only by this package to create a forwarder that buffers its
+// newBasicBufferedForwarder is used only by this package to create a forwarder that buffers its
 // datapoint channel
-func NewBasicBufferedForwarder(bufferSize uint32, maxDrainSize uint32, name string, numDrainingThreads uint32) *basicBufferedForwarder {
+func newBasicBufferedForwarder(bufferSize uint32, maxDrainSize uint32, name string, numDrainingThreads uint32) *basicBufferedForwarder {
 	return &basicBufferedForwarder{
 		datapointsChannel:     make(chan core.Datapoint, bufferSize),
 		maxDrainSize:          maxDrainSize,
@@ -112,7 +112,7 @@ func NewBasicBufferedForwarder(bufferSize uint32, maxDrainSize uint32, name stri
 }
 
 // AllForwarderLoaders is a map of config names to loaders for that config
-var AllForwarderLoaders = map[string]ForwarderLoader{
+var AllForwarderLoaders = map[string]Loader{
 	"signalfx-json": SignalfxJSONForwarderLoader,
 	"carbon":        TcpGraphiteCarbonForwarerLoader,
 	"csv":           CsvForwarderLoader,

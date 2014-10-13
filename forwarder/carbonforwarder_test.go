@@ -54,7 +54,7 @@ func (dp *carbonDatapoint) ToCarbonLine() string {
 func TestCreation(t *testing.T) {
 	listenFrom := config.ListenFrom{}
 	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12345")
-	forwardTo := NewBasicBufferedForwarder(100, 1, "", 1)
+	forwardTo := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
 	a.ExpectEquals(t, nil, err, "Expect no error")
@@ -76,7 +76,7 @@ func TestDeadlineError(t *testing.T) {
 	listenFrom := config.ListenFrom{}
 	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12345")
 
-	forwardTo := NewBasicBufferedForwarder(100, 1, "", 1)
+	forwardTo := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
 	carbonForwarder, err := newTcpGraphiteCarbonForwarer("0.0.0.0", 12345, time.Second, 10)
@@ -98,7 +98,7 @@ func TestWriteError(t *testing.T) {
 	listenFrom := config.ListenFrom{}
 	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12345")
 
-	forwardTo := NewBasicBufferedForwarder(100, 1, "", 1)
+	forwardTo := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
 	forwarder, err := newTcpGraphiteCarbonForwarer("0.0.0.0", 12345, time.Second, 10)
@@ -119,7 +119,7 @@ func TestWriteError(t *testing.T) {
 func TestCarbonWrite(t *testing.T) {
 	listenFrom := config.ListenFrom{}
 	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12345")
-	forwardTo := NewBasicBufferedForwarder(100, 1, "", 1)
+	forwardTo := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
 	a.ExpectEquals(t, nil, err, "Expect no error")
@@ -142,7 +142,7 @@ func TestCarbonWrite(t *testing.T) {
 func TestFailedConn(t *testing.T) {
 	listenFrom := config.ListenFrom{}
 	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12345")
-	forwardTo := NewBasicBufferedForwarder(100, 1, "", 1)
+	forwardTo := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
 	a.ExpectEquals(t, nil, err, "Expect no error")

@@ -11,7 +11,7 @@ import (
 
 func TestBasicBufferedForwarder(t *testing.T) {
 	upto := uint32(10)
-	f := NewBasicBufferedForwarder(100, upto, "aname", 1)
+	f := newBasicBufferedForwarder(100, upto, "aname", 1)
 	a.ExpectEquals(t, "aname", f.Name(), "Mismatched name")
 	for i := uint32(0); i < upto+uint32(1); i++ {
 		f.DatapointsChannel() <- nil
@@ -23,7 +23,7 @@ func TestBasicBufferedForwarder(t *testing.T) {
 }
 
 func TestStopForwarder(t *testing.T) {
-	f := NewBasicBufferedForwarder(100, uint32(10), "aname", 1)
+	f := newBasicBufferedForwarder(100, uint32(10), "aname", 1)
 	f.DatapointsChannel() <- nil
 	f.DatapointsChannel() <- nil
 	glog.Info("Hello")

@@ -1,4 +1,4 @@
-package signalfxproxy
+package gangliaxdr
 
 import (
 	"errors"
@@ -93,15 +93,15 @@ func CreateValue(format string, buf []byte, metadata *gangliaMetadata) (dp Datap
 	return
 }
 
-// CreateInput parses the raw ganglia byte to find out when we need to create a ganglia point
-func CreateInput(buf []byte, givenMetadata *gangliaMetadata) (input *GangliaInput, metadata *gangliaMetadata, err error) {
+// createInput parses the raw ganglia byte to find out when we need to create a ganglia point
+func createInput(buf []byte, givenMetadata *gangliaMetadata) (input *GangliaInput, metadata *gangliaMetadata, err error) {
 	var version int32
 	if buf, err = xdr.Unmarshal(buf, &version); err != nil {
 		return
 	}
 	if version == 128 {
 		var gmetadata gangliaMetadata
-		gmetadata, err = ReadGangliaMetadata(buf)
+		gmetadata, err = readGangliaMetadata(buf)
 		metadata = &gmetadata
 		return
 	}
@@ -133,8 +133,8 @@ func CreateInput(buf []byte, givenMetadata *gangliaMetadata) (input *GangliaInpu
 	return
 }
 
-// ReadGangliaMetadata reads a metadata request from the current ganglia input stream
-func ReadGangliaMetadata(buf []byte) (gmeta gangliaMetadata, err error) {
+// readGangliaMetadata reads a metadata request from the current ganglia input stream
+func readGangliaMetadata(buf []byte) (gmeta gangliaMetadata, err error) {
 	gmeta.Version = 128
 	if buf, err = xdr.Unmarshal(buf, &gmeta.Hostname); err != nil {
 		return
@@ -208,7 +208,7 @@ func SocketListen(sock *net.UDPConn, f HandlerFunc, bufferSize int) {
 		if rlen, _, err = sock.ReadFromUDP(buf); err != nil {
 			return
 		}
-		input, meta, err = CreateInput(buf[:rlen], meta)
+		input, meta, err = createInput(buf[:rlen], meta)
 		if reset {
 			// Do we keep metadata?  Not sure
 			meta = nil

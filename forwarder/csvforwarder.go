@@ -60,7 +60,7 @@ var osXXXRemove = os.Remove
 // NewCsvForwarder creates a new CSV forwarder
 func NewCsvForwarder(bufferSize uint32, name string, filename string, maxDrainSize uint32) (core.StatKeepingStreamingAPI, error) {
 	ret := &filenameForwarder{
-		basicBufferedForwarder: NewBasicBufferedForwarder(bufferSize, maxDrainSize, name, uint32(1)),
+		basicBufferedForwarder: newBasicBufferedForwarder(bufferSize, maxDrainSize, name, uint32(1)),
 		filename:               filename,
 	}
 	err := osXXXRemove(filename)

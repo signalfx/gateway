@@ -11,11 +11,11 @@ type DatapointListener interface {
 	Close()
 }
 
-// A ListenerLoader loads a DatapointListener from a configuration definition
-type ListenerLoader func(core.DatapointStreamingAPI, *config.ListenFrom) (DatapointListener, error)
+// A Loader loads a DatapointListener from a configuration definition
+type Loader func(core.DatapointStreamingAPI, *config.ListenFrom) (DatapointListener, error)
 
 // AllListenerLoaders is a map of all loaders from config, for each listener we support
-var AllListenerLoaders = map[string]ListenerLoader{
+var AllListenerLoaders = map[string]Loader{
 	"signalfx": SignalFxListenerLoader,
 	"carbon":   CarbonListenerLoader,
 }

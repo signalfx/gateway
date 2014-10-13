@@ -31,7 +31,7 @@ func newTcpGraphiteCarbonForwarer(host string, port uint16, timeout time.Duratio
 		return nil, err
 	}
 	ret := &reconectingGraphiteCarbonConnection{
-		basicBufferedForwarder: NewBasicBufferedForwarder(bufferSize, 100, "", 1),
+		basicBufferedForwarder: newBasicBufferedForwarder(bufferSize, 100, "", 1),
 		openConnection:         conn,
 		connectionTimeout:      timeout,
 		connectionAddress:      connectionAddress}
