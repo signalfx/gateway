@@ -1,22 +1,22 @@
 package forwarder
 
 import (
-	"testing"
-	"github.com/cep21/gohelpers/a"
-	"github.com/signalfuse/signalfxproxy/core"
-	"time"
 	"errors"
+	"github.com/cep21/gohelpers/a"
 	"github.com/golang/glog"
+	"github.com/signalfuse/signalfxproxy/core"
+	"testing"
+	"time"
 )
 
 func TestBasicBufferedForwarder(t *testing.T) {
 	upto := uint32(10)
 	f := NewBasicBufferedForwarder(100, upto, "aname", 1)
 	a.ExpectEquals(t, "aname", f.Name(), "Mismatched name")
-	for i := uint32(0); i < upto + uint32(1) ; i++ {
+	for i := uint32(0); i < upto+uint32(1); i++ {
 		f.DatapointsChannel() <- nil
 	}
-	points  := f.blockingDrainUpTo()
+	points := f.blockingDrainUpTo()
 	a.ExpectEquals(t, upto, uint32(len(points)), "Expect a full set")
 	points = f.blockingDrainUpTo()
 	a.ExpectEquals(t, 1, len(points), "Expect one point")
@@ -29,7 +29,7 @@ func TestStopForwarder(t *testing.T) {
 	glog.Info("Hello")
 	seenPoints := 0
 	// nil should make it stop itself
-	f.start(func(dp []core.Datapoint) (error) {
+	f.start(func(dp []core.Datapoint) error {
 		seenPoints += len(dp)
 		return errors.New("unable to process")
 	})

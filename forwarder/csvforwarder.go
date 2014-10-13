@@ -6,8 +6,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
-	"os"
 	"io/ioutil"
+	"os"
 )
 
 var csvDefaultConfig = &config.ForwardTo{
@@ -47,7 +47,7 @@ func (connector *filenameForwarder) process(datapoints []core.Datapoint) error {
 	defer file.Sync()
 	defer file.Close()
 	for _, dp := range datapoints {
-		_, err := fileXXXWriteString(file, dp.String() + "\n")
+		_, err := fileXXXWriteString(file, dp.String()+"\n")
 		if err != nil {
 			return err
 		}

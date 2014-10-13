@@ -11,8 +11,8 @@ import (
 	"io"
 	"net"
 	"strings"
-	"time"
 	"sync/atomic"
+	"time"
 )
 
 type carbonListener struct {

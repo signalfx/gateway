@@ -1,32 +1,32 @@
 package forwarder
 
 import (
-	"testing"
-	"github.com/cep21/gohelpers/a"
-	"github.com/signalfuse/signalfxproxy/listener"
-	"github.com/signalfuse/signalfxproxy/config"
-	"time"
-	"github.com/cep21/gohelpers/workarounds"
-	"github.com/signalfuse/signalfxproxy/core"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
-	"github.com/signalfuse/signalfxproxy/core/value"
 	"errors"
+	"github.com/cep21/gohelpers/a"
+	"github.com/cep21/gohelpers/workarounds"
 	"github.com/golang/glog"
+	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
+	"github.com/signalfuse/signalfxproxy/config"
+	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/core/value"
+	"github.com/signalfuse/signalfxproxy/listener"
+	"testing"
+	"time"
 )
 
 type mockConn struct {
 	a.Conn
 	deadlineReturn error
-	writeReturn error
+	writeReturn    error
 }
 
-func (conn* mockConn) SetDeadline(t time.Time) error {
+func (conn *mockConn) SetDeadline(t time.Time) error {
 	r := conn.deadlineReturn
 	conn.deadlineReturn = nil
 	return r
 }
 
-func (conn* mockConn) Write(bytes []byte) (int, error) {
+func (conn *mockConn) Write(bytes []byte) (int, error) {
 	r := conn.writeReturn
 	conn.writeReturn = nil
 	return len(bytes), r
@@ -34,7 +34,7 @@ func (conn* mockConn) Write(bytes []byte) (int, error) {
 
 func TestInvalidPort(t *testing.T) {
 
-	ft := config.ForwardTo {
+	ft := config.ForwardTo{
 		Host: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0"),
 		Port: workarounds.GolangDoesnotAllowPointerToUint16Literal(1),
 	}

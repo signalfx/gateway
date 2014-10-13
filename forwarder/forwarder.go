@@ -1,12 +1,12 @@
 package forwarder
 
 import (
+	"errors"
 	"github.com/golang/glog"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
-	"sync/atomic"
 	"sync"
-	"errors"
+	"sync/atomic"
 )
 
 // ProcessingFunction is a function that can process datapoints for the basic buffered forwarder
@@ -28,11 +28,11 @@ type basicBufferedForwarder struct {
 // for a proxy and return the streamer
 type ForwarderLoader func(*config.ForwardTo) (core.StatKeepingStreamingAPI, error)
 
-func (forwarder *basicBufferedForwarder) DatapointsChannel() (chan<- core.Datapoint) {
+func (forwarder *basicBufferedForwarder) DatapointsChannel() chan<- core.Datapoint {
 	return forwarder.datapointsChannel
 }
 
-func (forwarder *basicBufferedForwarder) blockingDrainUpTo() ([]core.Datapoint) {
+func (forwarder *basicBufferedForwarder) blockingDrainUpTo() []core.Datapoint {
 	// Block for at least one point
 	datapoints := []core.Datapoint{}
 
@@ -40,7 +40,7 @@ func (forwarder *basicBufferedForwarder) blockingDrainUpTo() ([]core.Datapoint) 
 	case datapoint := <-forwarder.datapointsChannel:
 		datapoints = append(datapoints, datapoint)
 		break
-	case _ = <- forwarder.blockingDrainStopChan:
+	case _ = <-forwarder.blockingDrainStopChan:
 		forwarder.blockingDrainStopChan <- true
 		return datapoints
 	}
@@ -101,13 +101,13 @@ func (forwarder *basicBufferedForwarder) Name() string {
 // datapoint channel
 func NewBasicBufferedForwarder(bufferSize uint32, maxDrainSize uint32, name string, numDrainingThreads uint32) *basicBufferedForwarder {
 	return &basicBufferedForwarder{
-		datapointsChannel:  make(chan core.Datapoint, bufferSize),
-		maxDrainSize:       maxDrainSize,
-		bufferSize:         bufferSize,
-		name:               name,
-		numDrainingThreads: numDrainingThreads,
-		started:            false,
-		blockingDrainStopChan : make(chan bool, 2),
+		datapointsChannel:     make(chan core.Datapoint, bufferSize),
+		maxDrainSize:          maxDrainSize,
+		bufferSize:            bufferSize,
+		name:                  name,
+		numDrainingThreads:    numDrainingThreads,
+		started:               false,
+		blockingDrainStopChan: make(chan bool, 2),
 	}
 }
 
