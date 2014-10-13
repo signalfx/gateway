@@ -11,21 +11,24 @@ Install
 =======
 
 ```
-  ./install.sh
+  mkdir -p /opt/sfproxy
+  cd /opt/sfproxy
+  yum install -y golang
+  env GOPATH=`pwd` go get github.com/signalfuse/signalfxproxy
  ```
 
 Running
 =======
 
 ```
-   ./start.sh -logtostderr
+   ./src/github.com/signalfuse/signalfxproxy/start.sh -logtostderr
  ```
  
 Running as daemon
 =================
 
 ```
-   nohup ./start.sh &
+   nohup ./src/github.com/signalfuse/signalfxproxy/start.sh &
  ```
 
 Debug logging
