@@ -238,7 +238,7 @@ func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datap
 			continue
 		}
 		if point.MetricType() != com_signalfuse_metrics_protobuf.MetricType_GAUGE {
-			preCreated := func() (bool) {
+			preCreated := func() bool {
 				connector.v1MetricLoadedCacheMutex.Lock()
 				defer connector.v1MetricLoadedCacheMutex.Unlock()
 				_, ok := connector.v1MetricLoadedCache[point.Metric()]

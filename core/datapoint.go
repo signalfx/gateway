@@ -23,6 +23,8 @@ type Datapoint interface {
 	String() string
 }
 
+// TimeRelativeDatapoint is a datapoint that supports the optional ability to get the timestamp
+// as a time relative to the current time, in Ms
 type TimeRelativeDatapoint interface {
 	Datapoint
 	RelativeTime() int64
