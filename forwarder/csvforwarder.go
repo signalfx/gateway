@@ -7,14 +7,15 @@ import (
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"os"
+	"io/ioutil"
 )
 
 var csvDefaultConfig = &config.ForwardTo{
-	Filename:        workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfuse.com/v1/datapoint"),
-	BufferSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(10000)),
+	Filename:        workarounds.GolangDoesnotAllowPointerToStringLiteral("datapoints.csv"),
 	DrainingThreads: workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1)),
 	Name:            workarounds.GolangDoesnotAllowPointerToStringLiteral("filename-drainer"),
 	MaxDrainSize:    workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(100)),
+	BufferSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(100)),
 }
 
 // CsvForwarderLoader loads a CSV forwarder forwarding points from proxy to a file
@@ -34,6 +35,10 @@ func (connector *filenameForwarder) GetStats() []core.Datapoint {
 	return ret
 }
 
+var fileXXXWriteString = func(f *os.File, str string) (int, error) {
+	return f.WriteString(str)
+}
+
 func (connector *filenameForwarder) process(datapoints []core.Datapoint) error {
 	file, err := os.OpenFile(connector.filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.FileMode(0666))
 	if err != nil {
@@ -42,7 +47,7 @@ func (connector *filenameForwarder) process(datapoints []core.Datapoint) error {
 	defer file.Sync()
 	defer file.Close()
 	for _, dp := range datapoints {
-		_, err := file.WriteString(dp.String() + "\n")
+		_, err := fileXXXWriteString(file, dp.String() + "\n")
 		if err != nil {
 			return err
 		}
@@ -50,13 +55,21 @@ func (connector *filenameForwarder) process(datapoints []core.Datapoint) error {
 	return nil
 }
 
+var osXXXRemove = os.Remove
+
 // NewCsvForwarder creates a new CSV forwarder
 func NewCsvForwarder(bufferSize uint32, name string, filename string, maxDrainSize uint32) (core.StatKeepingStreamingAPI, error) {
 	ret := &filenameForwarder{
 		basicBufferedForwarder: NewBasicBufferedForwarder(bufferSize, maxDrainSize, name, uint32(1)),
 		filename:               filename,
 	}
-	os.Remove(filename)
+	err := osXXXRemove(filename)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	if err := ioutil.WriteFile(filename, []byte{}, os.FileMode(0666)); err != nil {
+		return nil, err
+	}
 	ret.start(ret.process)
 	return ret, nil
 }

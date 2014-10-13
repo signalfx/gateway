@@ -5,6 +5,8 @@ import (
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"sync/atomic"
+	"sync"
+	"errors"
 )
 
 // ProcessingFunction is a function that can process datapoints for the basic buffered forwarder
@@ -18,7 +20,8 @@ type basicBufferedForwarder struct {
 	numDrainingThreads    uint32
 	started               bool
 	stopped               int32
-	blockingDrainStopChan chan (chan bool)
+	threadsWaitingToDie   sync.WaitGroup
+	blockingDrainStopChan chan bool
 }
 
 // ForwarderLoader is the function definition of a function that can load a config
@@ -29,16 +32,17 @@ func (forwarder *basicBufferedForwarder) DatapointsChannel() (chan<- core.Datapo
 	return forwarder.datapointsChannel
 }
 
-func (forwarder *basicBufferedForwarder) blockingDrainUpTo() ([]core.Datapoint, error) {
+func (forwarder *basicBufferedForwarder) blockingDrainUpTo() ([]core.Datapoint) {
 	// Block for at least one point
 	datapoints := []core.Datapoint{}
+
 	select {
 	case datapoint := <-forwarder.datapointsChannel:
 		datapoints = append(datapoints, datapoint)
 		break
-	case stopFlag := <-forwarder.blockingDrainStopChan:
-		stopFlag <- true
-		return datapoints, nil
+	case _ = <- forwarder.blockingDrainStopChan:
+		forwarder.blockingDrainStopChan <- true
+		return datapoints
 	}
 Loop:
 	for uint32(len(datapoints)) < forwarder.maxDrainSize {
@@ -54,39 +58,31 @@ Loop:
 			break Loop
 		}
 	}
-	return datapoints, nil
+	return datapoints
 }
 
 func (forwarder *basicBufferedForwarder) stop() {
 	// Set stop flag
 	atomic.StoreInt32(&forwarder.stopped, 1)
-	// Send a stop signal
-	myChan := make(chan bool, forwarder.numDrainingThreads)
-	for i := 0; i < int(forwarder.numDrainingThreads); i++ {
-		forwarder.blockingDrainStopChan <- myChan
+	select {
+	case forwarder.blockingDrainStopChan <- true:
+	default:
 	}
-
-	// Wait for stop to come in
-	for i := 0; i < int(forwarder.numDrainingThreads); i++ {
-		_ = <-myChan
-	}
+	forwarder.threadsWaitingToDie.Wait()
 }
 
-func (forwarder *basicBufferedForwarder) start(processor ProcessingFunction) {
+func (forwarder *basicBufferedForwarder) start(processor ProcessingFunction) error {
 	if forwarder.started {
-		glog.Fatalf("Forwarder already started!")
+		return errors.New("forwarder already started!")
 	}
-	// TODO: Add stop?
 	forwarder.started = true
 	for i := uint32(0); i < forwarder.numDrainingThreads; i++ {
 		go func() {
+			forwarder.threadsWaitingToDie.Add(1)
+			defer forwarder.threadsWaitingToDie.Done()
 			for atomic.LoadInt32(&forwarder.stopped) == 0 {
-				datapoints, err := forwarder.blockingDrainUpTo()
-				if err != nil {
-					glog.Warningf("Unable to drain any datapoints: %s", err)
-					continue
-				}
-				err = processor(datapoints)
+				datapoints := forwarder.blockingDrainUpTo()
+				err := processor(datapoints)
 				if err != nil {
 					glog.Warningf("Unable to process datapoints: %s", err)
 					continue
@@ -94,6 +90,7 @@ func (forwarder *basicBufferedForwarder) start(processor ProcessingFunction) {
 			}
 		}()
 	}
+	return nil
 }
 
 func (forwarder *basicBufferedForwarder) Name() string {
@@ -110,6 +107,7 @@ func NewBasicBufferedForwarder(bufferSize uint32, maxDrainSize uint32, name stri
 		name:               name,
 		numDrainingThreads: numDrainingThreads,
 		started:            false,
+		blockingDrainStopChan : make(chan bool, 2),
 	}
 }
 

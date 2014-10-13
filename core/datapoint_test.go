@@ -21,6 +21,7 @@ func TestRelativeDatapoint(t *testing.T) {
 
 	now := time.Now()
 	timeXXXXNow = func() time.Time { return now }
+	defer func(){timeXXXXNow = time.Now}()
 
 	a.ExpectEquals(t, now, dp.Timestamp(), "Expected now")
 

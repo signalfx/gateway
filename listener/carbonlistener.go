@@ -12,6 +12,7 @@ import (
 	"net"
 	"strings"
 	"time"
+	"sync/atomic"
 )
 
 type carbonListener struct {
@@ -19,11 +20,17 @@ type carbonListener struct {
 	psocket               net.Listener
 	DatapointStreamingAPI core.DatapointStreamingAPI
 	connectionTimeout     time.Duration
+	isClosed              int32
 }
 
 func (listener *carbonListener) GetStats() []core.Datapoint {
 	ret := []core.Datapoint{}
 	return ret
+}
+
+func (listener *carbonListener) Close() {
+	listener.psocket.Close()
+	atomic.StoreInt32(&listener.isClosed, 1)
 }
 
 func (listener *carbonListener) handleConnection(conn net.Conn) {
@@ -53,7 +60,7 @@ func (listener *carbonListener) handleConnection(conn net.Conn) {
 }
 
 func (listener *carbonListener) startListening() {
-	for {
+	for atomic.LoadInt32(&listener.isClosed) == 0 {
 		conn, err := listener.psocket.Accept()
 		if err != nil {
 			glog.Warningf("Unable to accept a socket connection: %s", err)
@@ -61,6 +68,7 @@ func (listener *carbonListener) startListening() {
 		}
 		go listener.handleConnection(conn)
 	}
+	glog.Infof("Carbon listener closed")
 }
 
 var defaultCarbonConfig = &config.ListenFrom{

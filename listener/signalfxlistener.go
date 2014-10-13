@@ -21,11 +21,16 @@ import (
 )
 
 type listenerServer struct {
+	listener net.Listener
 }
 
 func (streamer *listenerServer) GetStats() []core.Datapoint {
 	ret := []core.Datapoint{}
 	return ret
+}
+
+func (streamer *listenerServer) Close() {
+	streamer.listener.Close()
 }
 
 type jsonDatapointV1 struct {
@@ -96,7 +101,6 @@ func protobufDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI) f
 				return err
 			}
 			if int(num) != len(buf) {
-				fmt.Printf("%d %d\n", num, len(buf))
 				return errors.New("unable to fully read protobuf message")
 			}
 			var msg com_signalfuse_metrics_protobuf.DataPoint
@@ -161,7 +165,9 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 	if err != nil {
 		return nil, err
 	}
-	listenServer := listenerServer{}
+	listenServer := listenerServer{
+		listener: listener,
+	}
 	go server.Serve(listener)
 	return &listenServer, err
 }

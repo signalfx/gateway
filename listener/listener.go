@@ -8,6 +8,7 @@ import (
 // A DatapointListener is an object that listens for input datapoints
 type DatapointListener interface {
 	core.StatKeeper
+	Close()
 }
 
 // A ListenerLoader loads a DatapointListener from a configuration definition
