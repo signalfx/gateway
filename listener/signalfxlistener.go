@@ -190,6 +190,9 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 	mux.HandleFunc(
 		"/v1/metric",
 		metricHandler)
+	mux.HandleFunc(
+		"/metric",
+		metricHandler)
 	server := http.Server{
 		Handler:      mux,
 		Addr:         listenAddr,
