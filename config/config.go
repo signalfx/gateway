@@ -11,21 +11,20 @@ import (
 
 // ForwardTo configures where we forward datapoints to
 type ForwardTo struct {
-	URL                   *string
-	MetricRegistrationURL *string
-	Host                  *string
-	Port                  *uint16
-	Type                  string
-	TimeoutDuration       *time.Duration `json:"-"`
-	Timeout               *string
-	DefaultSource         *string
-	DefaultAuthToken      *string
-	BufferSize            *uint32
-	Name                  *string
-	DrainingThreads       *uint32
-	MetricCreationURL     *string
-	MaxDrainSize          *uint32
-	Filename              *string
+	URL               *string
+	Host              *string
+	Port              *uint16
+	Type              string
+	TimeoutDuration   *time.Duration `json:"-"`
+	Timeout           *string
+	DefaultSource     *string
+	DefaultAuthToken  *string
+	BufferSize        *uint32
+	Name              *string
+	DrainingThreads   *uint32
+	MetricCreationURL *string
+	MaxDrainSize      *uint32
+	Filename          *string
 }
 
 // ListenFrom configures where we forward datapoints to

@@ -28,6 +28,7 @@ func TestRelativeDatapoint(t *testing.T) {
 	dp = NewRelativeTimeDatapoint("metric", map[string]string{"host": "bob"},
 		value.NewIntWire(1), com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER, -1)
 	a.ExpectEquals(t, now.Add(-time.Millisecond), dp.Timestamp(), "Expected now one ms before")
+	a.ExpectEquals(t, int64(-1), dp.RelativeTime(), "Expected negative relative time")
 	dp = NewRelativeTimeDatapoint("metric", map[string]string{"host": "bob"},
 		value.NewIntWire(1), com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER, now.UnixNano()/int64(time.Millisecond))
 	a.ExpectContains(t, dp.String(), "bob", "Got string for dp")

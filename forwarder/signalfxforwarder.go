@@ -21,6 +21,11 @@ import (
 	"time"
 )
 
+var jsonXXXMarshal = json.Marshal
+var protoXXXMarshal = proto.Marshal
+var jsonXXXUnmarshal = json.Unmarshal
+var ioutilXXXReadAll = ioutil.ReadAll
+
 type metricCreationRequest struct {
 	toCreate        map[string]com_signalfuse_metrics_protobuf.MetricType
 	responseChannel chan (error)
@@ -128,7 +133,7 @@ func (connector *signalfxJSONConnector) encodePostBodyV2(datapoints []core.Datap
 		}
 		bodyToSend[dp.MetricType().String()] = append(bodyToSend[dp.MetricType().String()], bsf)
 	}
-	jsonBytes, err := json.Marshal(&bodyToSend)
+	jsonBytes, err := jsonXXXMarshal(&bodyToSend)
 	glog.V(3).Infof("Posting %s from %s", jsonBytes, bodyToSend)
 
 	// Now we can send datapoints
@@ -169,7 +174,7 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 			MetricType: metricType.String(),
 		})
 	}
-	jsonBytes, err := json.Marshal(&postBody)
+	jsonBytes, err := jsonXXXMarshal(&postBody)
 	if err != nil {
 		glog.Warningf("Unable to marshal body: %s", err)
 		return err
@@ -191,7 +196,7 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 	}
 
 	defer resp.Body.Close()
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := ioutilXXXReadAll(resp.Body)
 	if err != nil {
 		glog.Warningf("Unable to verify response body: %s", err)
 		return err
@@ -201,7 +206,7 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 		return fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
 	var metricCreationBody []protocoltypes.SignalfxMetricCreationResponse
-	err = json.Unmarshal(respBody, &metricCreationBody)
+	err = jsonXXXUnmarshal(respBody, &metricCreationBody)
 	if err != nil {
 		glog.Warningf("body=(%s), err=(%s)", respBody, err)
 		return err
@@ -262,7 +267,7 @@ func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datap
 			Value:     datumForPoint(point.Value()),
 		}
 		glog.V(3).Infof("Single datapoint to signalfx: %s", v)
-		encodedBytes, err := proto.Marshal(v)
+		encodedBytes, err := protoXXXMarshal(v)
 		if err != nil {
 			return nil, "", err
 		}
@@ -325,7 +330,7 @@ func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) err
 
 	glog.V(3).Infof("Response: %s", resp)
 	defer resp.Body.Close()
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := ioutilXXXReadAll(resp.Body)
 	if err != nil {
 		glog.Warningf("Unable to verify response body: %s", err)
 		return err
@@ -335,14 +340,14 @@ func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) err
 		return fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
 	var body string
-	err = json.Unmarshal(respBody, &body)
+	err = jsonXXXUnmarshal(respBody, &body)
 	if err != nil {
 		glog.Warningf("body=(%s), err=(%s)", respBody, err)
 		return err
 	}
 	if body != "OK" {
 		glog.Warningf("Response not OK: %s", body)
-		return err
+		return fmt.Errorf("Body decode error: %s", body)
 	}
 	return nil
 }
