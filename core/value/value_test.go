@@ -26,6 +26,15 @@ func TestFloatWire(t *testing.T) {
 	a.ExpectEquals(t, 3.0, f, "Expect 3")
 }
 
+func TestStrWire(t *testing.T) {
+	iv := NewStrWire("val")
+	a.ExpectEquals(t, iv.String(), "val", "Expect val")
+	_, err := iv.IntValue()
+	a.ExpectNotEquals(t, nil, err, "Expect no int")
+	_, err = iv.FloatValue()
+	a.ExpectNotEquals(t, nil, err, "Expect no float")
+}
+
 func TestDatumValue(t *testing.T) {
 	iv := NewDatumWire(&com_signalfuse_metrics_protobuf.Datum{DoubleValue: workarounds.GolangDoesnotAllowPointerToFloat64Literal(3.0)})
 	a.ExpectEquals(t, iv.String(), "doubleValue:3 ", "Expect 3")
