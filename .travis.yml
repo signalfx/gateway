@@ -8,12 +8,12 @@ go:
 
 install:
   - go get github.com/golang/lint/golint
-  - stat $GOPATH/bin/golint
   - go get code.google.com/p/go.tools/cmd/vet
   - go get github.com/stretchr/testify/mock
   - go get code.google.com/p/go.tools/cmd/cover
   - gem install mdl
-  - go get ./...
+  - go get -u ./...
 
 script:
+  - export PATH=$GOPATH/bin:$PATH
   - ./travis_check.sh
