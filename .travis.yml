@@ -8,7 +8,7 @@ go:
 
 install:
   - go get github.com/golang/lint/golint
-  - which golint
+  - stat $GOPATH/bin/golint
   - go get code.google.com/p/go.tools/cmd/vet
   - go get github.com/stretchr/testify/mock
   - go get code.google.com/p/go.tools/cmd/cover
@@ -16,5 +16,4 @@ install:
   - go get ./...
 
 script:
-  - which golint
   - ./travis_check.sh
