@@ -16,4 +16,8 @@ install:
 
 script:
   - export PATH=$HOME/gopath/bin:$PATH
+  - cd forwarder
+  - go test -cover -coverprofile=/tmp/a -covermode=atomic -v ./...
+  - cat /tmp/a
+  - cd -
   - ./travis_check.sh
