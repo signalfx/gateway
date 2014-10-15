@@ -35,7 +35,7 @@ func init() {
 	proxyCommandLineConfiguration.stopChannel = make(chan bool)
 }
 
-func (proxyCommandLineConfiguration*proxyCommandLineConfigurationT) main() {
+func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() {
 	writePidFile(proxyCommandLineConfiguration.pidFileName)
 	glog.Infof("Looking for config file %s\n", proxyCommandLineConfiguration.configFileName)
 

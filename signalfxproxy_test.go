@@ -1,12 +1,11 @@
 package main
 
 import (
-	"testing"
+	"github.com/cep21/gohelpers/a"
 	"io/ioutil"
 	"os"
-	"github.com/cep21/gohelpers/a"
+	"testing"
 )
-
 
 func TestProxyPidWrite(t *testing.T) {
 	a.ExpectEquals(t, nil, writePidFile("/tmp/pidfile"), "Expect no error writing PID")
@@ -21,7 +20,7 @@ func TestProxyInvalidConfig(t *testing.T) {
 	ioutil.WriteFile(filename, []byte{}, os.FileMode(0666))
 	proxyCommandLineConfiguration = proxyCommandLineConfigurationT{
 		configFileName: filename,
-		stopChannel: make(chan bool),
+		stopChannel:    make(chan bool),
 	}
 	go func() {
 		proxyCommandLineConfiguration.stopChannel <- true
@@ -42,10 +41,10 @@ func TestProxyEmptyConfig(t *testing.T) {
 func TestProxyOkLoading(t *testing.T) {
 	filename := "/tmp/config.db.1"
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"csv", "Filename":"/tmp/acsvfile"}], "ListenFrom":[{"Type":"carbon", "Port":"11616"}]}`), os.FileMode(0666))
-//	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"csv", "Filename":"/tmp/acsvfile"}]}`), os.FileMode(0666))
+	//	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"csv", "Filename":"/tmp/acsvfile"}]}`), os.FileMode(0666))
 	proxyCommandLineConfiguration = proxyCommandLineConfigurationT{
 		configFileName: filename,
-		stopChannel: make(chan bool),
+		stopChannel:    make(chan bool),
 	}
 	go func() {
 		proxyCommandLineConfiguration.stopChannel <- true
@@ -58,7 +57,7 @@ func TestProxyListenerError(t *testing.T) {
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ListenFrom":[{"Type":"carbon"}, {"Type":"carbon"}]}`), os.FileMode(0666))
 	proxyCommandLineConfiguration = proxyCommandLineConfigurationT{
 		configFileName: filename,
-		stopChannel: make(chan bool),
+		stopChannel:    make(chan bool),
 	}
 	go func() {
 		proxyCommandLineConfiguration.stopChannel <- true
@@ -71,7 +70,7 @@ func TestProxyForwardError(t *testing.T) {
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"carbon", "Host":"192.168.100.108", "Timeout": "1s"}]}`), os.FileMode(0666))
 	proxyCommandLineConfiguration = proxyCommandLineConfigurationT{
 		configFileName: filename,
-		stopChannel: make(chan bool),
+		stopChannel:    make(chan bool),
 	}
 	go func() {
 		proxyCommandLineConfiguration.stopChannel <- true
@@ -84,7 +83,7 @@ func TestProxyUnknownForwarder(t *testing.T) {
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"unknown"}]}`), os.FileMode(0666))
 	proxyCommandLineConfiguration = proxyCommandLineConfigurationT{
 		configFileName: filename,
-		stopChannel: make(chan bool),
+		stopChannel:    make(chan bool),
 	}
 	go func() {
 		proxyCommandLineConfiguration.stopChannel <- true
@@ -97,7 +96,7 @@ func TestProxyUnknownListener(t *testing.T) {
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ListenFrom":[{"Type":"unknown"}]}`), os.FileMode(0666))
 	proxyCommandLineConfiguration = proxyCommandLineConfigurationT{
 		configFileName: filename,
-		stopChannel: make(chan bool),
+		stopChannel:    make(chan bool),
 	}
 	go func() {
 		proxyCommandLineConfiguration.stopChannel <- true
