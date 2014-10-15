@@ -1,12 +1,12 @@
 package protocoltypes
 
 import (
+	"errors"
 	"github.com/cep21/gohelpers/a"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"os"
 	"testing"
-	"errors"
 )
 
 func TestNewOnHostDatapoint(t *testing.T) {
