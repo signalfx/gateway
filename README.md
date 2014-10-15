@@ -60,3 +60,8 @@ Configuration
 Use the file exampleSfdbproxy.conf as an example configuration.  Importantly,
 replace DefaultAuthToken with your auth token and remove any listeners or
 forwarders you don't use.
+
+Build status
+------------
+
+[![Build Status](https://travis-ci.org/signalfuse/signalfxproxy.svg?branch=master)](https://travis-ci.org/signalfuse/signalfxproxy)
