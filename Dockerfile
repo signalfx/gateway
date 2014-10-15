@@ -12,6 +12,9 @@ RUN apt-get -y upgrade
 RUN apt-get -y install golang git mercurial curl
 
 RUN mkdir -p /opt/sfproxy
+
+# Invalidate cache so "go get" gets the latest code
+ADD README.md /root
 RUN cd /opt/sfproxy && env GOPATH=`pwd` go get -u github.com/signalfuse/signalfxproxy
 
 # Add run command
