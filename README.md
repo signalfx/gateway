@@ -31,7 +31,7 @@ Running as daemon
 ```
    nohup ./src/github.com/signalfuse/signalfxproxy/start.sh &
  ```
- 
+
 Stopping the daemon
 -------------------
 
