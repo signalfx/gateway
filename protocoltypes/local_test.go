@@ -4,9 +4,9 @@ import (
 	"github.com/cep21/gohelpers/a"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core/value"
-	"github.com/vektra/errors"
 	"os"
 	"testing"
+	"errors"
 )
 
 func TestNewOnHostDatapoint(t *testing.T) {
