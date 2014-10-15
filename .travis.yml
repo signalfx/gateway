@@ -15,5 +15,5 @@ install:
   - go get -u ./...
 
 script:
-  - export PATH=$GOPATH/bin:$PATH
+  - export PATH=$HOME/gopath/bin:$PATH
   - ./travis_check.sh
