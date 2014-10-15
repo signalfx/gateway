@@ -11,7 +11,7 @@ import (
 
 func TestNewStreamingDatapointDemultiplexer(t *testing.T) {
 	sendTo := newBasicBufferedForwarder(1, 10, "", 1)
-	mOrig, _ := NewStreamingDatapointDemultiplexer([]core.DatapointStreamingAPI{sendTo})
+	mOrig := NewStreamingDatapointDemultiplexer([]core.DatapointStreamingAPI{sendTo})
 	m, ok := mOrig.(*streamingDemultiplexerImpl)
 	a.ExpectEquals(t, true, ok, "Wrong type!")
 	a.ExpectEquals(t, "demultiplexer", m.Name(), "Expect one point")

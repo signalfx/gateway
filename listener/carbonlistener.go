@@ -84,7 +84,7 @@ func (listener *carbonListener) startListening() {
 }
 
 var defaultCarbonConfig = &config.ListenFrom{
-	ListenAddr:      workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12346"),
+	ListenAddr:      workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:2003"),
 	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
 }
 

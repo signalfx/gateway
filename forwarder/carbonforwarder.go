@@ -26,7 +26,9 @@ type reconectingGraphiteCarbonConnection struct {
 // NewTcpGraphiteCarbonForwarer creates a new forwarder for sending points to carbon
 func newTcpGraphiteCarbonForwarer(host string, port uint16, timeout time.Duration, bufferSize uint32) (*reconectingGraphiteCarbonConnection, error) {
 	connectionAddress := net.JoinHostPort(host, strconv.FormatUint(uint64(port), 10))
-	conn, err := net.Dial("tcp", connectionAddress)
+	var d net.Dialer
+	d.Deadline = time.Now().Add(timeout)
+	conn, err := d.Dial("tcp", connectionAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +49,7 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) GetStats() []core.D
 var defaultCarbonConfig = &config.ForwardTo{
 	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
 	BufferSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(10000)),
+	Port:            workarounds.GolangDoesnotAllowPointerToUint16Literal(2003),
 	DrainingThreads: workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(5)),
 	Name:            workarounds.GolangDoesnotAllowPointerToStringLiteral("carbonforwarder"),
 	MaxDrainSize:    workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(100)),

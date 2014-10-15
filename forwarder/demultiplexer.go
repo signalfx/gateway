@@ -55,7 +55,7 @@ func (streamer *streamingDemultiplexerImpl) GetStats() []core.Datapoint {
 }
 
 // NewStreamingDatapointDemultiplexer creates a new forwarder that sends datapoints to multiple recievers
-func NewStreamingDatapointDemultiplexer(sendTo []core.DatapointStreamingAPI) (core.StatKeepingStreamingAPI, error) {
+func NewStreamingDatapointDemultiplexer(sendTo []core.DatapointStreamingAPI) core.StatKeepingStreamingAPI {
 	ret := &streamingDemultiplexerImpl{
 		sendTo,
 		make(chan core.Datapoint),
@@ -64,5 +64,5 @@ func NewStreamingDatapointDemultiplexer(sendTo []core.DatapointStreamingAPI) (co
 		"demultiplexer",
 	}
 	go ret.datapointReadingThread()
-	return ret, nil
+	return ret
 }

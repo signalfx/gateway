@@ -44,8 +44,8 @@ func TestCarbonListenerLoader(t *testing.T) {
 		channel: make(chan core.Datapoint),
 	}
 	listener, err := CarbonListenerLoader(sendTo, listenFrom)
-	defer listener.Close()
 	a.ExpectEquals(t, nil, err, "Should be ok to make")
+	defer listener.Close()
 	a.ExpectEquals(t, 0, len(listener.GetStats()), "Should have no stats")
 	a.ExpectNotEquals(t, listener, err, "Should be ok to make")
 

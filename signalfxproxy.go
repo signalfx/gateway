@@ -12,26 +12,36 @@ import (
 	"strconv"
 )
 
-func writePidFile(pidFileName *string) error {
+func writePidFile(pidFileName string) error {
 	pid := os.Getpid()
-	err := ioutil.WriteFile(*pidFileName, []byte(strconv.FormatInt(int64(pid), 10)), os.FileMode(0644))
+	err := ioutil.WriteFile(pidFileName, []byte(strconv.FormatInt(int64(pid), 10)), os.FileMode(0644))
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func main() {
-	configFileName := flag.String("configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
-	pidFileName := flag.String("signalfxproxypid", "signalfxproxy.pid", "Name of the file to store the PID in")
-	flag.Parse()
+type proxyCommandLineConfigurationT struct {
+	configFileName string
+	pidFileName    string
+	stopChannel    chan bool
+}
 
-	writePidFile(pidFileName)
-	glog.Infof("Looking for config file %s\n", *configFileName)
+var proxyCommandLineConfiguration proxyCommandLineConfigurationT
 
-	loadedConfig, err := config.LoadConfig(*configFileName)
+func init() {
+	flag.StringVar(&proxyCommandLineConfiguration.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
+	flag.StringVar(&proxyCommandLineConfiguration.pidFileName, "signalfxproxypid", "signalfxproxy.pid", "Name of the file to store the PID in")
+	proxyCommandLineConfiguration.stopChannel = make(chan bool)
+}
+
+func (proxyCommandLineConfiguration*proxyCommandLineConfigurationT) main() {
+	writePidFile(proxyCommandLineConfiguration.pidFileName)
+	glog.Infof("Looking for config file %s\n", proxyCommandLineConfiguration.configFileName)
+
+	loadedConfig, err := config.LoadConfig(proxyCommandLineConfiguration.configFileName)
 	if err != nil {
-		glog.Fatalln("Unable to load config: ", err)
+		glog.Errorf("Unable to load config: %s", err)
 		return
 	}
 
@@ -41,51 +51,47 @@ func main() {
 	for _, forwardConfig := range loadedConfig.ForwardTo {
 		loader, ok := forwarder.AllForwarderLoaders[forwardConfig.Type]
 		if !ok {
-			glog.Fatalf("Unknown loader type: %s", forwardConfig.Type)
+			glog.Errorf("Unknown loader type: %s", forwardConfig.Type)
 			return
 		}
 		forwarder, err := loader(forwardConfig)
 		if err != nil {
-			glog.Fatalf("Unable to loader forwarder: %s", err)
+			glog.Errorf("Unable to loader forwarder: %s", err)
 			return
 		}
 		allForwarders = append(allForwarders, forwarder)
 		allStatKeepers = append(allStatKeepers, forwarder)
 	}
-	multiplexer, err := forwarder.NewStreamingDatapointDemultiplexer(allForwarders)
-	if err != nil {
-		glog.Fatalf("Unable to loader multiplexer: %s", err)
-		return
-	}
+	multiplexer := forwarder.NewStreamingDatapointDemultiplexer(allForwarders)
 	allStatKeepers = append(allStatKeepers, multiplexer)
 
 	allListeners := make([]listener.DatapointListener, len(loadedConfig.ListenFrom))
 	for _, forwardConfig := range loadedConfig.ListenFrom {
 		loader, ok := listener.AllListenerLoaders[forwardConfig.Type]
 		if !ok {
-			glog.Fatalf("Unknown loader type: %s", forwardConfig.Type)
+			glog.Errorf("Unknown loader type: %s", forwardConfig.Type)
 			return
 		}
 		listener, err := loader(multiplexer, forwardConfig)
 		if err != nil {
-			glog.Fatalf("Unable to loader listener: %s", err)
+			glog.Errorf("Unable to loader listener: %s", err)
 			return
-		}
-		if listener == nil {
-			glog.Fatalf("Got nil listener from %s", forwardConfig.Type)
 		}
 		allListeners = append(allListeners, listener)
 		allStatKeepers = append(allStatKeepers, listener)
 	}
 
-	glog.Infof("Setup done.  Blocking!\n")
-	stopChannel := make(chan bool, 2)
 	if loadedConfig.StatsDelayDuration != nil && *loadedConfig.StatsDelayDuration != 0 {
-		go core.DrainStatsThread(*loadedConfig.StatsDelayDuration, allForwarders, allStatKeepers, stopChannel)
+		go core.DrainStatsThread(*loadedConfig.StatsDelayDuration, allForwarders, allStatKeepers, proxyCommandLineConfiguration.stopChannel)
 	} else {
 		glog.Infof("Skipping stat keeping")
 	}
 
-	// TODO: Replace with something more graceful that allows us to shutdown?
-	select {}
+	glog.Infof("Setup done.  Blocking!\n")
+	_ = <-proxyCommandLineConfiguration.stopChannel
+}
+
+func main() {
+	flag.Parse()
+	proxyCommandLineConfiguration.main()
 }
