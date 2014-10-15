@@ -12,17 +12,21 @@ import (
 	"strconv"
 )
 
+func writePidFile(pidFileName *string) error {
+	pid := os.Getpid()
+	err := ioutil.WriteFile(*pidFileName, []byte(strconv.FormatInt(int64(pid), 10)), os.FileMode(0644))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func main() {
 	configFileName := flag.String("configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
 	pidFileName := flag.String("signalfxproxypid", "signalfxproxy.pid", "Name of the file to store the PID in")
 	flag.Parse()
-	pid := os.Getpid()
-	err := ioutil.WriteFile(*pidFileName, []byte(strconv.FormatInt(int64(pid), 10)), os.FileMode(0644))
-	if err != nil {
-		glog.Fatalln("Unable to save PID: ", err)
-		return
-	}
 
+	writePidFile(pidFileName)
 	glog.Infof("Looking for config file %s\n", *configFileName)
 
 	loadedConfig, err := config.LoadConfig(*configFileName)

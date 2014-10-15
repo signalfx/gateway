@@ -1,32 +1,31 @@
 package listener
 
 import (
-	"testing"
-	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/cep21/gohelpers/a"
-	"github.com/signalfuse/signalfxproxy/core"
-	"bytes"
-	"github.com/cep21/gohelpers/workarounds"
-	"net"
-	"fmt"
-	"time"
-	"errors"
 	"bufio"
+	"bytes"
+	"errors"
+	"fmt"
+	"github.com/cep21/gohelpers/a"
+	"github.com/cep21/gohelpers/workarounds"
+	"github.com/signalfuse/signalfxproxy/config"
+	"github.com/signalfuse/signalfxproxy/core"
 	"io"
+	"net"
+	"testing"
+	"time"
 )
 
 type basicDatapointStreamingAPI struct {
 	channel chan core.Datapoint
 }
 
-func (api *basicDatapointStreamingAPI) DatapointsChannel() (chan<- core.Datapoint) {
+func (api *basicDatapointStreamingAPI) DatapointsChannel() chan<- core.Datapoint {
 	return api.channel
 }
 
 func (api *basicDatapointStreamingAPI) Name() string {
 	return ""
 }
-
 
 func TestInvalidCarbonListenerLoader(t *testing.T) {
 	listenFrom := &config.ListenFrom{
@@ -60,17 +59,19 @@ func TestCarbonListenerLoader(t *testing.T) {
 	_, err = buf.WriteTo(conn)
 	conn.Close()
 	a.ExpectEquals(t, nil, err, "Should be ok to write")
-	datapoint := <- sendTo.channel
+	datapoint := <-sendTo.channel
 	a.ExpectEquals(t, "ametric", datapoint.Metric(), "Should be metric")
 	i, _ := datapoint.Value().IntValue()
 	a.ExpectEquals(t, int64(2), i, "Should get 2")
 
 	for len(sendTo.channel) > 0 {
-		_ = <- sendTo.channel
+		_ = <-sendTo.channel
 	}
 
 	prev := readerReadBytes
-	readerReadBytes = func(reader *bufio.Reader, delim byte)([]byte, error) {return nil, errors.New("error reading from reader")}
+	readerReadBytes = func(reader *bufio.Reader, delim byte) ([]byte, error) {
+		return nil, errors.New("error reading from reader")
+	}
 	conn, err = net.Dial("tcp", *listenFrom.ListenAddr)
 	a.ExpectEquals(t, nil, err, "Should be ok to make")
 	var buf2 bytes.Buffer
@@ -79,10 +80,12 @@ func TestCarbonListenerLoader(t *testing.T) {
 	conn.Close()
 
 	for len(sendTo.channel) > 0 {
-		_ = <- sendTo.channel
+		_ = <-sendTo.channel
 	}
 
-	readerReadBytes = func(reader *bufio.Reader, delim byte)([]byte, error) {return []byte("ametric 3 2\n"), io.EOF}
+	time.Sleep(time.Millisecond)
+
+	readerReadBytes = func(reader *bufio.Reader, delim byte) ([]byte, error) { return []byte("ametric 3 2\n"), io.EOF }
 	conn, err = net.Dial("tcp", *listenFrom.ListenAddr)
 	a.ExpectEquals(t, nil, err, "Should be ok to make")
 	var buf3 bytes.Buffer
@@ -90,7 +93,7 @@ func TestCarbonListenerLoader(t *testing.T) {
 	_, err = buf3.WriteTo(conn)
 	conn.Close()
 	readerReadBytes = prev
-	datapoint = <- sendTo.channel
+	datapoint = <-sendTo.channel
 	i, _ = datapoint.Value().IntValue()
 	a.ExpectEquals(t, int64(3), i, "Should get 3")
 

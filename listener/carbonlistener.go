@@ -33,7 +33,7 @@ func (listener *carbonListener) Close() {
 	atomic.StoreInt32(&listener.isClosed, 1)
 }
 
-var readerReadBytes = func(reader *bufio.Reader, delim byte)([]byte, error) {return reader.ReadBytes(delim)}
+var readerReadBytes = func(reader *bufio.Reader, delim byte) ([]byte, error) { return reader.ReadBytes(delim) }
 
 func (listener *carbonListener) handleConnection(conn net.Conn) {
 	reader := bufio.NewReader(conn)

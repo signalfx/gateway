@@ -36,6 +36,62 @@ func (streamer *listenerServer) Close() {
 	streamer.listener.Close()
 }
 
+func getMetricTypeFromMap(metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType, metricCreationsMapMutex *sync.Mutex, metricName string) com_signalfuse_metrics_protobuf.MetricType {
+	metricCreationsMapMutex.Lock()
+	defer metricCreationsMapMutex.Unlock()
+	mt, ok := metricCreationsMap[metricName]
+	if !ok {
+		return com_signalfuse_metrics_protobuf.MetricType_GAUGE
+	}
+	return mt
+}
+
+var protoXXXDecodeVarint = proto.DecodeVarint
+
+func protobufDecoding(body io.Reader, metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType, metricCreationsMapMutex *sync.Mutex, DatapointStreamingAPI core.DatapointStreamingAPI) error {
+	bufferedBody := bufio.NewReaderSize(body, 32768)
+	for {
+		glog.Infof("Start of loop for %s", body)
+		buf, err := bufferedBody.Peek(1) // should be big enough for any varint
+		if err == io.EOF {
+			glog.Infof("EOF")
+			return nil
+		}
+
+		if err != nil {
+			glog.Infof("peek error: %s", err)
+			return err
+		}
+		glog.Infof("Decoding varint")
+		num, bytesRead := protoXXXDecodeVarint(buf)
+		glog.Infof("Decoding result: %d %d", num, bytesRead)
+		if bytesRead == 0 {
+			// Invalid varint?
+			return errors.New("invalid varint decode from protobuf stream")
+		}
+		if num > 32768 {
+			// Sanity check
+			return fmt.Errorf("invalid varint decode from protobuf stream.  Value too large %d", num)
+		}
+		// Get the varint out
+		fullyReadFromBuffer(bufferedBody, uint64(bytesRead))
+		//buf = make([]byte, num)
+		buf, err = fullyReadFromBuffer(bufferedBody, num)
+		if int(num) != len(buf) {
+			return fmt.Errorf("unable to fully read protobuf message: %s", err)
+		}
+		var msg com_signalfuse_metrics_protobuf.DataPoint
+		err = proto.Unmarshal(buf, &msg)
+		if err != nil {
+			return err
+		}
+		mt := getMetricTypeFromMap(metricCreationsMap, metricCreationsMapMutex, msg.GetMetric())
+		dp := protocoltypes.NewProtobufDataPointWithType(&msg, mt)
+		glog.Infof("Adding a point")
+		DatapointStreamingAPI.DatapointsChannel() <- dp
+	}
+}
+
 func jsonDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI, metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType, metricCreationsMapMutex *sync.Mutex) func(*http.Request) error {
 	return func(req *http.Request) error {
 		dec := json.NewDecoder(req.Body)
@@ -51,16 +107,7 @@ func jsonDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI, metri
 					glog.Warningf("Invalid datapoint %s", d)
 					continue
 				}
-				mt := func() com_signalfuse_metrics_protobuf.MetricType {
-					metricCreationsMapMutex.Lock()
-					defer metricCreationsMapMutex.Unlock()
-					mt, ok := metricCreationsMap[d.Metric]
-					if !ok {
-						return com_signalfuse_metrics_protobuf.MetricType_GAUGE
-					}
-					return mt
-
-				}()
+				mt := getMetricTypeFromMap(metricCreationsMap, metricCreationsMapMutex, d.Metric)
 				DatapointStreamingAPI.DatapointsChannel() <- core.NewRelativeTimeDatapoint(d.Metric, map[string]string{"sf_source": d.Source}, value.NewFloatWire(d.Value), mt, 0)
 			}
 		}
@@ -73,63 +120,19 @@ func fullyReadFromBuffer(buffer *bufio.Reader, numBytes uint64) ([]byte, error) 
 	buf := make([]byte, numBytes)
 	for numBytes > totalBytesRead {
 		n, err := buffer.Read(buf[totalBytesRead:numBytes])
-		if err != nil {
-			return buf, err
-		}
-		if n == 0 {
-			return buf, nil
-		}
 		totalBytesRead += uint64(n)
+		if err != nil || n == 0 {
+			return buf[0:totalBytesRead], err
+		}
+
 	}
 	return buf, nil
 }
 
 func protobufDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI, metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType, metricCreationsMapMutex *sync.Mutex) func(*http.Request) error {
 	return func(req *http.Request) error {
-		bufferedBody := bufio.NewReaderSize(req.Body, 32768)
-		for {
-			buf, err := bufferedBody.Peek(16) // should be big enough for any varint
-			if err == io.EOF {
-				return nil
-			}
-
-			if err != nil {
-				glog.Infof("Got %s", err)
-				return err
-			}
-			num, bytesRead := proto.DecodeVarint(buf)
-			if bytesRead == 0 {
-				// Invalid varint?
-				return errors.New("invalid varint decode from protobuf stream")
-			}
-			if num > 32768 {
-				// Sanity check
-				return fmt.Errorf("invalid varint decode from protobuf stream.  Value too large %d", num)
-			}
-			// Get the varint out
-			fullyReadFromBuffer(bufferedBody, uint64(bytesRead))
-			//buf = make([]byte, num)
-			buf, err = fullyReadFromBuffer(bufferedBody, num)
-			if int(num) != len(buf) {
-				return fmt.Errorf("unable to fully read protobuf message: %s", err)
-			}
-			var msg com_signalfuse_metrics_protobuf.DataPoint
-			err = proto.Unmarshal(buf, &msg)
-			if err != nil {
-				return err
-			}
-			dp := func() core.Datapoint {
-				metricCreationsMapMutex.Lock()
-				defer metricCreationsMapMutex.Unlock()
-				mt, ok := metricCreationsMap[msg.GetMetric()]
-				if !ok {
-					return protocoltypes.NewProtobufDataPoint(msg)
-				}
-				return protocoltypes.NewProtobufDataPointWithType(msg, mt)
-
-			}()
-			DatapointStreamingAPI.DatapointsChannel() <- dp
-		}
+		glog.Infof("Request is %s", req)
+		return protobufDecoding(req.Body, metricCreationsMap, metricCreationsMapMutex, DatapointStreamingAPI)
 	}
 }
 
@@ -144,6 +147,8 @@ func SignalFxListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, li
 	glog.Infof("Creating signalfx listener using final config %s", listenFrom)
 	return StartServingHTTPOnPort(*listenFrom.ListenAddr, DatapointStreamingAPI, *listenFrom.TimeoutDuration)
 }
+
+var jsonXXXMarshal = json.Marshal
 
 // StartServingHTTPOnPort servers http requests for Signalfx datapoints
 func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.DatapointStreamingAPI, clientTimeout time.Duration) (DatapointListener, error) {
@@ -175,38 +180,35 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 	metricHandler := func(writter http.ResponseWriter, req *http.Request) {
 		dec := json.NewDecoder(req.Body)
 		var d []protocoltypes.SignalfxMetricCreationStruct
-		if err := dec.Decode(&d); err == io.EOF {
-			return
-		} else if err != nil {
+		if err := dec.Decode(&d); err != nil {
 			glog.Infof("Invalid metric creation request: %s", err)
 			writter.WriteHeader(http.StatusBadRequest)
 			writter.Write([]byte(`{msg:"Invalid creation request"}`))
 			return
-		} else {
-			glog.V(3).Info("Got metric types: %s", d)
-			metricCreationsMapMutex.Lock()
-			defer metricCreationsMapMutex.Unlock()
-			ret := []protocoltypes.SignalfxMetricCreationResponse{}
-			for _, m := range d {
-				metricType, ok := com_signalfuse_metrics_protobuf.MetricType_value[m.MetricType]
-				if !ok {
-					writter.WriteHeader(http.StatusBadRequest)
-					writter.Write([]byte(`{msg:"Invalid metric type"}`))
-					return
-				}
-				metricCreationsMap[m.MetricName] = com_signalfuse_metrics_protobuf.MetricType(metricType)
-				ret = append(ret, protocoltypes.SignalfxMetricCreationResponse{Code: 409})
-			}
-			toWrite, err := json.Marshal(ret)
-			if err != nil {
-				glog.Warningf("Unable to marshal json: %s", err)
+		}
+		glog.V(3).Info("Got metric types: %s", d)
+		metricCreationsMapMutex.Lock()
+		defer metricCreationsMapMutex.Unlock()
+		ret := []protocoltypes.SignalfxMetricCreationResponse{}
+		for _, m := range d {
+			metricType, ok := com_signalfuse_metrics_protobuf.MetricType_value[m.MetricType]
+			if !ok {
 				writter.WriteHeader(http.StatusBadRequest)
-				writter.Write([]byte(`{msg:"Unable to marshal json!"}`))
+				writter.Write([]byte(`{msg:"Invalid metric type"}`))
 				return
 			}
-			writter.WriteHeader(http.StatusOK)
-			writter.Write([]byte(toWrite))
+			metricCreationsMap[m.MetricName] = com_signalfuse_metrics_protobuf.MetricType(metricType)
+			ret = append(ret, protocoltypes.SignalfxMetricCreationResponse{Code: 409})
 		}
+		toWrite, err := jsonXXXMarshal(ret)
+		if err != nil {
+			glog.Warningf("Unable to marshal json: %s", err)
+			writter.WriteHeader(http.StatusBadRequest)
+			writter.Write([]byte(`{msg:"Unable to marshal json!"}`))
+			return
+		}
+		writter.WriteHeader(http.StatusOK)
+		writter.Write([]byte(toWrite))
 	}
 	mux.HandleFunc(
 		"/datapoint",
