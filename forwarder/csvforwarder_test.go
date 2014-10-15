@@ -26,12 +26,14 @@ func TestCsvForwarderLoader(t *testing.T) {
 }
 
 func TestInvalidFilenameCsvForwarderLoader(t *testing.T) {
+	osXXXRemove = func(s string) error { return nil }
 	defer func() { os.Remove("datapoints.csv") }()
 	forwardTo := config.ForwardTo{
 		Filename: workarounds.GolangDoesnotAllowPointerToStringLiteral("/root"),
 	}
 	_, err := CsvForwarderLoader(&forwardTo)
 	a.ExpectNotEquals(t, nil, err, "Expect no error")
+	osXXXRemove = os.Remove
 }
 
 func TestInvalidOpen(t *testing.T) {

@@ -68,6 +68,7 @@ func NewCsvForwarder(bufferSize uint32, name string, filename string, maxDrainSi
 		return nil, err
 	}
 	if err := ioutil.WriteFile(filename, []byte{}, os.FileMode(0666)); err != nil {
+		glog.Infof("Unable to verify write for file %s", filename)
 		return nil, err
 	}
 	ret.start(ret.process)
