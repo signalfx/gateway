@@ -16,11 +16,11 @@ RUN mkdir -p /opt/sfproxy
 # Invalidate cache so "go get" gets the latest code
 RUN mkdir -p /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 
-ADD config /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
-ADD core /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
-ADD forwarder /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
-ADD listener /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
-ADD protocoltypes /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+ADD config /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/config
+ADD core /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/core
+ADD forwarder /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/forwarder
+ADD listener /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/listener
+ADD protocoltypes /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/protocoltypes
 
 ADD signalfxproxy.go /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 ADD signalfxproxy_test.go /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
