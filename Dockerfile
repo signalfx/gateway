@@ -37,7 +37,7 @@ RUN go get code.google.com/p/go.tools/cmd/vet
 RUN go get github.com/stretchr/testify/mock
 RUN go get code.google.com/p/go.tools/cmd/cover
 RUN go env
-RUN go get -u ./...
+RUN go get ./...
 
 RUN export PATH=$GOPATH/bin:$PATH
 RUN /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/travis_check.sh
