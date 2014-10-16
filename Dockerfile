@@ -14,8 +14,32 @@ RUN apt-get -y install golang git mercurial curl
 RUN mkdir -p /opt/sfproxy
 
 # Invalidate cache so "go get" gets the latest code
-ADD . /root/builtfrom
-RUN cd /opt/sfproxy && env GOPATH=`pwd` go get -u github.com/signalfuse/signalfxproxy
+RUN mkdir -p /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+
+ADD config /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+ADD core /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+ADD forwarder /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+ADD listener /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+ADD protocoltypes /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+
+ADD signalfxproxy.go /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+ADD signalfxproxy_test.go /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+
+ADD travis_check.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+
+ADD lint_all.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+ADD vet_all.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+ADD format_all.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+
+ENV GOPATH /opt/sfproxy
+RUN go get github.com/golang/lint/golint
+RUN go get code.google.com/p/go.tools/cmd/vet
+RUN go get github.com/stretchr/testify/mock
+RUN go get code.google.com/p/go.tools/cmd/cover
+RUN go get -u ./...
+
+RUN export PATH=$GOPATH/bin:$PATH
+RUN /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/travis_check.sh
 
 # Add run command
 VOLUME /var/log/sfproxy
