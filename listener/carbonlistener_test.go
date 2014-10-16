@@ -30,7 +30,7 @@ func (api *basicDatapointStreamingAPI) Name() string {
 
 func TestInvalidCarbonListenerLoader(t *testing.T) {
 	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:1"),
+		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:999999"),
 	}
 	sendTo := &basicDatapointStreamingAPI{}
 	_, err := CarbonListenerLoader(sendTo, listenFrom)

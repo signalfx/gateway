@@ -35,7 +35,7 @@ func (conn *mockConn) Write(bytes []byte) (int, error) {
 func TestInvalidPort(t *testing.T) {
 
 	ft := config.ForwardTo{
-		Host: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0"),
+		Host: workarounds.GolangDoesnotAllowPointerToStringLiteral("invalid.port.address.should.not.bind"),
 		Port: workarounds.GolangDoesnotAllowPointerToUint16Literal(1),
 	}
 	_, err := TcpGraphiteCarbonForwarerLoader(&ft)

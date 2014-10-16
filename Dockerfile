@@ -9,7 +9,8 @@ RUN apt-get update
 RUN apt-get -y upgrade
 
 # Install dependencies
-RUN apt-get -y install golang git mercurial curl
+RUN apt-get -y install golang git mercurial curl ruby
+RUN gem install mdl
 
 RUN mkdir -p /opt/sfproxy
 
@@ -30,6 +31,7 @@ ADD travis_check.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 ADD lint_all.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 ADD vet_all.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 ADD format_all.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+ADD README.md /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 
 ENV GOPATH /opt/sfproxy
 RUN go get github.com/golang/lint/golint
@@ -37,10 +39,15 @@ RUN go get code.google.com/p/go.tools/cmd/vet
 RUN go get github.com/stretchr/testify/mock
 RUN go get code.google.com/p/go.tools/cmd/cover
 RUN go env
-RUN go get ./...
+RUN go get github.com/signalfuse/signalfxproxy
 
-RUN export PATH=$GOPATH/bin:$PATH
-RUN /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/travis_check.sh
+ENV PATH $GOPATH/bin:$PATH
+
+# For lint/vet/format verification
+ADD .git /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/.git
+RUN ls $GOPATH/bin
+RUN echo $PATH
+RUN cd /opt/sfproxy/src/github.com/signalfuse/signalfxproxy && /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/travis_check.sh
 
 # Add run command
 VOLUME /var/log/sfproxy
