@@ -65,3 +65,4 @@ Build status
 ------------
 
 [![Build Status](https://travis-ci.org/signalfuse/signalfxproxy.svg?branch=master)](https://travis-ci.org/signalfuse/signalfxproxy)
+[![Docker Repository on Quay.io](https://quay.io/repository/signalfuse/signalfxproxy/status "Docker Repository on Quay.io")](https://quay.io/repository/signalfuse/signalfxproxy)
