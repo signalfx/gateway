@@ -17,6 +17,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -42,6 +43,7 @@ type signalfxJSONConnector struct {
 	client             *http.Client
 	userAgent          string
 	defaultSource      string
+	dimensionSources   []string
 	// Map of all metric names to if we've created them with their metric type
 	v1MetricLoadedCache      map[string]struct{}
 	v1MetricLoadedCacheMutex sync.Mutex
@@ -73,6 +75,7 @@ var defaultConfig = &config.ForwardTo{
 	DrainingThreads:   workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(5)),
 	Name:              workarounds.GolangDoesnotAllowPointerToStringLiteral("signalfx-forwarder"),
 	MaxDrainSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(100)),
+	SourceDimensions:  workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
 }
 
 // SignalfxJSONForwarderLoader loads a json forwarder forwarding points from proxy to SignalFx
@@ -81,13 +84,13 @@ func SignalfxJSONForwarderLoader(forwardTo *config.ForwardTo) (core.StatKeepingS
 	glog.Infof("Creating signalfx forwarder using final config %s", forwardTo)
 	return NewSignalfxJSONForwarer(*forwardTo.URL, *forwardTo.TimeoutDuration, *forwardTo.BufferSize,
 		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads, *forwardTo.Name, *forwardTo.MetricCreationURL,
-		*forwardTo.MaxDrainSize, *forwardTo.DefaultSource)
+		*forwardTo.MaxDrainSize, *forwardTo.DefaultSource, *forwardTo.SourceDimensions)
 }
 
 // NewSignalfxJSONForwarer creates a new JSON forwarder
 func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint32,
 	defaultAuthToken string, drainingThreads uint32, name string, MetricCreationURL string,
-	maxDrainSize uint32, defaultSource string) (core.StatKeepingStreamingAPI, error) {
+	maxDrainSize uint32, defaultSource string, sourceDimensions string) (core.StatKeepingStreamingAPI, error) {
 	tr := &http.Transport{
 		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
 		MaxIdleConnsPerHost: int(drainingThreads) * 2,
@@ -107,6 +110,8 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint3
 		MetricCreationURL:   MetricCreationURL,
 		defaultSource:       defaultSource,
 		metricCreationChan:  make(chan *metricCreationRequest),
+		// sf_source is always a dimension that can be a source
+		dimensionSources: append([]string{"sf_source"}, strings.Split(sourceDimensions, ",")...),
 	}
 	ret.start(ret.process)
 	go ret.metricCreationLoop()
@@ -226,9 +231,11 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 }
 
 func (connector *signalfxJSONConnector) figureOutReasonableSource(point core.Datapoint) string {
-	thisPointSource := point.Dimensions()["sf_source"]
-	if thisPointSource != "" {
-		return thisPointSource
+	for _, sourceName := range connector.dimensionSources {
+		thisPointSource := point.Dimensions()[sourceName]
+		if thisPointSource != "" {
+			return thisPointSource
+		}
 	}
 	return connector.defaultSource
 }

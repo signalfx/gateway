@@ -7,6 +7,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/listener/metricdeconstructor"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"io"
 	"net"
@@ -21,6 +22,7 @@ type carbonListener struct {
 	DatapointStreamingAPI core.DatapointStreamingAPI
 	connectionTimeout     time.Duration
 	isClosed              int32
+	metricDeconstructor   metricdeconstructor.MetricDeconstructor
 }
 
 func (listener *carbonListener) GetStats() []core.Datapoint {
@@ -47,8 +49,7 @@ func (listener *carbonListener) handleConnection(conn net.Conn) {
 		}
 		line := strings.TrimSpace(string(bytes))
 		if line != "" {
-			dp, err := protocoltypes.NewCarbonDatapoint(line)
-
+			dp, err := protocoltypes.NewCarbonDatapoint(line, listener.metricDeconstructor)
 			if err != nil {
 				glog.Warningf("Error parsing carbon line: %s", err)
 				return
@@ -72,7 +73,7 @@ func (listener *carbonListener) startListening() {
 		if err != nil {
 			timeoutError, ok := err.(net.Error)
 			if ok && timeoutError.Timeout() {
-				glog.V(1).Infof("Timeout waiting for connection.  Expected, will continue")
+				glog.V(2).Infof("Timeout waiting for connection.  Expected, will continue")
 				continue
 			}
 			glog.Warningf("Unable to accept a socket connection: %s", err)
@@ -84,18 +85,25 @@ func (listener *carbonListener) startListening() {
 }
 
 var defaultCarbonConfig = &config.ListenFrom{
-	ListenAddr:      workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:2003"),
-	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
+	ListenAddr:                 workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:2003"),
+	TimeoutDuration:            workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
+	MetricDeconstructor:        workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
+	MetricDeconstructorOptions: workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
 }
 
 // CarbonListenerLoader loads a listener for the carbon/graphite protocol from config
 func CarbonListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, listenFrom *config.ListenFrom) (DatapointListener, error) {
 	structdefaults.FillDefaultFrom(listenFrom, defaultCarbonConfig)
-	return startListeningCarbonOnPort(*listenFrom.ListenAddr, DatapointStreamingAPI, *listenFrom.TimeoutDuration)
+	return startListeningCarbonOnPort(*listenFrom.ListenAddr, DatapointStreamingAPI, *listenFrom.TimeoutDuration, *listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions)
 }
 
-func startListeningCarbonOnPort(listenAddr string, DatapointStreamingAPI core.DatapointStreamingAPI, timeout time.Duration) (DatapointListener, error) {
+func startListeningCarbonOnPort(listenAddr string, DatapointStreamingAPI core.DatapointStreamingAPI, timeout time.Duration, metricDeconstructor string, metricDeconstructorOptions string) (DatapointListener, error) {
 	psocket, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	deconstructor, err := metricdeconstructor.Load(metricDeconstructor, metricDeconstructorOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +112,7 @@ func startListeningCarbonOnPort(listenAddr string, DatapointStreamingAPI core.Da
 		psocket:               psocket,
 		DatapointStreamingAPI: DatapointStreamingAPI,
 		connectionTimeout:     timeout,
+		metricDeconstructor:   deconstructor,
 	}
 	go receiver.startListening()
 	return &receiver, nil

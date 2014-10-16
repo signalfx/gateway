@@ -9,6 +9,7 @@ import (
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/listener/metricdeconstructor"
 	"io"
 	"net"
 	"testing"
@@ -30,6 +31,16 @@ func (api *basicDatapointStreamingAPI) Name() string {
 func TestInvalidCarbonListenerLoader(t *testing.T) {
 	listenFrom := &config.ListenFrom{
 		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:1"),
+	}
+	sendTo := &basicDatapointStreamingAPI{}
+	_, err := CarbonListenerLoader(sendTo, listenFrom)
+	a.ExpectNotEquals(t, nil, err, "Should get an error making")
+}
+
+func TestInvalidCarbonDeconstructorListenerLoader(t *testing.T) {
+	listenFrom := &config.ListenFrom{
+		ListenAddr:          workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12347"),
+		MetricDeconstructor: workarounds.GolangDoesnotAllowPointerToStringLiteral("UNKNOWN"),
 	}
 	sendTo := &basicDatapointStreamingAPI{}
 	_, err := CarbonListenerLoader(sendTo, listenFrom)
@@ -67,6 +78,26 @@ func TestCarbonListenerLoader(t *testing.T) {
 	for len(sendTo.channel) > 0 {
 		_ = <-sendTo.channel
 	}
+
+	carbonlistener, _ := listener.(*carbonListener)
+	carbonlistener.metricDeconstructor, _ = metricdeconstructor.Load("datadog", "ignored")
+	conn, err = net.Dial("tcp", *listenFrom.ListenAddr)
+	a.ExpectEquals(t, nil, err, "Should be ok to make")
+	buf = bytes.Buffer{}
+	fmt.Fprintf(&buf, "a.metric.name[host:bob,type:dev] 3 3")
+	_, err = buf.WriteTo(conn)
+	conn.Close()
+	a.ExpectEquals(t, nil, err, "Should be ok to write")
+	datapoint = <-sendTo.channel
+	a.ExpectEquals(t, "a.metric.name", datapoint.Metric(), "Should be metric")
+	a.ExpectEquals(t, map[string]string{"host": "bob", "type": "dev"}, datapoint.Dimensions(), "Did not parse dimensions")
+	i, _ = datapoint.Value().IntValue()
+	a.ExpectEquals(t, int64(3), i, "Should get 3")
+
+	for len(sendTo.channel) > 0 {
+		_ = <-sendTo.channel
+	}
+	carbonlistener.metricDeconstructor, _ = metricdeconstructor.Load("", "")
 
 	prev := readerReadBytes
 	readerReadBytes = func(reader *bufio.Reader, delim byte) ([]byte, error) {

@@ -32,8 +32,8 @@ func (vp *metricPanicDatapoint) Metric() string {
 }
 
 func TestSignalfxJSONForwarderLoader(t *testing.T) {
-	listenFrom := config.ListenFrom{}
-	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12345")
+	listenFromSignalfx := config.ListenFrom{}
+	listenFromSignalfx.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12345")
 
 	forwardTo := config.ForwardTo{
 		URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("http://0.0.0.0:12345/v1/datapoint"),
@@ -41,10 +41,11 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 		MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral("http://0.0.0.0:12345/v1/metric"),
 		DefaultAuthToken:  workarounds.GolangDoesnotAllowPointerToStringLiteral("AUTH_TOKEN"),
 		DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral("proxy-source"),
+		SourceDimensions:  workarounds.GolangDoesnotAllowPointerToStringLiteral("username,ignored,hostname"),
 	}
 
 	finalDatapointDestination := newBasicBufferedForwarder(100, 1, "", 1)
-	l, err := listener.SignalFxListenerLoader(finalDatapointDestination, &listenFrom)
+	l, err := listener.SignalFxListenerLoader(finalDatapointDestination, &listenFromSignalfx)
 	defer l.Close()
 	a.ExpectEquals(t, nil, err, "Expect no error")
 
@@ -61,6 +62,15 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	dpRecieved := <-finalDatapointDestination.datapointsChannel
 	i, _ := dpRecieved.Value().IntValue()
 	a.ExpectEquals(t, int64(2), i, "Expect 2 back")
+	a.ExpectEquals(t, "proxy-source", dpRecieved.Dimensions()["sf_source"], "Expect ahost back")
+
+	timeToSend = time.Now().Round(time.Second)
+	dpSent = core.NewAbsoluteTimeDatapoint("metric", map[string]string{"cpusize": "big", "hostname": "ahost"}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
+	forwarder.DatapointsChannel() <- dpSent
+	dpRecieved = <-finalDatapointDestination.datapointsChannel
+	i, _ = dpRecieved.Value().IntValue()
+	a.ExpectEquals(t, int64(2), i, "Expect 2 back")
+	a.ExpectEquals(t, "ahost", dpRecieved.Dimensions()["sf_source"], "Expect ahost back")
 
 	dpSent = core.NewAbsoluteTimeDatapoint("metric", map[string]string{}, value.NewFloatWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
 	forwarder.DatapointsChannel() <- dpSent

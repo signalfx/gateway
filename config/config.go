@@ -25,16 +25,19 @@ type ForwardTo struct {
 	MetricCreationURL *string
 	MaxDrainSize      *uint32
 	Filename          *string
+	SourceDimensions  *string
 }
 
 // ListenFrom configures where we forward datapoints to
 type ListenFrom struct {
-	Type            string
-	ListenAddr      *string
-	Timeout         *string
-	Name            *string
-	Encrypted       *bool
-	TimeoutDuration *time.Duration `json:"-"`
+	Type                       string
+	ListenAddr                 *string
+	MetricDeconstructor        *string
+	MetricDeconstructorOptions *string
+	Timeout                    *string
+	Name                       *string
+	Encrypted                  *bool
+	TimeoutDuration            *time.Duration `json:"-"`
 }
 
 func (listenFrom *ListenFrom) String() string {
