@@ -43,11 +43,10 @@ RUN go get github.com/signalfuse/signalfxproxy
 
 ENV PATH $GOPATH/bin:$PATH
 
-# For lint/vet/format verification
-ADD .git /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/.git
-RUN ls $GOPATH/bin
-RUN echo $PATH
-RUN cd /opt/sfproxy/src/github.com/signalfuse/signalfxproxy && /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/travis_check.sh
+# For lint/vet/format verification. (.git directory not in quay.io)
+# ADD .git /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/.git
+# Can't do this yet. quay.io doesn't add .git and we depend upon git ls-files
+# RUN cd /opt/sfproxy/src/github.com/signalfuse/signalfxproxy && /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/travis_check.sh
 
 # Add run command
 VOLUME /var/log/sfproxy
