@@ -36,6 +36,7 @@ RUN go get github.com/golang/lint/golint
 RUN go get code.google.com/p/go.tools/cmd/vet
 RUN go get github.com/stretchr/testify/mock
 RUN go get code.google.com/p/go.tools/cmd/cover
+RUN go env
 RUN go get -u ./...
 
 RUN export PATH=$GOPATH/bin:$PATH
