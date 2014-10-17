@@ -1,2 +1,2 @@
 #!/bin/bash
-git ls-files | grep go | xargs -n1 go fmt
+find . -type f | grep -v '.git' | grep '.go' | xargs -n1 go fmt
