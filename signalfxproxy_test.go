@@ -8,15 +8,22 @@ import (
 )
 
 func TestProxyPidWrite(t *testing.T) {
-	a.ExpectEquals(t, nil, writePidFile("/tmp/pidfile"), "Expect no error writing PID")
+	fileObj, _ := ioutil.TempFile("", "gotest")
+	filename := fileObj.Name()
+	defer os.Remove(filename)
+
+	a.ExpectNil(t, writePidFile(filename))
 }
 
 func TestProxyPidWriteError(t *testing.T) {
-	a.ExpectNotEquals(t, nil, writePidFile("/root"), "Expect error writing PID")
+	a.ExpectNotNil(t, writePidFile("/root"))
 }
 
 func TestProxyInvalidConfig(t *testing.T) {
-	filename := "/tmp/config.db.3"
+	fileObj, _ := ioutil.TempFile("", "gotest")
+	filename := fileObj.Name()
+	defer os.Remove(filename)
+
 	ioutil.WriteFile(filename, []byte{}, os.FileMode(0666))
 	proxyCommandLineConfiguration = proxyCommandLineConfigurationT{
 		configFileName: filename,
@@ -29,7 +36,10 @@ func TestProxyInvalidConfig(t *testing.T) {
 }
 
 func TestProxyEmptyConfig(t *testing.T) {
-	filename := "/tmp/config.db.2"
+	fileObj, _ := ioutil.TempFile("", "gotest")
+	filename := fileObj.Name()
+	defer os.Remove(filename)
+
 	ioutil.WriteFile(filename, []byte(`{}`), os.FileMode(0666))
 	proxyCommandLineConfiguration.configFileName = filename
 	go func() {
@@ -39,9 +49,11 @@ func TestProxyEmptyConfig(t *testing.T) {
 }
 
 func TestProxyOkLoading(t *testing.T) {
-	filename := "/tmp/config.db.1"
+	fileObj, _ := ioutil.TempFile("", "gotest")
+	filename := fileObj.Name()
+	defer os.Remove(filename)
+
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"csv", "Filename":"/tmp/acsvfile"}], "ListenFrom":[{"Type":"carbon", "Port":"11616"}]}`), os.FileMode(0666))
-	//	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"csv", "Filename":"/tmp/acsvfile"}]}`), os.FileMode(0666))
 	proxyCommandLineConfiguration = proxyCommandLineConfigurationT{
 		configFileName: filename,
 		stopChannel:    make(chan bool),
@@ -53,7 +65,10 @@ func TestProxyOkLoading(t *testing.T) {
 }
 
 func TestProxyListenerError(t *testing.T) {
-	filename := "/tmp/config.db.10"
+	fileObj, _ := ioutil.TempFile("", "gotest")
+	filename := fileObj.Name()
+	defer os.Remove(filename)
+
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ListenFrom":[{"Type":"carbon"}, {"Type":"carbon"}]}`), os.FileMode(0666))
 	proxyCommandLineConfiguration = proxyCommandLineConfigurationT{
 		configFileName: filename,
@@ -66,7 +81,10 @@ func TestProxyListenerError(t *testing.T) {
 }
 
 func TestProxyForwardError(t *testing.T) {
-	filename := "/tmp/config.db.11"
+	fileObj, _ := ioutil.TempFile("", "gotest")
+	filename := fileObj.Name()
+	defer os.Remove(filename)
+
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"carbon", "Host":"192.168.100.108", "Timeout": "1s"}]}`), os.FileMode(0666))
 	proxyCommandLineConfiguration = proxyCommandLineConfigurationT{
 		configFileName: filename,
@@ -79,7 +97,10 @@ func TestProxyForwardError(t *testing.T) {
 }
 
 func TestProxyUnknownForwarder(t *testing.T) {
-	filename := "/tmp/config.db.4"
+	fileObj, _ := ioutil.TempFile("", "gotest")
+	filename := fileObj.Name()
+	defer os.Remove(filename)
+
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"unknown"}]}`), os.FileMode(0666))
 	proxyCommandLineConfiguration = proxyCommandLineConfigurationT{
 		configFileName: filename,
@@ -92,7 +113,10 @@ func TestProxyUnknownForwarder(t *testing.T) {
 }
 
 func TestProxyUnknownListener(t *testing.T) {
-	filename := "/tmp/config.db.6"
+	fileObj, _ := ioutil.TempFile("", "gotest")
+	filename := fileObj.Name()
+	defer os.Remove(filename)
+
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ListenFrom":[{"Type":"unknown"}]}`), os.FileMode(0666))
 	proxyCommandLineConfiguration = proxyCommandLineConfigurationT{
 		configFileName: filename,
