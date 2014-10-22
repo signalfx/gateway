@@ -61,6 +61,36 @@ Use the file exampleSfdbproxy.conf as an example configuration.  Importantly,
 replace DefaultAuthToken with your auth token and remove any listeners or
 forwarders you don't use.
 
+Code layout
+-----------
+
+You only need to read this if you want to develop the proxy or understand
+the proxy's code.
+
+The proxy is divided into two main components: [forwarder(forwarder)]
+and [listener(listener)].  The forwarder and listener are glued together
+by the [demultiplexer(forwarder/demultiplexer.go)].
+
+When a listener recieves a datapoint, it converts the datapoint into a
+basic [datapoint type(core/datapoint.go)].  This core datapoint type is
+then sent to the multiplexer that will send a pointer to that datapoint
+to each forwarder.
+
+Sometimes there is a loss of fidelity during transmition if a listener
+and forwarder don't support the same options.  While it's impossible
+to make something understand an option it does not, we don't want to
+forget support for this option when we translate a datapoint through
+the multiplexer.  We work around this by sometimes encoding the raw
+representation of the datapoint into the Datapoint object we forward.
+For example, points from carbon are not only translated into our core
+datapoint format, but also support [ToCarbonLine(protocoltypes/carbon.go)]
+which allows us to directly convert the abstract datapoint into what it
+looked like for carbon, which allows us to forward the point to another
+carbon database exactly as we received it.
+
+All message passing between forwarders, multiplexer, and listeners
+happen on golang's built in channel abstraction.
+
 Build status
 ------------
 
