@@ -28,9 +28,6 @@ ADD signalfxproxy_test.go /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 
 ADD travis_check.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 
-ADD lint_all.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
-ADD vet_all.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
-ADD format_all.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 ADD README.md /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 
 ENV GOPATH /opt/sfproxy
