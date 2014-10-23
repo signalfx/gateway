@@ -71,12 +71,12 @@ The proxy is divided into two main components: [forwarder](forwarder)
 and [listener](listener).  The forwarder and listener are glued together
 by the [demultiplexer](forwarder/demultiplexer.go).
 
-When a listener recieves a datapoint, it converts the datapoint into a
+When a listener receives a datapoint, it converts the datapoint into a
 basic [datapoint type](core/datapoint.go).  This core datapoint type is
 then sent to the multiplexer that will send a pointer to that datapoint
 to each forwarder.
 
-Sometimes there is a loss of fidelity during transmition if a listener
+Sometimes there is a loss of fidelity during transmission if a listener
 and forwarder don't support the same options.  While it's impossible
 to make something understand an option it does not, we don't want to
 forget support for this option when we translate a datapoint through
