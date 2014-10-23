@@ -8,6 +8,8 @@ import (
 	"github.com/signalfuse/signalfxproxy/forwarder"
 	"github.com/signalfuse/signalfxproxy/listener"
 	"io/ioutil"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"strconv"
 )
@@ -24,6 +26,7 @@ func writePidFile(pidFileName string) error {
 type proxyCommandLineConfigurationT struct {
 	configFileName string
 	pidFileName    string
+	pprofaddr      string
 	stopChannel    chan bool
 }
 
@@ -32,10 +35,18 @@ var proxyCommandLineConfiguration proxyCommandLineConfigurationT
 func init() {
 	flag.StringVar(&proxyCommandLineConfiguration.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
 	flag.StringVar(&proxyCommandLineConfiguration.pidFileName, "signalfxproxypid", "signalfxproxy.pid", "Name of the file to store the PID in")
+	flag.StringVar(&proxyCommandLineConfiguration.pprofaddr, "pprofaddr", "", "Address to open pprof info on")
 	proxyCommandLineConfiguration.stopChannel = make(chan bool)
 }
 
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() {
+	if proxyCommandLineConfiguration.pprofaddr != "" {
+		go func() {
+			glog.Infof("Opening pprof debug information on %s", proxyCommandLineConfiguration.pprofaddr)
+			err := http.ListenAndServe(proxyCommandLineConfiguration.pprofaddr, nil)
+			glog.Infof("Finished listening: %s", err)
+		}()
+	}
 	writePidFile(proxyCommandLineConfiguration.pidFileName)
 	glog.Infof("Looking for config file %s\n", proxyCommandLineConfiguration.configFileName)
 

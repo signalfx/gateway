@@ -42,6 +42,7 @@ func TestProxyEmptyConfig(t *testing.T) {
 
 	ioutil.WriteFile(filename, []byte(`{}`), os.FileMode(0666))
 	proxyCommandLineConfiguration.configFileName = filename
+	proxyCommandLineConfiguration.pprofaddr = "0.0.0.0:0"
 	go func() {
 		proxyCommandLineConfiguration.stopChannel <- true
 	}()
