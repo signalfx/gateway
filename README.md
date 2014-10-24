@@ -1,5 +1,4 @@
-signalfxproxy
-=============
+# signalfxproxy
 
 The proxy is a multilingual datapoint demultiplexer that can accept time
 series data from the statsd, carbon, or signalfuse protocols and emit
@@ -8,8 +7,7 @@ signalfuse protocol.  The proxy is ideally placed on the same server as
 either another aggregator, such as statsd, or on a central server that
 is already receiving datapoints, such as graphite's carbon database.
 
-Install
--------
+## Install
 
 ```
   mkdir -p /opt/sfproxy
@@ -18,51 +16,44 @@ Install
   env GOPATH=`pwd` go get -u github.com/signalfuse/signalfxproxy
  ```
 
-Running
--------
+## Running
 
 ```
    ./src/github.com/signalfuse/signalfxproxy/start.sh -logtostderr
  ```
 
-Running as daemon
------------------
+## Running as daemon
 
 ```
    nohup ./src/github.com/signalfuse/signalfxproxy/start.sh &
  ```
 
-Stopping the daemon
--------------------
+## Stopping the daemon
 
 ```
    ./src/github.com/signalfuse/signalfxproxy/stop.sh
  ```
 
-Debug logging
--------------
+## Debug logging
 
 ```
    /opt/proxy/bin/signalfxproxy --configfile /tmp/sfdbproxy.conf -v=3
  ```
 
-Debugging
----------
+## Debugging
 
 ```
   cd /var/log/sfproxy
   tail -F *
 ```
 
-Configuration
--------------
+## Configuration
 
 Use the file exampleSfdbproxy.conf as an example configuration.  Importantly,
 replace DefaultAuthToken with your auth token and remove any listeners or
 forwarders you don't use.
 
-Code layout
------------
+## Code layout
 
 You only need to read this if you want to develop the proxy or understand
 the proxy's code.
@@ -91,9 +82,29 @@ carbon database exactly as we received it.
 All message passing between forwarders, multiplexer, and listeners
 happen on golang's built in channel abstraction.
 
-Build status
-------------
+## Development
+
+If you want to submit patches for the proxy, make sure your code passes
+[travis_check.sh](travis_check.sh) with exit code 0.  For help setting
+up your development enviroment, it should be enough to mirror the install
+steps of [.travis.yml](.travis.yml).  You may need to make sure your GOPATH
+env variable is set correctly.
+
+## Docker
+
+The proxy comes with a [docker image](Dockerfile) that is built and deployed
+to [quay.io](https://quay.io/repository/signalfuse/signalfxproxy).  It assumes
+you will have a sfdbconfig.json file cross mounted to
+/var/config/sfproxy/sfdbconfig.json for the docker container.
+
+## Build status
+
+### Travis
 
 [![Build Status](https://travis-ci.org/signalfuse/signalfxproxy.svg?branch=master)](https://travis-ci.org/signalfuse/signalfxproxy)
+
+### Quay
+
 [![Docker Repository on Quay.io](https://quay.io/repository/signalfuse/signalfxproxy/status
 "Docker Repository on Quay.io")](https://quay.io/repository/signalfuse/signalfxproxy)
+
