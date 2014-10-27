@@ -1,6 +1,7 @@
 #!/bin/bash
 set -x
 rm -f /tmp/a || exit 1
+go install . || exit 1
 find . -type f | grep -v '.git' | grep '.go' | xargs -n1 -P8 go fmt > /tmp/a || exit 1
 [[ ! -s /tmp/a ]] || cat /tmp/a
 [[ ! -s /tmp/a ]] || exit 1

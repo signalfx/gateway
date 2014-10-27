@@ -145,6 +145,21 @@ func (connector *signalfxJSONConnector) encodePostBodyV2(datapoints []core.Datap
 	return jsonBytes, "application/json", err
 }
 
+func (connector *signalfxJSONConnector) encodePostBodyProtobufV2(datapoints []core.Datapoint) ([]byte, string, error) {
+	dps := []*com_signalfuse_metrics_protobuf.DataPoint{}
+	for _, dp := range datapoints {
+		dps = append(dps, connector.coreDatapointToProtobuf(dp))
+	}
+	msg := &com_signalfuse_metrics_protobuf.DataPointUploadMessage{
+		Datapoints: dps,
+	}
+	protobytes, err := protoXXXMarshal(msg)
+	glog.V(3).Infof("Posting %s from %s", protobytes, dps)
+
+	// Now we can send datapoints
+	return protobytes, "application/x-protobuf", err
+}
+
 func datumForPoint(pv value.DatapointValue) *com_signalfuse_metrics_protobuf.Datum {
 	i, err := pv.IntValue()
 	if err == nil {
@@ -240,15 +255,51 @@ func (connector *signalfxJSONConnector) figureOutReasonableSource(point core.Dat
 	return connector.defaultSource
 }
 
+func (connector *signalfxJSONConnector) requiresSource() bool {
+	return connector.sendVersion == 0 || connector.sendVersion == 1
+}
+
+func (connector *signalfxJSONConnector) coreDatapointToProtobuf(point core.Datapoint) *com_signalfuse_metrics_protobuf.DataPoint {
+	thisPointSource := connector.figureOutReasonableSource(point)
+	if thisPointSource == "" && connector.requiresSource() {
+		glog.Warningf("unable to figure out a reasonable source for %s, skipping", point)
+		return nil
+	}
+	m := point.Metric()
+	ts := point.Timestamp().UnixNano() / time.Millisecond.Nanoseconds()
+	relativeTimeDp, ok := point.(core.TimeRelativeDatapoint)
+	if ok {
+		ts = relativeTimeDp.RelativeTime()
+	}
+	mt := point.MetricType()
+	v := &com_signalfuse_metrics_protobuf.DataPoint{
+		Metric:     &m,
+		Timestamp:  &ts,
+		Value:      datumForPoint(point.Value()),
+		MetricType: &mt,
+		Dimensions: mapToDimensions(point.Dimensions()),
+	}
+	if thisPointSource != "" {
+		v.Source = &thisPointSource
+	}
+	return v
+}
+
+func mapToDimensions(dimensions map[string]string) []*com_signalfuse_metrics_protobuf.Dimension {
+	ret := []*com_signalfuse_metrics_protobuf.Dimension{}
+	for k, v := range dimensions {
+		ret = append(ret, (&com_signalfuse_metrics_protobuf.Dimension{
+			Key:   &k,
+			Value: &v,
+		}))
+	}
+	return ret
+}
+
 func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datapoint) ([]byte, string, error) {
 	var msgBody []byte
 	metricsToBeCreated := make(map[string]com_signalfuse_metrics_protobuf.MetricType)
 	for _, point := range datapoints {
-		thisPointSource := connector.figureOutReasonableSource(point)
-		if thisPointSource == "" {
-			glog.Warningf("unable to figure out a reasonable source for %s, skipping", point)
-			continue
-		}
 		if point.MetricType() != com_signalfuse_metrics_protobuf.MetricType_GAUGE {
 			preCreated := func() bool {
 				connector.v1MetricLoadedCacheMutex.Lock()
@@ -261,17 +312,9 @@ func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datap
 				metricsToBeCreated[point.Metric()] = point.MetricType()
 			}
 		}
-		m := point.Metric()
-		ts := point.Timestamp().UnixNano() / time.Millisecond.Nanoseconds()
-		relativeTimeDp, ok := point.(core.TimeRelativeDatapoint)
-		if ok {
-			ts = relativeTimeDp.RelativeTime()
-		}
-		v := &com_signalfuse_metrics_protobuf.DataPoint{
-			Source:    &thisPointSource,
-			Metric:    &m,
-			Timestamp: &ts,
-			Value:     datumForPoint(point.Value()),
+		v := connector.coreDatapointToProtobuf(point)
+		if v == nil {
+			continue
 		}
 		glog.V(3).Infof("Single datapoint to signalfx: %s", v)
 		encodedBytes, err := protoXXXMarshal(v)
@@ -306,6 +349,8 @@ func (connector *signalfxJSONConnector) GetStats() []core.Datapoint {
 
 func (connector *signalfxJSONConnector) encodePostBody(datapoints []core.Datapoint) ([]byte, string, error) {
 	switch connector.sendVersion {
+	case 3:
+		return connector.encodePostBodyProtobufV2(datapoints)
 	case 2:
 		return connector.encodePostBodyV2(datapoints)
 	default:

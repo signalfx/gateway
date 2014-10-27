@@ -159,8 +159,12 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	sfForwarder.sendVersion = 2
 	_, _, err = sfForwarder.encodePostBody([]core.Datapoint{dpSent, dpStr})
 	sfForwarder.sendVersion = 1
-	a.ExpectEquals(t, nil, err, "Expected no error making no metrics")
-	protoXXXMarshal = proto.Marshal
+	a.ExpectEquals(t, nil, err, "Expected no error making metrics")
+
+	sfForwarder.sendVersion = 3
+	_, _, err = sfForwarder.encodePostBody([]core.Datapoint{dpSent, dpStr})
+	sfForwarder.sendVersion = 1
+	a.ExpectEquals(t, nil, err, "Expected no error making metrics")
 
 	prevURL := sfForwarder.url
 	sfForwarder.url = "http://0.0.0.0:12333/vvv/s"
