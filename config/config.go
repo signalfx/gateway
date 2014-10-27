@@ -26,6 +26,7 @@ type ForwardTo struct {
 	MaxDrainSize      *uint32
 	Filename          *string
 	SourceDimensions  *string
+	FormatVersion     *uint32
 }
 
 // ListenFrom configures where we forward datapoints to

@@ -76,6 +76,7 @@ var defaultConfig = &config.ForwardTo{
 	Name:              workarounds.GolangDoesnotAllowPointerToStringLiteral("signalfx-forwarder"),
 	MaxDrainSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(100)),
 	SourceDimensions:  workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
+	FormatVersion:     workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1)),
 }
 
 // SignalfxJSONForwarderLoader loads a json forwarder forwarding points from proxy to SignalFx
@@ -84,13 +85,13 @@ func SignalfxJSONForwarderLoader(forwardTo *config.ForwardTo) (core.StatKeepingS
 	glog.Infof("Creating signalfx forwarder using final config %s", forwardTo)
 	return NewSignalfxJSONForwarer(*forwardTo.URL, *forwardTo.TimeoutDuration, *forwardTo.BufferSize,
 		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads, *forwardTo.Name, *forwardTo.MetricCreationURL,
-		*forwardTo.MaxDrainSize, *forwardTo.DefaultSource, *forwardTo.SourceDimensions)
+		*forwardTo.MaxDrainSize, *forwardTo.DefaultSource, *forwardTo.SourceDimensions, int(*forwardTo.FormatVersion))
 }
 
 // NewSignalfxJSONForwarer creates a new JSON forwarder
 func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint32,
 	defaultAuthToken string, drainingThreads uint32, name string, MetricCreationURL string,
-	maxDrainSize uint32, defaultSource string, sourceDimensions string) (core.StatKeepingStreamingAPI, error) {
+	maxDrainSize uint32, defaultSource string, sourceDimensions string, sendVersion int) (core.StatKeepingStreamingAPI, error) {
 	tr := &http.Transport{
 		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
 		MaxIdleConnsPerHost: int(drainingThreads) * 2,
@@ -99,7 +100,7 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint3
 		basicBufferedForwarder: newBasicBufferedForwarder(bufferSize, maxDrainSize, name, drainingThreads),
 		url:              url,
 		defaultAuthToken: defaultAuthToken,
-		sendVersion:      1,
+		sendVersion:      sendVersion,
 		userAgent:        fmt.Sprintf("SignalfxProxy/0.1 (gover %s)", runtime.Version()),
 		tr:               tr,
 		client: &http.Client{
