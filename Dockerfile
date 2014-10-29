@@ -9,7 +9,7 @@ RUN apt-get update
 RUN apt-get -y upgrade
 
 # Install dependencies
-RUN apt-get -y install golang git mercurial curl ruby ghc6 ghc6-prof ghc6-doc cabal-install
+RUN apt-get -y install golang git mercurial curl ruby ghc ghc-prof ghc-doc cabal-install
 RUN cabal update
 RUN cabal install shellcheck
 RUN ln ~/.cabal/bin/shellcheck /usr/bin/shellcheck
