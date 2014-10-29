@@ -33,7 +33,7 @@ is_running() {
 
 case "$1" in
     start-foreground | start)
-    if [ "$1" == "start-foreground" ]; then
+    if [ "$1" = "start-foreground" ]; then
         nohup = ""
     fi
     if [ ! -f $binary ]; then
