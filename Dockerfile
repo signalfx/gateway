@@ -29,6 +29,7 @@ ADD protocoltypes /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/protocolt
 ADD signalfxproxy.go /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 ADD signalfxproxy_test.go /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 
+ADD exampleSfdbproxy.conf /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 ADD travis_check.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 ADD install.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 ADD signalfxproxy /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
