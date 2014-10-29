@@ -7,10 +7,11 @@ go:
 
 install:
   - sudo apt-get update
-  - sudo apt-get install ghc6 ghc6-prof ghc6-doc
+  - sudo apt-get install -y ghc6 ghc6-prof ghc6-doc cabal-install
   - cabal update
   - cabal install cabal-install
   - cabal install shellcheck
+  - sudo ln ~/.cabal/bin/shellcheck /usr/bin/shellcheck
   - go get github.com/golang/lint/golint
   - go get code.google.com/p/go.tools/cmd/vet
   - go get github.com/stretchr/testify/mock
