@@ -5,7 +5,7 @@ APT_GET_CMD=$(which apt-get)
 GO_CMD=$(which go)
 HG_CMD=$(which hg)
 
-if [ ! -z $GO_CMD && ! -z $HG_CMD ]; then
+if [ ! -z $GO_CMD ] && [ ! -z $HG_CMD ]; then
   set -e
 elif [ ! -z $APT_GET_CMD ]; then
   set -e
