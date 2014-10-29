@@ -73,9 +73,15 @@ func TestLoadConfig(t *testing.T) {
 	err := ioutil.WriteFile(filename, []byte(`{"ListenFrom":[{"Timeout":"3s"}]}`), os.FileMode(0644))
 	defer os.Remove(filename)
 	_, err = LoadConfig(filename)
+	prev := xdgbasedirGetConfigFileLocation
 	xdgbasedirGetConfigFileLocation = func(string) (string, error) { return "", errors.New("bad") }
+	defer func() { xdgbasedirGetConfigFileLocation = prev }()
 	_, err = LoadConfig(filename)
 	a.ExpectEquals(t, "bad", fmt.Sprintf("%s", err), "Expect error when xdg loading fails")
+	xdgbasedirGetConfigFileLocation = func(string) (string, error) { return filename, nil }
+	_, err = LoadConfig(filename)
+	a.ExpectNil(t, err)
+
 }
 
 func TestDecodeConfig(t *testing.T) {

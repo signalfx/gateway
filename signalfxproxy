@@ -47,10 +47,12 @@ case "$1" in
         fi
         nohup sudo "-u" "$user" "$binary" "-configfile" "$configfile" "-log_dir" "$logdir"  2>&1 | sudo tee -a "$stdout_log" &
         echo "$!" > "$pid_file"
+        sleep 1 # Give it time to try to open ports and connect
         if ! is_running; then
             echo "Unable to start, see $stdout_log"
             exit 1
         fi
+        echo "Started $name"
     fi
     ;;
     stop)

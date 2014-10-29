@@ -106,14 +106,16 @@ func LoadConfig(configFile string) (*LoadedConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	config, err := loadConfig(filename)
-	if err != nil {
-		glog.Errorf("Unable to load config from %s with error %s\n", configFile, err)
-		config, err = loadConfig(configFile)
-		if err != nil {
-			glog.Errorf("Unable to load config from %s with error %s\n", configFile, err)
-			return nil, err
-		}
+	config, errFilename := loadConfig(filename)
+	if errFilename == nil {
+		return nil, errFilename
 	}
-	return config, err
+	glog.V(1).Infof("Unable to load config from %s with error %s\n", filename, errFilename)
+	var errConfigfile error
+	config, errConfigfile = loadConfig(configFile)
+	if errConfigfile != nil {
+		glog.Errorf("Unable to load config from %s or %s with error %s | %s\n", filename, configFile, errFilename, errConfigfile)
+		return nil, errConfigfile
+	}
+	return config, nil
 }
