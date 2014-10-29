@@ -6,7 +6,6 @@ go:
   - release
 
 install:
-  - sudo apt-get install -y cabal
   - cabal update
   - cabal install cabal-install
   - cabal install shellcheck
