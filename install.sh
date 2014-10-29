@@ -1,8 +1,24 @@
 #!/bin/sh
-set -e
+
+YUM_CMD=$(which yum)
+APT_GET_CMD=$(which apt-get)
+GO_CMD=$(which go)
+
+if [[ ! -z $GO_CMD ]]; then
+  set -e
+elif [[ ! -z $APT_GET_CMD ]]; then
+  set -e
+  apt-get install -y golang
+elif [[ ! -z $YUM_CMD ]]; then
+  set -e
+  yum install -y golang
+else
+  echo "Unable to find package manager"
+  exit 1
+fi
+
 mkdir -p /opt/sfproxy
 cd /opt/sfproxy
-yum install -y golang
 env GOPATH=`pwd` go get -u github.com/signalfuse/signalfxproxy
 ln -s /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/signalfxproxy /etc/init.d/signalfxproxy
 if [ ! -f /opt/sfproxy/bin/signalfxproxy ]; then
