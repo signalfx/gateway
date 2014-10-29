@@ -1,5 +1,12 @@
 #!/bin/bash
 set -x
+shellcheck install.sh || exit 1
+shellcheck signalfxproxy || exit 1
+shellcheck travis_check.sh || exit 1
+set -e
+python -m json.tool < exampleSfdbproxy.conf
+set +e
+
 rm -f /tmp/a || exit 1
 go install . || exit 1
 find . -type f | grep -v '.git' | grep '.go' | xargs -n1 -P8 go fmt > /tmp/a || exit 1
