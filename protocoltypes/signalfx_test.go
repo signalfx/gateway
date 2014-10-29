@@ -21,4 +21,9 @@ func TestNewProtobufDataPoint(t *testing.T) {
 	protoDatapoint.MetricType = &v
 	dp = NewProtobufDataPointWithType(protoDatapoint, com_signalfuse_metrics_protobuf.MetricType_COUNTER)
 	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER, dp.MetricType(), "Line should be invalid")
+
+	item := &BodySendFormatV2{
+		Metric: "ametric",
+	}
+	a.ExpectContains(t, item.String(), "ametric", "Should get metric name back")
 }

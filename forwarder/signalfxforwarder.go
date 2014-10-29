@@ -50,22 +50,6 @@ type signalfxJSONConnector struct {
 	MetricCreationURL        string
 }
 
-// ValueToSend are values are sent from the proxy to a reciever for the datapoint
-type ValueToSend interface {
-}
-
-// BodySendFormat is the JSON format signalfx datapoints are expected to be in
-type BodySendFormat struct {
-	Metric     string            `json:"metric"`
-	Timestamp  int64             `json:"timestamp"`
-	Value      ValueToSend       `json:"value"`
-	Dimensions map[string]string `json:"dimensions"`
-}
-
-func (bodySendFormat *BodySendFormat) String() string {
-	return fmt.Sprintf("DP[metric=%s|time=%d|val=%s|dimensions=%s]", bodySendFormat.Metric, bodySendFormat.Timestamp, bodySendFormat.Value, bodySendFormat.Dimensions)
-}
-
 var defaultConfig = &config.ForwardTo{
 	URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfuse.com/v1/datapoint"),
 	DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
@@ -120,9 +104,9 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint3
 }
 
 func (connector *signalfxJSONConnector) encodePostBodyV2(datapoints []core.Datapoint) ([]byte, string, error) {
-	bodyToSend := make(map[string][]*BodySendFormat)
+	bodyToSend := make(protocoltypes.SignalfxJSONDatapointV2)
 	for _, dp := range datapoints {
-		bsf := &BodySendFormat{
+		bsf := &protocoltypes.BodySendFormatV2{
 			Metric:     dp.Metric(),
 			Timestamp:  dp.Timestamp().UnixNano() / time.Millisecond.Nanoseconds(),
 			Dimensions: dp.Dimensions(),
@@ -135,7 +119,7 @@ func (connector *signalfxJSONConnector) encodePostBodyV2(datapoints []core.Datap
 		}
 		_, ok := bodyToSend[dp.MetricType().String()]
 		if !ok {
-			bodyToSend[dp.MetricType().String()] = make([]*BodySendFormat, 0)
+			bodyToSend[dp.MetricType().String()] = make([]*protocoltypes.BodySendFormatV2, 0)
 		}
 		bodyToSend[dp.MetricType().String()] = append(bodyToSend[dp.MetricType().String()], bsf)
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/listener"
+	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"testing"
 	//	"time"
 	"code.google.com/p/goprotobuf/proto"
@@ -19,7 +20,9 @@ import (
 )
 
 func TestBodySendFormat(t *testing.T) {
-	b := &BodySendFormat{Metric: "cpu"}
+	b := &protocoltypes.BodySendFormatV2{
+		Metric: "cpu",
+	}
 	a.ExpectContains(t, b.String(), "cpu", "Expect cpu")
 }
 
@@ -32,6 +35,7 @@ func (vp *metricPanicDatapoint) Metric() string {
 }
 
 func TestSignalfxJSONForwarderLoader(t *testing.T) {
+	// TODO: Break this out into smaller tests
 	listenFromSignalfx := config.ListenFrom{}
 	listenFromSignalfx.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12345")
 

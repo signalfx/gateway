@@ -150,24 +150,24 @@ func SignalFxListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, li
 
 var jsonXXXMarshal = json.Marshal
 
+type decoderFunc func(core.DatapointStreamingAPI, map[string]com_signalfuse_metrics_protobuf.MetricType, *sync.Mutex) func(*http.Request) error
+
 // StartServingHTTPOnPort servers http requests for Signalfx datapoints
 func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.DatapointStreamingAPI, clientTimeout time.Duration) (DatapointListener, error) {
 	mux := http.NewServeMux()
 	metricCreationsMap := make(map[string]com_signalfuse_metrics_protobuf.MetricType)
 	metricCreationsMapMutex := &sync.Mutex{}
-	datapointHandler := func(writter http.ResponseWriter, req *http.Request) {
+
+	datapointHandler := func(writter http.ResponseWriter, req *http.Request, knownTypes map[string]decoderFunc) {
 		contentType := req.Header.Get("Content-type")
-		var decoderFunc func(*http.Request) error
-		if contentType == "" || contentType == "application/json" {
-			decoderFunc = jsonDecoderFunction(DatapointStreamingAPI, metricCreationsMap, metricCreationsMapMutex)
-		} else if contentType == "" || contentType == "application/x-protobuf" {
-			decoderFunc = protobufDecoderFunction(DatapointStreamingAPI, metricCreationsMap, metricCreationsMapMutex)
-		} else {
+		decoderFunc, ok := knownTypes[contentType]
+
+		if !ok {
 			writter.WriteHeader(http.StatusBadRequest)
 			writter.Write([]byte(`{msg:"Unknown content type"}`))
 			return
 		}
-		err := decoderFunc(req)
+		err := decoderFunc(DatapointStreamingAPI, metricCreationsMap, metricCreationsMapMutex)(req)
 		if err != nil {
 			writter.WriteHeader(http.StatusBadRequest)
 			writter.Write([]byte(err.Error()))
@@ -176,6 +176,20 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 			writter.Write([]byte(`"OK"`))
 		}
 	}
+
+	datapointHandlerV1 := func(writter http.ResponseWriter, req *http.Request) {
+		knownTypes := map[string]decoderFunc{
+			"":                       jsonDecoderFunction,
+			"application/json":       jsonDecoderFunction,
+			"application/x-protobuf": protobufDecoderFunction,
+		}
+		datapointHandler(writter, req, knownTypes)
+	}
+
+	//	datapointHandlerV2 := func(writter http.ResponseWriter, req *http.Request) {
+	//		knownTypes := map[string]decoderFunc{"": jsonDecoderFunctionV2,"application/json": jsonDecoderFunctionV2, "application/x-protobuf", protobufDecoderFunctionV2}
+	//		datapointHandler(writter, req, knownTypes);
+	//	}
 
 	metricHandler := func(writter http.ResponseWriter, req *http.Request) {
 		dec := json.NewDecoder(req.Body)
@@ -212,10 +226,13 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 	}
 	mux.HandleFunc(
 		"/datapoint",
-		datapointHandler)
+		datapointHandlerV1)
 	mux.HandleFunc(
 		"/v1/datapoint",
-		datapointHandler)
+		datapointHandlerV1)
+	//	mux.HandleFunc(
+	//		"/v2/datapoint",
+	//		datapointHandlerV2)
 	mux.HandleFunc(
 		"/v1/metric",
 		metricHandler)
