@@ -11,6 +11,10 @@ is already receiving datapoints, such as graphite's carbon database.
 
 ```
   ./install.sh
+  # Config at    /etc/sfdbconfig.conf
+  # Binary at    /opt/sfproxy/bin/signalfxproxy
+  # Logs at      /var/log/sfproxy
+  # PID file at  /var/run/signalfxproxy.pid
  ```
 
 ## Running
