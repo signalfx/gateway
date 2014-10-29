@@ -18,6 +18,7 @@ else
 fi
 
 rm -rf /opt/sfproxy
+rm -f /etc/init.d/signalfxproxy
 mkdir -p /opt/sfproxy
 cd /opt/sfproxy
 env GOPATH="$(pwd)" go get -u github.com/signalfuse/signalfxproxy
