@@ -15,9 +15,6 @@ configfile="/etc/sfdbconfig.conf"
 logdir="/var/log/sfproxy"
 binary="/opt/sfproxy/bin/signalfxproxy"
 
-nohup="nohup "
-cmd="$binary -configfile $configfile -log_dir $logdir"
-
 name=$(basename "$0")
 pid_file="/var/run/$name.pid"
 stdout_log="/var/log/$name.log"
@@ -31,10 +28,7 @@ is_running() {
 }
 
 case "$1" in
-    start-foreground | start)
-    if [ "$1" = "start-foreground" ]; then
-        nohup=""
-    fi
+    start)
     if [ ! -f $binary ]; then
         echo "$name not installed.  No such file $binary"
        exit 1
@@ -51,7 +45,7 @@ case "$1" in
         if [ ! -d "$logdir" ]; then
             mkdir -p $logdir
         fi
-        sudo -u "$user" "$nohup $cmd"  2>&1 | sudo tee -a "$stdout_log" &
+        nohup sudo "-u" "$user" "$binary" "-configfile" "$configfile" "-log_dir" "$logdir"  2>&1 | sudo tee -a "$stdout_log" &
         echo "$!" > "$pid_file"
         if ! is_running; then
             echo "Unable to start, see $stdout_log"
