@@ -7,31 +7,22 @@ signalfuse protocol.  The proxy is ideally placed on the same server as
 either another aggregator, such as statsd, or on a central server that
 is already receiving datapoints, such as graphite's carbon database.
 
-## Install
+## Install and upgrade
 
 ```
-  mkdir -p /opt/sfproxy
-  cd /opt/sfproxy
-  yum install -y golang
-  env GOPATH=`pwd` go get -u github.com/signalfuse/signalfxproxy
+  ./install.sh
  ```
 
 ## Running
 
 ```
-   ./src/github.com/signalfuse/signalfxproxy/start.sh -logtostderr
- ```
-
-## Running as daemon
-
-```
-   nohup ./src/github.com/signalfuse/signalfxproxy/start.sh &
+   /etc/init.d/signalfxproxy start
  ```
 
 ## Stopping the daemon
 
 ```
-   ./src/github.com/signalfuse/signalfxproxy/stop.sh
+   /etc/init.d/signalfxproxy stop
  ```
 
 ## Debug logging
