@@ -6,6 +6,8 @@ go:
   - release
 
 install:
+  - sudo deb http://us.archive.ubuntu.com/ubuntu utopic main universe
+  - sudo apt-get update
   - sudo apt-get install -y shellcheck
   - go get github.com/golang/lint/golint
   - go get code.google.com/p/go.tools/cmd/vet
