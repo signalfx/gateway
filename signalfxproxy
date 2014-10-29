@@ -51,7 +51,7 @@ case "$1" in
         if [ ! -d "$logdir" ]; then
             mkdir -p $logdir
         fi
-        sudo -u "$user" "$nohup" "$cmd"  2>&1 | sudo tee -a "$stdout_log" &
+        sudo -u "$user" "$nohup $cmd"  2>&1 | sudo tee -a "$stdout_log" &
         echo "$!" > "$pid_file"
         if ! is_running; then
             echo "Unable to start, see $stdout_log"
