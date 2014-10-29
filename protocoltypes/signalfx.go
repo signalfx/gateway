@@ -18,6 +18,27 @@ type SignalfxJSONDatapointV1 struct {
 type ValueToSend interface {
 }
 
+// ValueToDatapointValue converts the v2 JSON value to a core api Value
+func ValueToDatapointValue(v ValueToSend) (value.DatapointValue, error) {
+	f, ok := v.(float64)
+	if ok {
+		return value.NewFloatWire(f), nil
+	}
+	i, ok := v.(int64)
+	if ok {
+		return value.NewIntWire(i), nil
+	}
+	i2, ok := v.(int)
+	if ok {
+		return value.NewIntWire(int64(i2)), nil
+	}
+	s, ok := v.(string)
+	if ok {
+		return value.NewStrWire(s), nil
+	}
+	return nil, fmt.Errorf("Unable to convert value: %s", v)
+}
+
 // SignalfxJSONDatapointV2 is the V2 json datapoint sending format
 type SignalfxJSONDatapointV2 map[string][]*BodySendFormatV2
 

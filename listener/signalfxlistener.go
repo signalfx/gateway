@@ -17,6 +17,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -115,6 +116,57 @@ func jsonDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI, metri
 	}
 }
 
+func protobufDecoderFunctionV2(DatapointStreamingAPI core.DatapointStreamingAPI, metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType, metricCreationsMapMutex *sync.Mutex) func(*http.Request) error {
+	return func(req *http.Request) error {
+		if req.ContentLength == -1 {
+			return errors.New("Invalid content length")
+		}
+		var msg com_signalfuse_metrics_protobuf.DataPointUploadMessage
+		bufferedBody := bufio.NewReaderSize(req.Body, 32768)
+		buf, err := fullyReadFromBuffer(bufferedBody, uint64(req.ContentLength))
+		if err != nil {
+			return err
+		}
+		err = proto.Unmarshal(buf, &msg)
+		if err != nil {
+			return err
+		}
+		for _, protoDb := range msg.GetDatapoints() {
+			dp := protocoltypes.NewProtobufDataPointWithType(protoDb, com_signalfuse_metrics_protobuf.MetricType_GAUGE)
+			DatapointStreamingAPI.DatapointsChannel() <- dp
+		}
+		return nil
+	}
+}
+
+func jsonDecoderFunctionV2(DatapointStreamingAPI core.DatapointStreamingAPI, metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType, metricCreationsMapMutex *sync.Mutex) func(*http.Request) error {
+	return func(req *http.Request) error {
+		dec := json.NewDecoder(req.Body)
+		var d protocoltypes.SignalfxJSONDatapointV2
+		if err := dec.Decode(&d); err != nil {
+			return err
+		}
+		glog.V(3).Info("Got a new point: %s", d)
+		for metricType, datapoints := range d {
+			mt, ok := com_signalfuse_metrics_protobuf.MetricType_value[strings.ToUpper(metricType)]
+			if !ok {
+				glog.Warningf("Unknown metric type %s", metricType)
+				continue
+			}
+			for _, jsonDatapoint := range datapoints {
+				v, err := protocoltypes.ValueToDatapointValue(jsonDatapoint.Value)
+				if err != nil {
+					glog.Warningf("Unable to get value for datapoint: %s", err)
+				} else {
+					dp := core.NewRelativeTimeDatapoint(jsonDatapoint.Metric, jsonDatapoint.Dimensions, v, com_signalfuse_metrics_protobuf.MetricType(mt), jsonDatapoint.Timestamp)
+					DatapointStreamingAPI.DatapointsChannel() <- dp
+				}
+			}
+		}
+		return nil
+	}
+}
+
 func fullyReadFromBuffer(buffer *bufio.Reader, numBytes uint64) ([]byte, error) {
 	totalBytesRead := uint64(0)
 	buf := make([]byte, numBytes)
@@ -186,10 +238,14 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 		datapointHandler(writter, req, knownTypes)
 	}
 
-	//	datapointHandlerV2 := func(writter http.ResponseWriter, req *http.Request) {
-	//		knownTypes := map[string]decoderFunc{"": jsonDecoderFunctionV2,"application/json": jsonDecoderFunctionV2, "application/x-protobuf", protobufDecoderFunctionV2}
-	//		datapointHandler(writter, req, knownTypes);
-	//	}
+	datapointHandlerV2 := func(writter http.ResponseWriter, req *http.Request) {
+		knownTypes := map[string]decoderFunc{
+			"":                       jsonDecoderFunctionV2,
+			"application/json":       jsonDecoderFunctionV2,
+			"application/x-protobuf": protobufDecoderFunctionV2,
+		}
+		datapointHandler(writter, req, knownTypes)
+	}
 
 	metricHandler := func(writter http.ResponseWriter, req *http.Request) {
 		dec := json.NewDecoder(req.Body)
@@ -230,9 +286,9 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 	mux.HandleFunc(
 		"/v1/datapoint",
 		datapointHandlerV1)
-	//	mux.HandleFunc(
-	//		"/v2/datapoint",
-	//		datapointHandlerV2)
+	mux.HandleFunc(
+		"/v2/datapoint",
+		datapointHandlerV2)
 	mux.HandleFunc(
 		"/v1/metric",
 		metricHandler)

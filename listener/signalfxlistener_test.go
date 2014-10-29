@@ -12,7 +12,9 @@ import (
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
+	"io/ioutil"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -163,6 +165,27 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	a.ExpectEquals(t, "ametric", dp.Metric(), "Should get metric back!")
 	a.ExpectEquals(t, "asource", dp.Dimensions()["sf_source"], "Should get metric back!")
 
+	req, _ = http.NewRequest(
+		"POST",
+		"http://0.0.0.0:12349/v2/datapoint",
+		bytes.NewBuffer([]byte(`{"unused":[], "gauge":[{"metric":"noval", "value":{"a":"b"}}, {"metric":"metrictwo", "value": 3}]}`)),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	gotPointChan = make(chan bool)
+	go func() {
+		dp = <-sendTo.channel
+		gotPointChan <- true
+	}()
+	resp, err = client.Do(req)
+	_ = <-gotPointChan
+	a.ExpectEquals(t, resp.StatusCode, http.StatusOK, "Request should work")
+	a.ExpectEquals(t, nil, err, "Should not get an error making request")
+
+	a.ExpectEquals(t, nil, err, "Should not get an error making request")
+	a.ExpectEquals(t, resp.StatusCode, 200, "Request should work")
+	a.ExpectEquals(t, "metrictwo", dp.Metric(), "Should get metric back!")
+	a.ExpectEquals(t, 0, len(dp.Dimensions()), "Should get metric back!")
+
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/datapoint", bytes.NewBuffer([]byte(`INVALIDJSON`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
@@ -208,10 +231,45 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	a.ExpectEquals(t, "asource", dp.Dimensions()["sf_source"], "Expect source back")
 	a.ExpectEquals(t, "2", dp.Value().WireValue(), "Expect 2 back")
 
+	uploadMsg := &com_signalfuse_metrics_protobuf.DataPointUploadMessage{
+		Datapoints: []*com_signalfuse_metrics_protobuf.DataPoint{protoDatapoint},
+	}
+	dpInBytes, _ = proto.Marshal(uploadMsg)
+	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v2/datapoint", bytes.NewBuffer(dpInBytes))
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	go func() {
+		dp = <-sendTo.channel
+		gotPointChan <- true
+	}()
+	resp, err = client.Do(req)
+	a.ExpectEquals(t, resp.StatusCode, 200, "Request should work")
+	a.ExpectEquals(t, "asource", dp.Dimensions()["sf_source"], "Expect source back")
+	a.ExpectEquals(t, "2", dp.Value().WireValue(), "Expect 2 back")
+
+	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v2/datapoint", bytes.NewBuffer([]byte(`invalid`)))
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	resp, err = client.Do(req)
+	a.ExpectEquals(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: length issue")
+
+	reqObj := &http.Request{
+		ContentLength: -1,
+	}
+	a.ExpectNotNil(t, protobufDecoderFunctionV2(sendTo, make(map[string]com_signalfuse_metrics_protobuf.MetricType), &sync.Mutex{})(reqObj))
+	reqObj = &http.Request{
+		ContentLength: 20,
+		Body:          ioutil.NopCloser(strings.NewReader("abcd")),
+	}
+	a.ExpectNotNil(t, protobufDecoderFunctionV2(sendTo, make(map[string]com_signalfuse_metrics_protobuf.MetricType), &sync.Mutex{})(reqObj))
+
 	jsonXXXMarshal = func(interface{}) ([]byte, error) {
 		return nil, errors.New("Unable to marshal json")
 	}
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/metric", bytes.NewBuffer([]byte(`[{"sf_metric": "nowacounter", "sf_metricType":"COUNTER"}]`)))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = client.Do(req)
+	a.ExpectEquals(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: json issue")
+
+	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v2/datapoint", bytes.NewBuffer([]byte(`[{"sf_metric": "nowacounter", "sf_metricType":"COUNTER"}]`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
 	a.ExpectEquals(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: json issue")
