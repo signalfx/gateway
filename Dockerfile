@@ -30,6 +30,9 @@ ADD signalfxproxy.go /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 ADD signalfxproxy_test.go /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 
 ADD travis_check.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+ADD install.sh /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+ADD signalfxproxy /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
+RUN ln -s /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/signalfxproxy /etc/init.d/signalfxproxy
 
 ADD README.md /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 
