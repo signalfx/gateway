@@ -58,7 +58,7 @@ var defaultConfig = &config.ForwardTo{
 	BufferSize:        workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(10000)),
 	DrainingThreads:   workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(5)),
 	Name:              workarounds.GolangDoesnotAllowPointerToStringLiteral("signalfx-forwarder"),
-	MaxDrainSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(100)),
+	MaxDrainSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1000)),
 	SourceDimensions:  workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
 	FormatVersion:     workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1)),
 }

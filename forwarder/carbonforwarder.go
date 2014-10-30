@@ -52,7 +52,7 @@ var defaultCarbonConfig = &config.ForwardTo{
 	Port:            workarounds.GolangDoesnotAllowPointerToUint16Literal(2003),
 	DrainingThreads: workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(5)),
 	Name:            workarounds.GolangDoesnotAllowPointerToStringLiteral("carbonforwarder"),
-	MaxDrainSize:    workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(100)),
+	MaxDrainSize:    workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1000)),
 }
 
 // TcpGraphiteCarbonForwarerLoader loads a carbon forwarder
