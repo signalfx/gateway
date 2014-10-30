@@ -2,6 +2,7 @@
 set -x
 shellcheck install.sh || exit 1
 shellcheck signalfxproxy || exit 1
+# Yo dawg
 shellcheck travis_check.sh || exit 1
 set -e
 python -m json.tool < exampleSfdbproxy.conf

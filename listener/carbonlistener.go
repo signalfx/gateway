@@ -44,14 +44,14 @@ func (listener *carbonListener) handleConnection(conn net.Conn) {
 		conn.SetDeadline(time.Now().Add(listener.connectionTimeout))
 		bytes, err := readerReadBytes(reader, (byte)('\n'))
 		if err != nil && err != io.EOF {
-			glog.Warningf("Carbon listener pipe closed %s", err)
+			glog.Warningf("Listening for carbon data returned an error (Note: We timeout idle connections): %s", err)
 			return
 		}
 		line := strings.TrimSpace(string(bytes))
 		if line != "" {
 			dp, err := protocoltypes.NewCarbonDatapoint(line, listener.metricDeconstructor)
 			if err != nil {
-				glog.Warningf("Error parsing carbon line: %s", err)
+				glog.Warningf("Received data on a carbon port, but it doesn't look like carbon data: %s => %s", line, err)
 				return
 			}
 			listener.DatapointStreamingAPI.DatapointsChannel() <- dp

@@ -35,9 +35,9 @@ func (streamer *streamingDemultiplexerImpl) datapointReadingThread() {
 			select {
 			case sendTo.DatapointsChannel() <- datapoint:
 			default:
-				atomic.AddInt64(&streamer.droppedPoints[index], 1)
-				glog.Info("Dropped datapoint")
 				// Don't block operation
+				atomic.AddInt64(&streamer.droppedPoints[index], 1)
+				glog.Info("Dropped datapoint for %s", sendTo.Name())
 			}
 		}
 	}
