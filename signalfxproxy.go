@@ -55,10 +55,6 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() {
 		glog.Errorf("Unable to load config: %s", err)
 		return
 	}
-	if loadedConfig == nil {
-		glog.Fatalf("Loaded config should not be null if err != nil")
-	}
-
 	glog.Infof("Config is %s\n", loadedConfig)
 	allForwarders := []core.DatapointStreamingAPI{}
 	allStatKeepers := []core.StatKeeper{}
