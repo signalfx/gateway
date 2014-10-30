@@ -42,6 +42,14 @@ is already receiving datapoints, such as graphite's carbon database.
   tail -F *
 ```
 
+## Profiling
+
+If you start the proxy with -pprofaddr="0.0.0.0:6060", it will enable pprof
+for the proxy and you can profile it at
+[http://localhost:6060/debug/pprof/](http://localhost:6060/debug/pprof/).  You
+can find more information about how to use pprof at
+[http://golang.org/pkg/net/http/pprof/](the pprof help page).
+
 ## Configuration
 
 Use the file exampleSfdbproxy.conf as an example configuration.  Importantly,
