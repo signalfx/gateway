@@ -15,6 +15,7 @@ import (
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"runtime"
 	"strings"
@@ -77,8 +78,12 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint3
 	defaultAuthToken string, drainingThreads uint32, name string, MetricCreationURL string,
 	maxDrainSize uint32, defaultSource string, sourceDimensions string, sendVersion int) (core.StatKeepingStreamingAPI, error) {
 	tr := &http.Transport{
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
-		MaxIdleConnsPerHost: int(drainingThreads) * 2,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
+		MaxIdleConnsPerHost:   int(drainingThreads) * 2,
+		ResponseHeaderTimeout: timeout,
+		Dial: func(network, addr string) (net.Conn, error) {
+			return net.DialTimeout(network, addr, timeout)
+		},
 	}
 	ret := &signalfxJSONConnector{
 		basicBufferedForwarder: newBasicBufferedForwarder(bufferSize, maxDrainSize, name, drainingThreads),
