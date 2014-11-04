@@ -34,6 +34,17 @@ func (vp *metricPanicDatapoint) Metric() string {
 	panic("This shouldn't happen!")
 }
 
+func TestSignalfxJSONForwarderLoaderDefaults(t *testing.T) {
+	forwardTo := config.ForwardTo{
+		FormatVersion:    workarounds.GolangDoesnotAllowPointerToUintLiteral(2),
+		DefaultAuthToken: workarounds.GolangDoesnotAllowPointerToStringLiteral("AUTH_TOKEN"),
+	}
+	forwarder, err := SignalfxJSONForwarderLoader(&forwardTo)
+	sfForwarder, _ := forwarder.(*signalfxJSONConnector)
+	a.ExpectNil(t, err)
+	a.ExpectEquals(t, "https://api.signalfuse.com/v2/datapoint", sfForwarder.url, "URL should change for version 2")
+}
+
 func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	// TODO: Break this out into smaller tests
 	listenFromSignalfx := config.ListenFrom{}

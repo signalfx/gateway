@@ -51,7 +51,7 @@ type signalfxJSONConnector struct {
 	MetricCreationURL        string
 }
 
-var defaultConfig = &config.ForwardTo{
+var defaultConfigV1 = &config.ForwardTo{
 	URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfuse.com/v1/datapoint"),
 	DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
 	MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfuse.com/v1/metric?bulkupdate=true"),
@@ -64,9 +64,26 @@ var defaultConfig = &config.ForwardTo{
 	FormatVersion:     workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1)),
 }
 
+var defaultConfigV2 = &config.ForwardTo{
+	URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfuse.com/v2/datapoint"),
+	DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
+	MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfuse.com/v1/metric?bulkupdate=true"),
+	TimeoutDuration:   workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
+	BufferSize:        workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(10000)),
+	DrainingThreads:   workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(5)),
+	Name:              workarounds.GolangDoesnotAllowPointerToStringLiteral("signalfx-forwarder"),
+	MaxDrainSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1000)),
+	SourceDimensions:  workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
+	FormatVersion:     workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(2)),
+}
+
 // SignalfxJSONForwarderLoader loads a json forwarder forwarding points from proxy to SignalFx
 func SignalfxJSONForwarderLoader(forwardTo *config.ForwardTo) (core.StatKeepingStreamingAPI, error) {
-	structdefaults.FillDefaultFrom(forwardTo, defaultConfig)
+	if forwardTo.FormatVersion == nil || *forwardTo.FormatVersion == 1 {
+		structdefaults.FillDefaultFrom(forwardTo, defaultConfigV1)
+	} else if *forwardTo.FormatVersion == 2 || *forwardTo.FormatVersion == 3 {
+		structdefaults.FillDefaultFrom(forwardTo, defaultConfigV2)
+	}
 	glog.Infof("Creating signalfx forwarder using final config %s", forwardTo)
 	return NewSignalfxJSONForwarer(*forwardTo.URL, *forwardTo.TimeoutDuration, *forwardTo.BufferSize,
 		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads, *forwardTo.Name, *forwardTo.MetricCreationURL,
@@ -366,7 +383,7 @@ func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) err
 	resp, err := connector.client.Do(req)
 
 	if err != nil {
-		glog.Warningf("Unable to POST response: %s", err)
+		glog.Warningf("Unable to POST request: %s", err)
 		return err
 	}
 
@@ -378,7 +395,7 @@ func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) err
 		return err
 	}
 	if resp.StatusCode != 200 {
-		glog.Warningf("Metric upload failed: %s", respBody)
+		glog.Warningf("Metric upload to %s failed: %s", connector.url, respBody)
 		return fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
 	var body string
