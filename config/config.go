@@ -37,6 +37,7 @@ type ListenFrom struct {
 	MetricDeconstructorOptions *string
 	Timeout                    *string
 	Name                       *string
+	ListenPath                 *string
 	Encrypted                  *bool
 	TimeoutDuration            *time.Duration `json:"-"`
 }
