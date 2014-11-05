@@ -12,6 +12,12 @@ import (
 	"testing"
 )
 
+var fileStub a.FileWriteStringObj
+
+func init() {
+	fileXXXWriteString = fileStub.Execute
+}
+
 func TestCsvForwarderLoader(t *testing.T) {
 	defer func() { os.Remove("datapoints.csv") }()
 	forwardTo := config.ForwardTo{
@@ -25,7 +31,7 @@ func TestCsvForwarderLoader(t *testing.T) {
 	cl.DatapointsChannel() <- dpSent
 }
 
-func TestInvalidFilenameCsvForwarderLoader(t *testing.T) {
+func TestCsvInvalidFilenameCsvForwarderLoader(t *testing.T) {
 
 	defer func() { os.Remove("datapoints.csv") }()
 	forwardTo := config.ForwardTo{
@@ -38,7 +44,7 @@ func TestInvalidFilenameCsvForwarderLoader(t *testing.T) {
 	a.ExpectNotEquals(t, nil, err, "Expect no error")
 }
 
-func TestInvalidOpen(t *testing.T) {
+func TestCsvInvalidOpen(t *testing.T) {
 	defer func() { os.Remove("datapoints.csv") }()
 	forwardTo := config.ForwardTo{}
 	cl, err := CsvForwarderLoader(&forwardTo)
@@ -52,7 +58,7 @@ func TestInvalidOpen(t *testing.T) {
 	cl.DatapointsChannel() <- dpSent
 }
 
-func TestRemoveError(t *testing.T) {
+func TestCsvRemoveError(t *testing.T) {
 	defer func() { os.Remove("datapoints.csv") }()
 	forwardTo := config.ForwardTo{}
 	osXXXRemove = func(s string) error { return errors.New("unable to remove") }
@@ -64,13 +70,12 @@ func TestRemoveError(t *testing.T) {
 func TestCsvWriteError(t *testing.T) {
 	defer func() { os.Remove("datapoints.csv") }()
 	forwardTo := config.ForwardTo{}
-	oldVersion := fileXXXWriteString
-	defer func() { fileXXXWriteString = oldVersion }()
 	c := make(chan bool)
-	fileXXXWriteString = func(f *os.File, str string) (int, error) {
+	fileStub.UseFunction(func(f *os.File, str string) (int, error) {
 		defer func() { c <- true }()
 		return 0, errors.New("an error")
-	}
+	})
+	defer fileStub.Reset()
 	cl, _ := CsvForwarderLoader(&forwardTo)
 	dpSent := core.NewRelativeTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
 	cl.DatapointsChannel() <- dpSent
