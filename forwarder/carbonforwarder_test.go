@@ -16,13 +16,15 @@ import (
 
 type mockConn struct {
 	a.Conn
-	deadlineReturn error
-	writeReturn    error
+	deadlineReturn   error
+	setDeadlineBlock chan bool
+	writeReturn      error
 }
 
 func (conn *mockConn) SetDeadline(t time.Time) error {
 	r := conn.deadlineReturn
 	conn.deadlineReturn = nil
+	conn.setDeadlineBlock <- true
 	return r
 }
 
@@ -85,14 +87,14 @@ func TestDeadlineError(t *testing.T) {
 	a.ExpectEquals(t, nil, err, "Expect no error")
 
 	dpSent := core.NewRelativeTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
-	mockConn := mockConn{}
+	mockConn := mockConn{
+		setDeadlineBlock: make(chan bool),
+	}
 	mockConn.deadlineReturn = errors.New("deadline error")
 	carbonForwarder.openConnection = &mockConn
 	carbonForwarder.DatapointsChannel() <- dpSent
 	a.ExpectEquals(t, 0, len(forwardTo.datapointsChannel), "Expect drain from chan")
-	for mockConn.deadlineReturn != nil {
-		time.Sleep(time.Millisecond)
-	}
+	_ = <-mockConn.setDeadlineBlock
 	a.ExpectEquals(t, 0, len(forwardTo.datapointsChannel), "Expect no stats")
 }
 
@@ -107,14 +109,14 @@ func TestWriteError(t *testing.T) {
 	a.ExpectEquals(t, nil, err, "Expect no error")
 
 	dpSent := core.NewRelativeTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
-	mockConn := mockConn{}
+	mockConn := mockConn{
+		setDeadlineBlock: make(chan bool),
+	}
 	mockConn.writeReturn = errors.New("write error")
 	forwarder.openConnection = &mockConn
 	forwarder.DatapointsChannel() <- dpSent
 	a.ExpectEquals(t, 0, len(forwardTo.datapointsChannel), "Expect drain from chan")
-	for mockConn.writeReturn != nil {
-		time.Sleep(time.Millisecond)
-	}
+	_ = <-mockConn.setDeadlineBlock
 	a.ExpectEquals(t, 0, len(forwardTo.datapointsChannel), "Expect no stats")
 }
 
