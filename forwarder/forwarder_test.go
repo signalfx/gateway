@@ -6,10 +6,9 @@ import (
 	"github.com/golang/glog"
 	"github.com/signalfuse/signalfxproxy/core"
 	"testing"
-	"time"
 )
 
-func TestBasicBufferedForwarder(t *testing.T) {
+func TestForwarderBasicBufferedForwarder(t *testing.T) {
 	upto := uint32(10)
 	f := newBasicBufferedForwarder(100, upto, "aname", 1)
 	a.ExpectEquals(t, "aname", f.Name(), "Mismatched name")
@@ -22,18 +21,20 @@ func TestBasicBufferedForwarder(t *testing.T) {
 	a.ExpectEquals(t, 1, len(points), "Expect one point")
 }
 
-func TestStopForwarder(t *testing.T) {
+func TestForwarderStopForwarder(t *testing.T) {
 	f := newBasicBufferedForwarder(100, uint32(10), "aname", 1)
 	f.DatapointsChannel() <- nil
 	f.DatapointsChannel() <- nil
 	glog.Info("Hello")
-	seenPoints := 0
+	seenPointsChan := make(chan int, 2)
 	// nil should make it stop itself
 	f.start(func(dp []core.Datapoint) error {
-		seenPoints += len(dp)
+		defer func(){
+			seenPointsChan <- len(dp)
+		}()
 		return errors.New("unable to process")
 	})
-	time.Sleep(time.Millisecond * 5)
+	seenPoints := <- seenPointsChan
 	f.stop()
 	a.ExpectEquals(t, 2, seenPoints, "Expect two points")
 	a.ExpectNotEquals(t, nil, f.start(nil), "Shouldn't be able to start twice")
