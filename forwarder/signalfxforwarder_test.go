@@ -20,9 +20,11 @@ import (
 )
 
 var jsonUnmarshalObj a.JsonUnmarshalObj
+var ioutilReadAllObj a.IoutilReadAllObj
 
 func init() {
 	jsonXXXUnmarshal = jsonUnmarshalObj.Execute
+	ioutilXXXReadAll = ioutilReadAllObj.Execute
 }
 
 func TestBodySendFormat(t *testing.T) {
@@ -145,32 +147,40 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	a.ExpectNotEquals(t, nil, err, "Expected no error making no metrics")
 	jsonXXXMarshal = json.Marshal
 
-	ioutilXXXReadAll = func(r io.Reader) ([]byte, error) { return nil, errors.New("ioutil") }
-	err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"m": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
-	a.ExpectContains(t, err.Error(), "ioutil", "Expected ioutil issue")
-	ioutilXXXReadAll = ioutil.ReadAll
+	func() {
+		ioutilReadAllObj.UseFunction(func(r io.Reader) ([]byte, error) { return nil, errors.New("ioutil") })
+		defer ioutilReadAllObj.Reset()
+		err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"m": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
+		a.ExpectContains(t, err.Error(), "ioutil", "Expected ioutil issue")
+	}()
 
 	sfForwarder.MetricCreationURL = "http://0.0.0.0:12345/vmetric"
 	err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"m": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
 	a.ExpectContains(t, err.Error(), "invalid status code", "Expected status code 404")
 	sfForwarder.MetricCreationURL = "http://0.0.0.0:12345/v1/metric"
 
-	ioutilXXXReadAll = func(r io.Reader) ([]byte, error) { return []byte("InvalidJson"), nil }
-	err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"m": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
-	a.ExpectContains(t, err.Error(), "invalid character", "Expected ioutil issue")
-	ioutilXXXReadAll = ioutil.ReadAll
+	func() {
+		ioutilReadAllObj.UseFunction(func(r io.Reader) ([]byte, error) { return []byte("InvalidJson"), nil })
+		defer ioutilReadAllObj.Reset()
+		err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"m": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
+		a.ExpectContains(t, err.Error(), "invalid character", "Expected ioutil issue")
+	}()
 
-	ioutilXXXReadAll = func(r io.Reader) ([]byte, error) { return []byte("InvalidJson"), nil }
-	err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"m": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
-	a.ExpectContains(t, err.Error(), "invalid character", "Expected ioutil issue")
-	ioutilXXXReadAll = ioutil.ReadAll
+	func() {
+		ioutilReadAllObj.UseFunction(func(r io.Reader) ([]byte, error) { return []byte("InvalidJson"), nil })
+		defer ioutilReadAllObj.Reset()
+		err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"m": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
+		a.ExpectContains(t, err.Error(), "invalid character", "Expected ioutil issue")
+	}()
 
-	ioutilXXXReadAll = func(r io.Reader) ([]byte, error) { return []byte(`[{"code":203}]`), nil }
-	err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"wontexist": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
-	a.ExpectEquals(t, nil, err, "Expected no error making no metrics")
-	_, ok = sfForwarder.v1MetricLoadedCache["wontexist"]
-	a.ExpectEquals(t, false, ok, "Should not make")
-	ioutilXXXReadAll = ioutil.ReadAll
+	func() {
+		ioutilReadAllObj.UseFunction(func(r io.Reader) ([]byte, error) { return []byte(`[{"code":203}]`), nil })
+		defer ioutilReadAllObj.Reset()
+		err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"wontexist": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
+		a.ExpectEquals(t, nil, err, "Expected no error making no metrics")
+		_, ok = sfForwarder.v1MetricLoadedCache["wontexist"]
+		a.ExpectEquals(t, false, ok, "Should not make")
+	}()
 
 	protoXXXMarshal = func(r proto.Message) ([]byte, error) { return nil, errors.New("proto encode error") }
 	_, _, err = sfForwarder.encodePostBodyV1([]core.Datapoint{dpSent})
