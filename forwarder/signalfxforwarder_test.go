@@ -19,6 +19,12 @@ import (
 	"time"
 )
 
+var jsonUnmarshalObj a.JsonUnmarshalObj
+
+func init() {
+	jsonXXXUnmarshal = jsonUnmarshalObj.Execute
+}
+
 func TestBodySendFormat(t *testing.T) {
 	b := &protocoltypes.BodySendFormatV2{
 		Metric: "cpu",
@@ -197,10 +203,12 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	a.ExpectEquals(t, "ioutil", err.Error(), "Expected ioutil decoding response")
 	ioutilXXXReadAll = ioutil.ReadAll
 
-	jsonXXXUnmarshal = func([]byte, interface{}) error { return errors.New("jsonUnmarshalError") }
-	err = sfForwarder.process([]core.Datapoint{dpSent})
-	a.ExpectEquals(t, "jsonUnmarshalError", err.Error(), "Expected ioutil decoding response")
-	jsonXXXUnmarshal = json.Unmarshal
+	func() {
+		jsonUnmarshalObj.UseFunction(func([]byte, interface{}) error { return errors.New("jsonUnmarshalError") })
+		defer jsonUnmarshalObj.Reset()
+		err = sfForwarder.process([]core.Datapoint{dpSent})
+		a.ExpectEquals(t, "jsonUnmarshalError", err.Error(), "Expected ioutil decoding response")
+	}()
 
 	ioutilXXXReadAll = func(r io.Reader) ([]byte, error) { return []byte(`"invalidbody"`), nil }
 	err = sfForwarder.process([]core.Datapoint{dpSent})

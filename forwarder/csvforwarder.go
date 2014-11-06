@@ -10,6 +10,12 @@ import (
 	"os"
 )
 
+func originalFileWrite(f *os.File, str string) (int, error) {
+	return f.WriteString(str)
+}
+
+var fileXXXWriteString = originalFileWrite
+
 var csvDefaultConfig = &config.ForwardTo{
 	Filename:        workarounds.GolangDoesnotAllowPointerToStringLiteral("datapoints.csv"),
 	DrainingThreads: workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1)),
@@ -33,10 +39,6 @@ type filenameForwarder struct {
 func (connector *filenameForwarder) GetStats() []core.Datapoint {
 	ret := []core.Datapoint{}
 	return ret
-}
-
-var fileXXXWriteString = func(f *os.File, str string) (int, error) {
-	return f.WriteString(str)
 }
 
 func (connector *filenameForwarder) process(datapoints []core.Datapoint) error {

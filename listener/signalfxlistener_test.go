@@ -222,11 +222,13 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	varintBytes := proto.EncodeVarint(uint64(len(dpInBytes)))
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/datapoint", bytes.NewBuffer(append(varintBytes, dpInBytes...)))
 	req.Header.Set("Content-Type", "application/x-protobuf")
+	gotPointChan = make(chan bool)
 	go func() {
 		dp = <-sendTo.channel
 		gotPointChan <- true
 	}()
 	resp, err = client.Do(req)
+	_ = <-gotPointChan
 	a.ExpectEquals(t, resp.StatusCode, 200, "Request should work")
 	a.ExpectEquals(t, "asource", dp.Dimensions()["sf_source"], "Expect source back")
 	a.ExpectEquals(t, "2", dp.Value().WireValue(), "Expect 2 back")
@@ -242,6 +244,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 		gotPointChan <- true
 	}()
 	resp, err = client.Do(req)
+	_ = <-gotPointChan
 	a.ExpectEquals(t, resp.StatusCode, 200, "Request should work")
 	a.ExpectEquals(t, "asource", dp.Dimensions()["sf_source"], "Expect source back")
 	a.ExpectEquals(t, "2", dp.Value().WireValue(), "Expect 2 back")

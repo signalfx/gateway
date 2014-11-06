@@ -29,12 +29,12 @@ func TestForwarderStopForwarder(t *testing.T) {
 	seenPointsChan := make(chan int, 2)
 	// nil should make it stop itself
 	f.start(func(dp []core.Datapoint) error {
-		defer func(){
+		defer func() {
 			seenPointsChan <- len(dp)
 		}()
 		return errors.New("unable to process")
 	})
-	seenPoints := <- seenPointsChan
+	seenPoints := <-seenPointsChan
 	f.stop()
 	a.ExpectEquals(t, 2, seenPoints, "Expect two points")
 	a.ExpectNotEquals(t, nil, f.start(nil), "Shouldn't be able to start twice")

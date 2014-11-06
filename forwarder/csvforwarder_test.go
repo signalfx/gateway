@@ -8,6 +8,7 @@ import (
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
+	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -16,6 +17,14 @@ var fileStub a.FileWriteStringObj
 
 func init() {
 	fileXXXWriteString = fileStub.Execute
+}
+
+func TestCsvCoverFileWrite(t *testing.T) {
+	fileObj, _ := ioutil.TempFile("", "gotest")
+	filename := fileObj.Name()
+	defer os.Remove(filename)
+	_, err := originalFileWrite(fileObj, "test")
+	a.ExpectNil(t, err)
 }
 
 func TestCsvForwarderLoader(t *testing.T) {

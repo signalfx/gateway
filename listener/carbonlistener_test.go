@@ -16,6 +16,12 @@ import (
 	"time"
 )
 
+var readerReadBytesObj a.ReaderReadBytesObj
+
+func init() {
+	readerReadBytes = readerReadBytesObj.Execute
+}
+
 type basicDatapointStreamingAPI struct {
 	channel chan core.Datapoint
 }
@@ -28,7 +34,14 @@ func (api *basicDatapointStreamingAPI) Name() string {
 	return ""
 }
 
-func TestInvalidCarbonListenerLoader(t *testing.T) {
+func TestCarbonCoverOriginalReaderReadBytes(t *testing.T) {
+	r := bufio.NewReader(bytes.NewReader([]byte("test*test")))
+	b, err := originalReaderReadBytes(r, '*')
+	a.ExpectNil(t, err)
+	a.ExpectEquals(t, "test*", string(b), "Did not get test string back")
+}
+
+func TestCarbonInvalidCarbonListenerLoader(t *testing.T) {
 	listenFrom := &config.ListenFrom{
 		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:999999"),
 	}
@@ -37,7 +50,7 @@ func TestInvalidCarbonListenerLoader(t *testing.T) {
 	a.ExpectNotEquals(t, nil, err, "Should get an error making")
 }
 
-func TestInvalidCarbonDeconstructorListenerLoader(t *testing.T) {
+func TestCarbonInvalidCarbonDeconstructorListenerLoader(t *testing.T) {
 	listenFrom := &config.ListenFrom{
 		ListenAddr:          workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12347"),
 		MetricDeconstructor: workarounds.GolangDoesnotAllowPointerToStringLiteral("UNKNOWN"),
@@ -78,57 +91,68 @@ func TestCarbonListenerLoader(t *testing.T) {
 	for len(sendTo.channel) > 0 {
 		_ = <-sendTo.channel
 	}
-
+}
+func TestCarbonListenerLoader2(t *testing.T) {
+	listenFrom := &config.ListenFrom{
+		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12348"),
+	}
+	sendTo := &basicDatapointStreamingAPI{
+		channel: make(chan core.Datapoint),
+	}
+	listener, err := CarbonListenerLoader(sendTo, listenFrom)
+	a.ExpectEquals(t, nil, err, "Should be ok to make")
+	defer listener.Close()
 	carbonlistener, _ := listener.(*carbonListener)
 	carbonlistener.metricDeconstructor, _ = metricdeconstructor.Load("datadog", "ignored")
-	conn, err = net.Dial("tcp", *listenFrom.ListenAddr)
+	conn, err := net.Dial("tcp", *listenFrom.ListenAddr)
 	a.ExpectEquals(t, nil, err, "Should be ok to make")
-	buf = bytes.Buffer{}
+	buf := bytes.Buffer{}
 	fmt.Fprintf(&buf, "a.metric.name[host:bob,type:dev] 3 3")
 	_, err = buf.WriteTo(conn)
 	conn.Close()
 	a.ExpectEquals(t, nil, err, "Should be ok to write")
-	datapoint = <-sendTo.channel
+	datapoint := <-sendTo.channel
 	a.ExpectEquals(t, "a.metric.name", datapoint.Metric(), "Should be metric")
 	a.ExpectEquals(t, map[string]string{"host": "bob", "type": "dev"}, datapoint.Dimensions(), "Did not parse dimensions")
-	i, _ = datapoint.Value().IntValue()
+	i, _ := datapoint.Value().IntValue()
 	a.ExpectEquals(t, int64(3), i, "Should get 3")
 
-	for len(sendTo.channel) > 0 {
-		_ = <-sendTo.channel
-	}
 	carbonlistener.metricDeconstructor, _ = metricdeconstructor.Load("", "")
 
-	prev := readerReadBytes
-	readerReadBytes = func(reader *bufio.Reader, delim byte) ([]byte, error) {
-		return nil, errors.New("error reading from reader")
-	}
-	conn, err = net.Dial("tcp", *listenFrom.ListenAddr)
-	a.ExpectEquals(t, nil, err, "Should be ok to make")
-	var buf2 bytes.Buffer
-	fmt.Fprintf(&buf2, "ametric 2 2\n")
-	_, err = buf2.WriteTo(conn)
-	conn.Close()
-
-	for len(sendTo.channel) > 0 {
-		_ = <-sendTo.channel
-	}
+	func() {
+		readerErrorSignal := make(chan bool)
+		readerReadBytesObj.UseFunction(func(reader *bufio.Reader, delim byte) ([]byte, error) {
+			readerErrorSignal <- true
+			return nil, errors.New("error reading from reader")
+		})
+		defer readerReadBytesObj.Reset()
+		conn, err = net.Dial("tcp", *listenFrom.ListenAddr)
+		a.ExpectEquals(t, nil, err, "Should be ok to make")
+		var buf2 bytes.Buffer
+		fmt.Fprintf(&buf2, "ametric 2 2\n")
+		_, err = buf2.WriteTo(conn)
+		conn.Close()
+		_ = <-readerErrorSignal
+	}()
 
 	time.Sleep(time.Millisecond)
 
-	readerReadBytes = func(reader *bufio.Reader, delim byte) ([]byte, error) { return []byte("ametric 3 2\n"), io.EOF }
-	conn, err = net.Dial("tcp", *listenFrom.ListenAddr)
-	a.ExpectEquals(t, nil, err, "Should be ok to make")
-	var buf3 bytes.Buffer
-	fmt.Fprintf(&buf3, "ametric 3 2\n")
-	_, err = buf3.WriteTo(conn)
-	conn.Close()
-	readerReadBytes = prev
-	datapoint = <-sendTo.channel
-	i, _ = datapoint.Value().IntValue()
-	a.ExpectEquals(t, int64(3), i, "Should get 3")
-
-	listener.Close()
-	// Wait for the other thread to die
-	time.Sleep(2 * time.Second)
+	func() {
+		readerErrorSignal := make(chan bool)
+		readerReadBytesObj.UseFunction(func(reader *bufio.Reader, delim byte) ([]byte, error) {
+			readerErrorSignal <- true
+			return []byte("ametric 3 2\n"), io.EOF
+		})
+		defer readerReadBytesObj.Reset()
+		conn, err = net.Dial("tcp", *listenFrom.ListenAddr)
+		a.ExpectEquals(t, nil, err, "Should be ok to make")
+		var buf3 bytes.Buffer
+		fmt.Fprintf(&buf3, "ametric 3 2\n")
+		_, err = buf3.WriteTo(conn)
+		conn.Close()
+		_ = <-readerErrorSignal
+		datapoint = <-sendTo.channel
+		i, _ = datapoint.Value().IntValue()
+		a.ExpectEquals(t, int64(3), i, "Should get 3")
+	}()
 }
