@@ -47,7 +47,7 @@ case "$1" in
             mkdir -p $logdir
         fi
 	if [ ! -e "$pid_file" ]; then
-            touch "$pid_file" &> /dev/null
+            touch "$pid_file" > /dev/null 2> /dev/null
         fi
         if [ ! -w "$pid_file" ]; then
             echo "Unable to start proxy: pid file $pid_file is not writable"
