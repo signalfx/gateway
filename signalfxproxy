@@ -17,7 +17,8 @@ binary="/opt/sfproxy/bin/signalfxproxy"
 
 name=$(basename "$0")
 pid_file="/var/run/$name.pid"
-stdout_log="/var/log/$name.log"
+stdout_log="/var/log/$name.stdout.log"
+stderr_log="/var/log/$name.stderr.log"
 
 get_pid() {
     cat "$pid_file"
@@ -45,7 +46,11 @@ case "$1" in
         if [ ! -d "$logdir" ]; then
             mkdir -p $logdir
         fi
-        nohup sudo "-u" "$user" "$binary" "-configfile" "$configfile" "-log_dir" "$logdir" > "$stdout_log" 2>&1 &
+        if [ ! -w "$pid_file" ]; then
+            echo "Unable to start proxy: pid file $pid_file is not writable"
+            exit 1
+        fi
+        nohup sudo "-u" "$user" "$binary" "-configfile" "$configfile" "-log_dir" "$logdir" > "$stdout_log" 2> "$stderr_log" &
         echo "$!" > "$pid_file"
         sleep 1 # Give it time to try to open ports and connect
         if ! is_running; then
@@ -58,7 +63,7 @@ case "$1" in
     stop)
     if is_running; then
         echo "Stopping $name.."
-        kill "$(get_pid)"
+        sudo "-u" "$user" kill "$(get_pid)"
         for _ in 1 2 3 4 5 6 7 8 9 10
         do
             if ! is_running; then
