@@ -5,6 +5,7 @@ shellcheck signalfxproxy || exit 1
 # Yo dawg
 shellcheck travis_check.sh || exit 1
 set -e
+# Want example config file to be valid json
 python -m json.tool < exampleSfdbproxy.conf
 set +e
 
