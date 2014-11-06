@@ -79,12 +79,12 @@ func TestCreation(t *testing.T) {
 
 func TestDeadlineError(t *testing.T) {
 	listenFrom := config.ListenFrom{}
-	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12346")
+	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12246")
 
 	forwardTo := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
-	carbonForwarder, err := newTcpGraphiteCarbonForwarer("0.0.0.0", 12346, time.Second, 10, "")
+	carbonForwarder, err := newTcpGraphiteCarbonForwarer("0.0.0.0", 12246, time.Second, 10, "")
 	a.ExpectEquals(t, nil, err, "Expect no error")
 
 	dpSent := core.NewRelativeTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)

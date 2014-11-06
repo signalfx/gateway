@@ -52,7 +52,7 @@ func TestCarbonInvalidCarbonListenerLoader(t *testing.T) {
 
 func TestCarbonInvalidCarbonDeconstructorListenerLoader(t *testing.T) {
 	listenFrom := &config.ListenFrom{
-		ListenAddr:          workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12347"),
+		ListenAddr:          workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12247"),
 		MetricDeconstructor: workarounds.GolangDoesnotAllowPointerToStringLiteral("UNKNOWN"),
 	}
 	sendTo := &basicDatapointStreamingAPI{}
@@ -62,7 +62,7 @@ func TestCarbonInvalidCarbonDeconstructorListenerLoader(t *testing.T) {
 
 func TestCarbonListenerLoader(t *testing.T) {
 	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12346"),
+		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12245"),
 	}
 	sendTo := &basicDatapointStreamingAPI{
 		channel: make(chan core.Datapoint),
@@ -94,7 +94,7 @@ func TestCarbonListenerLoader(t *testing.T) {
 }
 func TestCarbonListenerLoader2(t *testing.T) {
 	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12348"),
+		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12248"),
 	}
 	sendTo := &basicDatapointStreamingAPI{
 		channel: make(chan core.Datapoint),
