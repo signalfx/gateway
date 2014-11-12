@@ -4,32 +4,13 @@ import (
 	"bytes"
 	"github.com/cep21/gohelpers/a"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"net/http"
 	"testing"
 )
 
-func TestMetricTypeFromDsType(t *testing.T) {
-	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("gauge")), "Types don't match expectation")
-	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(nil), "Types don't match expectation")
-	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("unknown")), "Types don't match expectation")
-	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("derive")), "Types don't match expectation")
-
-}
-
-func TestInvalidListen(t *testing.T) {
-	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:999999"),
-	}
-	sendTo := &basicDatapointStreamingAPI{}
-	_, err := CollectdListenerLoader(sendTo, listenFrom)
-	a.ExpectNotNil(t, err)
-}
-
-func TestCollectDListener(t *testing.T) {
-	jsonBody := `[
+const testCollectdBody = `[
     {
         "dsnames": [
             "shortterm",
@@ -91,6 +72,19 @@ func TestCollectDListener(t *testing.T) {
         ]
     }
 ]`
+
+func TestInvalidListen(t *testing.T) {
+	listenFrom := &config.ListenFrom{
+		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:999999"),
+	}
+	sendTo := &basicDatapointStreamingAPI{}
+	_, err := CollectdListenerLoader(sendTo, listenFrom)
+	a.ExpectNotNil(t, err)
+}
+
+func TestCollectDListener(t *testing.T) {
+	jsonBody := testCollectdBody
+
 	sendTo := &basicDatapointStreamingAPI{
 		channel: make(chan core.Datapoint),
 	}
@@ -105,19 +99,19 @@ func TestCollectDListener(t *testing.T) {
 	client := &http.Client{}
 	go func() {
 		dp := <-sendTo.channel
-		a.ExpectEquals(t, "load", dp.Metric(), "Metric not named correctly")
+		a.ExpectEquals(t, "load.shortterm", dp.Metric(), "Metric not named correctly")
 
 		dp = <-sendTo.channel
-		a.ExpectEquals(t, "load", dp.Metric(), "Metric not named correctly")
+		a.ExpectEquals(t, "load.midterm", dp.Metric(), "Metric not named correctly")
 
 		dp = <-sendTo.channel
-		a.ExpectEquals(t, "load", dp.Metric(), "Metric not named correctly")
+		a.ExpectEquals(t, "load.longterm", dp.Metric(), "Metric not named correctly")
 
 		dp = <-sendTo.channel
-		a.ExpectEquals(t, "memory", dp.Metric(), "Metric not named correctly")
+		a.ExpectEquals(t, "memory.used", dp.Metric(), "Metric not named correctly")
 
 		dp = <-sendTo.channel
-		a.ExpectEquals(t, "df_complex", dp.Metric(), "Metric not named correctly")
+		a.ExpectEquals(t, "df_complex.free", dp.Metric(), "Metric not named correctly")
 	}()
 	resp, err := client.Do(req)
 	a.ExpectNil(t, err)

@@ -5,10 +5,8 @@ import (
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/golang/glog"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
-	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"net"
 	"net/http"
@@ -30,24 +28,6 @@ func (streamer *collectdListenerServer) Close() {
 	streamer.listener.Close()
 }
 
-func metricTypeFromDsType(dstype *string) com_signalfuse_metrics_protobuf.MetricType {
-	if dstype == nil {
-		return com_signalfuse_metrics_protobuf.MetricType_GAUGE
-	}
-
-	m := map[string]com_signalfuse_metrics_protobuf.MetricType{
-		"gauge":    com_signalfuse_metrics_protobuf.MetricType_GAUGE,
-		"derive":   com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
-		"counter":  com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
-		"absolute": com_signalfuse_metrics_protobuf.MetricType_COUNTER,
-	}
-	v, ok := m[*dstype]
-	if ok {
-		return v
-	}
-	return com_signalfuse_metrics_protobuf.MetricType_GAUGE
-}
-
 func (streamer *collectdListenerServer) jsonDecode(req *http.Request) error {
 	dec := json.NewDecoder(req.Body)
 	var d protocoltypes.CollectdJSONWriteBody
@@ -58,28 +38,7 @@ func (streamer *collectdListenerServer) jsonDecode(req *http.Request) error {
 		if f.TypeS != nil && f.Time != nil {
 			for i := range f.Dsnames {
 				if i < len(f.Dstypes) && i < len(f.Values) {
-					dstype, val, dsname := f.Dstypes[i], f.Values[i], f.Dsnames[i]
-					dimensions := make(map[string]string)
-					metricType := metricTypeFromDsType(dstype)
-					if f.Host != nil {
-						dimensions["host"] = *f.Host
-					}
-					if f.Plugin != nil {
-						dimensions["plugin"] = *f.Plugin
-					}
-					if f.PluginInstance != nil {
-						dimensions["plugin_instance"] = *f.PluginInstance
-					}
-					if f.TypeInstance != nil {
-						dimensions["type_instance"] = *f.TypeInstance
-					}
-					if dsname != nil {
-						dimensions["dsname"] = *dsname
-					}
-					timestamp := time.Unix(0, int64(*f.Time*float64(time.Second)))
-					streamer.datapointStreamingAPI.DatapointsChannel() <- core.NewAbsoluteTimeDatapoint(
-						*f.TypeS, dimensions, value.NewFloatWire(*val), metricType, timestamp)
-
+					streamer.datapointStreamingAPI.DatapointsChannel() <- protocoltypes.NewCollectdDatapoint(f, uint(i))
 				}
 			}
 		}
