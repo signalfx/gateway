@@ -13,12 +13,16 @@ func (parser *datadogMetricDeconstructor) Parse(originalMetric string) (string, 
 	if len(parts) != 2 {
 		return originalMetric, dimensions, nil
 	}
-	if len(parts[1]) == 0 || parts[1][len(parts[1])-1] != ']' {
+	if len(parts[1]) == 0 || len(parts[0]) == 0 {
 		return originalMetric, dimensions, nil
 	}
-	parts[1] = parts[1][:len(parts[1])-1]
-	newMetricName := parts[0]
-	tagParts := strings.Split(parts[1], ",")
+	bracketEndIndex := strings.LastIndex(parts[1], "]")
+	if bracketEndIndex == -1 {
+		return originalMetric, dimensions, nil
+	}
+	dimensionsPart := parts[1][:bracketEndIndex]
+	newMetricName := parts[0] + parts[1][bracketEndIndex+1:]
+	tagParts := strings.Split(dimensionsPart, ",")
 	for _, tagPart := range tagParts {
 		tagSectionsParts := strings.SplitN(tagPart, ":", 2)
 		if len(tagSectionsParts) != 2 {
