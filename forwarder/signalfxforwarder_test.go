@@ -53,6 +53,19 @@ func TestSignalfxJSONForwarderLoaderDefaults(t *testing.T) {
 	a.ExpectEquals(t, "https://api.signalfuse.com/v2/datapoint", sfForwarder.url, "URL should change for version 2")
 }
 
+func TestMapToDimensions(t *testing.T) {
+	r := map[string]string{
+		"dim1": "val1",
+		"dim2": "val2",
+	}
+	res := mapToDimensions(r)
+	expect := make(map[string]string)
+	for _, d := range res {
+		expect[d.GetKey()] = d.GetValue()
+	}
+	a.ExpectEquals(t, r, expect, "Dimensions don't parse right")
+}
+
 func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	// TODO: Break this out into smaller tests
 	listenFromSignalfx := config.ListenFrom{}
