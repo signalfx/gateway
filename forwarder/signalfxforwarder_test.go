@@ -55,15 +55,23 @@ func TestSignalfxJSONForwarderLoaderDefaults(t *testing.T) {
 
 func TestMapToDimensions(t *testing.T) {
 	r := map[string]string{
-		"dim1": "val1",
-		"dim2": "val2",
+		"dim1":     "val1",
+		"dim2":     "val2",
+		"key:char": "val3",
 	}
 	res := mapToDimensions(r)
 	expect := make(map[string]string)
 	for _, d := range res {
 		expect[d.GetKey()] = d.GetValue()
 	}
+	delete(r, "key:char")
+	r["key_char"] = "val3"
 	a.ExpectEquals(t, r, expect, "Dimensions don't parse right")
+}
+
+func TestFilterSignalfxString(t *testing.T) {
+	a.ExpectEquals(t, "hello", filterSignalfxKey("hello"), "Filter not working")
+	a.ExpectEquals(t, "_hello_bob1__", filterSignalfxKey(".hello:bob1_&"), "Filter not working")
 }
 
 func TestSignalfxJSONForwarderLoader(t *testing.T) {

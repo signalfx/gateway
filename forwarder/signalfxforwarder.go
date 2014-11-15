@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 var jsonXXXMarshal = json.Marshal
@@ -297,7 +298,7 @@ func mapToDimensions(dimensions map[string]string) []*com_signalfuse_metrics_pro
 	for k, v := range dimensions {
 		// If someone knows a better way to do this, let me know.  I can't just take the &
 		// of k and v because their content changes as the range iterates
-		copyOfK := (string([]byte(k)))
+		copyOfK := filterSignalfxKey(string([]byte(k)))
 		copyOfV := (string([]byte(v)))
 		ret = append(ret, (&com_signalfuse_metrics_protobuf.Dimension{
 			Key:   &copyOfK,
@@ -305,6 +306,15 @@ func mapToDimensions(dimensions map[string]string) []*com_signalfuse_metrics_pro
 		}))
 	}
 	return ret
+}
+
+func filterSignalfxKey(str string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsDigit(r) || unicode.IsLetter(r) || r == '_' {
+			return r
+		}
+		return '_'
+	}, str)
 }
 
 func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datapoint) ([]byte, string, error) {
