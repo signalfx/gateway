@@ -11,9 +11,10 @@ type MetricDeconstructor interface {
 type loader func(string) (MetricDeconstructor, error)
 
 var knownLoaders = map[string]loader{
-	"":         identityLoader,
-	"identity": identityLoader,
-	"datadog":  datadogLoader,
+	"":          identityLoader,
+	"identity":  identityLoader,
+	"datadog":   commaKeysLoader,
+	"commakeys": commaKeysLoader,
 }
 
 // Load will load a MetricDeconstructor of the given name, with the given options

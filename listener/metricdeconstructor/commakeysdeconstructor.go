@@ -4,10 +4,10 @@ import (
 	"strings"
 )
 
-type datadogMetricDeconstructor struct {
+type commaKeysLoaderDeconstructor struct {
 }
 
-func (parser *datadogMetricDeconstructor) Parse(originalMetric string) (string, map[string]string, error) {
+func (parser *commaKeysLoaderDeconstructor) Parse(originalMetric string) (string, map[string]string, error) {
 	dimensions := map[string]string{}
 	parts := strings.SplitN(originalMetric, "[", 2)
 	if len(parts) != 2 {
@@ -36,6 +36,6 @@ func (parser *datadogMetricDeconstructor) Parse(originalMetric string) (string, 
 	return newMetricName, dimensions, nil
 }
 
-func datadogLoader(options string) (MetricDeconstructor, error) {
-	return &datadogMetricDeconstructor{}, nil
+func commaKeysLoader(options string) (MetricDeconstructor, error) {
+	return &commaKeysLoaderDeconstructor{}, nil
 }

@@ -10,7 +10,7 @@ func TestLoad(t *testing.T) {
 	a.ExpectNotEquals(t, m, nil, "Expected non nil error")
 	a.ExpectEquals(t, err, nil, "Expected non nil error")
 
-	m, err = Load("datadog", "ignored")
+	m, err = Load("commakeys", "ignored")
 	a.ExpectNotEquals(t, m, nil, "Expected non nil error")
 	a.ExpectEquals(t, err, nil, "Expected non nil error")
 

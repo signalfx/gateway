@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestDatadogMetricDeconstructor(t *testing.T) {
-	i := &datadogMetricDeconstructor{}
+func TestCommaKeysLoaderDeconstructor(t *testing.T) {
+	i := &commaKeysLoaderDeconstructor{}
 	m, d, e := i.Parse("original.metric[host:bob]")
 	a.ExpectEquals(t, nil, e, "Should get no errors")
 	a.ExpectEquals(t, "original.metric", m, "Should get metric back")
@@ -28,8 +28,8 @@ func TestDatadogMetricDeconstructor(t *testing.T) {
 	a.ExpectEquals(t, map[string]string{"host": "bob:bob2", "type": "dev"}, d, "Should get dimensions")
 }
 
-func TestDatadogMetricInvalidDeconstructorMissingBracket(t *testing.T) {
-	i := &datadogMetricDeconstructor{}
+func TestCommaKeysLoaderDeconstructorMissingBracket(t *testing.T) {
+	i := &commaKeysLoaderDeconstructor{}
 	m, d, e := i.Parse("original.metric[host:bob")
 	a.ExpectEquals(t, nil, e, "Should get no errors")
 	a.ExpectEquals(t, "original.metric[host:bob", m, "Should get metric back")
