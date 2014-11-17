@@ -98,7 +98,9 @@ var defaultCarbonConfig = &config.ListenFrom{
 // CarbonListenerLoader loads a listener for the carbon/graphite protocol from config
 func CarbonListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, listenFrom *config.ListenFrom) (DatapointListener, error) {
 	structdefaults.FillDefaultFrom(listenFrom, defaultCarbonConfig)
-	return startListeningCarbonOnPort(*listenFrom.ListenAddr, DatapointStreamingAPI, *listenFrom.TimeoutDuration, *listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions)
+	return startListeningCarbonOnPort(
+		*listenFrom.ListenAddr, DatapointStreamingAPI, *listenFrom.TimeoutDuration,
+		*listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions)
 }
 
 func startListeningCarbonOnPort(listenAddr string, DatapointStreamingAPI core.DatapointStreamingAPI, timeout time.Duration, metricDeconstructor string, metricDeconstructorOptions string) (DatapointListener, error) {

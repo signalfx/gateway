@@ -1,10 +1,12 @@
 package metricdeconstructor
 
 import (
+	"fmt"
 	"strings"
 )
 
 type commaKeysLoaderDeconstructor struct {
+	colonInKey bool
 }
 
 func (parser *commaKeysLoaderDeconstructor) Parse(originalMetric string) (string, map[string]string, error) {
@@ -24,18 +26,28 @@ func (parser *commaKeysLoaderDeconstructor) Parse(originalMetric string) (string
 	newMetricName := parts[0] + parts[1][bracketEndIndex+1:]
 	tagParts := strings.Split(dimensionsPart, ",")
 	for _, tagPart := range tagParts {
-		tagSectionsParts := strings.SplitN(tagPart, ":", 2)
-		if len(tagSectionsParts) != 2 {
-			// Maybe a tag rather than a dimension.  Skip?
+		var tagName, tagValue string
+		var splitIndex int
+		if parser.colonInKey {
+			splitIndex = strings.LastIndex(tagPart, ":")
+		} else {
+			splitIndex = strings.Index(tagPart, ":")
+		}
+		if splitIndex == -1 {
 			continue
 		}
-		tagName := tagSectionsParts[0]
-		tagValue := tagSectionsParts[1]
+		tagName = tagPart[0:splitIndex]
+		tagValue = tagPart[splitIndex+1:]
 		dimensions[tagName] = tagValue
 	}
 	return newMetricName, dimensions, nil
 }
 
 func commaKeysLoader(options string) (MetricDeconstructor, error) {
-	return &commaKeysLoaderDeconstructor{}, nil
+	if options != "" && options != "coloninkey" {
+		return nil, fmt.Errorf("Unknown commaKeysLoaderDeconstructor parameter %s", options)
+	}
+	return &commaKeysLoaderDeconstructor{
+		colonInKey: options == "coloninkey",
+	}, nil
 }

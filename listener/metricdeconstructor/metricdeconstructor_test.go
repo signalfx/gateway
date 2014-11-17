@@ -7,14 +7,18 @@ import (
 
 func TestLoad(t *testing.T) {
 	m, err := Load("", "ignored")
-	a.ExpectNotEquals(t, m, nil, "Expected non nil error")
-	a.ExpectEquals(t, err, nil, "Expected non nil error")
+	a.ExpectNotNil(t, m)
+	a.ExpectNil(t, err)
 
-	m, err = Load("commakeys", "ignored")
-	a.ExpectNotEquals(t, m, nil, "Expected non nil error")
-	a.ExpectEquals(t, err, nil, "Expected non nil error")
+	m, err = Load("commakeys", "unknown")
+	a.ExpectNil(t, m)
+	a.ExpectNotNil(t, err)
+
+	m, err = Load("commakeys", "")
+	a.ExpectNotNil(t, m)
+	a.ExpectNil(t, err)
 
 	m, err = Load("NOTFOUND", "ignored")
-	a.ExpectEquals(t, m, nil, "Expected non nil error")
-	a.ExpectNotEquals(t, err, nil, "Expected non nil error")
+	a.ExpectNil(t, m)
+	a.ExpectNotNil(t, err)
 }

@@ -26,6 +26,12 @@ func TestCommaKeysLoaderDeconstructor(t *testing.T) {
 	a.ExpectEquals(t, nil, e, "Should get no errors")
 	a.ExpectEquals(t, "original.metric.count", m, "Should get metric back")
 	a.ExpectEquals(t, map[string]string{"host": "bob:bob2", "type": "dev"}, d, "Should get dimensions")
+
+	i = &commaKeysLoaderDeconstructor{colonInKey: true}
+	m, d, e = i.Parse("original.metric[host:bob:bob2,testing,type:dev].count")
+	a.ExpectEquals(t, nil, e, "Should get no errors")
+	a.ExpectEquals(t, "original.metric.count", m, "Should get metric back")
+	a.ExpectEquals(t, map[string]string{"host:bob": "bob2", "type": "dev"}, d, "Should get dimensions")
 }
 
 func TestCommaKeysLoaderDeconstructorMissingBracket(t *testing.T) {

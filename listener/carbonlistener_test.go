@@ -103,7 +103,8 @@ func TestCarbonListenerLoader2(t *testing.T) {
 	a.ExpectEquals(t, nil, err, "Should be ok to make")
 	defer listener.Close()
 	carbonlistener, _ := listener.(*carbonListener)
-	carbonlistener.metricDeconstructor, _ = metricdeconstructor.Load("commakeys", "ignored")
+	carbonlistener.metricDeconstructor, err = metricdeconstructor.Load("commakeys", "")
+	a.ExpectNil(t, err)
 	conn, err := net.Dial("tcp", *listenFrom.ListenAddr)
 	a.ExpectEquals(t, nil, err, "Should be ok to make")
 	buf := bytes.Buffer{}
