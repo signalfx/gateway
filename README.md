@@ -50,12 +50,6 @@ for the proxy and you can profile it at
 can find more information about how to use pprof at
 [the pprof help page](http://golang.org/pkg/net/http/pprof/).
 
-## Configuration
-
-Use the file exampleSfdbproxy.conf as an example configuration.  Importantly,
-replace DefaultAuthToken with your auth token and remove any listeners or
-forwarders you don't use.
-
 ## Code layout
 
 You only need to read this if you want to develop the proxy or understand
@@ -99,6 +93,87 @@ The proxy comes with a [docker image](Dockerfile) that is built and deployed
 to [quay.io](https://quay.io/repository/signalfuse/signalfxproxy).  It assumes
 you will have a sfdbconfig.json file cross mounted to
 /var/config/sfproxy/sfdbconfig.json for the docker container.
+
+## Config file format
+
+See the [example config](exampleSfdbproxy.conf) file for an example of how
+configuration looks.  Configuration is a JSON file with two important fields:
+ListenFrom and ForwardTo.
+
+### ListenFrom
+
+ListenFrom is where you define what services the proxy will pretend to be and
+what ports to listen for those services on.
+
+#### signalfx
+
+You can pretend to be a signalfx endpoint with the signalfx type.  For this,
+you will need to specify which port to bind to.  An example config:
+
+```
+        {
+            "ListenAddr": "0.0.0.0:18080",
+            "Type": "signalfx"
+        },
+```
+
+#### carbon (for read)
+
+You can pretend to be carbon (the graphite database) with this type.  For
+this, you will need to specify the port to bind to.  An example config:
+
+```
+        {
+            "ListenAddr": "0.0.0.0:12003",
+            "Type": "carbon"
+        }
+```
+
+### ForwardTo
+
+ForwardTo is where you define where the proxy should send datapoints.  Each datapoint
+that comes from a ListenFrom definition will be send to each of these.
+
+#### csv
+
+You can write datapoints to a CSV file for debugging with this config.  You
+will need to specify the filename.
+
+```
+        {
+            "Filename": "/tmp/filewrite.csv",
+            "Name": "filelocal",
+            "type": "csv"
+        }
+```
+
+#### carbon (for write)
+
+You can write datapoints to a carbon server.  If the point came from a carbon
+listener, it will write the same way the proxy saw it.  Host/Port define where
+the carbon server is.
+
+```
+        {
+            "Name": "ourcarbon",
+            "Host": "example.com",
+            "Port": 2003,
+            "type": "carbon"
+        },
+```
+
+#### signalfx-json
+
+You can write datapoints to SiganlFuse with this endpoint.  You will need to
+configure your auth token inside DefaultAuthToken.
+
+```
+        {
+            "type": "signalfx-json",
+            "DefaultAuthToken": "___AUTH_TOKEN___",
+            "Name": "testproxy",
+        },
+```
 
 ## Build status
 
