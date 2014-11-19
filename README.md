@@ -10,7 +10,7 @@ is already receiving datapoints, such as graphite's carbon database.
 ## Install and upgrade
 
 ```
-  ./install.sh
+  curl -s https://raw.githubusercontent.com/signalfuse/signalfxproxy/master/install.sh | sudo sh
   # Config at    /etc/sfdbconfig.conf
   # Binary at    /opt/sfproxy/bin/signalfxproxy
   # Logs at      /var/log/sfproxy
