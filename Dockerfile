@@ -1,4 +1,4 @@
-FROM phusion/baseimage:0.9.11
+FROM phusion/baseimage:0.9.15
 MAINTAINER Jack Lindamood <jack@signalfuse.com>
 
 ENV DEBIAN_FRONTEND noninteractive
