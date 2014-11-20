@@ -18,4 +18,5 @@ type Loader func(core.DatapointStreamingAPI, *config.ListenFrom) (DatapointListe
 var AllListenerLoaders = map[string]Loader{
 	"signalfx": SignalFxListenerLoader,
 	"carbon":   CarbonListenerLoader,
+	"collectd": CollectdListenerLoader,
 }
