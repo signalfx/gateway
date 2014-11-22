@@ -37,7 +37,7 @@ func (streamer *streamingDemultiplexerImpl) datapointReadingThread() {
 			default:
 				// Don't block operation
 				atomic.AddInt64(&streamer.droppedPoints[index], 1)
-				glog.Info("Dropped datapoint for %s", sendTo.Name())
+				glog.Infof("Dropped datapoint for %s", sendTo.Name())
 			}
 		}
 	}

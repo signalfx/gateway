@@ -28,7 +28,7 @@ func (streamer *collectdListenerServer) Close() {
 	streamer.listener.Close()
 }
 
-func (streamer *collectdListenerServer) jsonDecode(req *http.Request) error {
+func jsonDecode(req *http.Request, datapointStreamingAPI core.DatapointStreamingAPI) error {
 	dec := json.NewDecoder(req.Body)
 	var d protocoltypes.CollectdJSONWriteBody
 	if err := dec.Decode(&d); err != nil {
@@ -38,7 +38,7 @@ func (streamer *collectdListenerServer) jsonDecode(req *http.Request) error {
 		if f.TypeS != nil && f.Time != nil {
 			for i := range f.Dsnames {
 				if i < len(f.Dstypes) && i < len(f.Values) {
-					streamer.datapointStreamingAPI.DatapointsChannel() <- protocoltypes.NewCollectdDatapoint(f, uint(i))
+					datapointStreamingAPI.DatapointsChannel() <- protocoltypes.NewCollectdDatapoint(f, uint(i))
 				}
 			}
 		}
@@ -46,9 +46,10 @@ func (streamer *collectdListenerServer) jsonDecode(req *http.Request) error {
 	return nil
 }
 
-func (streamer *collectdListenerServer) handleCollectd(writter http.ResponseWriter, req *http.Request) {
-	knownTypes := map[string]func(*http.Request) error{
-		"application/json": streamer.jsonDecode,
+// HandleCollectd will process the JSON sent from a collectd request
+func HandleCollectd(writter http.ResponseWriter, req *http.Request, datapointStreamingAPI core.DatapointStreamingAPI) {
+	knownTypes := map[string]func(*http.Request, core.DatapointStreamingAPI) error{
+		"application/json": jsonDecode,
 	}
 	contentType := req.Header.Get("Content-type")
 	decoderFunc, ok := knownTypes[contentType]
@@ -58,13 +59,17 @@ func (streamer *collectdListenerServer) handleCollectd(writter http.ResponseWrit
 		writter.Write([]byte(`{msg:"Unknown content type"}`))
 		return
 	}
-	err := decoderFunc(req)
+	err := decoderFunc(req, datapointStreamingAPI)
 	if err != nil {
 		writter.WriteHeader(http.StatusBadRequest)
 		writter.Write([]byte(err.Error()))
 	} else {
 		writter.WriteHeader(http.StatusOK)
 	}
+}
+
+func (streamer *collectdListenerServer) handleCollectd(writter http.ResponseWriter, req *http.Request) {
+	HandleCollectd(writter, req, streamer.datapointStreamingAPI)
 }
 
 var defaultCollectdConfig = &config.ListenFrom{

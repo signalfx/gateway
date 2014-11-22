@@ -229,6 +229,10 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 		}
 	}
 
+	collectdHandlerV1 := func(writter http.ResponseWriter, req *http.Request) {
+		HandleCollectd(writter, req, DatapointStreamingAPI)
+	}
+
 	datapointHandlerV1 := func(writter http.ResponseWriter, req *http.Request) {
 		knownTypes := map[string]decoderFunc{
 			"":                       jsonDecoderFunction,
@@ -289,6 +293,9 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 	mux.HandleFunc(
 		"/v2/datapoint",
 		datapointHandlerV2)
+	mux.HandleFunc(
+		"/v1/collectd",
+		collectdHandlerV1)
 	mux.HandleFunc(
 		"/v1/metric",
 		metricHandler)

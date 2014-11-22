@@ -186,6 +186,29 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	a.ExpectEquals(t, "metrictwo", dp.Metric(), "Should get metric back!")
 	a.ExpectEquals(t, 0, len(dp.Dimensions()), "Should get metric back!")
 
+	req, _ = http.NewRequest(
+		"POST",
+		"http://0.0.0.0:12349/v1/collectd",
+		bytes.NewBuffer([]byte(testCollectdBody)),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	gotPointChan = make(chan bool)
+	go func() {
+		for i := 0; i < 5; i++ {
+			dp = <-sendTo.channel
+		}
+		gotPointChan <- true
+	}()
+	resp, err = client.Do(req)
+	_ = <-gotPointChan
+	a.ExpectEquals(t, resp.StatusCode, http.StatusOK, "Request should work")
+	a.ExpectEquals(t, nil, err, "Should not get an error making request")
+
+	a.ExpectEquals(t, nil, err, "Should not get an error making request")
+	a.ExpectEquals(t, resp.StatusCode, 200, "Request should work")
+	a.ExpectEquals(t, "df_complex.free", dp.Metric(), "Should get metric back!")
+	a.ExpectEquals(t, 6, len(dp.Dimensions()), "Should get metric back!")
+
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/datapoint", bytes.NewBuffer([]byte(`INVALIDJSON`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
