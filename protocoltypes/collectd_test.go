@@ -68,6 +68,24 @@ const testCollectdBody = `[
         "values": [
             1962600000.0
         ]
+    },
+    {
+        "dsnames": [
+            "value"
+        ],
+        "dstypes": [
+            "derive"
+        ],
+        "host": "i-b13d1e5f",
+        "interval": 10.0,
+        "plugin": "df",
+        "plugin_instance": "dev",
+        "time": 1415062577.4949999,
+        "type": "",
+        "type_instance": "free",
+        "values": [
+            1962600000.0
+        ]
     }
 ]`
 
@@ -83,6 +101,11 @@ func TestCollectdJsonDecoding(t *testing.T) {
 	a.ExpectNil(t, json.Unmarshal([]byte(testCollectdBody), &postFormat))
 	dp := NewCollectdDatapoint(postFormat[0], uint(0))
 	a.ExpectEquals(t, "load.shortterm", dp.Metric(), "Metric not named correctly")
+	dp = NewCollectdDatapoint(postFormat[1], uint(0))
+	a.ExpectEquals(t, "memory.used", dp.Metric(), "Metric not named correctly")
 	dp = NewCollectdDatapoint(postFormat[2], uint(0))
 	a.ExpectEquals(t, "df_complex.free", dp.Metric(), "Metric not named correctly")
+	dp = NewCollectdDatapoint(postFormat[3], uint(0))
+	a.ExpectEquals(t, "free", dp.Metric(), "Metric not named correctly")
+
 }

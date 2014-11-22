@@ -52,7 +52,7 @@ func NewCollectdDatapoint(point CollectdJSONWriteFormat, index uint) core.Datapo
 	dstype, val, dsname := point.Dstypes[index], point.Values[index], point.Dsnames[index]
 	dimensions := make(map[string]string)
 	metricType := metricTypeFromDsType(dstype)
-	metricName := getReasonableMetricName(point, index)
+	metricName, usedParts := getReasonableMetricName(point, index)
 	if point.Host != nil {
 		dimensions["host"] = *point.Host
 	}
@@ -63,28 +63,41 @@ func NewCollectdDatapoint(point CollectdJSONWriteFormat, index uint) core.Datapo
 		dimensions["plugin_instance"] = *point.PluginInstance
 	}
 	if point.TypeInstance != nil {
-		dimensions["type_instance"] = *point.TypeInstance
+		_, usedInMetricName := usedParts["type_instance"]
+		if !usedInMetricName {
+			dimensions["type_instance"] = *point.TypeInstance
+		}
 	}
 	if point.TypeS != nil {
-		dimensions["type"] = *point.TypeS
+		_, usedInMetricName := usedParts["type"]
+		if !usedInMetricName {
+			dimensions["type"] = *point.TypeS
+		}
 	}
 	if dsname != nil {
-		dimensions["dsname"] = *dsname
+		_, usedInMetricName := usedParts["dsname"]
+		if !usedInMetricName {
+			dimensions["dsname"] = *dsname
+		}
 	}
 	timestamp := time.Unix(0, int64(float64(time.Second)**point.Time))
 	return core.NewAbsoluteTimeDatapoint(metricName, dimensions, value.NewFloatWire(*val), metricType, timestamp)
 }
 
-func getReasonableMetricName(point CollectdJSONWriteFormat, index uint) string {
+func getReasonableMetricName(point CollectdJSONWriteFormat, index uint) (string, map[string]interface{}) {
 	parts := []string{}
+	usedParts := make(map[string]interface{})
 	if !isNilOrEmpty(point.TypeS) {
 		parts = append(parts, *point.TypeS)
+		usedParts["type"] = nil
 	}
 	if !isNilOrEmpty(point.TypeInstance) {
 		parts = append(parts, *point.TypeInstance)
+		usedParts["type_instance"] = nil
 	}
 	if !isNilOrEmpty(point.Dsnames[index]) && len(point.Dsnames) > 1 {
 		parts = append(parts, *point.Dsnames[index])
+		usedParts["dsname"] = nil
 	}
-	return strings.Join(parts, ".")
+	return strings.Join(parts, "."), usedParts
 }
