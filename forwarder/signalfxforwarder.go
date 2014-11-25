@@ -68,14 +68,14 @@ var defaultConfigV1 = &config.ForwardTo{
 var defaultConfigV2 = &config.ForwardTo{
 	URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfuse.com/v2/datapoint"),
 	DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
-	MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfuse.com/v1/metric?bulkupdate=true"),
-	TimeoutDuration:   workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
-	BufferSize:        workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(10000)),
-	DrainingThreads:   workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(5)),
+	MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral(""), // Not used
+	TimeoutDuration:   workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 60),
+	BufferSize:        workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1000000)),
+	DrainingThreads:   workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(10)),
 	Name:              workarounds.GolangDoesnotAllowPointerToStringLiteral("signalfx-forwarder"),
-	MaxDrainSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1000)),
+	MaxDrainSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(3000)),
 	SourceDimensions:  workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
-	FormatVersion:     workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(2)),
+	FormatVersion:     workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(3)),
 }
 
 // SignalfxJSONForwarderLoader loads a json forwarder forwarding points from proxy to SignalFx
@@ -108,7 +108,7 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint3
 		url:              url,
 		defaultAuthToken: defaultAuthToken,
 		sendVersion:      sendVersion,
-		userAgent:        fmt.Sprintf("SignalfxProxy/0.1 (gover %s)", runtime.Version()),
+		userAgent:        fmt.Sprintf("SignalfxProxy/0.2 (gover %s)", runtime.Version()),
 		tr:               tr,
 		client: &http.Client{
 			Transport: tr,
