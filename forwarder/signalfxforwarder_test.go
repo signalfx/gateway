@@ -67,6 +67,10 @@ func TestMapToDimensions(t *testing.T) {
 	delete(r, "key:char")
 	r["key_char"] = "val3"
 	a.ExpectEquals(t, r, expect, "Dimensions don't parse right")
+	r["invalid_val"] = ""
+	res = mapToDimensions(r)
+	delete(r, "invalid_val")
+	a.ExpectEquals(t, r, expect, "Dimensions don't parse right")
 }
 
 func TestFilterSignalfxString(t *testing.T) {

@@ -296,6 +296,9 @@ func (connector *signalfxJSONConnector) coreDatapointToProtobuf(point core.Datap
 func mapToDimensions(dimensions map[string]string) []*com_signalfuse_metrics_protobuf.Dimension {
 	ret := []*com_signalfuse_metrics_protobuf.Dimension{}
 	for k, v := range dimensions {
+		if k == "" || v == "" {
+			continue
+		}
 		// If someone knows a better way to do this, let me know.  I can't just take the &
 		// of k and v because their content changes as the range iterates
 		copyOfK := filterSignalfxKey(string([]byte(k)))
