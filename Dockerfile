@@ -4,6 +4,8 @@ MAINTAINER Jack Lindamood <jack@signalfuse.com>
 ENV DEBIAN_FRONTEND noninteractive
 
 # Clean/refresh apt-get
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN apt-get update
 RUN apt-get -y install golang git mercurial
 
 RUN mkdir -p /opt/sfproxy
