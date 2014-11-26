@@ -1,10 +1,21 @@
 FROM phusion/baseimage:0.9.15
 MAINTAINER Jack Lindamood <jack@signalfuse.com>
 
+# Does a full build and tests.  Larger docker image, but good for extra
+# testing env
 ENV DEBIAN_FRONTEND noninteractive
 
 # Clean/refresh apt-get
-RUN apt-get -y install golang git mercurial
+RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN apt-get update
+RUN apt-get -y upgrade
+
+# Install dependencies
+RUN apt-get -y install golang git mercurial curl ruby ghc ghc-prof ghc-doc cabal-install
+RUN cabal update
+RUN cabal install shellcheck
+RUN ln ~/.cabal/bin/shellcheck /usr/bin/shellcheck
+RUN gem install mdl
 
 RUN mkdir -p /opt/sfproxy
 
@@ -35,9 +46,10 @@ RUN go get github.com/stretchr/testify/mock
 RUN go get code.google.com/p/go.tools/cmd/cover
 RUN go env
 RUN go get github.com/signalfuse/signalfxproxy
-RUN go test github.com/signalfuse/signalfxproxy
 
 ENV PATH $GOPATH/bin:$PATH
+
+RUN cd /opt/sfproxy/src/github.com/signalfuse/signalfxproxy && /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/travis_check.sh
 
 # Add run command
 VOLUME /var/log/sfproxy
