@@ -86,6 +86,24 @@ const testCollectdBody = `[
         "values": [
             1962600000.0
         ]
+    },
+    {
+        "dsnames": [
+            "value"
+        ],
+        "dstypes": [
+            "derive"
+        ],
+        "host": "i-b13d1e5f",
+        "interval": 10.0,
+        "plugin": "ignored",
+        "plugin_instance": "ignored2",
+        "time": 1415062577.4949999,
+        "type": "",
+        "type_instance": "free",
+        "values": [
+            5.36202e+09
+        ]
     }
 ]`
 
@@ -107,5 +125,7 @@ func TestCollectdJsonDecoding(t *testing.T) {
 	a.ExpectEquals(t, "df_complex.free", dp.Metric(), "Metric not named correctly")
 	dp = NewCollectdDatapoint(postFormat[3], uint(0))
 	a.ExpectEquals(t, "free", dp.Metric(), "Metric not named correctly")
-
+	dp = NewCollectdDatapoint(postFormat[4], uint(0))
+	f, _ := dp.Value().FloatValue()
+	a.ExpectEquals(t, 5.36202e+09, f, "Cannot parse value correctly")
 }
