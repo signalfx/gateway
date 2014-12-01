@@ -13,6 +13,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"strconv"
+	"runtime"
 )
 
 func writePidFile(pidFileName string) error {
@@ -41,6 +42,10 @@ func init() {
 }
 
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() {
+	// TODO: Configure this on command line.  Needed because JSON decoding can get kinda slow.
+	num_procs := runtime.NumCPU()
+	runtime.GOMAXPROCS(num_procs)
+
 	if proxyCommandLineConfiguration.pprofaddr != "" {
 		go func() {
 			glog.Infof("Opening pprof debug information on %s", proxyCommandLineConfiguration.pprofaddr)
