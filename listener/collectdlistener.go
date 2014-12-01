@@ -5,22 +5,52 @@ import (
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/golang/glog"
+	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"net"
 	"net/http"
+	"sync/atomic"
 	"time"
 )
 
 type collectdListenerServer struct {
+	name                  string
 	listener              net.Listener
 	server                *http.Server
 	datapointStreamingAPI core.DatapointStreamingAPI
+
+	activeConnections int64
+	totalConnections  int64
+	totalDatapoints   int64
+	invalidRequests   int64
 }
 
 func (streamer *collectdListenerServer) GetStats() []core.Datapoint {
 	ret := []core.Datapoint{}
+	stats := map[string]int64{
+		"total_datapoints":   atomic.LoadInt64(&streamer.totalDatapoints),
+		"invalid_requests":   atomic.LoadInt64(&streamer.invalidRequests),
+		"total_connections":  atomic.LoadInt64(&streamer.totalConnections),
+		"active_connections": atomic.LoadInt64(&streamer.activeConnections),
+	}
+	for k, v := range stats {
+		var t com_signalfuse_metrics_protobuf.MetricType
+		if k == "active_connections" {
+			t = com_signalfuse_metrics_protobuf.MetricType_GAUGE
+		} else {
+			t = com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER
+		}
+		ret = append(
+			ret,
+			protocoltypes.NewOnHostDatapointDimensions(
+				k,
+				value.NewIntWire(v),
+				t,
+				map[string]string{"listener": streamer.name}))
+	}
 	return ret
 }
 
@@ -28,17 +58,22 @@ func (streamer *collectdListenerServer) Close() {
 	streamer.listener.Close()
 }
 
-func jsonDecode(req *http.Request, datapointStreamingAPI core.DatapointStreamingAPI) error {
+func (streamer *collectdListenerServer) jsonDecode(req *http.Request) error {
+	atomic.AddInt64(&streamer.totalConnections, 1)
+	atomic.AddInt64(&streamer.activeConnections, 1)
+	defer atomic.AddInt64(&streamer.activeConnections, -1)
 	dec := json.NewDecoder(req.Body)
 	var d protocoltypes.CollectdJSONWriteBody
 	if err := dec.Decode(&d); err != nil {
+		atomic.AddInt64(&streamer.invalidRequests, 1)
 		return err
 	}
 	for _, f := range d {
 		if f.TypeS != nil && f.Time != nil {
 			for i := range f.Dsnames {
 				if i < len(f.Dstypes) && i < len(f.Values) {
-					datapointStreamingAPI.DatapointsChannel() <- protocoltypes.NewCollectdDatapoint(f, uint(i))
+					atomic.AddInt64(&streamer.totalDatapoints, 1)
+					streamer.datapointStreamingAPI.DatapointsChannel() <- protocoltypes.NewCollectdDatapoint(f, uint(i))
 				}
 			}
 		}
@@ -46,10 +81,9 @@ func jsonDecode(req *http.Request, datapointStreamingAPI core.DatapointStreaming
 	return nil
 }
 
-// HandleCollectd will process the JSON sent from a collectd request
-func HandleCollectd(writter http.ResponseWriter, req *http.Request, datapointStreamingAPI core.DatapointStreamingAPI) {
-	knownTypes := map[string]func(*http.Request, core.DatapointStreamingAPI) error{
-		"application/json": jsonDecode,
+func (streamer *collectdListenerServer) handleCollectd(writter http.ResponseWriter, req *http.Request) {
+	knownTypes := map[string]func(*http.Request) error{
+		"application/json": streamer.jsonDecode,
 	}
 	contentType := req.Header.Get("Content-type")
 	decoderFunc, ok := knownTypes[contentType]
@@ -59,17 +93,13 @@ func HandleCollectd(writter http.ResponseWriter, req *http.Request, datapointStr
 		writter.Write([]byte(`{msg:"Unknown content type"}`))
 		return
 	}
-	err := decoderFunc(req, datapointStreamingAPI)
+	err := decoderFunc(req)
 	if err != nil {
 		writter.WriteHeader(http.StatusBadRequest)
 		writter.Write([]byte(err.Error()))
 	} else {
 		writter.WriteHeader(http.StatusOK)
 	}
-}
-
-func (streamer *collectdListenerServer) handleCollectd(writter http.ResponseWriter, req *http.Request) {
-	HandleCollectd(writter, req, streamer.datapointStreamingAPI)
 }
 
 var defaultCollectdConfig = &config.ListenFrom{

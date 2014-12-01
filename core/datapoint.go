@@ -19,7 +19,7 @@ type Datapoint interface {
 	MetricType() com_signalfuse_metrics_protobuf.MetricType
 	// The unix time of the datapoint
 	Timestamp() time.Time
-	// String readable datapoint
+	// String readable datapoint (@deprecated)
 	String() string
 }
 

@@ -19,17 +19,78 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 type listenerServer struct {
+	name                    string
 	listener                net.Listener
 	metricCreationsMap      map[string]com_signalfuse_metrics_protobuf.MetricType
-	metricCreationsMapMutex *sync.Mutex
+	metricCreationsMapMutex sync.Mutex
+
+	collectdHandler       *collectdListenerServer
+	datapointStreamingAPI core.DatapointStreamingAPI
+
+	protobufPoints   int64
+	jsonPoints       int64
+	protobufPointsV2 int64
+	jsonPointsV2     int64
+
+	totalJSONDecoderCalls      int64
+	totalProtobufDecoderCalls  int64
+	activeJSONDecoderCalls     int64
+	activeProtobufDecoderCalls int64
+	errorJSONDecoderCalls      int64
+	errorProtobufDecoderCalls  int64
+
+	totalJSONDecoderCallsv2      int64
+	totalProtobufDecoderCallsv2  int64
+	activeJSONDecoderCallsv2     int64
+	activeProtobufDecoderCallsv2 int64
+	errorJSONDecoderCallsv2      int64
+	errorProtobufDecoderCallsv2  int64
 }
 
 func (streamer *listenerServer) GetStats() []core.Datapoint {
 	ret := []core.Datapoint{}
+	stats := map[string]int64{
+		"total_json_calls":  atomic.LoadInt64(&streamer.totalJSONDecoderCalls),
+		"active_json_calls": atomic.LoadInt64(&streamer.activeJSONDecoderCalls),
+		"error_json_calls":  atomic.LoadInt64(&streamer.errorJSONDecoderCalls),
+
+		"total_json_v2_calls":  atomic.LoadInt64(&streamer.totalJSONDecoderCallsv2),
+		"active_json_v2_calls": atomic.LoadInt64(&streamer.activeJSONDecoderCallsv2),
+		"error_json_v2_calls":  atomic.LoadInt64(&streamer.errorJSONDecoderCallsv2),
+
+		"total_protobuf_calls":  atomic.LoadInt64(&streamer.totalProtobufDecoderCalls),
+		"active_protobuf_calls": atomic.LoadInt64(&streamer.activeProtobufDecoderCalls),
+		"error_protobuf_calls":  atomic.LoadInt64(&streamer.errorProtobufDecoderCalls),
+
+		"total_protobuf_v2_calls":  atomic.LoadInt64(&streamer.totalProtobufDecoderCallsv2),
+		"active_protobuf_v2_calls": atomic.LoadInt64(&streamer.activeProtobufDecoderCallsv2),
+		"error_protobuf_v2_calls":  atomic.LoadInt64(&streamer.errorProtobufDecoderCallsv2),
+	}
+	for k, v := range stats {
+		keyParts := strings.SplitN(k, "_", 2)
+
+		keyType := keyParts[0]
+		metric := keyParts[1]
+		var t com_signalfuse_metrics_protobuf.MetricType
+		if keyType == "active" {
+			t = com_signalfuse_metrics_protobuf.MetricType_GAUGE
+		} else {
+			t = com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER
+		}
+		ret = append(
+			ret,
+			protocoltypes.NewOnHostDatapointDimensions(
+				metric,
+				value.NewIntWire(v),
+				t,
+				map[string]string{"listener": streamer.name, "type": keyType}))
+	}
+	ret = append(ret, streamer.collectdHandler.GetStats()...)
 	return ret
 }
 
@@ -37,10 +98,10 @@ func (streamer *listenerServer) Close() {
 	streamer.listener.Close()
 }
 
-func getMetricTypeFromMap(metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType, metricCreationsMapMutex *sync.Mutex, metricName string) com_signalfuse_metrics_protobuf.MetricType {
-	metricCreationsMapMutex.Lock()
-	defer metricCreationsMapMutex.Unlock()
-	mt, ok := metricCreationsMap[metricName]
+func (streamer *listenerServer) getMetricTypeFromMap(metricName string) com_signalfuse_metrics_protobuf.MetricType {
+	streamer.metricCreationsMapMutex.Lock()
+	defer streamer.metricCreationsMapMutex.Unlock()
+	mt, ok := streamer.metricCreationsMap[metricName]
 	if !ok {
 		return com_signalfuse_metrics_protobuf.MetricType_GAUGE
 	}
@@ -49,7 +110,7 @@ func getMetricTypeFromMap(metricCreationsMap map[string]com_signalfuse_metrics_p
 
 var protoXXXDecodeVarint = proto.DecodeVarint
 
-func protobufDecoding(body io.Reader, metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType, metricCreationsMapMutex *sync.Mutex, DatapointStreamingAPI core.DatapointStreamingAPI) error {
+func (streamer *listenerServer) protobufDecoding(body io.Reader) error {
 	bufferedBody := bufio.NewReaderSize(body, 32768)
 	for {
 		glog.Infof("Start of loop for %s", body)
@@ -86,14 +147,15 @@ func protobufDecoding(body io.Reader, metricCreationsMap map[string]com_signalfu
 		if err != nil {
 			return err
 		}
-		mt := getMetricTypeFromMap(metricCreationsMap, metricCreationsMapMutex, msg.GetMetric())
+		mt := streamer.getMetricTypeFromMap(msg.GetMetric())
 		dp := protocoltypes.NewProtobufDataPointWithType(&msg, mt)
 		glog.Infof("Adding a point")
-		DatapointStreamingAPI.DatapointsChannel() <- dp
+		streamer.datapointStreamingAPI.DatapointsChannel() <- dp
+		atomic.AddInt64(&streamer.protobufPoints, 1)
 	}
 }
 
-func jsonDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI, metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType, metricCreationsMapMutex *sync.Mutex) func(*http.Request) error {
+func (streamer *listenerServer) jsonDecoderFunction() func(*http.Request) error {
 	return func(req *http.Request) error {
 		dec := json.NewDecoder(req.Body)
 		for {
@@ -108,15 +170,16 @@ func jsonDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI, metri
 					glog.Warningf("Invalid datapoint %s", d)
 					continue
 				}
-				mt := getMetricTypeFromMap(metricCreationsMap, metricCreationsMapMutex, d.Metric)
-				DatapointStreamingAPI.DatapointsChannel() <- core.NewRelativeTimeDatapoint(d.Metric, map[string]string{"sf_source": d.Source}, value.NewFloatWire(d.Value), mt, 0)
+				mt := streamer.getMetricTypeFromMap(d.Metric)
+				atomic.AddInt64(&streamer.jsonPoints, 1)
+				streamer.datapointStreamingAPI.DatapointsChannel() <- core.NewRelativeTimeDatapoint(d.Metric, map[string]string{"sf_source": d.Source}, value.NewFloatWire(d.Value), mt, 0)
 			}
 		}
 		return nil
 	}
 }
 
-func protobufDecoderFunctionV2(DatapointStreamingAPI core.DatapointStreamingAPI, metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType, metricCreationsMapMutex *sync.Mutex) func(*http.Request) error {
+func (streamer *listenerServer) protobufDecoderFunctionV2() func(*http.Request) error {
 	return func(req *http.Request) error {
 		if req.ContentLength == -1 {
 			return errors.New("Invalid content length")
@@ -133,13 +196,14 @@ func protobufDecoderFunctionV2(DatapointStreamingAPI core.DatapointStreamingAPI,
 		}
 		for _, protoDb := range msg.GetDatapoints() {
 			dp := protocoltypes.NewProtobufDataPointWithType(protoDb, com_signalfuse_metrics_protobuf.MetricType_GAUGE)
-			DatapointStreamingAPI.DatapointsChannel() <- dp
+			atomic.AddInt64(&streamer.protobufPointsV2, 1)
+			streamer.datapointStreamingAPI.DatapointsChannel() <- dp
 		}
 		return nil
 	}
 }
 
-func jsonDecoderFunctionV2(DatapointStreamingAPI core.DatapointStreamingAPI, metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType, metricCreationsMapMutex *sync.Mutex) func(*http.Request) error {
+func (streamer *listenerServer) jsonDecoderFunctionV2() func(*http.Request) error {
 	return func(req *http.Request) error {
 		dec := json.NewDecoder(req.Body)
 		var d protocoltypes.SignalfxJSONDatapointV2
@@ -159,7 +223,8 @@ func jsonDecoderFunctionV2(DatapointStreamingAPI core.DatapointStreamingAPI, met
 					glog.Warningf("Unable to get value for datapoint: %s", err)
 				} else {
 					dp := core.NewRelativeTimeDatapoint(jsonDatapoint.Metric, jsonDatapoint.Dimensions, v, com_signalfuse_metrics_protobuf.MetricType(mt), jsonDatapoint.Timestamp)
-					DatapointStreamingAPI.DatapointsChannel() <- dp
+					atomic.AddInt64(&streamer.jsonPointsV2, 1)
+					streamer.datapointStreamingAPI.DatapointsChannel() <- dp
 				}
 			}
 		}
@@ -181,36 +246,78 @@ func fullyReadFromBuffer(buffer *bufio.Reader, numBytes uint64) ([]byte, error) 
 	return buf, nil
 }
 
-func protobufDecoderFunction(DatapointStreamingAPI core.DatapointStreamingAPI, metricCreationsMap map[string]com_signalfuse_metrics_protobuf.MetricType, metricCreationsMapMutex *sync.Mutex) func(*http.Request) error {
+func (streamer *listenerServer) protobufDecoderFunction() func(*http.Request) error {
 	return func(req *http.Request) error {
 		glog.Infof("Request is %s", req)
-		return protobufDecoding(req.Body, metricCreationsMap, metricCreationsMapMutex, DatapointStreamingAPI)
+		return streamer.protobufDecoding(req.Body)
 	}
 }
 
 var defaultConfig = &config.ListenFrom{
 	ListenAddr:      workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12345"),
 	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
+	Name:            workarounds.GolangDoesnotAllowPointerToStringLiteral("signalfxlistener"),
 }
 
 // SignalFxListenerLoader loads a listener for signalfx protocol from config
 func SignalFxListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, listenFrom *config.ListenFrom) (DatapointListener, error) {
 	structdefaults.FillDefaultFrom(listenFrom, defaultConfig)
 	glog.Infof("Creating signalfx listener using final config %s", listenFrom)
-	return StartServingHTTPOnPort(*listenFrom.ListenAddr, DatapointStreamingAPI, *listenFrom.TimeoutDuration)
+	return StartServingHTTPOnPort(
+		*listenFrom.ListenAddr, DatapointStreamingAPI, *listenFrom.TimeoutDuration, *listenFrom.Name)
+}
+
+func (streamer *listenerServer) metricHandler(writter http.ResponseWriter, req *http.Request) {
+	dec := json.NewDecoder(req.Body)
+	var d []protocoltypes.SignalfxMetricCreationStruct
+	if err := dec.Decode(&d); err != nil {
+		glog.Infof("Invalid metric creation request: %s", err)
+		writter.WriteHeader(http.StatusBadRequest)
+		writter.Write([]byte(`{msg:"Invalid creation request"}`))
+		return
+	}
+	glog.V(3).Info("Got metric types: %s", d)
+	streamer.metricCreationsMapMutex.Lock()
+	defer streamer.metricCreationsMapMutex.Unlock()
+	ret := []protocoltypes.SignalfxMetricCreationResponse{}
+	for _, m := range d {
+		metricType, ok := com_signalfuse_metrics_protobuf.MetricType_value[m.MetricType]
+		if !ok {
+			writter.WriteHeader(http.StatusBadRequest)
+			writter.Write([]byte(`{msg:"Invalid metric type"}`))
+			return
+		}
+		streamer.metricCreationsMap[m.MetricName] = com_signalfuse_metrics_protobuf.MetricType(metricType)
+		ret = append(ret, protocoltypes.SignalfxMetricCreationResponse{Code: 409})
+	}
+	toWrite, err := jsonXXXMarshal(ret)
+	if err != nil {
+		glog.Warningf("Unable to marshal json: %s", err)
+		writter.WriteHeader(http.StatusBadRequest)
+		writter.Write([]byte(`{msg:"Unable to marshal json!"}`))
+		return
+	}
+	writter.WriteHeader(http.StatusOK)
+	writter.Write([]byte(toWrite))
 }
 
 var jsonXXXMarshal = json.Marshal
 
-type decoderFunc func(core.DatapointStreamingAPI, map[string]com_signalfuse_metrics_protobuf.MetricType, *sync.Mutex) func(*http.Request) error
+type decoderFunc func() func(*http.Request) error
 
 // StartServingHTTPOnPort servers http requests for Signalfx datapoints
-func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.DatapointStreamingAPI, clientTimeout time.Duration) (DatapointListener, error) {
+func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.DatapointStreamingAPI,
+	clientTimeout time.Duration, name string) (DatapointListener, error) {
 	mux := http.NewServeMux()
-	metricCreationsMap := make(map[string]com_signalfuse_metrics_protobuf.MetricType)
-	metricCreationsMapMutex := &sync.Mutex{}
 
-	datapointHandler := func(writter http.ResponseWriter, req *http.Request, knownTypes map[string]decoderFunc) {
+	datapointHandler := func(
+		writter http.ResponseWriter,
+		req *http.Request,
+		knownTypes map[string]decoderFunc,
+		totalCallsMap map[string]*int64,
+		activeCallsMap map[string]*int64,
+		errorCallsMap map[string]*int64) {
+
 		contentType := req.Header.Get("Content-type")
 		decoderFunc, ok := knownTypes[contentType]
 
@@ -219,71 +326,97 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 			writter.Write([]byte(`{msg:"Unknown content type"}`))
 			return
 		}
-		err := decoderFunc(DatapointStreamingAPI, metricCreationsMap, metricCreationsMapMutex)(req)
+		totalCalls := totalCallsMap[contentType]
+		activeCalls := activeCallsMap[contentType]
+		errorCalls := errorCallsMap[contentType]
+		atomic.AddInt64(totalCalls, 1)
+		atomic.AddInt64(activeCalls, 1)
+		defer atomic.AddInt64(activeCalls, -1)
+		err := decoderFunc()(req)
 		if err != nil {
 			writter.WriteHeader(http.StatusBadRequest)
 			writter.Write([]byte(err.Error()))
+			atomic.AddInt64(errorCalls, 1)
 		} else {
 			writter.WriteHeader(http.StatusOK)
 			writter.Write([]byte(`"OK"`))
 		}
 	}
 
+	server := http.Server{
+		Handler:      mux,
+		Addr:         listenAddr,
+		ReadTimeout:  clientTimeout,
+		WriteTimeout: clientTimeout,
+	}
+	listener, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		return nil, err
+	}
+	listenServer := listenerServer{
+		listener:                listener,
+		metricCreationsMap:      make(map[string]com_signalfuse_metrics_protobuf.MetricType),
+		metricCreationsMapMutex: sync.Mutex{},
+		collectdHandler: &collectdListenerServer{
+			name:                  name + "_collectd",
+			listener:              nil,
+			datapointStreamingAPI: DatapointStreamingAPI,
+		},
+		datapointStreamingAPI: DatapointStreamingAPI,
+	}
+
 	collectdHandlerV1 := func(writter http.ResponseWriter, req *http.Request) {
-		HandleCollectd(writter, req, DatapointStreamingAPI)
+		listenServer.collectdHandler.handleCollectd(writter, req)
 	}
 
 	datapointHandlerV1 := func(writter http.ResponseWriter, req *http.Request) {
-		knownTypes := map[string]decoderFunc{
-			"":                       jsonDecoderFunction,
-			"application/json":       jsonDecoderFunction,
-			"application/x-protobuf": protobufDecoderFunction,
+		total := map[string]*int64{
+			"":                       &listenServer.totalJSONDecoderCalls,
+			"application/json":       &listenServer.totalJSONDecoderCalls,
+			"application/x-protobuf": &listenServer.totalProtobufDecoderCalls,
 		}
-		datapointHandler(writter, req, knownTypes)
+		active := map[string]*int64{
+			"":                       &listenServer.activeJSONDecoderCalls,
+			"application/json":       &listenServer.activeJSONDecoderCalls,
+			"application/x-protobuf": &listenServer.activeProtobufDecoderCalls,
+		}
+		error := map[string]*int64{
+			"":                       &listenServer.errorJSONDecoderCalls,
+			"application/json":       &listenServer.errorJSONDecoderCalls,
+			"application/x-protobuf": &listenServer.errorProtobufDecoderCalls,
+		}
+		knownTypes := map[string]decoderFunc{
+			"":                       listenServer.jsonDecoderFunction,
+			"application/json":       listenServer.jsonDecoderFunction,
+			"application/x-protobuf": listenServer.protobufDecoderFunction,
+		}
+		datapointHandler(writter, req, knownTypes, total, active, error)
 	}
 
 	datapointHandlerV2 := func(writter http.ResponseWriter, req *http.Request) {
-		knownTypes := map[string]decoderFunc{
-			"":                       jsonDecoderFunctionV2,
-			"application/json":       jsonDecoderFunctionV2,
-			"application/x-protobuf": protobufDecoderFunctionV2,
+		total := map[string]*int64{
+			"":                       &listenServer.totalJSONDecoderCallsv2,
+			"application/json":       &listenServer.totalJSONDecoderCallsv2,
+			"application/x-protobuf": &listenServer.totalProtobufDecoderCallsv2,
 		}
-		datapointHandler(writter, req, knownTypes)
+		active := map[string]*int64{
+			"":                       &listenServer.activeJSONDecoderCallsv2,
+			"application/json":       &listenServer.activeJSONDecoderCallsv2,
+			"application/x-protobuf": &listenServer.activeProtobufDecoderCallsv2,
+		}
+		error := map[string]*int64{
+			"":                       &listenServer.errorJSONDecoderCallsv2,
+			"application/json":       &listenServer.errorJSONDecoderCallsv2,
+			"application/x-protobuf": &listenServer.errorProtobufDecoderCallsv2,
+		}
+		knownTypes := map[string]decoderFunc{
+			"":                       listenServer.jsonDecoderFunctionV2,
+			"application/json":       listenServer.jsonDecoderFunctionV2,
+			"application/x-protobuf": listenServer.protobufDecoderFunctionV2,
+		}
+		datapointHandler(writter, req, knownTypes, total, active, error)
 	}
 
-	metricHandler := func(writter http.ResponseWriter, req *http.Request) {
-		dec := json.NewDecoder(req.Body)
-		var d []protocoltypes.SignalfxMetricCreationStruct
-		if err := dec.Decode(&d); err != nil {
-			glog.Infof("Invalid metric creation request: %s", err)
-			writter.WriteHeader(http.StatusBadRequest)
-			writter.Write([]byte(`{msg:"Invalid creation request"}`))
-			return
-		}
-		glog.V(3).Info("Got metric types: %s", d)
-		metricCreationsMapMutex.Lock()
-		defer metricCreationsMapMutex.Unlock()
-		ret := []protocoltypes.SignalfxMetricCreationResponse{}
-		for _, m := range d {
-			metricType, ok := com_signalfuse_metrics_protobuf.MetricType_value[m.MetricType]
-			if !ok {
-				writter.WriteHeader(http.StatusBadRequest)
-				writter.Write([]byte(`{msg:"Invalid metric type"}`))
-				return
-			}
-			metricCreationsMap[m.MetricName] = com_signalfuse_metrics_protobuf.MetricType(metricType)
-			ret = append(ret, protocoltypes.SignalfxMetricCreationResponse{Code: 409})
-		}
-		toWrite, err := jsonXXXMarshal(ret)
-		if err != nil {
-			glog.Warningf("Unable to marshal json: %s", err)
-			writter.WriteHeader(http.StatusBadRequest)
-			writter.Write([]byte(`{msg:"Unable to marshal json!"}`))
-			return
-		}
-		writter.WriteHeader(http.StatusOK)
-		writter.Write([]byte(toWrite))
-	}
 	mux.HandleFunc(
 		"/datapoint",
 		datapointHandlerV1)
@@ -298,25 +431,10 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 		collectdHandlerV1)
 	mux.HandleFunc(
 		"/v1/metric",
-		metricHandler)
+		listenServer.metricHandler)
 	mux.HandleFunc(
 		"/metric",
-		metricHandler)
-	server := http.Server{
-		Handler:      mux,
-		Addr:         listenAddr,
-		ReadTimeout:  clientTimeout,
-		WriteTimeout: clientTimeout,
-	}
-	listener, err := net.Listen("tcp", listenAddr)
-	if err != nil {
-		return nil, err
-	}
-	listenServer := listenerServer{
-		listener:                listener,
-		metricCreationsMap:      metricCreationsMap,
-		metricCreationsMapMutex: metricCreationsMapMutex,
-	}
+		listenServer.metricHandler)
 	go server.Serve(listener)
 	return &listenServer, err
 }

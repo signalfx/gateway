@@ -55,10 +55,13 @@ func (errorReader *errorReader) Read([]byte) (int, error) {
 }
 
 func TestProtobufDecoding(t *testing.T) {
-	metricCreationsMap := make(map[string]com_signalfuse_metrics_protobuf.MetricType)
-	metricCreationsMapMutex := &sync.Mutex{}
 	DatapointStreamingAPI := &basicDatapointStreamingAPI{
 		channel: make(chan core.Datapoint),
+	}
+	listenerServer := &listenerServer{
+		metricCreationsMap:      make(map[string]com_signalfuse_metrics_protobuf.MetricType),
+		metricCreationsMapMutex: sync.Mutex{},
+		datapointStreamingAPI:   DatapointStreamingAPI,
 	}
 
 	protoDatapoint := &com_signalfuse_metrics_protobuf.DataPoint{
@@ -76,11 +79,11 @@ func TestProtobufDecoding(t *testing.T) {
 	body := bytes.NewBuffer(append(varintBytes, dpInBytes...))
 	glog.Infof("Body size: %d", body.Len())
 	a.ExpectEquals(t, nil,
-		protobufDecoding(body, metricCreationsMap, metricCreationsMapMutex, DatapointStreamingAPI),
+		listenerServer.protobufDecoding(body),
 		"Should not get error reading")
 
 	a.ExpectNotEquals(t, nil,
-		protobufDecoding(&errorReader{}, metricCreationsMap, metricCreationsMapMutex, DatapointStreamingAPI),
+		listenerServer.protobufDecoding(&errorReader{}),
 		"Should not get error reading")
 
 	glog.Infof("Stubbing function")
@@ -91,7 +94,7 @@ func TestProtobufDecoding(t *testing.T) {
 	body = bytes.NewBuffer(append(varintBytes, dpInBytes...))
 	glog.Infof("Body size: %d", body.Len())
 	a.ExpectNotEquals(t, nil,
-		protobufDecoding(body, metricCreationsMap, metricCreationsMapMutex, DatapointStreamingAPI),
+		listenerServer.protobufDecoding(body),
 		"Should get error decoding protobuf")
 	protoXXXDecodeVarint = proto.DecodeVarint
 
@@ -100,7 +103,7 @@ func TestProtobufDecoding(t *testing.T) {
 	body = bytes.NewBuffer(append(varintBytes, dpInBytes[0:5]...))
 	glog.Infof("Short body size: %d", body.Len())
 	a.ExpectNotEquals(t, nil,
-		protobufDecoding(body, metricCreationsMap, metricCreationsMapMutex, DatapointStreamingAPI),
+		listenerServer.protobufDecoding(body),
 		"Should get error reading shorted protobuf")
 
 	protoXXXDecodeVarint = func([]byte) (uint64, int) {
@@ -110,7 +113,7 @@ func TestProtobufDecoding(t *testing.T) {
 	body = bytes.NewBuffer(append(varintBytes, make([]byte, len(dpInBytes))...))
 	glog.Infof("Body size: %d", body.Len())
 	a.ExpectNotEquals(t, nil,
-		protobufDecoding(body, metricCreationsMap, metricCreationsMapMutex, DatapointStreamingAPI),
+		listenerServer.protobufDecoding(body),
 		"Should get error decoding protobuf")
 	protoXXXDecodeVarint = proto.DecodeVarint
 
@@ -118,19 +121,23 @@ func TestProtobufDecoding(t *testing.T) {
 	body = bytes.NewBuffer(append(varintBytes, make([]byte, len(dpInBytes))...))
 	glog.Infof("Body size: %d", body.Len())
 	a.ExpectNotEquals(t, nil,
-		protobufDecoding(body, metricCreationsMap, metricCreationsMapMutex, DatapointStreamingAPI),
+		listenerServer.protobufDecoding(body),
 		"Should get error decoding invalid protobuf")
 }
 
 func TestGetMetricTypeFromMap(t *testing.T) {
 	metricCreationsMap := make(map[string]com_signalfuse_metrics_protobuf.MetricType)
-	metricCreationsMapMutex := &sync.Mutex{}
+	metricCreationsMapMutex := sync.Mutex{}
 	metricCreationsMap["countername"] = com_signalfuse_metrics_protobuf.MetricType_COUNTER
+	listenerServer := &listenerServer{
+		metricCreationsMap:      metricCreationsMap,
+		metricCreationsMapMutex: metricCreationsMapMutex,
+	}
 	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_COUNTER,
-		getMetricTypeFromMap(metricCreationsMap, metricCreationsMapMutex, "countername"),
+		listenerServer.getMetricTypeFromMap("countername"),
 		"Should get back the counter")
 	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE,
-		getMetricTypeFromMap(metricCreationsMap, metricCreationsMapMutex, "unknown"),
+		listenerServer.getMetricTypeFromMap("unknown"),
 		"Should get the default")
 }
 
@@ -144,7 +151,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 
 	listener, err := SignalFxListenerLoader(sendTo, listenFrom)
 	a.ExpectEquals(t, nil, err, "Should not get an error making")
-	a.ExpectEquals(t, 0, len(listener.GetStats()), "Should have no stats")
+	a.ExpectEquals(t, 16, len(listener.GetStats()), "Should have no stats")
 
 	defer listener.Close()
 
@@ -280,12 +287,15 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	reqObj := &http.Request{
 		ContentLength: -1,
 	}
-	a.ExpectNotNil(t, protobufDecoderFunctionV2(sendTo, make(map[string]com_signalfuse_metrics_protobuf.MetricType), &sync.Mutex{})(reqObj))
+	listenerServer := &listenerServer{
+		datapointStreamingAPI: sendTo,
+	}
+	a.ExpectNotNil(t, listenerServer.protobufDecoderFunctionV2()(reqObj))
 	reqObj = &http.Request{
 		ContentLength: 20,
 		Body:          ioutil.NopCloser(strings.NewReader("abcd")),
 	}
-	a.ExpectNotNil(t, protobufDecoderFunctionV2(sendTo, make(map[string]com_signalfuse_metrics_protobuf.MetricType), &sync.Mutex{})(reqObj))
+	a.ExpectNotNil(t, listenerServer.protobufDecoderFunctionV2()(reqObj))
 
 	jsonXXXMarshal = func(interface{}) ([]byte, error) {
 		return nil, errors.New("Unable to marshal json")

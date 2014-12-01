@@ -61,19 +61,19 @@ func TestCreation(t *testing.T) {
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
 	a.ExpectEquals(t, nil, err, "Expect no error")
-	a.ExpectEquals(t, 0, len(l.GetStats()), "Expect no stats")
+	a.ExpectEquals(t, 4, len(l.GetStats()), "Expect no stats")
 	forwarder, err := newTcpGraphiteCarbonForwarer("0.0.0.0", 12345, time.Second, 10, "")
 	a.ExpectEquals(t, nil, err, "Expect no error")
 	a.ExpectEquals(t, "", forwarder.Name(), "Expect no name")
 	a.ExpectEquals(t, 0, len(forwarder.GetStats()), "Expect no stats")
 	forwarder.openConnection = nil // Connection should remake itself
 	timeToSend := time.Now().Round(time.Second)
-	dpSent := core.NewAbsoluteTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
+	dpSent := core.NewAbsoluteTimeDatapoint("metric", map[string]string{"from": "bob"}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
 	glog.Info("Sending a dp")
 	forwarder.DatapointsChannel() <- dpSent
 	glog.Info("Looking for DP back")
 	dp := <-forwardTo.datapointsChannel
-	a.ExpectEquals(t, "metric", dp.Metric(), "Expect metric back")
+	a.ExpectEquals(t, "bob.metric", dp.Metric(), "Expect metric back")
 	a.ExpectEquals(t, dpSent.Timestamp(), dp.Timestamp(), "Expect metric back")
 }
 
@@ -128,7 +128,7 @@ func TestCarbonWrite(t *testing.T) {
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
 	a.ExpectEquals(t, nil, err, "Expect no error")
-	a.ExpectEquals(t, 0, len(l.GetStats()), "Expect no stats")
+	a.ExpectEquals(t, 4, len(l.GetStats()), "Expect no stats")
 	forwarder, err := newTcpGraphiteCarbonForwarer("0.0.0.0", 12348, time.Second, 10, "")
 	a.ExpectEquals(t, nil, err, "Expect no error")
 	a.ExpectEquals(t, "", forwarder.Name(), "Expect no name")
@@ -151,7 +151,7 @@ func TestFailedConn(t *testing.T) {
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
 	a.ExpectEquals(t, nil, err, "Expect no error")
-	a.ExpectEquals(t, 0, len(l.GetStats()), "Expect no stats")
+	a.ExpectEquals(t, 4, len(l.GetStats()), "Expect no stats")
 	forwarder, err := newTcpGraphiteCarbonForwarer("0.0.0.0", 12349, time.Second, 10, "")
 	a.ExpectEquals(t, nil, err, "Expect no error")
 	a.ExpectEquals(t, "", forwarder.Name(), "Expect no name")

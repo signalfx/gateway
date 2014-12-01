@@ -117,7 +117,7 @@ func TestCollectDListener(t *testing.T) {
 	a.ExpectNil(t, err)
 	a.ExpectEquals(t, resp.StatusCode, 200, "Request should work")
 
-	a.ExpectEquals(t, 0, len(collectdListener.GetStats()), "Request should work")
+	a.ExpectEquals(t, 4, len(collectdListener.GetStats()), "Request should work")
 
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:8081/post-collectd", bytes.NewBuffer([]byte(`invalidjson`)))
 	req.Header.Set("Content-Type", "application/json")

@@ -1,7 +1,6 @@
 package forwarder
 
 import (
-	"fmt"
 	"github.com/golang/glog"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core"
@@ -47,10 +46,20 @@ func (streamer *streamingDemultiplexerImpl) GetStats() []core.Datapoint {
 	ret := []core.Datapoint{}
 	for index := range streamer.droppedPoints {
 		val := atomic.LoadInt64(&streamer.droppedPoints[index])
-		ret = append(ret, protocoltypes.NewOnHostDatapoint(fmt.Sprintf("proxy.droppedPoints.%s", streamer.sendTo[index].Name()), value.NewIntWire(val), com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER))
+		ret = append(
+			ret,
+			protocoltypes.NewOnHostDatapointDimensions(
+				"dropped_points",
+				value.NewIntWire(val),
+				com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+				map[string]string{"forwarder": streamer.sendTo[index].Name()}))
 	}
 	totalDatapoints := atomic.LoadInt64(streamer.totalDatapoints)
-	ret = append(ret, protocoltypes.NewOnHostDatapoint("proxy.total_datapoints", value.NewIntWire(totalDatapoints), com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER))
+	ret = append(ret, protocoltypes.NewOnHostDatapointDimensions(
+		"total_datapoints",
+		value.NewIntWire(totalDatapoints),
+		com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+		map[string]string{"forwarder": streamer.Name()}))
 	return ret
 }
 

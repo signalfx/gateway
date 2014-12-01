@@ -5,8 +5,10 @@ import (
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/golang/glog"
+	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/listener/metricdeconstructor"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"io"
@@ -29,10 +31,36 @@ type carbonListener struct {
 	connectionTimeout     time.Duration
 	isClosed              int32
 	metricDeconstructor   metricdeconstructor.MetricDeconstructor
+	name                  string
+	totalDatapoints       int64
+	invalidDatapoints     int64
+	totalConnections      int64
+	activeConnections     int64
 }
 
 func (listener *carbonListener) GetStats() []core.Datapoint {
 	ret := []core.Datapoint{}
+	stats := map[string]int64{
+		"total_datapoints":   atomic.LoadInt64(&listener.totalDatapoints),
+		"invalid_datapoints": atomic.LoadInt64(&listener.invalidDatapoints),
+		"total_connections":  atomic.LoadInt64(&listener.totalConnections),
+		"active_connections": atomic.LoadInt64(&listener.activeConnections),
+	}
+	for k, v := range stats {
+		var t com_signalfuse_metrics_protobuf.MetricType
+		if k == "active_connections" {
+			t = com_signalfuse_metrics_protobuf.MetricType_GAUGE
+		} else {
+			t = com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER
+		}
+		ret = append(
+			ret,
+			protocoltypes.NewOnHostDatapointDimensions(
+				k,
+				value.NewIntWire(v),
+				t,
+				map[string]string{"listener": listener.name}))
+	}
 	return ret
 }
 
@@ -43,7 +71,10 @@ func (listener *carbonListener) Close() {
 
 func (listener *carbonListener) handleConnection(conn net.Conn) {
 	reader := bufio.NewReader(conn)
+	atomic.AddInt64(&listener.totalConnections, 1)
+	atomic.AddInt64(&listener.activeConnections, 1)
 	defer conn.Close()
+	defer atomic.AddInt64(&listener.activeConnections, -1)
 	for {
 		conn.SetDeadline(time.Now().Add(listener.connectionTimeout))
 		bytes, err := readerReadBytes(reader, (byte)('\n'))
@@ -55,9 +86,11 @@ func (listener *carbonListener) handleConnection(conn net.Conn) {
 		if line != "" {
 			dp, err := protocoltypes.NewCarbonDatapoint(line, listener.metricDeconstructor)
 			if err != nil {
+				atomic.AddInt64(&listener.invalidDatapoints, 1)
 				glog.Warningf("Received data on a carbon port, but it doesn't look like carbon data: %s => %s", line, err)
 				return
 			}
+			atomic.AddInt64(&listener.totalDatapoints, 1)
 			listener.DatapointStreamingAPI.DatapointsChannel() <- dp
 		}
 
@@ -90,6 +123,7 @@ func (listener *carbonListener) startListening() {
 
 var defaultCarbonConfig = &config.ListenFrom{
 	ListenAddr:                 workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:2003"),
+	Name:                       workarounds.GolangDoesnotAllowPointerToStringLiteral("carbonlistener"),
 	TimeoutDuration:            workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
 	MetricDeconstructor:        workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
 	MetricDeconstructorOptions: workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
@@ -100,10 +134,12 @@ func CarbonListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, list
 	structdefaults.FillDefaultFrom(listenFrom, defaultCarbonConfig)
 	return startListeningCarbonOnPort(
 		*listenFrom.ListenAddr, DatapointStreamingAPI, *listenFrom.TimeoutDuration,
-		*listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions)
+		*listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions, *listenFrom.Name)
 }
 
-func startListeningCarbonOnPort(listenAddr string, DatapointStreamingAPI core.DatapointStreamingAPI, timeout time.Duration, metricDeconstructor string, metricDeconstructorOptions string) (DatapointListener, error) {
+func startListeningCarbonOnPort(listenAddr string, DatapointStreamingAPI core.DatapointStreamingAPI,
+	timeout time.Duration, metricDeconstructor string,
+	metricDeconstructorOptions string, name string) (DatapointListener, error) {
 	psocket, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return nil, err
@@ -119,6 +155,7 @@ func startListeningCarbonOnPort(listenAddr string, DatapointStreamingAPI core.Da
 		DatapointStreamingAPI: DatapointStreamingAPI,
 		connectionTimeout:     timeout,
 		metricDeconstructor:   deconstructor,
+		name:                  name,
 	}
 	go receiver.startListening()
 	return &receiver, nil

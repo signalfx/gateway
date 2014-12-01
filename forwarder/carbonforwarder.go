@@ -11,6 +11,7 @@ import (
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -69,6 +70,17 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) createClientIfNeede
 	return err
 }
 
+func (carbonConnection *reconectingGraphiteCarbonConnection) datapointToGraphite(datapoint core.Datapoint) string {
+	ret := []string{}
+	// Note: Key is unused.  It's ambiguous how to add this.  Also, the dimensions aren't exactly
+	//       ordered ....
+	for _, d := range datapoint.Dimensions() {
+		ret = append(ret, d)
+	}
+	ret = append(ret, datapoint.Metric())
+	return strings.Join(ret, ".")
+}
+
 func (carbonConnection *reconectingGraphiteCarbonConnection) drainDatapointChannel(datapoints []core.Datapoint) error {
 	if err := carbonConnection.createClientIfNeeded(); err != nil {
 		return err
@@ -83,7 +95,9 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) drainDatapointChann
 		if ok {
 			fmt.Fprintf(&buf, "%s\n", carbonReadyDatapoint.ToCarbonLine())
 		} else {
-			fmt.Fprintf(&buf, "%s %s %d\n", datapoint.Metric(), datapoint.Value().WireValue(), datapoint.Timestamp().UnixNano()/time.Second.Nanoseconds())
+			fmt.Fprintf(&buf, "%s %s %d\n", carbonConnection.datapointToGraphite(datapoint),
+				datapoint.Value().WireValue(),
+				datapoint.Timestamp().UnixNano()/time.Second.Nanoseconds())
 		}
 	}
 	glog.V(2).Infof("Will write: `%s`", buf.String())
