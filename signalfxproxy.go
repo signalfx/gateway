@@ -7,6 +7,7 @@ import (
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/forwarder"
 	"github.com/signalfuse/signalfxproxy/listener"
+	"github.com/signalfuse/signalfxproxy/stats"
 	"io/ioutil"
 	"net/http"
 	_ "net/http/pprof"
@@ -90,6 +91,8 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() {
 		allListeners = append(allListeners, listener)
 		allStatKeepers = append(allStatKeepers, listener)
 	}
+
+	allStatKeepers = append(allStatKeepers, stats.NewGolangStatKeeper())
 
 	if loadedConfig.StatsDelayDuration != nil && *loadedConfig.StatsDelayDuration != 0 {
 		go core.DrainStatsThread(*loadedConfig.StatsDelayDuration, allForwarders, allStatKeepers, proxyCommandLineConfiguration.stopChannel)
