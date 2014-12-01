@@ -7,14 +7,16 @@ import (
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"sync/atomic"
+	"time"
 )
 
 type streamingDemultiplexerImpl struct {
-	sendTo           []core.DatapointStreamingAPI
-	datapointChannel chan core.Datapoint
-	droppedPoints    []int64
-	totalDatapoints  *int64
-	name             string
+	sendTo               []core.DatapointStreamingAPI
+	datapointChannel     chan core.Datapoint
+	droppedPoints        []int64
+	totalDatapoints      int64
+	name                 string
+	latestDatapointDelay int64
 }
 
 func (streamer *streamingDemultiplexerImpl) DatapointsChannel() chan<- core.Datapoint {
@@ -28,7 +30,12 @@ func (streamer *streamingDemultiplexerImpl) Name() string {
 func (streamer *streamingDemultiplexerImpl) datapointReadingThread() {
 	for {
 		datapoint := <-streamer.datapointChannel
-		atomic.AddInt64(streamer.totalDatapoints, 1)
+		// Don't do it all the time, could be slow
+		if atomic.LoadInt64(&streamer.totalDatapoints) == 0 {
+			delay := time.Now().Sub(datapoint.Timestamp())
+			atomic.StoreInt64(&streamer.latestDatapointDelay, delay.Nanoseconds())
+		}
+		atomic.AddInt64(&streamer.totalDatapoints, 1)
 		glog.V(2).Infof("New datapoint: %s", datapoint)
 		for index, sendTo := range streamer.sendTo {
 			select {
@@ -54,11 +61,16 @@ func (streamer *streamingDemultiplexerImpl) GetStats() []core.Datapoint {
 				com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
 				map[string]string{"forwarder": streamer.sendTo[index].Name()}))
 	}
-	totalDatapoints := atomic.LoadInt64(streamer.totalDatapoints)
+	totalDatapoints := atomic.LoadInt64(&streamer.totalDatapoints)
 	ret = append(ret, protocoltypes.NewOnHostDatapointDimensions(
 		"total_datapoints",
 		value.NewIntWire(totalDatapoints),
 		com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+		map[string]string{"forwarder": streamer.Name()}))
+	ret = append(ret, protocoltypes.NewOnHostDatapointDimensions(
+		"datapoint_delay",
+		value.NewIntWire(atomic.LoadInt64(&streamer.latestDatapointDelay)),
+		com_signalfuse_metrics_protobuf.MetricType_GAUGE,
 		map[string]string{"forwarder": streamer.Name()}))
 	return ret
 }
@@ -69,8 +81,9 @@ func NewStreamingDatapointDemultiplexer(sendTo []core.DatapointStreamingAPI) cor
 		sendTo,
 		make(chan core.Datapoint),
 		make([]int64, len(sendTo)),
-		new(int64),
+		0,
 		"demultiplexer",
+		0,
 	}
 	go ret.datapointReadingThread()
 	return ret

@@ -19,19 +19,19 @@ func TestNewStreamingDatapointDemultiplexer(t *testing.T) {
 	m.DatapointsChannel() <- dpSent
 
 	// Wait for something to get on the chan
-	for *m.totalDatapoints == 0 {
+	for m.totalDatapoints == 0 {
 		time.Sleep(time.Millisecond)
 	}
 
 	a.ExpectEquals(t, value.NewIntWire(0), m.GetStats()[0].Value(), "Expect zero dropped point")
-	a.ExpectEquals(t, 2, len(m.GetStats()), "Expect two stats")
+	a.ExpectEquals(t, 3, len(m.GetStats()), "Expect three stats")
 	m.DatapointsChannel() <- dpSent
 
 	// Wait for something to get on the chan
-	for *m.totalDatapoints == 1 {
+	for m.totalDatapoints == 1 {
 		time.Sleep(time.Millisecond)
 	}
 	a.ExpectEquals(t, value.NewIntWire(1), m.GetStats()[0].Value(), "Expect one dropped point")
 	a.ExpectEquals(t, value.NewIntWire(2), m.GetStats()[1].Value(), "Expect one dropped point")
-	a.ExpectEquals(t, 2, len(m.GetStats()), "Expect two stats")
+	a.ExpectEquals(t, 3, len(m.GetStats()), "Expect three stats")
 }
