@@ -31,7 +31,7 @@ func (streamer *streamingDemultiplexerImpl) datapointReadingThread() {
 	for {
 		datapoint := <-streamer.datapointChannel
 		// Don't do it all the time, could be slow
-		if atomic.LoadInt64(&streamer.totalDatapoints) == 0 {
+		if atomic.LoadInt64(&streamer.totalDatapoints)%1000 == 0 {
 			delay := time.Now().Sub(datapoint.Timestamp())
 			atomic.StoreInt64(&streamer.latestDatapointDelay, delay.Nanoseconds())
 		}
