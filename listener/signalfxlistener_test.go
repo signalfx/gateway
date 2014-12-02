@@ -6,9 +6,9 @@ import (
 	"code.google.com/p/goprotobuf/proto"
 	"encoding/json"
 	"errors"
+	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/a"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/golang/glog"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
@@ -77,7 +77,7 @@ func TestProtobufDecoding(t *testing.T) {
 	dpInBytes, _ := proto.Marshal(protoDatapoint)
 	varintBytes := proto.EncodeVarint(uint64(len(dpInBytes)))
 	body := bytes.NewBuffer(append(varintBytes, dpInBytes...))
-	glog.Infof("Body size: %d", body.Len())
+	log.WithField("len", body.Len()).Info("Got body to post")
 	a.ExpectEquals(t, nil,
 		listenerServer.protobufDecoding(body),
 		"Should not get error reading")
@@ -86,13 +86,13 @@ func TestProtobufDecoding(t *testing.T) {
 		listenerServer.protobufDecoding(&errorReader{}),
 		"Should not get error reading")
 
-	glog.Infof("Stubbing function")
+	log.Info("Stubbing function")
 	protoXXXDecodeVarint = func([]byte) (uint64, int) {
 		return 0, 0
 	}
 	varintBytes = proto.EncodeVarint(uint64(len(dpInBytes)))
 	body = bytes.NewBuffer(append(varintBytes, dpInBytes...))
-	glog.Infof("Body size: %d", body.Len())
+	log.WithField("len", body.Len()).Info("Got body to post")
 	a.ExpectNotEquals(t, nil,
 		listenerServer.protobufDecoding(body),
 		"Should get error decoding protobuf")
@@ -101,7 +101,7 @@ func TestProtobufDecoding(t *testing.T) {
 	dpInBytes, _ = proto.Marshal(protoDatapoint)
 	varintBytes = proto.EncodeVarint(uint64(len(dpInBytes)))
 	body = bytes.NewBuffer(append(varintBytes, dpInBytes[0:5]...))
-	glog.Infof("Short body size: %d", body.Len())
+	log.WithField("len", body.Len()).Info("Short body size")
 	a.ExpectNotEquals(t, nil,
 		listenerServer.protobufDecoding(body),
 		"Should get error reading shorted protobuf")
@@ -111,7 +111,7 @@ func TestProtobufDecoding(t *testing.T) {
 	}
 	varintBytes = proto.EncodeVarint(uint64(len(dpInBytes)))
 	body = bytes.NewBuffer(append(varintBytes, make([]byte, len(dpInBytes))...))
-	glog.Infof("Body size: %d", body.Len())
+	log.WithField("len", body.Len()).Info("Got body to post")
 	a.ExpectNotEquals(t, nil,
 		listenerServer.protobufDecoding(body),
 		"Should get error decoding protobuf")
@@ -119,7 +119,7 @@ func TestProtobufDecoding(t *testing.T) {
 
 	varintBytes = proto.EncodeVarint(uint64(len(dpInBytes)))
 	body = bytes.NewBuffer(append(varintBytes, make([]byte, len(dpInBytes))...))
-	glog.Infof("Body size: %d", body.Len())
+	log.WithField("len", body.Len()).Info("Got body to post")
 	a.ExpectNotEquals(t, nil,
 		listenerServer.protobufDecoding(body),
 		"Should get error decoding invalid protobuf")

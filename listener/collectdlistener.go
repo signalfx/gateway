@@ -2,9 +2,9 @@ package listener
 
 import (
 	"encoding/json"
+	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/golang/glog"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
@@ -111,7 +111,7 @@ var defaultCollectdConfig = &config.ListenFrom{
 // CollectdListenerLoader loads a listener for collectd write_http protocol
 func CollectdListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, listenFrom *config.ListenFrom) (DatapointListener, error) {
 	structdefaults.FillDefaultFrom(listenFrom, defaultCollectdConfig)
-	glog.Infof("Creating signalfx listener using final config %s", listenFrom)
+	log.WithField("listenFrom", listenFrom).Info("Creating signalfx listener using final config")
 	return StartListeningCollectDHTTPOnPort(DatapointStreamingAPI, *listenFrom.ListenAddr, *listenFrom.ListenPath, *listenFrom.TimeoutDuration)
 }
 

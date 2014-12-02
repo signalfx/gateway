@@ -2,7 +2,7 @@ package forwarder
 
 import (
 	"errors"
-	"github.com/golang/glog"
+	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"sync"
@@ -46,14 +46,14 @@ func (forwarder *basicBufferedForwarder) blockingDrainUpTo() []core.Datapoint {
 	}
 Loop:
 	for uint32(len(datapoints)) < forwarder.maxDrainSize {
-		glog.V(2).Infof("Less than size: %d < %d len is %d", len(datapoints), forwarder.maxDrainSize, len(forwarder.datapointsChannel))
+		log.WithFields(log.Fields{"len": len(datapoints), "maxDrain": forwarder.maxDrainSize, "chanSize": len(forwarder.datapointsChannel)}).Debug("Less than size")
 		select {
 		case datapoint := <-forwarder.datapointsChannel:
 			datapoints = append(datapoints, datapoint)
-			glog.V(2).Infof("Got another point to increase size")
+			log.Debug("Got another point to increase size")
 			continue
 		default:
-			glog.V(2).Infof("Nothing on channel: %d", len(forwarder.datapointsChannel))
+			log.WithField("len", len(forwarder.datapointsChannel)).Debug("Nothing on channel")
 			// Nothing left.  Flush this.
 			break Loop
 		}
@@ -84,7 +84,7 @@ func (forwarder *basicBufferedForwarder) start(processor ProcessingFunction) err
 				datapoints := forwarder.blockingDrainUpTo()
 				err := processor(datapoints)
 				if err != nil {
-					glog.Warningf("Unable to process datapoints: %s", err)
+					log.WithField("err", err).Warn("Unable to process datapoints")
 					continue
 				}
 			}

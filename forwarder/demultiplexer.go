@@ -1,7 +1,7 @@
 package forwarder
 
 import (
-	"github.com/golang/glog"
+	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
@@ -36,14 +36,14 @@ func (streamer *streamingDemultiplexerImpl) datapointReadingThread() {
 			atomic.StoreInt64(&streamer.latestDatapointDelay, delay.Nanoseconds())
 		}
 		atomic.AddInt64(&streamer.totalDatapoints, 1)
-		glog.V(2).Infof("New datapoint: %s", datapoint)
+		log.WithField("datapoint", datapoint).Debug("New datapoint")
 		for index, sendTo := range streamer.sendTo {
 			select {
 			case sendTo.DatapointsChannel() <- datapoint:
 			default:
 				// Don't block operation
 				atomic.AddInt64(&streamer.droppedPoints[index], 1)
-				glog.Infof("Dropped datapoint for %s", sendTo.Name())
+				log.WithField("sendTo", sendTo.Name()).Info("Dropped datapoint")
 			}
 		}
 	}

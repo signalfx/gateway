@@ -3,14 +3,14 @@ package forwarder
 import (
 	"bytes"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/golang/glog"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
-	"sort"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -77,12 +77,12 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) datapointToGraphite
 	//       ordered ....
 	keys := []string{}
 	dims := datapoint.Dimensions()
-	for k, _ := range dims {
+	for k := range dims {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	for k := range keys {
-		ret = append(ret, ret[dims[k]])
+	for _, k := range keys {
+		ret = append(ret, dims[k])
 	}
 	ret = append(ret, datapoint.Metric())
 	return strings.Join(ret, ".")
@@ -107,7 +107,7 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) drainDatapointChann
 				datapoint.Timestamp().UnixNano()/time.Second.Nanoseconds())
 		}
 	}
-	glog.V(2).Infof("Will write: `%s`", buf.String())
+	log.WithField("buf", buf).Debug("Will write to graphite")
 	_, err = buf.WriteTo(carbonConnection.openConnection)
 	if err != nil {
 		return err

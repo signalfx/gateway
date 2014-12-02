@@ -1,7 +1,7 @@
 package protocoltypes
 
 import (
-	"github.com/golang/glog"
+	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
@@ -23,7 +23,7 @@ func NewOnHostDatapointDimensions(metric string, value value.DatapointValue,
 	dimensions map[string]string) core.Datapoint {
 	hostname, err := osXXXHostname()
 	if err != nil {
-		glog.Warningf("Unable to find hostname: %s", err)
+		log.WithField("err", err).Warn("Unable to find hostname")
 		hostname = "unknown"
 	}
 	dimensions["host"] = hostname

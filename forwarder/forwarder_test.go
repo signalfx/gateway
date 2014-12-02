@@ -2,8 +2,8 @@ package forwarder
 
 import (
 	"errors"
+	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/a"
-	"github.com/golang/glog"
 	"github.com/signalfuse/signalfxproxy/core"
 	"testing"
 )
@@ -25,7 +25,7 @@ func TestForwarderStopForwarder(t *testing.T) {
 	f := newBasicBufferedForwarder(100, uint32(10), "aname", 1)
 	f.DatapointsChannel() <- nil
 	f.DatapointsChannel() <- nil
-	glog.Info("Hello")
+	log.Info("Hello")
 	seenPointsChan := make(chan int, 2)
 	// nil should make it stop itself
 	f.start(func(dp []core.Datapoint) error {

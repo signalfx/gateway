@@ -1,9 +1,9 @@
 package forwarder
 
 import (
+	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/golang/glog"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"io/ioutil"
@@ -27,7 +27,7 @@ var csvDefaultConfig = &config.ForwardTo{
 // CsvForwarderLoader loads a CSV forwarder forwarding points from proxy to a file
 func CsvForwarderLoader(forwardTo *config.ForwardTo) (core.StatKeepingStreamingAPI, error) {
 	structdefaults.FillDefaultFrom(forwardTo, csvDefaultConfig)
-	glog.Infof("Creating CSV using final config %s", forwardTo)
+	log.WithField("forwardTo", forwardTo).Info("Creating CSV using final config")
 	return NewCsvForwarder(*forwardTo.BufferSize, *forwardTo.Name, *forwardTo.Filename, *forwardTo.MaxDrainSize)
 }
 
@@ -70,7 +70,7 @@ func NewCsvForwarder(bufferSize uint32, name string, filename string, maxDrainSi
 		return nil, err
 	}
 	if err := ioutil.WriteFile(filename, []byte{}, os.FileMode(0666)); err != nil {
-		glog.Infof("Unable to verify write for file %s", filename)
+		log.WithField("filename", filename).Info("Unable to verify write for file")
 		return nil, err
 	}
 	ret.start(ret.process)

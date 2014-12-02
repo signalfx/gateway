@@ -2,9 +2,9 @@ package config
 
 import (
 	"encoding/json"
+	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/stringhelper"
 	"github.com/cep21/xdgbasedir"
-	"github.com/golang/glog"
 	"io/ioutil"
 	"time"
 )
@@ -111,11 +111,11 @@ func LoadConfig(configFile string) (*LoadedConfig, error) {
 	if errFilename == nil {
 		return config, nil
 	}
-	glog.V(1).Infof("Unable to load config from %s with error %s\n", filename, errFilename)
+	log.WithFields(log.Fields{"filename": filename, "errFilename": errFilename}).Debug("Unable to load config")
 	var errConfigfile error
 	config, errConfigfile = loadConfig(configFile)
 	if errConfigfile != nil {
-		glog.Errorf("Unable to load config from %s or %s with error %s | %s\n", filename, configFile, errFilename, errConfigfile)
+		log.WithFields(log.Fields{"filename": filename, "configFilename": configFile, "errFilename": errFilename, "errConfigFile": errConfigfile}).Error("Unable to load config")
 		return nil, errConfigfile
 	}
 	return config, nil

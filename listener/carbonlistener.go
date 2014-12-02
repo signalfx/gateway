@@ -2,9 +2,9 @@ package listener
 
 import (
 	"bufio"
+	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/golang/glog"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
@@ -79,7 +79,7 @@ func (listener *carbonListener) handleConnection(conn net.Conn) {
 		conn.SetDeadline(time.Now().Add(listener.connectionTimeout))
 		bytes, err := readerReadBytes(reader, (byte)('\n'))
 		if err != nil && err != io.EOF {
-			glog.Warningf("Listening for carbon data returned an error (Note: We timeout idle connections): %s", err)
+			log.WithField("err", err).Warn("Listening for carbon data returned an error (Note: We timeout idle connections)")
 			return
 		}
 		line := strings.TrimSpace(string(bytes))
@@ -87,7 +87,7 @@ func (listener *carbonListener) handleConnection(conn net.Conn) {
 			dp, err := protocoltypes.NewCarbonDatapoint(line, listener.metricDeconstructor)
 			if err != nil {
 				atomic.AddInt64(&listener.invalidDatapoints, 1)
-				glog.Warningf("Received data on a carbon port, but it doesn't look like carbon data: %s => %s", line, err)
+				log.WithFields(log.Fields{"line": line, "err": err}).Warn("Received data on a carbon port, but it doesn't look like carbon data")
 				return
 			}
 			atomic.AddInt64(&listener.totalDatapoints, 1)
@@ -110,15 +110,15 @@ func (listener *carbonListener) startListening() {
 		if err != nil {
 			timeoutError, ok := err.(net.Error)
 			if ok && timeoutError.Timeout() {
-				glog.V(2).Infof("Timeout waiting for connection.  Expected, will continue")
+				log.Debug("Timeout waiting for connection.  Expected, will continue")
 				continue
 			}
-			glog.Warningf("Unable to accept a socket connection: %s", err)
+			log.WithField("err", err).Debug("Unable to accept a socket connection")
 			continue
 		}
 		go listener.handleConnection(conn)
 	}
-	glog.Infof("Carbon listener closed")
+	log.Info("Carbon listener closed")
 }
 
 var defaultCarbonConfig = &config.ListenFrom{

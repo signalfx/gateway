@@ -57,6 +57,9 @@ func TestProxyOkLoading(t *testing.T) {
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"csv", "Filename":"/tmp/acsvfile"}], "ListenFrom":[{"Type":"carbon", "Port":"11616"}]}`), os.FileMode(0666))
 	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
 		configFileName: filename,
+		logDir:         os.TempDir(),
+		logMaxSize:     1,
+		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
 	}
 	go func() {
@@ -73,6 +76,9 @@ func TestProxyListenerError(t *testing.T) {
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ListenFrom":[{"Type":"carbon"}, {"Type":"carbon"}]}`), os.FileMode(0666))
 	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
 		configFileName: filename,
+		logDir:         os.TempDir(),
+		logMaxSize:     1,
+		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
 	}
 	go func() {
@@ -89,6 +95,9 @@ func TestProxyForwardError(t *testing.T) {
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"carbon", "Host":"192.168.100.108", "Timeout": "1s"}]}`), os.FileMode(0666))
 	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
 		configFileName: filename,
+		logDir:         os.TempDir(),
+		logMaxSize:     1,
+		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
 	}
 	go func() {
@@ -105,6 +114,9 @@ func TestProxyUnknownForwarder(t *testing.T) {
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"unknown"}]}`), os.FileMode(0666))
 	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
 		configFileName: filename,
+		logDir:         os.TempDir(),
+		logMaxSize:     1,
+		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
 	}
 	go func() {
@@ -121,6 +133,9 @@ func TestProxyUnknownListener(t *testing.T) {
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ListenFrom":[{"Type":"unknown"}]}`), os.FileMode(0666))
 	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
 		configFileName: filename,
+		logDir:         os.TempDir(),
+		logMaxSize:     1,
+		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
 	}
 	go func() {

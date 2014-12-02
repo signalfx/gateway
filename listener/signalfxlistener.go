@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/golang/glog"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
@@ -113,20 +113,20 @@ var protoXXXDecodeVarint = proto.DecodeVarint
 func (streamer *listenerServer) protobufDecoding(body io.Reader) error {
 	bufferedBody := bufio.NewReaderSize(body, 32768)
 	for {
-		glog.Infof("Start of loop for %s", body)
+		log.WithField("body", body).Debug("Starting protobuf loop")
 		buf, err := bufferedBody.Peek(1) // should be big enough for any varint
 		if err == io.EOF {
-			glog.Infof("EOF")
+			log.Debug("EOF")
 			return nil
 		}
 
 		if err != nil {
-			glog.Infof("peek error: %s", err)
+			log.WithField("err", err).Info("peek error")
 			return err
 		}
-		glog.Infof("Decoding varint")
+		log.Debug("Decoding varint")
 		num, bytesRead := protoXXXDecodeVarint(buf)
-		glog.Infof("Decoding result: %d %d", num, bytesRead)
+		log.WithFields(log.Fields{"num": num, "bytesRead": bytesRead}).Debug("Decoding result")
 		if bytesRead == 0 {
 			// Invalid varint?
 			return errors.New("invalid varint decode from protobuf stream")
@@ -149,7 +149,7 @@ func (streamer *listenerServer) protobufDecoding(body io.Reader) error {
 		}
 		mt := streamer.getMetricTypeFromMap(msg.GetMetric())
 		dp := protocoltypes.NewProtobufDataPointWithType(&msg, mt)
-		glog.Infof("Adding a point")
+		log.Debug("Adding a point")
 		streamer.datapointStreamingAPI.DatapointsChannel() <- dp
 		atomic.AddInt64(&streamer.protobufPoints, 1)
 	}
@@ -165,9 +165,9 @@ func (streamer *listenerServer) jsonDecoderFunction() func(*http.Request) error 
 			} else if err != nil {
 				return err
 			} else {
-				glog.V(3).Info("Got a new point: %s", d)
+				log.WithField("dp", d).Debug("Got a new point")
 				if d.Metric == "" {
-					glog.Warningf("Invalid datapoint %s", d)
+					log.WithField("dp", d).Debug("Invalid Datapoint")
 					continue
 				}
 				mt := streamer.getMetricTypeFromMap(d.Metric)
@@ -210,17 +210,17 @@ func (streamer *listenerServer) jsonDecoderFunctionV2() func(*http.Request) erro
 		if err := dec.Decode(&d); err != nil {
 			return err
 		}
-		glog.V(3).Info("Got a new point: %s", d)
+		log.WithField("jsonpoint_v2", d).Debug("Got a new point")
 		for metricType, datapoints := range d {
 			mt, ok := com_signalfuse_metrics_protobuf.MetricType_value[strings.ToUpper(metricType)]
 			if !ok {
-				glog.Warningf("Unknown metric type %s", metricType)
+				log.WithField("metricType", metricType).Warn("Unknown metric type")
 				continue
 			}
 			for _, jsonDatapoint := range datapoints {
 				v, err := protocoltypes.ValueToDatapointValue(jsonDatapoint.Value)
 				if err != nil {
-					glog.Warningf("Unable to get value for datapoint: %s", err)
+					log.WithField("err", err).Warn("Unable to get value for datapoint")
 				} else {
 					dp := core.NewRelativeTimeDatapoint(jsonDatapoint.Metric, jsonDatapoint.Dimensions, v, com_signalfuse_metrics_protobuf.MetricType(mt), jsonDatapoint.Timestamp)
 					atomic.AddInt64(&streamer.jsonPointsV2, 1)
@@ -248,7 +248,7 @@ func fullyReadFromBuffer(buffer *bufio.Reader, numBytes uint64) ([]byte, error) 
 
 func (streamer *listenerServer) protobufDecoderFunction() func(*http.Request) error {
 	return func(req *http.Request) error {
-		glog.Infof("Request is %s", req)
+		log.WithField("req", req).Info("Got a request")
 		return streamer.protobufDecoding(req.Body)
 	}
 }
@@ -262,7 +262,7 @@ var defaultConfig = &config.ListenFrom{
 // SignalFxListenerLoader loads a listener for signalfx protocol from config
 func SignalFxListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, listenFrom *config.ListenFrom) (DatapointListener, error) {
 	structdefaults.FillDefaultFrom(listenFrom, defaultConfig)
-	glog.Infof("Creating signalfx listener using final config %s", listenFrom)
+	log.WithField("listenFrom", listenFrom).Info("Creating signalfx listener using final config")
 	return StartServingHTTPOnPort(
 		*listenFrom.ListenAddr, DatapointStreamingAPI, *listenFrom.TimeoutDuration, *listenFrom.Name)
 }
@@ -271,12 +271,12 @@ func (streamer *listenerServer) metricHandler(writter http.ResponseWriter, req *
 	dec := json.NewDecoder(req.Body)
 	var d []protocoltypes.SignalfxMetricCreationStruct
 	if err := dec.Decode(&d); err != nil {
-		glog.Infof("Invalid metric creation request: %s", err)
+		log.WithField("err", err).Info("Invalid metric creation request")
 		writter.WriteHeader(http.StatusBadRequest)
 		writter.Write([]byte(`{msg:"Invalid creation request"}`))
 		return
 	}
-	glog.V(3).Info("Got metric types: %s", d)
+	log.WithField("d", d).Debug("Got metric types")
 	streamer.metricCreationsMapMutex.Lock()
 	defer streamer.metricCreationsMapMutex.Unlock()
 	ret := []protocoltypes.SignalfxMetricCreationResponse{}
@@ -292,7 +292,7 @@ func (streamer *listenerServer) metricHandler(writter http.ResponseWriter, req *
 	}
 	toWrite, err := jsonXXXMarshal(ret)
 	if err != nil {
-		glog.Warningf("Unable to marshal json: %s", err)
+		log.WithField("err", err).Warn("Unable to marshal json")
 		writter.WriteHeader(http.StatusBadRequest)
 		writter.Write([]byte(`{msg:"Unable to marshal json!"}`))
 		return

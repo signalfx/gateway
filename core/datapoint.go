@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core/value"
-	time "time"
+	"time"
 )
 
 // A Datapoint is the metric that is saved

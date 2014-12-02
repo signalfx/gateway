@@ -1,7 +1,7 @@
 package core
 
 import (
-	"github.com/golang/glog"
+	log "github.com/Sirupsen/logrus"
 	"time"
 )
 
@@ -26,21 +26,21 @@ type StatKeepingStreamingAPI interface {
 // DrainStatsThread starts the stats listening thread that sleeps delay amount between gathering
 // and sending stats
 func DrainStatsThread(delay time.Duration, sendTo []DatapointStreamingAPI, listenFrom []StatKeeper, stopChannel <-chan bool) {
-	glog.Infof("Draining stats from %s", listenFrom)
+	log.WithField("listenFrom", listenFrom).Info("Draining stats")
 	for {
 		select {
 		case _ = <-stopChannel:
-			glog.V(1).Infof("Request to stop stat thread")
+			log.Debug("Request to stop stat thread")
 			return
 		case _ = <-time.After(delay):
-			glog.V(3).Infof("Stat thread waking up")
+			log.Debug("Stat thread waking up")
 		}
 
 		points := []Datapoint{}
 		for _, listenFrom := range listenFrom {
-			glog.V(1).Infof("Loading from  %s", listenFrom)
+			log.WithField("listenFrom", listenFrom).Debug("Loading stats")
 			stats := listenFrom.GetStats()
-			glog.V(1).Infof("Stats are %s", stats)
+			log.WithField("stats", stats).Debug("Stats loaded")
 			points = append(points, listenFrom.GetStats()...)
 		}
 		for _, sendTo := range sendTo {

@@ -2,16 +2,18 @@ package main
 
 import (
 	"flag"
-	"github.com/golang/glog"
+	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/forwarder"
 	"github.com/signalfuse/signalfxproxy/listener"
 	"github.com/signalfuse/signalfxproxy/stats"
+	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 	"io/ioutil"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"path"
 	"runtime"
 	"strconv"
 )
@@ -29,16 +31,33 @@ type proxyCommandLineConfigurationT struct {
 	configFileName string
 	pidFileName    string
 	pprofaddr      string
+	logDir         string
+	logMaxSize     int
+	logMaxBackups  int
 	stopChannel    chan bool
 }
 
 var proxyCommandLineConfiguration proxyCommandLineConfigurationT
 
 func init() {
-	flag.StringVar(&proxyCommandLineConfiguration.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
-	flag.StringVar(&proxyCommandLineConfiguration.pidFileName, "signalfxproxypid", "signalfxproxy.pid", "Name of the file to store the PID in")
-	flag.StringVar(&proxyCommandLineConfiguration.pprofaddr, "pprofaddr", "", "Address to open pprof info on")
+	commandLine := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	commandLine.StringVar(&proxyCommandLineConfiguration.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
+	commandLine.StringVar(&proxyCommandLineConfiguration.pidFileName, "signalfxproxypid", "signalfxproxy.pid", "Name of the file to store the PID in")
+	commandLine.StringVar(&proxyCommandLineConfiguration.pprofaddr, "pprofaddr", "", "Address to open pprof info on")
+	commandLine.StringVar(&proxyCommandLineConfiguration.logDir, "log_dir", os.TempDir(), "Directory to store log files")
+	commandLine.IntVar(&proxyCommandLineConfiguration.logMaxSize, "log_max_size", 100, "Maximum size of log files (in Megabytes)")
+	commandLine.IntVar(&proxyCommandLineConfiguration.logMaxBackups, "log_max_backups", 10, "Maximum number of rotated log files to keep")
+	commandLine.Parse(os.Args[1:])
 	proxyCommandLineConfiguration.stopChannel = make(chan bool)
+}
+
+func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus() {
+	lumberjackLogger := &lumberjack.Logger{
+		Filename:   path.Join(proxyCommandLineConfiguration.logDir, "signalfxproxy"),
+		MaxSize:    proxyCommandLineConfiguration.logMaxSize, // megabytes
+		MaxBackups: proxyCommandLineConfiguration.logMaxBackups,
+	}
+	log.SetOutput(lumberjackLogger)
 }
 
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() {
@@ -48,31 +67,31 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() {
 
 	if proxyCommandLineConfiguration.pprofaddr != "" {
 		go func() {
-			glog.Infof("Opening pprof debug information on %s", proxyCommandLineConfiguration.pprofaddr)
+			log.WithField("pprofaddr", proxyCommandLineConfiguration.pprofaddr).Info("Opening pprof debug information")
 			err := http.ListenAndServe(proxyCommandLineConfiguration.pprofaddr, nil)
-			glog.Infof("Finished listening: %s", err)
+			log.WithField("err", err).Info("Finished listening")
 		}()
 	}
 	writePidFile(proxyCommandLineConfiguration.pidFileName)
-	glog.Infof("Looking for config file %s\n", proxyCommandLineConfiguration.configFileName)
+	log.WithField("configFile", proxyCommandLineConfiguration.configFileName).Info("Looking for config file")
 
 	loadedConfig, err := config.LoadConfig(proxyCommandLineConfiguration.configFileName)
 	if err != nil {
-		glog.Errorf("Unable to load config: %s", err)
+		log.WithField("err", err).Error("Unable to load config")
 		return
 	}
-	glog.Infof("Config is %s\n", loadedConfig)
+	log.WithField("config", loadedConfig).Info("Config loaded")
 	allForwarders := []core.DatapointStreamingAPI{}
 	allStatKeepers := []core.StatKeeper{}
 	for _, forwardConfig := range loadedConfig.ForwardTo {
 		loader, ok := forwarder.AllForwarderLoaders[forwardConfig.Type]
 		if !ok {
-			glog.Errorf("Unknown loader type: %s", forwardConfig.Type)
+			log.WithField("type", forwardConfig.Type).Error("Unknown loader type")
 			return
 		}
 		forwarder, err := loader(forwardConfig)
 		if err != nil {
-			glog.Errorf("Unable to loader forwarder: %s", err)
+			log.WithField("err", err).Error("Unable to load config")
 			return
 		}
 		allForwarders = append(allForwarders, forwarder)
@@ -85,12 +104,12 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() {
 	for _, forwardConfig := range loadedConfig.ListenFrom {
 		loader, ok := listener.AllListenerLoaders[forwardConfig.Type]
 		if !ok {
-			glog.Errorf("Unknown loader type: %s", forwardConfig.Type)
+			log.WithField("type", forwardConfig.Type).Error("Unknown loader type")
 			return
 		}
 		listener, err := loader(multiplexer, forwardConfig)
 		if err != nil {
-			glog.Errorf("Unable to loader listener: %s", err)
+			log.WithField("err", err).Error("Unable to load config")
 			return
 		}
 		allListeners = append(allListeners, listener)
@@ -102,10 +121,10 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() {
 	if loadedConfig.StatsDelayDuration != nil && *loadedConfig.StatsDelayDuration != 0 {
 		go core.DrainStatsThread(*loadedConfig.StatsDelayDuration, allForwarders, allStatKeepers, proxyCommandLineConfiguration.stopChannel)
 	} else {
-		glog.Infof("Skipping stat keeping")
+		log.Info("Skipping stat keeping")
 	}
 
-	glog.Infof("Setup done.  Blocking!\n")
+	log.Infof("Setup done.  Blocking!")
 	_ = <-proxyCommandLineConfiguration.stopChannel
 }
 

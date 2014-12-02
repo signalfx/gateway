@@ -6,9 +6,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/golang/glog"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
@@ -85,7 +85,7 @@ func SignalfxJSONForwarderLoader(forwardTo *config.ForwardTo) (core.StatKeepingS
 	} else if *forwardTo.FormatVersion == 2 || *forwardTo.FormatVersion == 3 {
 		structdefaults.FillDefaultFrom(forwardTo, defaultConfigV2)
 	}
-	glog.Infof("Creating signalfx forwarder using final config %s", forwardTo)
+	log.WithField("forwardTo", forwardTo).Info("Creating signalfx forwarder using final config")
 	return NewSignalfxJSONForwarer(*forwardTo.URL, *forwardTo.TimeoutDuration, *forwardTo.BufferSize,
 		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads, *forwardTo.Name, *forwardTo.MetricCreationURL,
 		*forwardTo.MaxDrainSize, *forwardTo.DefaultSource, *forwardTo.SourceDimensions, int(*forwardTo.FormatVersion))
@@ -147,7 +147,7 @@ func (connector *signalfxJSONConnector) encodePostBodyV2(datapoints []core.Datap
 		bodyToSend[dp.MetricType().String()] = append(bodyToSend[dp.MetricType().String()], bsf)
 	}
 	jsonBytes, err := jsonXXXMarshal(&bodyToSend)
-	glog.V(3).Infof("Posting %s from %s", jsonBytes, bodyToSend)
+	log.WithField("jsonBytes", jsonBytes).WithField("bodyToSend", bodyToSend).Debug("Posting from signalfxforwarder")
 
 	// Now we can send datapoints
 	return jsonBytes, "application/json", err
@@ -162,7 +162,7 @@ func (connector *signalfxJSONConnector) encodePostBodyProtobufV2(datapoints []co
 		Datapoints: dps,
 	}
 	protobytes, err := protoXXXMarshal(msg)
-	glog.V(3).Infof("Posting %s from %s", protobytes, dps)
+	log.WithFields(log.Fields{"protobytes": protobytes, "dps": dps}).Debug("Posting from V2")
 
 	// Now we can send datapoints
 	return protobytes, "application/x-protobuf", err
@@ -183,9 +183,9 @@ func datumForPoint(pv value.DatapointValue) *com_signalfuse_metrics_protobuf.Dat
 
 func (connector *signalfxJSONConnector) metricCreationLoop() {
 	for {
-		glog.V(3).Infof("Waiting for creation request")
+		log.Debug("Waiting for creation request")
 		request := <-connector.metricCreationChan
-		glog.V(3).Infof("Got creation request: %s", request)
+		log.WithField("request", request).Debug("Got creation request")
 		resp := connector.createMetricsOfType(request.toCreate)
 		request.responseChannel <- resp
 	}
@@ -204,10 +204,10 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 	}
 	jsonBytes, err := jsonXXXMarshal(&postBody)
 	if err != nil {
-		glog.Warningf("Unable to marshal body: %s", err)
+		log.WithField("err", err).Warn("Unable to marshal body")
 		return err
 	}
-	glog.V(3).Infof("Posting %s from %s", jsonBytes, postBody)
+	log.WithFields(log.Fields{"jsonBytes": jsonBytes, "postBody": postBody}).Debug("Posting create metrics")
 
 	req, _ := http.NewRequest("POST", connector.MetricCreationURL, bytes.NewBuffer(jsonBytes))
 	req.Header.Set("Content-Type", "application/json")
@@ -215,28 +215,28 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 	req.Header.Set("User-Agent", connector.userAgent)
 
 	req.Header.Set("Connection", "Keep-Alive")
-	glog.V(3).Infof("Request is %s", req)
+	log.WithField("req", req).Info("Posting request")
 	resp, err := connector.client.Do(req)
 
 	if err != nil {
-		glog.Warningf("Unable to POST response: %s", err)
+		log.WithField("err", err).Warn("Unable to POST request")
 		return err
 	}
 
 	defer resp.Body.Close()
 	respBody, err := ioutilXXXReadAll(resp.Body)
 	if err != nil {
-		glog.Warningf("Unable to verify response body: %s", err)
+		log.WithField("err", err).Warn("Unable to verify response body")
 		return err
 	}
 	if resp.StatusCode != 200 {
-		glog.Warningf("Metric creation failed: %s", respBody)
+		log.WithField("respBody", respBody).Warn("Metric creation failed")
 		return fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
 	var metricCreationBody []protocoltypes.SignalfxMetricCreationResponse
 	err = jsonXXXUnmarshal(respBody, &metricCreationBody)
 	if err != nil {
-		glog.Warningf("body=(%s), err=(%s)", respBody, err)
+		log.WithFields(log.Fields{"respBody": respBody, "err": err}).Warn("Unable to unmarshall")
 		return err
 	}
 	connector.v1MetricLoadedCacheMutex.Lock()
@@ -246,10 +246,10 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 		if resp.Code == 0 || resp.Code == 409 {
 			connector.v1MetricLoadedCache[metricName] = struct{}{}
 		} else {
-			glog.Warningf("Unable to create metric %s: %s", metricName, respBody)
+			log.WithFields(log.Fields{"metricName": metricName, "respBody": respBody}).Warn("Unable to create metric")
 		}
 	}
-	glog.V(3).Infof("Metric creation %s returned %s", jsonBytes, respBody)
+	log.WithFields(log.Fields{"jsonBytes": jsonBytes, "respBody": respBody}).Debug("Metric creation finished")
 	return nil
 }
 
@@ -270,7 +270,7 @@ func (connector *signalfxJSONConnector) requiresSource() bool {
 func (connector *signalfxJSONConnector) coreDatapointToProtobuf(point core.Datapoint) *com_signalfuse_metrics_protobuf.DataPoint {
 	thisPointSource := connector.figureOutReasonableSource(point)
 	if thisPointSource == "" && connector.requiresSource() {
-		glog.Warningf("unable to figure out a reasonable source for %s, skipping", point)
+		log.WithField("point", point).Warn("unable to figure out a reasonable source")
 		return nil
 	}
 	m := point.Metric()
@@ -340,7 +340,7 @@ func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datap
 		if v == nil {
 			continue
 		}
-		glog.V(3).Infof("Single datapoint to signalfx: %s", v)
+		log.WithField("v", v).Debug("Single datapoint to signalfx")
 		encodedBytes, err := protoXXXMarshal(v)
 		if err != nil {
 			return nil, "", err
@@ -348,7 +348,7 @@ func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datap
 		msgBody = append(msgBody, proto.EncodeVarint(uint64(len(encodedBytes)))...)
 		msgBody = append(msgBody, encodedBytes...)
 	}
-	glog.V(3).Infof("Posting %s len %d", msgBody, len(msgBody))
+	log.WithFields(log.Fields{"msgBody": msgBody, "len": len(msgBody)}).Debug("Posting body")
 
 	if len(metricsToBeCreated) > 0 {
 		// Create metrics if we need to
@@ -356,13 +356,13 @@ func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datap
 			toCreate:        metricsToBeCreated,
 			responseChannel: make(chan error),
 		}
-		glog.V(3).Infof("Trying to create metrics first")
+		log.Debug("Trying to create metrics first")
 		connector.metricCreationChan <- creationRequest
 		err := <-creationRequest.responseChannel
 		if err != nil {
 			return nil, "", err
 		}
-		glog.V(3).Infof("Metric creation OK")
+		log.Debug("Metric creation OK")
 	}
 	return msgBody, "application/x-protobuf", nil
 }
@@ -383,11 +383,11 @@ func (connector *signalfxJSONConnector) encodePostBody(datapoints []core.Datapoi
 }
 
 func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) error {
-	glog.V(2).Infof("Got %d points: %s\n", len(datapoints), datapoints)
+	log.WithFields(log.Fields{"len": len(datapoints), "datapoints": datapoints}).Debug("Got JSON points")
 	jsonBytes, bodyType, err := connector.encodePostBody(datapoints)
 
 	if err != nil {
-		glog.Warningf("Unable to marshal json: %s", err)
+		log.WithField("err", err).Warn("Unable to marshal json")
 		return err
 	}
 	req, _ := http.NewRequest("POST", connector.url, bytes.NewBuffer(jsonBytes))
@@ -396,33 +396,33 @@ func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) err
 	req.Header.Set("User-Agent", connector.userAgent)
 
 	req.Header.Set("Connection", "Keep-Alive")
-	glog.V(3).Infof("Request: %s from %s", req, string(jsonBytes))
+	log.WithFields(log.Fields{"Request": req, "jsonBytes": jsonBytes}).Debug("JSON Request")
 	resp, err := connector.client.Do(req)
 
 	if err != nil {
-		glog.Warningf("Unable to POST request: %s", err)
+		log.WithField("err", err).Warn("Unable to POST request")
 		return err
 	}
 
-	glog.V(3).Infof("Response: %s", resp)
+	log.WithField("resp", resp).Debug("POST response")
 	defer resp.Body.Close()
 	respBody, err := ioutilXXXReadAll(resp.Body)
 	if err != nil {
-		glog.Warningf("Unable to verify response body: %s", err)
+		log.WithField("err", err).Warn("Unable to verify response body")
 		return err
 	}
 	if resp.StatusCode != 200 {
-		glog.Warningf("Metric upload to %s failed: %s", connector.url, respBody)
+		log.WithFields(log.Fields{"url": connector.url, "respBody": respBody}).Warn("Metric upload failed")
 		return fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
 	var body string
 	err = jsonXXXUnmarshal(respBody, &body)
 	if err != nil {
-		glog.Warningf("body=(%s), err=(%s)", respBody, err)
+		log.WithFields(log.Fields{"body": respBody, "err": err}).Warn("Unable to unmarshal")
 		return err
 	}
 	if body != "OK" {
-		glog.Warningf("Response not OK: %s", body)
+		log.WithField("body", body).Warn("Response not OK")
 		return fmt.Errorf("Body decode error: %s", body)
 	}
 	return nil

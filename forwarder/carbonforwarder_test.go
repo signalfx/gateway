@@ -2,9 +2,9 @@ package forwarder
 
 import (
 	"errors"
+	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/a"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/golang/glog"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
@@ -69,9 +69,9 @@ func TestCreation(t *testing.T) {
 	forwarder.openConnection = nil // Connection should remake itself
 	timeToSend := time.Now().Round(time.Second)
 	dpSent := core.NewAbsoluteTimeDatapoint("metric", map[string]string{"from": "bob"}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
-	glog.Info("Sending a dp")
+	log.Info("Sending a dp")
 	forwarder.DatapointsChannel() <- dpSent
-	glog.Info("Looking for DP back")
+	log.Info("Looking for DP back")
 	dp := <-forwardTo.datapointsChannel
 	a.ExpectEquals(t, "bob.metric", dp.Metric(), "Expect metric back")
 	a.ExpectEquals(t, dpSent.Timestamp(), dp.Timestamp(), "Expect metric back")
@@ -135,10 +135,10 @@ func TestCarbonWrite(t *testing.T) {
 	a.ExpectEquals(t, 0, len(forwarder.GetStats()), "Expect no stats")
 	forwarder.openConnection = nil // Connection should remake itself
 	dpSent := core.NewRelativeTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
-	glog.Info("Sending a dp")
+	log.Info("Sending a dp")
 	carbonReadyDp := &carbonDatapoint{dpSent, "lineitem 3 4"}
 	forwarder.DatapointsChannel() <- carbonReadyDp
-	glog.Info("Looking for DP back")
+	log.Info("Looking for DP back")
 	dp := <-forwardTo.datapointsChannel
 	a.ExpectEquals(t, "lineitem", dp.Metric(), "Expect metric back")
 	a.ExpectEquals(t, "3", dp.Value().WireValue(), "Expect value back")
@@ -159,8 +159,8 @@ func TestFailedConn(t *testing.T) {
 	forwarder.openConnection = nil // Connection should remake itself
 	forwarder.connectionAddress = "0.0.0.0:1"
 	dpSent := core.NewRelativeTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
-	glog.Info("Sending a dp")
+	log.Info("Sending a dp")
 	forwarder.DatapointsChannel() <- dpSent
-	glog.Info("Looking for DP back")
+	log.Info("Looking for DP back")
 	a.ExpectEquals(t, 0, len(forwardTo.datapointsChannel), "Expect no stats")
 }
