@@ -230,13 +230,13 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 		return err
 	}
 	if resp.StatusCode != 200 {
-		log.WithField("respBody", respBody).Warn("Metric creation failed")
+		log.WithField("respBody", string(respBody)).Warn("Metric creation failed")
 		return fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
 	var metricCreationBody []protocoltypes.SignalfxMetricCreationResponse
 	err = jsonXXXUnmarshal(respBody, &metricCreationBody)
 	if err != nil {
-		log.WithFields(log.Fields{"respBody": respBody, "err": err}).Warn("Unable to unmarshall")
+		log.WithFields(log.Fields{"respBody": string(respBody), "err": err}).Warn("Unable to unmarshall")
 		return err
 	}
 	connector.v1MetricLoadedCacheMutex.Lock()
@@ -246,7 +246,7 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 		if resp.Code == 0 || resp.Code == 409 {
 			connector.v1MetricLoadedCache[metricName] = struct{}{}
 		} else {
-			log.WithFields(log.Fields{"metricName": metricName, "respBody": respBody}).Warn("Unable to create metric")
+			log.WithFields(log.Fields{"metricName": metricName, "respBody": string(respBody)}).Warn("Unable to create metric")
 		}
 	}
 	log.WithFields(log.Fields{"jsonBytes": jsonBytes, "respBody": respBody}).Debug("Metric creation finished")
@@ -412,13 +412,13 @@ func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) err
 		return err
 	}
 	if resp.StatusCode != 200 {
-		log.WithFields(log.Fields{"url": connector.url, "respBody": respBody}).Warn("Metric upload failed")
+		log.WithFields(log.Fields{"url": connector.url, "respBody": string(respBody)}).Warn("Metric upload failed")
 		return fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
 	var body string
 	err = jsonXXXUnmarshal(respBody, &body)
 	if err != nil {
-		log.WithFields(log.Fields{"body": respBody, "err": err}).Warn("Unable to unmarshal")
+		log.WithFields(log.Fields{"body": string(respBody), "err": err}).Warn("Unable to unmarshal")
 		return err
 	}
 	if body != "OK" {

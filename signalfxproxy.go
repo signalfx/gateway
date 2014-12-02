@@ -16,6 +16,7 @@ import (
 	"path"
 	"runtime"
 	"strconv"
+	"fmt"
 )
 
 func writePidFile(pidFileName string) error {
@@ -52,15 +53,19 @@ func init() {
 }
 
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus() {
+
 	lumberjackLogger := &lumberjack.Logger{
 		Filename:   path.Join(proxyCommandLineConfiguration.logDir, "signalfxproxy"),
 		MaxSize:    proxyCommandLineConfiguration.logMaxSize, // megabytes
 		MaxBackups: proxyCommandLineConfiguration.logMaxBackups,
 	}
+	fmt.Printf("Sending logging to %s\n", lumberjackLogger.Filename)
 	log.SetOutput(lumberjackLogger)
+	log.SetFormatter(&log.TextFormatter{DisableColors: true})
 }
 
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() {
+	proxyCommandLineConfiguration.setupLogrus()
 	// TODO: Configure this on command line.  Needed because JSON decoding can get kinda slow.
 	numProcs := runtime.NumCPU()
 	runtime.GOMAXPROCS(numProcs)
