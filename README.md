@@ -1,4 +1,5 @@
 # signalfxproxy
+[![Build Status](https://travis-ci.org/signalfuse/signalfxproxy.svg?branch=master)](https://travis-ci.org/signalfuse/signalfxproxy) [![Docker Repository on Quay.io](https://quay.io/repository/signalfuse/signalfxproxy/status "Docker Repository on Quay.io")](https://quay.io/repository/signalfuse/signalfxproxy)
 
 The proxy is a multilingual datapoint demultiplexer that can accept time
 series data from the statsd, carbon, or signalfuse protocols and emit
@@ -174,15 +175,3 @@ configure your auth token inside DefaultAuthToken.
             "Name": "testproxy",
         },
 ```
-
-## Build status
-
-### Travis
-
-[![Build Status](https://travis-ci.org/signalfuse/signalfxproxy.svg?branch=master)](https://travis-ci.org/signalfuse/signalfxproxy)
-
-### Quay
-
-[![Docker Repository on Quay.io](https://quay.io/repository/signalfuse/signalfxproxy/status
-"Docker Repository on Quay.io")](https://quay.io/repository/signalfuse/signalfxproxy)
-

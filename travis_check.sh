@@ -12,7 +12,7 @@ shellcheck travis_check.sh || exit 1
 # ---- Check markdown
 #
 # Note: there is one line (a curl) that we can't help but make long
-grep -v curl < README.md | mdl || exit 1
+grep -v curl < README.md | grep -v 'Build Status' | mdl || exit 1
 
 #
 # ---- Check JSON
