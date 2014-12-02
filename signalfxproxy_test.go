@@ -27,6 +27,9 @@ func TestProxyInvalidConfig(t *testing.T) {
 	ioutil.WriteFile(filename, []byte{}, os.FileMode(0666))
 	proxyCommandLineConfiguration = proxyCommandLineConfigurationT{
 		configFileName: filename,
+		logDir:         os.TempDir(),
+		logMaxSize:     1,
+		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
 	}
 	go func() {
@@ -53,7 +56,6 @@ func TestProxyOkLoading(t *testing.T) {
 	fileObj, _ := ioutil.TempFile("", "gotest")
 	filename := fileObj.Name()
 	defer os.Remove(filename)
-
 	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"csv", "Filename":"/tmp/acsvfile"}], "ListenFrom":[{"Type":"carbon", "Port":"11616"}]}`), os.FileMode(0666))
 	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
 		configFileName: filename,

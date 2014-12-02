@@ -41,14 +41,12 @@ type proxyCommandLineConfigurationT struct {
 var proxyCommandLineConfiguration proxyCommandLineConfigurationT
 
 func init() {
-	commandLine := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-	commandLine.StringVar(&proxyCommandLineConfiguration.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
-	commandLine.StringVar(&proxyCommandLineConfiguration.pidFileName, "signalfxproxypid", "signalfxproxy.pid", "Name of the file to store the PID in")
-	commandLine.StringVar(&proxyCommandLineConfiguration.pprofaddr, "pprofaddr", "", "Address to open pprof info on")
-	commandLine.StringVar(&proxyCommandLineConfiguration.logDir, "log_dir", os.TempDir(), "Directory to store log files")
-	commandLine.IntVar(&proxyCommandLineConfiguration.logMaxSize, "log_max_size", 100, "Maximum size of log files (in Megabytes)")
-	commandLine.IntVar(&proxyCommandLineConfiguration.logMaxBackups, "log_max_backups", 10, "Maximum number of rotated log files to keep")
-	commandLine.Parse(os.Args[1:])
+	flag.StringVar(&proxyCommandLineConfiguration.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
+	flag.StringVar(&proxyCommandLineConfiguration.pidFileName, "signalfxproxypid", "signalfxproxy.pid", "Name of the file to store the PID in")
+	flag.StringVar(&proxyCommandLineConfiguration.pprofaddr, "pprofaddr", "", "Address to open pprof info on")
+	flag.StringVar(&proxyCommandLineConfiguration.logDir, "logdir", os.TempDir(), "Directory to store log files")
+	flag.IntVar(&proxyCommandLineConfiguration.logMaxSize, "log_max_size", 100, "Maximum size of log files (in Megabytes)")
+	flag.IntVar(&proxyCommandLineConfiguration.logMaxBackups, "log_max_backups", 10, "Maximum number of rotated log files to keep")
 	proxyCommandLineConfiguration.stopChannel = make(chan bool)
 }
 
@@ -59,7 +57,7 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus
 		MaxSize:    proxyCommandLineConfiguration.logMaxSize, // megabytes
 		MaxBackups: proxyCommandLineConfiguration.logMaxBackups,
 	}
-	fmt.Printf("Sending logging to %s\n", lumberjackLogger.Filename)
+	fmt.Printf("Sending logging to %s temp is %s\n", lumberjackLogger.Filename, os.TempDir())
 	log.SetOutput(lumberjackLogger)
 	log.SetFormatter(&log.TextFormatter{DisableColors: true})
 }
