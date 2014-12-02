@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
@@ -16,7 +17,6 @@ import (
 	"path"
 	"runtime"
 	"strconv"
-	"fmt"
 )
 
 func writePidFile(pidFileName string) error {
@@ -41,7 +41,7 @@ type proxyCommandLineConfigurationT struct {
 var proxyCommandLineConfiguration proxyCommandLineConfigurationT
 
 func init() {
-	commandLine := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	commandLine := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 	commandLine.StringVar(&proxyCommandLineConfiguration.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
 	commandLine.StringVar(&proxyCommandLineConfiguration.pidFileName, "signalfxproxypid", "signalfxproxy.pid", "Name of the file to store the PID in")
 	commandLine.StringVar(&proxyCommandLineConfiguration.pprofaddr, "pprofaddr", "", "Address to open pprof info on")
@@ -55,7 +55,7 @@ func init() {
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus() {
 
 	lumberjackLogger := &lumberjack.Logger{
-		Filename:   path.Join(proxyCommandLineConfiguration.logDir, "signalfxproxy"),
+		Filename:   path.Join(proxyCommandLineConfiguration.logDir, "signalfxproxy.log"),
 		MaxSize:    proxyCommandLineConfiguration.logMaxSize, // megabytes
 		MaxBackups: proxyCommandLineConfiguration.logMaxBackups,
 	}
