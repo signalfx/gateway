@@ -9,6 +9,7 @@ import (
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
+	"sort"
 	"net"
 	"strconv"
 	"strings"
@@ -74,8 +75,14 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) datapointToGraphite
 	ret := []string{}
 	// Note: Key is unused.  It's ambiguous how to add this.  Also, the dimensions aren't exactly
 	//       ordered ....
-	for _, d := range datapoint.Dimensions() {
-		ret = append(ret, d)
+	keys := []string{}
+	dims := datapoint.Dimensions()
+	for k, _ := range dims {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for k := range keys {
+		ret = append(ret, ret[dims[k]])
 	}
 	ret = append(ret, datapoint.Metric())
 	return strings.Join(ret, ".")
