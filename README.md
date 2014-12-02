@@ -29,12 +29,6 @@ is already receiving datapoints, such as graphite's carbon database.
    /etc/init.d/signalfxproxy stop
  ```
 
-## Debug logging
-
-```
-   /opt/proxy/bin/signalfxproxy --configfile /tmp/sfdbproxy.conf -v=3
- ```
-
 ## Debugging
 
 ```
