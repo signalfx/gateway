@@ -248,7 +248,7 @@ func fullyReadFromBuffer(buffer *bufio.Reader, numBytes uint64) ([]byte, error) 
 
 func (streamer *listenerServer) protobufDecoderFunction() func(*http.Request) error {
 	return func(req *http.Request) error {
-		log.WithField("req", req).Info("Got a request")
+		log.WithField("req", req).Debug("Got a request")
 		return streamer.protobufDecoding(req.Body)
 	}
 }
