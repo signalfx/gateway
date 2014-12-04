@@ -1,10 +1,8 @@
-package protocoltypes
+package jsonengines
 
 import (
-	"encoding/json"
+	"bytes"
 	"github.com/cep21/gohelpers/a"
-	"github.com/cep21/gohelpers/workarounds"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"testing"
 )
 
@@ -107,28 +105,33 @@ const testCollectdBody = `[
     }
 ]`
 
-func TestMetricTypeFromDsType(t *testing.T) {
-	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("gauge")), "Types don't match expectation")
-	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(nil), "Types don't match expectation")
-	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("unknown")), "Types don't match expectation")
-	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("derive")), "Types don't match expectation")
+func BenchmarkJsonDecodingNative(b *testing.B) {
+	benchmarkDecoder(b, &NativeMarshallJSONDecoder{})
 }
 
-func TestCollectdJsonDecoding(t *testing.T) {
-	//	var postFormat CollectdJSONWriteBody
-	postFormat := new([]*CollectdJSONWriteFormat)
-	a.ExpectNil(t, json.Unmarshal([]byte(testCollectdBody), &postFormat))
-	//	a.ExpectNil(t, NewCollectdJSONWriteFormatJSONDecoder(bytes.NewBuffer([]byte(testCollectdBody))).DecodeArray(postFormat))
-	a.ExpectEquals(t, 5, len(*postFormat), "Expect 5 elements")
-	dp := NewCollectdDatapoint((*postFormat)[0], uint(0))
-	a.ExpectEquals(t, "load.shortterm", dp.Metric(), "Metric not named correctly")
-	dp = NewCollectdDatapoint((*postFormat)[1], uint(0))
-	a.ExpectEquals(t, "memory.used", dp.Metric(), "Metric not named correctly")
-	dp = NewCollectdDatapoint((*postFormat)[2], uint(0))
-	a.ExpectEquals(t, "df_complex.free", dp.Metric(), "Metric not named correctly")
-	dp = NewCollectdDatapoint((*postFormat)[3], uint(0))
-	a.ExpectEquals(t, "free", dp.Metric(), "Metric not named correctly")
-	dp = NewCollectdDatapoint((*postFormat)[4], uint(0))
-	f, _ := dp.Value().FloatValue()
-	a.ExpectEquals(t, 5.36202e+09, f, "Cannot parse value correctly")
+func benchmarkDecoder(b *testing.B, decoder JSONDecodingEngine) {
+	barray := []byte(testCollectdBody)
+	for i := 0; i < b.N; i++ {
+		buf := bytes.NewBuffer(barray)
+		val, err := decoder.DecodeCollectdJSONWriteBody(buf)
+		if len(val) != 5 || err != nil {
+			b.FailNow()
+		}
+	}
+}
+
+func BenchmarkJsonDecodingMegaJson(b *testing.B) {
+	benchmarkDecoder(b, &MegaJSONJSONDecoder{})
+}
+
+func decoderTest(t *testing.T, decoder JSONDecodingEngine) {
+	buf := bytes.NewBuffer([]byte(testCollectdBody))
+	val, err := decoder.DecodeCollectdJSONWriteBody(buf)
+	a.ExpectNil(t, err)
+	a.ExpectEquals(t, 5, len(val), "expect 5")
+}
+
+func TestJsonDecodingMatches(t *testing.T) {
+	decoderTest(t, &MegaJSONJSONDecoder{})
+	decoderTest(t, &NativeMarshallJSONDecoder{})
 }

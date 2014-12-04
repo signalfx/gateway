@@ -9,7 +9,7 @@ import (
 )
 
 // CollectdJSONWriteBody is the full POST body of collectd's write_http format
-type CollectdJSONWriteBody []CollectdJSONWriteFormat
+type CollectdJSONWriteBody []*CollectdJSONWriteFormat
 
 // CollectdJSONWriteFormat is the format for collectd json datapoints
 type CollectdJSONWriteFormat struct {
@@ -48,7 +48,7 @@ func isNilOrEmpty(str *string) bool {
 }
 
 // NewCollectdDatapoint creates a new datapoint from collectd's write_http endpoint JSON format
-func NewCollectdDatapoint(point CollectdJSONWriteFormat, index uint) core.Datapoint {
+func NewCollectdDatapoint(point *CollectdJSONWriteFormat, index uint) core.Datapoint {
 	dstype, val, dsname := point.Dstypes[index], point.Values[index], point.Dsnames[index]
 	dimensions := make(map[string]string)
 	metricType := metricTypeFromDsType(dstype)
@@ -84,7 +84,7 @@ func NewCollectdDatapoint(point CollectdJSONWriteFormat, index uint) core.Datapo
 	return core.NewAbsoluteTimeDatapoint(metricName, dimensions, value.NewFloatWire(*val), metricType, timestamp)
 }
 
-func getReasonableMetricName(point CollectdJSONWriteFormat, index uint) (string, map[string]interface{}) {
+func getReasonableMetricName(point *CollectdJSONWriteFormat, index uint) (string, map[string]interface{}) {
 	parts := []string{}
 	usedParts := make(map[string]interface{})
 	if !isNilOrEmpty(point.TypeS) {

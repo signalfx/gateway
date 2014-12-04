@@ -20,6 +20,10 @@ pid_file="/var/run/$name.pid"
 stdout_log="/var/log/$name.stdout.log"
 stderr_log="/var/log/$name.stderr.log"
 
+if [ "$(id -un)" != "$user" ]; then
+  exec su - $user -- "$0" "$@"
+fi
+
 get_pid() {
     cat "$pid_file"
 }

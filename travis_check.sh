@@ -44,7 +44,7 @@ find . -type f -name \*.go | grep -v '.git' | xargs -n1 -P8 go vet > /tmp/a || e
 #
 # ---- Check for 100% code coverage
 #
-go test -cover -race -covermode=atomic -parallel=8 ./... | grep -v "100.0% of statements" > /tmp/no_100_coverage
+go test -cover -race -covermode=atomic -parallel=8 ./... | grep -v 'skiptestcoverage' | grep -v "100.0% of statements" > /tmp/no_100_coverage
 [[ ! -s /tmp/no_100_coverage ]] || cat /tmp/no_100_coverage
 [[ ! -s /tmp/no_100_coverage ]] || exit 1
 echo "OK!"
