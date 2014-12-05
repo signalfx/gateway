@@ -160,7 +160,6 @@ func TestCarbonListenerLoader2(t *testing.T) {
 }
 
 func BenchmarkCarbonListening(b *testing.B) {
-	b.Logf("Checking N=%d", b.N)
 	listenFrom := &config.ListenFrom{
 		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0"),
 	}
