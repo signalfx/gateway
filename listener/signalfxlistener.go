@@ -13,6 +13,7 @@ import (
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
+	"github.com/signalfuse/signalfxproxy/jsonengines"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"io"
 	"net"
@@ -361,6 +362,7 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 			name:                  name + "_collectd",
 			listener:              nil,
 			datapointStreamingAPI: DatapointStreamingAPI,
+			decodingEngine:        &jsonengines.NativeMarshallJSONDecoder{},
 		},
 		datapointStreamingAPI: DatapointStreamingAPI,
 	}

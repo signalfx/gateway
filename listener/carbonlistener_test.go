@@ -157,3 +157,47 @@ func TestCarbonListenerLoader2(t *testing.T) {
 		a.ExpectEquals(t, int64(3), i, "Should get 3")
 	}()
 }
+
+func BenchmarkCarbonListening(b *testing.B) {
+	b.Logf("Checking N=%d", b.N)
+	listenFrom := &config.ListenFrom{
+		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0"),
+	}
+	bytesToSend := []byte("ametric 123 1234\n")
+	sendTo := &basicDatapointStreamingAPI{
+		channel: make(chan core.Datapoint, 10000),
+	}
+	listener, err := CarbonListenerLoader(sendTo, listenFrom)
+	if err != nil {
+		b.Fatal(err)
+	}
+	carbonListener := listener.(*carbonListener)
+	defer listener.Close()
+
+	conn, err := net.Dial(carbonListener.finalAddr.Network(), carbonListener.finalAddr.String())
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer conn.Close()
+
+	doneReadingPoints := make(chan bool)
+
+	b.ResetTimer()
+	go func() {
+		for i := 0; i < b.N; i++ {
+			dp := <- sendTo.channel
+			if (dp.Metric() != "ametric") {
+				b.Fatalf("Invalid metric %s", dp.Metric())
+			}
+		}
+		doneReadingPoints <- true
+	}()
+
+	n := int64(0)
+	for i := 0; i < b.N; i++ {
+		n += int64(len(bytesToSend))
+		_, err = bytes.NewBuffer(bytesToSend).WriteTo(conn)
+	}
+	_ = <- doneReadingPoints
+	b.SetBytes(n)
+}

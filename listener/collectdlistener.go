@@ -1,7 +1,6 @@
 package listener
 
 import (
-	"encoding/json"
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
@@ -9,6 +8,7 @@ import (
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
+	"github.com/signalfuse/signalfxproxy/jsonengines"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"net"
 	"net/http"
@@ -21,6 +21,7 @@ type collectdListenerServer struct {
 	listener              net.Listener
 	server                *http.Server
 	datapointStreamingAPI core.DatapointStreamingAPI
+	decodingEngine        jsonengines.JSONDecodingEngine
 
 	activeConnections int64
 	totalConnections  int64
@@ -62,9 +63,10 @@ func (streamer *collectdListenerServer) jsonDecode(req *http.Request) error {
 	atomic.AddInt64(&streamer.totalConnections, 1)
 	atomic.AddInt64(&streamer.activeConnections, 1)
 	defer atomic.AddInt64(&streamer.activeConnections, -1)
-	dec := json.NewDecoder(req.Body)
-	var d protocoltypes.CollectdJSONWriteBody
-	if err := dec.Decode(&d); err != nil {
+	//	dec := json.NewDecoder(req.Body)
+	d, err := streamer.decodingEngine.DecodeCollectdJSONWriteBody(req.Body)
+	//	var d protocoltypes.CollectdJSONWriteBody
+	if err != nil {
 		atomic.AddInt64(&streamer.invalidRequests, 1)
 		return err
 	}
@@ -134,6 +136,7 @@ func StartListeningCollectDHTTPOnPort(DatapointStreamingAPI core.DatapointStream
 		listener:              listener,
 		server:                server,
 		datapointStreamingAPI: DatapointStreamingAPI,
+		decodingEngine:        &jsonengines.NativeMarshallJSONDecoder{},
 	}
 
 	mux.HandleFunc(
