@@ -185,8 +185,8 @@ func BenchmarkCarbonListening(b *testing.B) {
 	b.ResetTimer()
 	go func() {
 		for i := 0; i < b.N; i++ {
-			dp := <- sendTo.channel
-			if (dp.Metric() != "ametric") {
+			dp := <-sendTo.channel
+			if dp.Metric() != "ametric" {
 				b.Fatalf("Invalid metric %s", dp.Metric())
 			}
 		}
@@ -198,6 +198,6 @@ func BenchmarkCarbonListening(b *testing.B) {
 		n += int64(len(bytesToSend))
 		_, err = bytes.NewBuffer(bytesToSend).WriteTo(conn)
 	}
-	_ = <- doneReadingPoints
+	_ = <-doneReadingPoints
 	b.SetBytes(n)
 }

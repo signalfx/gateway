@@ -28,7 +28,7 @@ type carbonListener struct {
 	totalPoints           *uint64
 	psocket               net.Listener
 	DatapointStreamingAPI core.DatapointStreamingAPI
-	finalAddr net.Addr
+	finalAddr             net.Addr
 	connectionTimeout     time.Duration
 	isClosed              int32
 	metricDeconstructor   metricdeconstructor.MetricDeconstructor
@@ -157,7 +157,7 @@ func startListeningCarbonOnPort(listenAddr string, DatapointStreamingAPI core.Da
 		connectionTimeout:     timeout,
 		metricDeconstructor:   deconstructor,
 		name:                  name,
-		finalAddr: 	psocket.Addr(),
+		finalAddr:             psocket.Addr(),
 	}
 	go receiver.startListening()
 	return &receiver, nil
