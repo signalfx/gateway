@@ -19,6 +19,7 @@ ADD forwarder /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/forwarder
 ADD listener /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/listener
 ADD stats /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/stats
 ADD protocoltypes /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/protocoltypes
+ADD jsonengines /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/jsonengines
 
 ADD signalfxproxy.go /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 ADD signalfxproxy_test.go /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
