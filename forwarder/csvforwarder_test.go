@@ -8,6 +8,7 @@ import (
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -24,7 +25,7 @@ func TestCsvCoverFileWrite(t *testing.T) {
 	filename := fileObj.Name()
 	defer os.Remove(filename)
 	_, err := originalFileWrite(fileObj, "test")
-	a.ExpectNil(t, err)
+	assert.Nil(t, err)
 }
 
 func TestCsvForwarderLoader(t *testing.T) {
@@ -33,8 +34,8 @@ func TestCsvForwarderLoader(t *testing.T) {
 		Filename: workarounds.GolangDoesnotAllowPointerToStringLiteral("/tmp/tempfile.csv"),
 	}
 	cl, err := CsvForwarderLoader(&forwardTo)
-	a.ExpectEquals(t, nil, err, "Expect no error")
-	a.ExpectEquals(t, 0, len(cl.GetStats()), "Expect no stats")
+	assert.Equal(t, nil, err, "Expect no error")
+	assert.Equal(t, 0, len(cl.GetStats()), "Expect no stats")
 
 	dpSent := core.NewRelativeTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
 	cl.DatapointsChannel() <- dpSent
@@ -50,19 +51,19 @@ func TestCsvInvalidFilenameCsvForwarderLoader(t *testing.T) {
 	_, err := CsvForwarderLoader(&forwardTo)
 	osXXXRemove = os.Remove
 
-	a.ExpectNotEquals(t, nil, err, "Expect no error")
+	assert.NotEqual(t, nil, err, "Expect no error")
 }
 
 func TestCsvInvalidOpen(t *testing.T) {
 	defer func() { os.Remove("datapoints.csv") }()
 	forwardTo := config.ForwardTo{}
 	cl, err := CsvForwarderLoader(&forwardTo)
-	a.ExpectEquals(t, nil, err, "Expect no error")
-	a.ExpectEquals(t, 0, len(cl.GetStats()), "Expect no stats")
+	assert.Equal(t, nil, err, "Expect no error")
+	assert.Equal(t, 0, len(cl.GetStats()), "Expect no stats")
 
 	dpSent := core.NewRelativeTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
 	clOrig, ok := cl.(*filenameForwarder)
-	a.ExpectEquals(t, true, ok, "Expect no error")
+	assert.Equal(t, true, ok, "Expect no error")
 	clOrig.filename = "/root"
 	cl.DatapointsChannel() <- dpSent
 }
@@ -73,7 +74,7 @@ func TestCsvRemoveError(t *testing.T) {
 	osXXXRemove = func(s string) error { return errors.New("unable to remove") }
 	defer func() { osXXXRemove = os.Remove }()
 	_, err := CsvForwarderLoader(&forwardTo)
-	a.ExpectNotEquals(t, nil, err, "Expect remove error")
+	assert.NotEqual(t, nil, err, "Expect remove error")
 }
 
 func TestCsvWriteError(t *testing.T) {

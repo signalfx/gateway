@@ -2,7 +2,7 @@ package jsonengines
 
 import (
 	"bytes"
-	"github.com/cep21/gohelpers/a"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -127,8 +127,8 @@ func BenchmarkJsonDecodingMegaJson(b *testing.B) {
 func decoderTest(t *testing.T, decoder JSONDecodingEngine) {
 	buf := bytes.NewBuffer([]byte(testCollectdBody))
 	val, err := decoder.DecodeCollectdJSONWriteBody(buf)
-	a.ExpectNil(t, err)
-	a.ExpectEquals(t, 5, len(val), "expect 5")
+	assert.Nil(t, err)
+	assert.Equal(t, 5, len(val), "expect 5")
 }
 
 func TestJsonDecodingMatches(t *testing.T) {

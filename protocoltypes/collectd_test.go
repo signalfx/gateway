@@ -2,9 +2,9 @@ package protocoltypes
 
 import (
 	"encoding/json"
-	"github.com/cep21/gohelpers/a"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -108,27 +108,27 @@ const testCollectdBody = `[
 ]`
 
 func TestMetricTypeFromDsType(t *testing.T) {
-	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("gauge")), "Types don't match expectation")
-	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(nil), "Types don't match expectation")
-	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("unknown")), "Types don't match expectation")
-	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("derive")), "Types don't match expectation")
+	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("gauge")), "Types don't match expectation")
+	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(nil), "Types don't match expectation")
+	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("unknown")), "Types don't match expectation")
+	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("derive")), "Types don't match expectation")
 }
 
 func TestCollectdJsonDecoding(t *testing.T) {
 	//	var postFormat CollectdJSONWriteBody
 	postFormat := new([]*CollectdJSONWriteFormat)
-	a.ExpectNil(t, json.Unmarshal([]byte(testCollectdBody), &postFormat))
-	//	a.ExpectNil(t, NewCollectdJSONWriteFormatJSONDecoder(bytes.NewBuffer([]byte(testCollectdBody))).DecodeArray(postFormat))
-	a.ExpectEquals(t, 5, len(*postFormat), "Expect 5 elements")
+	assert.Nil(t, json.Unmarshal([]byte(testCollectdBody), &postFormat))
+	//	assert.Nil(t, NewCollectdJSONWriteFormatJSONDecoder(bytes.NewBuffer([]byte(testCollectdBody))).DecodeArray(postFormat))
+	assert.Equal(t, 5, len(*postFormat), "Expect 5 elements")
 	dp := NewCollectdDatapoint((*postFormat)[0], uint(0))
-	a.ExpectEquals(t, "load.shortterm", dp.Metric(), "Metric not named correctly")
+	assert.Equal(t, "load.shortterm", dp.Metric(), "Metric not named correctly")
 	dp = NewCollectdDatapoint((*postFormat)[1], uint(0))
-	a.ExpectEquals(t, "memory.used", dp.Metric(), "Metric not named correctly")
+	assert.Equal(t, "memory.used", dp.Metric(), "Metric not named correctly")
 	dp = NewCollectdDatapoint((*postFormat)[2], uint(0))
-	a.ExpectEquals(t, "df_complex.free", dp.Metric(), "Metric not named correctly")
+	assert.Equal(t, "df_complex.free", dp.Metric(), "Metric not named correctly")
 	dp = NewCollectdDatapoint((*postFormat)[3], uint(0))
-	a.ExpectEquals(t, "free", dp.Metric(), "Metric not named correctly")
+	assert.Equal(t, "free", dp.Metric(), "Metric not named correctly")
 	dp = NewCollectdDatapoint((*postFormat)[4], uint(0))
 	f, _ := dp.Value().FloatValue()
-	a.ExpectEquals(t, 5.36202e+09, f, "Cannot parse value correctly")
+	assert.Equal(t, 5.36202e+09, f, "Cannot parse value correctly")
 }

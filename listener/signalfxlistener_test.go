@@ -7,11 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	log "github.com/Sirupsen/logrus"
-	"github.com/cep21/gohelpers/a"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -25,7 +25,7 @@ func TestInvalidSignalfxJSONForwarderLoader(t *testing.T) {
 	}
 	sendTo := &basicDatapointStreamingAPI{}
 	_, err := SignalFxListenerLoader(sendTo, listenFrom)
-	a.ExpectNotEquals(t, nil, err, "Should get an error making")
+	assert.NotEqual(t, nil, err, "Should get an error making")
 }
 
 type myReaderType struct{}
@@ -38,14 +38,14 @@ func TestReadFully(t *testing.T) {
 	myReader := &myReaderType{}
 	reader := bufio.NewReader(myReader)
 	_, err := fullyReadFromBuffer(reader, 10)
-	a.ExpectNotEquals(t, nil, err, "Should get an error making")
+	assert.NotEqual(t, nil, err, "Should get an error making")
 
 	_, err = fullyReadFromBuffer(bufio.NewReader(bytes.NewBuffer([]byte("abcde"))), 7)
-	a.ExpectNotEquals(t, nil, err, "Should get an error making (EOF or something)")
+	assert.NotEqual(t, nil, err, "Should get an error making (EOF or something)")
 
 	result, err := fullyReadFromBuffer(bufio.NewReader(bytes.NewBuffer([]byte("abcdefg"))), 5)
-	a.ExpectEquals(t, nil, err, "Should not get an error")
-	a.ExpectEquals(t, "abcde", string(result), "Expect my result back")
+	assert.Equal(t, nil, err, "Should not get an error")
+	assert.Equal(t, "abcde", string(result), "Expect my result back")
 }
 
 type errorReader struct{}
@@ -78,11 +78,11 @@ func TestProtobufDecoding(t *testing.T) {
 	varintBytes := proto.EncodeVarint(uint64(len(dpInBytes)))
 	body := bytes.NewBuffer(append(varintBytes, dpInBytes...))
 	log.WithField("len", body.Len()).Info("Got body to post")
-	a.ExpectEquals(t, nil,
+	assert.Equal(t, nil,
 		listenerServer.protobufDecoding(body),
 		"Should not get error reading")
 
-	a.ExpectNotEquals(t, nil,
+	assert.NotEqual(t, nil,
 		listenerServer.protobufDecoding(&errorReader{}),
 		"Should not get error reading")
 
@@ -93,7 +93,7 @@ func TestProtobufDecoding(t *testing.T) {
 	varintBytes = proto.EncodeVarint(uint64(len(dpInBytes)))
 	body = bytes.NewBuffer(append(varintBytes, dpInBytes...))
 	log.WithField("len", body.Len()).Info("Got body to post")
-	a.ExpectNotEquals(t, nil,
+	assert.NotEqual(t, nil,
 		listenerServer.protobufDecoding(body),
 		"Should get error decoding protobuf")
 	protoXXXDecodeVarint = proto.DecodeVarint
@@ -102,7 +102,7 @@ func TestProtobufDecoding(t *testing.T) {
 	varintBytes = proto.EncodeVarint(uint64(len(dpInBytes)))
 	body = bytes.NewBuffer(append(varintBytes, dpInBytes[0:5]...))
 	log.WithField("len", body.Len()).Info("Short body size")
-	a.ExpectNotEquals(t, nil,
+	assert.NotEqual(t, nil,
 		listenerServer.protobufDecoding(body),
 		"Should get error reading shorted protobuf")
 
@@ -112,7 +112,7 @@ func TestProtobufDecoding(t *testing.T) {
 	varintBytes = proto.EncodeVarint(uint64(len(dpInBytes)))
 	body = bytes.NewBuffer(append(varintBytes, make([]byte, len(dpInBytes))...))
 	log.WithField("len", body.Len()).Info("Got body to post")
-	a.ExpectNotEquals(t, nil,
+	assert.NotEqual(t, nil,
 		listenerServer.protobufDecoding(body),
 		"Should get error decoding protobuf")
 	protoXXXDecodeVarint = proto.DecodeVarint
@@ -120,7 +120,7 @@ func TestProtobufDecoding(t *testing.T) {
 	varintBytes = proto.EncodeVarint(uint64(len(dpInBytes)))
 	body = bytes.NewBuffer(append(varintBytes, make([]byte, len(dpInBytes))...))
 	log.WithField("len", body.Len()).Info("Got body to post")
-	a.ExpectNotEquals(t, nil,
+	assert.NotEqual(t, nil,
 		listenerServer.protobufDecoding(body),
 		"Should get error decoding invalid protobuf")
 }
@@ -133,10 +133,10 @@ func TestGetMetricTypeFromMap(t *testing.T) {
 		metricCreationsMap:      metricCreationsMap,
 		metricCreationsMapMutex: metricCreationsMapMutex,
 	}
-	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_COUNTER,
+	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_COUNTER,
 		listenerServer.getMetricTypeFromMap("countername"),
 		"Should get back the counter")
-	a.ExpectEquals(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE,
+	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE,
 		listenerServer.getMetricTypeFromMap("unknown"),
 		"Should get the default")
 }
@@ -150,8 +150,8 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	}
 
 	listener, err := SignalFxListenerLoader(sendTo, listenFrom)
-	a.ExpectEquals(t, nil, err, "Should not get an error making")
-	a.ExpectEquals(t, 16, len(listener.GetStats()), "Should have no stats")
+	assert.Equal(t, nil, err, "Should not get an error making")
+	assert.Equal(t, 16, len(listener.GetStats()), "Should have no stats")
 
 	defer listener.Close()
 
@@ -167,10 +167,10 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	resp, err := client.Do(req)
 	_ = <-gotPointChan
 
-	a.ExpectEquals(t, nil, err, "Should not get an error making request")
-	a.ExpectEquals(t, resp.StatusCode, 200, "Request should work")
-	a.ExpectEquals(t, "ametric", dp.Metric(), "Should get metric back!")
-	a.ExpectEquals(t, "asource", dp.Dimensions()["sf_source"], "Should get metric back!")
+	assert.Equal(t, nil, err, "Should not get an error making request")
+	assert.Equal(t, resp.StatusCode, 200, "Request should work")
+	assert.Equal(t, "ametric", dp.Metric(), "Should get metric back!")
+	assert.Equal(t, "asource", dp.Dimensions()["sf_source"], "Should get metric back!")
 
 	req, _ = http.NewRequest(
 		"POST",
@@ -185,13 +185,13 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	}()
 	resp, err = client.Do(req)
 	_ = <-gotPointChan
-	a.ExpectEquals(t, resp.StatusCode, http.StatusOK, "Request should work")
-	a.ExpectEquals(t, nil, err, "Should not get an error making request")
+	assert.Equal(t, resp.StatusCode, http.StatusOK, "Request should work")
+	assert.Equal(t, nil, err, "Should not get an error making request")
 
-	a.ExpectEquals(t, nil, err, "Should not get an error making request")
-	a.ExpectEquals(t, resp.StatusCode, 200, "Request should work")
-	a.ExpectEquals(t, "metrictwo", dp.Metric(), "Should get metric back!")
-	a.ExpectEquals(t, 0, len(dp.Dimensions()), "Should get metric back!")
+	assert.Equal(t, nil, err, "Should not get an error making request")
+	assert.Equal(t, resp.StatusCode, 200, "Request should work")
+	assert.Equal(t, "metrictwo", dp.Metric(), "Should get metric back!")
+	assert.Equal(t, 0, len(dp.Dimensions()), "Should get metric back!")
 
 	req, _ = http.NewRequest(
 		"POST",
@@ -208,40 +208,40 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	}()
 	resp, err = client.Do(req)
 	_ = <-gotPointChan
-	a.ExpectEquals(t, resp.StatusCode, http.StatusOK, "Request should work")
-	a.ExpectEquals(t, nil, err, "Should not get an error making request")
+	assert.Equal(t, resp.StatusCode, http.StatusOK, "Request should work")
+	assert.Equal(t, nil, err, "Should not get an error making request")
 
-	a.ExpectEquals(t, nil, err, "Should not get an error making request")
-	a.ExpectEquals(t, resp.StatusCode, 200, "Request should work")
-	a.ExpectEquals(t, "df_complex.free", dp.Metric(), "Should get metric back!")
-	a.ExpectEquals(t, 4, len(dp.Dimensions()), "Should get metric back!")
+	assert.Equal(t, nil, err, "Should not get an error making request")
+	assert.Equal(t, resp.StatusCode, 200, "Request should work")
+	assert.Equal(t, "df_complex.free", dp.Metric(), "Should get metric back!")
+	assert.Equal(t, 4, len(dp.Dimensions()), "Should get metric back!")
 
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/datapoint", bytes.NewBuffer([]byte(`INVALIDJSON`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
-	a.ExpectEquals(t, resp.StatusCode, 400, "Request should not work")
-	a.ExpectEquals(t, nil, err, "Should not get an error making request")
+	assert.Equal(t, resp.StatusCode, 400, "Request should not work")
+	assert.Equal(t, nil, err, "Should not get an error making request")
 
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/datapoint", bytes.NewBuffer([]byte(`{}`)))
 	req.Header.Set("Content-Type", "UNKNOWNTYPE")
 	resp, err = client.Do(req)
-	a.ExpectEquals(t, resp.StatusCode, http.StatusBadRequest, "Request should not work")
-	a.ExpectEquals(t, nil, err, "Should not get an error making request")
+	assert.Equal(t, resp.StatusCode, http.StatusBadRequest, "Request should not work")
+	assert.Equal(t, nil, err, "Should not get an error making request")
 
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/metric", bytes.NewBuffer([]byte(`[{"sf_metric": "nowacounter", "sf_metricType":"COUNTER"}]`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
-	a.ExpectEquals(t, resp.StatusCode, 200, "Request should work")
+	assert.Equal(t, resp.StatusCode, 200, "Request should work")
 
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/metric", bytes.NewBuffer([]byte(`[{"sf_metric": "invalid", "sf_metricType":"INVALIDTYPE"}]`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
-	a.ExpectEquals(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: invalid type")
+	assert.Equal(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: invalid type")
 
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/metric", bytes.NewBuffer([]byte(`INVALIDJSONFORMETRIC`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
-	a.ExpectEquals(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: invalid type")
+	assert.Equal(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: invalid type")
 
 	protoDatapoint := &com_signalfuse_metrics_protobuf.DataPoint{
 		Source: workarounds.GolangDoesnotAllowPointerToStringLiteral("asource"),
@@ -259,9 +259,9 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	}()
 	resp, err = client.Do(req)
 	_ = <-gotPointChan
-	a.ExpectEquals(t, resp.StatusCode, 200, "Request should work")
-	a.ExpectEquals(t, "asource", dp.Dimensions()["sf_source"], "Expect source back")
-	a.ExpectEquals(t, "2", dp.Value().WireValue(), "Expect 2 back")
+	assert.Equal(t, resp.StatusCode, 200, "Request should work")
+	assert.Equal(t, "asource", dp.Dimensions()["sf_source"], "Expect source back")
+	assert.Equal(t, "2", dp.Value().WireValue(), "Expect 2 back")
 
 	uploadMsg := &com_signalfuse_metrics_protobuf.DataPointUploadMessage{
 		Datapoints: []*com_signalfuse_metrics_protobuf.DataPoint{protoDatapoint},
@@ -275,14 +275,14 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	}()
 	resp, err = client.Do(req)
 	_ = <-gotPointChan
-	a.ExpectEquals(t, resp.StatusCode, 200, "Request should work")
-	a.ExpectEquals(t, "asource", dp.Dimensions()["sf_source"], "Expect source back")
-	a.ExpectEquals(t, "2", dp.Value().WireValue(), "Expect 2 back")
+	assert.Equal(t, resp.StatusCode, 200, "Request should work")
+	assert.Equal(t, "asource", dp.Dimensions()["sf_source"], "Expect source back")
+	assert.Equal(t, "2", dp.Value().WireValue(), "Expect 2 back")
 
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v2/datapoint", bytes.NewBuffer([]byte(`invalid`)))
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	resp, err = client.Do(req)
-	a.ExpectEquals(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: length issue")
+	assert.Equal(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: length issue")
 
 	reqObj := &http.Request{
 		ContentLength: -1,
@@ -290,12 +290,12 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	listenerServer := &listenerServer{
 		datapointStreamingAPI: sendTo,
 	}
-	a.ExpectNotNil(t, listenerServer.protobufDecoderFunctionV2()(reqObj))
+	assert.NotNil(t, listenerServer.protobufDecoderFunctionV2()(reqObj))
 	reqObj = &http.Request{
 		ContentLength: 20,
 		Body:          ioutil.NopCloser(strings.NewReader("abcd")),
 	}
-	a.ExpectNotNil(t, listenerServer.protobufDecoderFunctionV2()(reqObj))
+	assert.NotNil(t, listenerServer.protobufDecoderFunctionV2()(reqObj))
 
 	jsonXXXMarshal = func(interface{}) ([]byte, error) {
 		return nil, errors.New("Unable to marshal json")
@@ -303,11 +303,11 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/metric", bytes.NewBuffer([]byte(`[{"sf_metric": "nowacounter", "sf_metricType":"COUNTER"}]`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
-	a.ExpectEquals(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: json issue")
+	assert.Equal(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: json issue")
 
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v2/datapoint", bytes.NewBuffer([]byte(`[{"sf_metric": "nowacounter", "sf_metricType":"COUNTER"}]`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
-	a.ExpectEquals(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: json issue")
+	assert.Equal(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: json issue")
 	jsonXXXMarshal = json.Marshal
 }

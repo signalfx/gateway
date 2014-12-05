@@ -2,10 +2,10 @@ package listener
 
 import (
 	"bytes"
-	"github.com/cep21/gohelpers/a"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"testing"
 )
@@ -79,7 +79,7 @@ func TestInvalidListen(t *testing.T) {
 	}
 	sendTo := &basicDatapointStreamingAPI{}
 	_, err := CollectdListenerLoader(sendTo, listenFrom)
-	a.ExpectNotNil(t, err)
+	assert.Error(t, err)
 }
 
 func TestCollectDListener(t *testing.T) {
@@ -91,44 +91,44 @@ func TestCollectDListener(t *testing.T) {
 	listenFrom := &config.ListenFrom{}
 	collectdListener, err := CollectdListenerLoader(sendTo, listenFrom)
 	defer collectdListener.Close()
-	a.ExpectNil(t, err)
-	a.ExpectNotNil(t, collectdListener)
+	assert.Nil(t, err)
+	assert.NotNil(t, collectdListener)
 
 	req, _ := http.NewRequest("POST", "http://0.0.0.0:8081/post-collectd", bytes.NewBuffer([]byte(jsonBody)))
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	go func() {
 		dp := <-sendTo.channel
-		a.ExpectEquals(t, "load.shortterm", dp.Metric(), "Metric not named correctly")
+		assert.Equal(t, "load.shortterm", dp.Metric(), "Metric not named correctly")
 
 		dp = <-sendTo.channel
-		a.ExpectEquals(t, "load.midterm", dp.Metric(), "Metric not named correctly")
+		assert.Equal(t, "load.midterm", dp.Metric(), "Metric not named correctly")
 
 		dp = <-sendTo.channel
-		a.ExpectEquals(t, "load.longterm", dp.Metric(), "Metric not named correctly")
+		assert.Equal(t, "load.longterm", dp.Metric(), "Metric not named correctly")
 
 		dp = <-sendTo.channel
-		a.ExpectEquals(t, "memory.used", dp.Metric(), "Metric not named correctly")
+		assert.Equal(t, "memory.used", dp.Metric(), "Metric not named correctly")
 
 		dp = <-sendTo.channel
-		a.ExpectEquals(t, "df_complex.free", dp.Metric(), "Metric not named correctly")
+		assert.Equal(t, "df_complex.free", dp.Metric(), "Metric not named correctly")
 	}()
 	resp, err := client.Do(req)
-	a.ExpectNil(t, err)
-	a.ExpectEquals(t, resp.StatusCode, 200, "Request should work")
+	assert.Nil(t, err)
+	assert.Equal(t, resp.StatusCode, 200, "Request should work")
 
-	a.ExpectEquals(t, 4, len(collectdListener.GetStats()), "Request should work")
+	assert.Equal(t, 4, len(collectdListener.GetStats()), "Request should work")
 
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:8081/post-collectd", bytes.NewBuffer([]byte(`invalidjson`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
-	a.ExpectNil(t, err)
-	a.ExpectEquals(t, resp.StatusCode, 400, "Request should work")
+	assert.Nil(t, err)
+	assert.Equal(t, resp.StatusCode, 400, "Request should work")
 
 	req, _ = http.NewRequest("POST", "http://0.0.0.0:8081/post-collectd", bytes.NewBuffer([]byte(jsonBody)))
 	req.Header.Set("Content-Type", "application/plaintext")
 	resp, err = client.Do(req)
-	a.ExpectNil(t, err)
-	a.ExpectEquals(t, resp.StatusCode, 400, "Request should work (Plaintext not supported)")
+	assert.Nil(t, err)
+	assert.Equal(t, resp.StatusCode, 400, "Request should work (Plaintext not supported)")
 
 }

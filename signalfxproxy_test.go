@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/cep21/gohelpers/a"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -12,11 +12,11 @@ func TestProxyPidWrite(t *testing.T) {
 	filename := fileObj.Name()
 	defer os.Remove(filename)
 
-	a.ExpectNil(t, writePidFile(filename))
+	assert.Nil(t, writePidFile(filename))
 }
 
 func TestProxyPidWriteError(t *testing.T) {
-	a.ExpectNotNil(t, writePidFile("/root"))
+	assert.Error(t, writePidFile("/root"))
 }
 
 func TestProxyInvalidConfig(t *testing.T) {
