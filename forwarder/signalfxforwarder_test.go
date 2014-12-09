@@ -1,6 +1,7 @@
 package forwarder
 
 import (
+	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/a"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
@@ -26,6 +27,7 @@ var ioutilReadAllObj a.IoutilReadAllObj
 func init() {
 	jsonXXXUnmarshal = jsonUnmarshalObj.Execute
 	ioutilXXXReadAll = ioutilReadAllObj.Execute
+	log.SetLevel(log.DebugLevel)
 }
 
 func TestBodySendFormat(t *testing.T) {
@@ -152,12 +154,13 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	ts, _ := dpRecieved.(core.TimeRelativeDatapoint)
 	assert.Equal(t, int64(-1), ts.RelativeTime(), "Expect -1 time ago")
 
+	log.WithField("chanlen", len(finalDatapointDestination.datapointsChannel)).Info("Starting failing test")
 	dpSent = core.NewRelativeTimeDatapoint("metricnowacounter", map[string]string{"sf_source": "asource"}, value.NewFloatWire(2.0), com_signalfuse_metrics_protobuf.MetricType_COUNTER, -1)
 	forwarder.DatapointsChannel() <- dpSent
 	dpRecieved = <-finalDatapointDestination.datapointsChannel
 	_, ok := sfForwarder.v1MetricLoadedCache["metricnowacounter"]
 	assert.Equal(t, true, ok, "Expected asource")
-	assert.Equal(t, "asource", dpRecieved.Dimensions()["sf_source"], "Expected asource")
+	assert.Equal(t, "asource", dpRecieved.Dimensions()["sf_source"], "Expected asource for %s", dpRecieved)
 
 	sfForwarder.MetricCreationURL = "http://0.0.0.0:21/asfd" // invalid
 	dpSent = core.NewRelativeTimeDatapoint("anotermetric", map[string]string{}, value.NewFloatWire(2.0), com_signalfuse_metrics_protobuf.MetricType_COUNTER, -1)

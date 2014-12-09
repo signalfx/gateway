@@ -215,7 +215,7 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 	req.Header.Set("User-Agent", connector.userAgent)
 
 	req.Header.Set("Connection", "Keep-Alive")
-	log.WithField("req", req).Info("Posting request")
+	log.WithField("req", req).Debug("Posting request")
 	resp, err := connector.client.Do(req)
 
 	if err != nil {
@@ -383,7 +383,7 @@ func (connector *signalfxJSONConnector) encodePostBody(datapoints []core.Datapoi
 }
 
 func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) error {
-	log.WithFields(log.Fields{"len": len(datapoints), "datapoints": datapoints}).Debug("Got JSON points")
+	log.WithFields(log.Fields{"len": len(datapoints), "datapoints": datapoints}).Debug("Processing dp")
 	jsonBytes, bodyType, err := connector.encodePostBody(datapoints)
 
 	if err != nil {

@@ -150,7 +150,7 @@ func (streamer *listenerServer) protobufDecoding(body io.Reader) error {
 		}
 		mt := streamer.getMetricTypeFromMap(msg.GetMetric())
 		dp := protocoltypes.NewProtobufDataPointWithType(&msg, mt)
-		log.Debug("Adding a point")
+		log.WithField("dp", dp).Debug("Adding a point")
 		streamer.datapointStreamingAPI.DatapointsChannel() <- dp
 		atomic.AddInt64(&streamer.protobufPoints, 1)
 	}

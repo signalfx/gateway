@@ -2,6 +2,7 @@ package protocoltypes
 
 import (
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
@@ -70,6 +71,7 @@ type SignalfxMetricCreationResponse struct {
 // NewProtobufDataPointWithType creates a new datapoint from SignalFx's protobuf definition (backwards compatable with old API)
 func NewProtobufDataPointWithType(datapoint *com_signalfuse_metrics_protobuf.DataPoint, mType com_signalfuse_metrics_protobuf.MetricType) core.Datapoint {
 	var mt com_signalfuse_metrics_protobuf.MetricType
+	log.WithField("dp", datapoint).Debug("NewProtobufDataPointWithType")
 
 	if datapoint.MetricType != nil {
 		mt = datapoint.GetMetricType()
@@ -77,8 +79,17 @@ func NewProtobufDataPointWithType(datapoint *com_signalfuse_metrics_protobuf.Dat
 		mt = mType
 	}
 
+	dims := map[string]string{}
+	if datapoint.GetSource() != "" {
+		dims["sf_source"] = datapoint.GetSource()
+	}
+
+	dpdims := datapoint.GetDimensions()
+	for _, dpdim := range dpdims {
+		dims[dpdim.GetKey()] = dpdim.GetValue()
+	}
+
 	return core.NewRelativeTimeDatapoint(datapoint.GetMetric(),
-		map[string]string{"sf_source": datapoint.GetSource()},
-		value.NewDatumWire(datapoint.GetValue()), mt,
+		dims, value.NewDatumWire(datapoint.GetValue()), mt,
 		datapoint.GetTimestamp())
 }
