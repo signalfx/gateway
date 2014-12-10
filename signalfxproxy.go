@@ -17,6 +17,7 @@ import (
 	"path"
 	"runtime"
 	"strconv"
+	"sync"
 )
 
 func writePidFile(pidFileName string) error {
@@ -39,6 +40,7 @@ type proxyCommandLineConfigurationT struct {
 }
 
 var proxyCommandLineConfiguration proxyCommandLineConfigurationT
+var logSetupSync sync.Once
 
 func init() {
 	flag.StringVar(&proxyCommandLineConfiguration.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
@@ -58,8 +60,12 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus
 		MaxBackups: proxyCommandLineConfiguration.logMaxBackups,
 	}
 	fmt.Printf("Sending logging to %s temp is %s\n", lumberjackLogger.Filename, os.TempDir())
-	log.SetOutput(lumberjackLogger)
-	log.SetFormatter(&log.TextFormatter{DisableColors: true})
+
+	// -race detection in unit tests w/o this
+	logSetupSync.Do(func() {
+		log.SetOutput(lumberjackLogger)
+		log.SetFormatter(&log.TextFormatter{DisableColors: true})
+	})
 }
 
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() {
