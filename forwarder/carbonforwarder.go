@@ -26,7 +26,7 @@ type reconectingGraphiteCarbonConnection struct {
 }
 
 // NewTcpGraphiteCarbonForwarer creates a new forwarder for sending points to carbon
-func newTcpGraphiteCarbonForwarer(host string, port uint16, timeout time.Duration, bufferSize uint32, name string) (*reconectingGraphiteCarbonConnection, error) {
+func newTcpGraphiteCarbonForwarer(host string, port uint16, timeout time.Duration, bufferSize uint32, name string, drainingThreads uint32) (*reconectingGraphiteCarbonConnection, error) {
 	connectionAddress := net.JoinHostPort(host, strconv.FormatUint(uint64(port), 10))
 	var d net.Dialer
 	d.Deadline = time.Now().Add(timeout)
@@ -35,7 +35,7 @@ func newTcpGraphiteCarbonForwarer(host string, port uint16, timeout time.Duratio
 		return nil, err
 	}
 	ret := &reconectingGraphiteCarbonConnection{
-		basicBufferedForwarder: newBasicBufferedForwarder(bufferSize, 100, name, 1),
+		basicBufferedForwarder: newBasicBufferedForwarder(bufferSize, 100, name, drainingThreads),
 		openConnection:         conn,
 		connectionTimeout:      timeout,
 		connectionAddress:      connectionAddress}
@@ -52,7 +52,7 @@ var defaultCarbonConfig = &config.ForwardTo{
 	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
 	BufferSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(10000)),
 	Port:            workarounds.GolangDoesnotAllowPointerToUint16Literal(2003),
-	DrainingThreads: workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(5)),
+	DrainingThreads: workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1)),
 	Name:            workarounds.GolangDoesnotAllowPointerToStringLiteral("carbonforwarder"),
 	MaxDrainSize:    workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1000)),
 }
@@ -60,7 +60,7 @@ var defaultCarbonConfig = &config.ForwardTo{
 // TcpGraphiteCarbonForwarerLoader loads a carbon forwarder
 func TcpGraphiteCarbonForwarerLoader(forwardTo *config.ForwardTo) (core.StatKeepingStreamingAPI, error) {
 	structdefaults.FillDefaultFrom(forwardTo, defaultCarbonConfig)
-	return newTcpGraphiteCarbonForwarer(*forwardTo.Host, *forwardTo.Port, *forwardTo.TimeoutDuration, *forwardTo.BufferSize, *forwardTo.Name)
+	return newTcpGraphiteCarbonForwarer(*forwardTo.Host, *forwardTo.Port, *forwardTo.TimeoutDuration, *forwardTo.BufferSize, *forwardTo.Name, *forwardTo.DrainingThreads)
 }
 
 func (carbonConnection *reconectingGraphiteCarbonConnection) createClientIfNeeded() error {
