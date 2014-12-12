@@ -58,7 +58,7 @@ case "$1" in
             echo "Unable to start proxy: pid file $pid_file is not writable"
             exit 1
         fi
-        nohup sudo "-u" "$user" "$binary" "-configfile" "$configfile" "-logdir" "$logdir" > "$stdout_log" 2> "$stderr_log" &
+        nohup "$binary" "-configfile" "$configfile" "-logdir" "$logdir" > "$stdout_log" 2> "$stderr_log" &
         echo "$!" > "$pid_file"
         sleep 1 # Give it time to try to open ports and connect
         if ! is_running; then
@@ -71,7 +71,7 @@ case "$1" in
     stop)
     if is_running; then
         echo "Stopping $name.."
-        sudo "-u" "$user" kill "$(get_pid)"
+        kill "$(get_pid)"
         for _ in 1 2 3 4 5 6 7 8 9 10
         do
             if ! is_running; then
