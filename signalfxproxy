@@ -21,8 +21,10 @@ stdout_log="/var/log/$name.stdout.log"
 stderr_log="/var/log/$name.stderr.log"
 
 # https://github.com/WASdev/ci.chef.wlp/issues/9
-if [ "$(id -un)" != "$user" ]; then
-  exec su - $user -- "$0" "$@"
+if [ "$1" != "locations" ]; then
+  if [ "$(id -un)" != "$user" ]; then
+    exec su - $user -- "$0" "$@"
+  fi
 fi
 
 get_pid() {
@@ -109,8 +111,18 @@ case "$1" in
         exit 1
     fi
     ;;
+    locations)
+    echo "Install dir:   $dir"
+    echo "Run as:        $user"
+    echo "Config file:   $configfile"
+    echo "PID file:      $pid_file"
+    echo "Stdout log:    $stdout_log"
+    echo "Stderr log:    $stderr_log"
+    echo "Binary:        $binary"
+    echo "Log directory: $logdir"
+    ;;
     *)
-    echo "Usage: $0 {start|stop|restart|status}"
+    echo "Usage: $0 {start|stop|restart|status|locations}"
     exit 1
     ;;
 esac

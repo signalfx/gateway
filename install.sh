@@ -29,4 +29,5 @@ if [ ! -f /opt/sfproxy/bin/signalfxproxy ]; then
     echo "Unable to install proxy"
     exit 1
 fi
-echo "Install ok!  To run execute '/etc/init.d/signalfxproxy start'"
+echo "Install ok!  To run execute 'sudo /etc/init.d/signalfxproxy start'"
+/etc/init.d/signalfxproxy locations
