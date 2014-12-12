@@ -108,17 +108,23 @@ var defaultCollectdConfig = &config.ListenFrom{
 	ListenAddr:      workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:8081"),
 	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
 	ListenPath:      workarounds.GolangDoesnotAllowPointerToStringLiteral("/post-collectd"),
+	JSONEngine:      workarounds.GolangDoesnotAllowPointerToStringLiteral("native"),
 }
 
 // CollectdListenerLoader loads a listener for collectd write_http protocol
 func CollectdListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, listenFrom *config.ListenFrom) (DatapointListener, error) {
 	structdefaults.FillDefaultFrom(listenFrom, defaultCollectdConfig)
 	log.WithField("listenFrom", listenFrom).Info("Creating signalfx listener using final config")
-	return StartListeningCollectDHTTPOnPort(DatapointStreamingAPI, *listenFrom.ListenAddr, *listenFrom.ListenPath, *listenFrom.TimeoutDuration)
+	engine, err := jsonengines.Load(*listenFrom.JSONEngine)
+	if err != nil {
+		return nil, err
+	}
+	return StartListeningCollectDHTTPOnPort(DatapointStreamingAPI, *listenFrom.ListenAddr, *listenFrom.ListenPath, *listenFrom.TimeoutDuration, engine)
 }
 
 // StartListeningCollectDHTTPOnPort servers http collectd requests
-func StartListeningCollectDHTTPOnPort(DatapointStreamingAPI core.DatapointStreamingAPI, listenAddr string, listenPath string, clientTimeout time.Duration) (DatapointListener, error) {
+func StartListeningCollectDHTTPOnPort(DatapointStreamingAPI core.DatapointStreamingAPI,
+	listenAddr string, listenPath string, clientTimeout time.Duration, decodingEngine jsonengines.JSONDecodingEngine) (DatapointListener, error) {
 	mux := http.NewServeMux()
 
 	listener, err := net.Listen("tcp", listenAddr)
@@ -136,7 +142,7 @@ func StartListeningCollectDHTTPOnPort(DatapointStreamingAPI core.DatapointStream
 		listener:              listener,
 		server:                server,
 		datapointStreamingAPI: DatapointStreamingAPI,
-		decodingEngine:        &jsonengines.NativeMarshallJSONDecoder{},
+		decodingEngine:        decodingEngine,
 	}
 
 	mux.HandleFunc(

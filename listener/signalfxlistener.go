@@ -258,14 +258,19 @@ var defaultConfig = &config.ListenFrom{
 	ListenAddr:      workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12345"),
 	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
 	Name:            workarounds.GolangDoesnotAllowPointerToStringLiteral("signalfxlistener"),
+	JSONEngine:      workarounds.GolangDoesnotAllowPointerToStringLiteral("native"),
 }
 
 // SignalFxListenerLoader loads a listener for signalfx protocol from config
 func SignalFxListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, listenFrom *config.ListenFrom) (DatapointListener, error) {
 	structdefaults.FillDefaultFrom(listenFrom, defaultConfig)
 	log.WithField("listenFrom", listenFrom).Info("Creating signalfx listener using final config")
-	return StartServingHTTPOnPort(
-		*listenFrom.ListenAddr, DatapointStreamingAPI, *listenFrom.TimeoutDuration, *listenFrom.Name)
+	engine, err := jsonengines.Load(*listenFrom.JSONEngine)
+	if err != nil {
+		return nil, err
+	}
+	return StartServingHTTPOnPort(*listenFrom.ListenAddr, DatapointStreamingAPI,
+		*listenFrom.TimeoutDuration, *listenFrom.Name, engine)
 }
 
 func (streamer *listenerServer) metricHandler(writter http.ResponseWriter, req *http.Request) {
@@ -308,7 +313,7 @@ type decoderFunc func() func(*http.Request) error
 
 // StartServingHTTPOnPort servers http requests for Signalfx datapoints
 func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.DatapointStreamingAPI,
-	clientTimeout time.Duration, name string) (DatapointListener, error) {
+	clientTimeout time.Duration, name string, decodingEngine jsonengines.JSONDecodingEngine) (DatapointListener, error) {
 	mux := http.NewServeMux()
 
 	datapointHandler := func(
@@ -362,7 +367,7 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 			name:                  name + "_collectd",
 			listener:              nil,
 			datapointStreamingAPI: DatapointStreamingAPI,
-			decodingEngine:        &jsonengines.NativeMarshallJSONDecoder{},
+			decodingEngine:        decodingEngine,
 		},
 		datapointStreamingAPI: DatapointStreamingAPI,
 	}

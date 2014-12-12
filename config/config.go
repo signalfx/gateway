@@ -38,6 +38,7 @@ type ListenFrom struct {
 	Timeout                    *string
 	Name                       *string
 	ListenPath                 *string
+	JSONEngine                 *string
 	Encrypted                  *bool
 	TimeoutDuration            *time.Duration `json:"-"`
 }

@@ -82,6 +82,17 @@ func TestInvalidListen(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestCollectdListenerInvalidJSONEngine(t *testing.T) {
+	sendTo := &basicDatapointStreamingAPI{
+		channel: make(chan core.Datapoint),
+	}
+	listenFrom := &config.ListenFrom{
+		JSONEngine: workarounds.GolangDoesnotAllowPointerToStringLiteral("unknown"),
+	}
+	_, err := CollectdListenerLoader(sendTo, listenFrom)
+	assert.Error(t, err)
+}
+
 func TestCollectDListener(t *testing.T) {
 	jsonBody := testCollectdBody
 

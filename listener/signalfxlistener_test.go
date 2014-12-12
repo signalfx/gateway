@@ -141,6 +141,17 @@ func TestGetMetricTypeFromMap(t *testing.T) {
 		"Should get the default")
 }
 
+func TestSignalfxJSONForwarderInvalidJSONEngine(t *testing.T) {
+	sendTo := &basicDatapointStreamingAPI{
+		channel: make(chan core.Datapoint),
+	}
+	listenFrom := &config.ListenFrom{
+		JSONEngine: workarounds.GolangDoesnotAllowPointerToStringLiteral("unknown"),
+	}
+	_, err := SignalFxListenerLoader(sendTo, listenFrom)
+	assert.Error(t, err)
+}
+
 func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	sendTo := &basicDatapointStreamingAPI{
 		channel: make(chan core.Datapoint),

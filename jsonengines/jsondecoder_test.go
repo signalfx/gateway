@@ -135,3 +135,10 @@ func TestJsonDecodingMatches(t *testing.T) {
 	decoderTest(t, &MegaJSONJSONDecoder{})
 	decoderTest(t, &NativeMarshallJSONDecoder{})
 }
+
+func TestLoad(t *testing.T) {
+	_, err := Load("")
+	assert.Nil(t, err)
+	_, err = Load("unknown")
+	assert.NotNil(t, err)
+}
