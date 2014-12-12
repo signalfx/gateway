@@ -1,6 +1,7 @@
 #!/bin/sh
 set -x
 
+/etc/init.d/signalfxproxy stop || echo "Proxy not currently running"
 YUM_CMD=$(which yum)
 APT_GET_CMD=$(which apt-get)
 GO_CMD=$(which go)
