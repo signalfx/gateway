@@ -3,6 +3,7 @@ language: go
 go:
   - 1.2
   - 1.3
+  - 1.4
   - release
 
 install:
@@ -16,7 +17,7 @@ install:
   - go get github.com/stretchr/testify/mock
   - go get code.google.com/p/go.tools/cmd/cover || go get golang.org/x/tools/cmd/cover
   - gem install mdl
-  - go get -u ./...
+  - go get -d -v ./... && go build -v ./...
 
 script:
   - export PATH=$HOME/gopath/bin:$PATH
