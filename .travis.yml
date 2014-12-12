@@ -12,7 +12,7 @@ install:
   - cabal install shellcheck
   - sudo ln ~/.cabal/bin/shellcheck /usr/bin/shellcheck
   - go get github.com/golang/lint/golint
-  - go get code.google.com/p/go.tools/cmd/vet
+  - go get golang.org/x/tools/cmd/vet
   - go get github.com/stretchr/testify/mock
   - go get code.google.com/p/go.tools/cmd/cover
   - gem install mdl
