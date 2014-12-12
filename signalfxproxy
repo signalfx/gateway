@@ -20,6 +20,7 @@ pid_file="/var/run/$name.pid"
 stdout_log="/var/log/$name.stdout.log"
 stderr_log="/var/log/$name.stderr.log"
 
+# https://github.com/WASdev/ci.chef.wlp/issues/9
 if [ "$(id -un)" != "$user" ]; then
   exec su - $user -- "$0" "$@"
 fi
