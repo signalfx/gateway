@@ -80,31 +80,3 @@ func (decoder *Float64PointDecoder) DecodeArray(s *[]*float64) error {
 	}
 	return nil
 }
-
-//type StringPointerEncoder struct {
-//	w *writer.Writer
-//}
-//
-//func NewstringJSONRawEncoder(w *writer.Writer) *StringPointerEncoder {
-//	return &StringPointerEncoder{
-//		w: w,
-//	}
-//}
-//
-//func (*StringPointerEncoder) RawEncode(s *string) error {
-//	return nil
-//}
-//
-//type Float64PointerEncoder struct {
-//	w *writer.Writer
-//}
-//
-//func Newfloat64JSONRawEncoder(w *writer.Writer) *Float64PointerEncoder {
-//	return &Float64PointerEncoder{
-//		w: w,
-//	}
-//}
-//
-//func (*Float64PointerEncoder) RawEncode(s *float64) error {
-//	return nil
-//}
