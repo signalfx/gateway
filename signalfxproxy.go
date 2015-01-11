@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/Sirupsen/logrus"
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
@@ -10,6 +11,7 @@ import (
 	"github.com/signalfuse/signalfxproxy/listener"
 	"github.com/signalfuse/signalfxproxy/stats"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
+	"io"
 	"io/ioutil"
 	"net/http"
 	_ "net/http/pprof"
@@ -37,6 +39,7 @@ type proxyCommandLineConfigurationT struct {
 	logMaxSize     int
 	logMaxBackups  int
 	stopChannel    chan bool
+	logJSON        bool
 }
 
 var proxyCommandLineConfiguration proxyCommandLineConfigurationT
@@ -46,25 +49,42 @@ func init() {
 	flag.StringVar(&proxyCommandLineConfiguration.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
 	flag.StringVar(&proxyCommandLineConfiguration.pidFileName, "signalfxproxypid", "signalfxproxy.pid", "Name of the file to store the PID in")
 	flag.StringVar(&proxyCommandLineConfiguration.pprofaddr, "pprofaddr", "", "Address to open pprof info on")
-	flag.StringVar(&proxyCommandLineConfiguration.logDir, "logdir", os.TempDir(), "Directory to store log files")
+	flag.StringVar(&proxyCommandLineConfiguration.logDir, "logdir", os.TempDir(), "Directory to store log files.  If -, will log to stdout")
 	flag.IntVar(&proxyCommandLineConfiguration.logMaxSize, "log_max_size", 100, "Maximum size of log files (in Megabytes)")
 	flag.IntVar(&proxyCommandLineConfiguration.logMaxBackups, "log_max_backups", 10, "Maximum number of rotated log files to keep")
+	flag.BoolVar(&proxyCommandLineConfiguration.logJSON, "logjson", false, "Log in JSON format (usable with logstash)")
 	proxyCommandLineConfiguration.stopChannel = make(chan bool)
 }
 
-func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus() {
-
+func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogrusOutput() io.Writer {
+	if proxyCommandLineConfiguration.logDir == "-" {
+		fmt.Printf("Sending logging to stdout")
+		return os.Stdout
+	}
 	lumberjackLogger := &lumberjack.Logger{
 		Filename:   path.Join(proxyCommandLineConfiguration.logDir, "signalfxproxy.log"),
 		MaxSize:    proxyCommandLineConfiguration.logMaxSize, // megabytes
 		MaxBackups: proxyCommandLineConfiguration.logMaxBackups,
 	}
 	fmt.Printf("Sending logging to %s temp is %s\n", lumberjackLogger.Filename, os.TempDir())
+	return lumberjackLogger
+}
+
+func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogrusFormatter() logrus.Formatter {
+	if proxyCommandLineConfiguration.logJSON {
+		return &log.JSONFormatter{}
+	}
+	return &log.TextFormatter{DisableColors: true}
+}
+
+func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus() {
+	out := proxyCommandLineConfiguration.getLogrusOutput()
+	formatter := proxyCommandLineConfiguration.getLogrusFormatter()
 
 	// -race detection in unit tests w/o this
 	logSetupSync.Do(func() {
-		log.SetOutput(lumberjackLogger)
-		log.SetFormatter(&log.TextFormatter{DisableColors: true})
+		log.SetOutput(out)
+		log.SetFormatter(formatter)
 	})
 }
 

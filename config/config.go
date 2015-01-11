@@ -27,6 +27,7 @@ type ForwardTo struct {
 	Filename          *string
 	SourceDimensions  *string
 	FormatVersion     *uint32
+	DimensionsOrder   []string
 }
 
 // ListenFrom configures where we forward datapoints to

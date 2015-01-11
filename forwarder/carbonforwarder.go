@@ -8,9 +8,9 @@ import (
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/core/sorting"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"net"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +19,7 @@ import (
 
 type reconectingGraphiteCarbonConnection struct {
 	*basicBufferedForwarder
+	dimensionComparor sorting.DimensionComparor
 	openConnection    net.Conn
 	connectionAddress string
 	connectionTimeout time.Duration
@@ -26,7 +27,7 @@ type reconectingGraphiteCarbonConnection struct {
 }
 
 // NewTcpGraphiteCarbonForwarer creates a new forwarder for sending points to carbon
-func newTcpGraphiteCarbonForwarer(host string, port uint16, timeout time.Duration, bufferSize uint32, name string, drainingThreads uint32) (*reconectingGraphiteCarbonConnection, error) {
+func newTcpGraphiteCarbonForwarer(host string, port uint16, timeout time.Duration, bufferSize uint32, name string, drainingThreads uint32, dimensionOrder []string) (*reconectingGraphiteCarbonConnection, error) {
 	connectionAddress := net.JoinHostPort(host, strconv.FormatUint(uint64(port), 10))
 	var d net.Dialer
 	d.Deadline = time.Now().Add(timeout)
@@ -35,6 +36,7 @@ func newTcpGraphiteCarbonForwarer(host string, port uint16, timeout time.Duratio
 		return nil, err
 	}
 	ret := &reconectingGraphiteCarbonConnection{
+		dimensionComparor:      sorting.NewOrderedDimensionComparor(dimensionOrder),
 		basicBufferedForwarder: newBasicBufferedForwarder(bufferSize, 100, name, drainingThreads),
 		openConnection:         conn,
 		connectionTimeout:      timeout,
@@ -55,12 +57,13 @@ var defaultCarbonConfig = &config.ForwardTo{
 	DrainingThreads: workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1)),
 	Name:            workarounds.GolangDoesnotAllowPointerToStringLiteral("carbonforwarder"),
 	MaxDrainSize:    workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1000)),
+	DimensionsOrder: []string{},
 }
 
 // TcpGraphiteCarbonForwarerLoader loads a carbon forwarder
 func TcpGraphiteCarbonForwarerLoader(forwardTo *config.ForwardTo) (core.StatKeepingStreamingAPI, error) {
 	structdefaults.FillDefaultFrom(forwardTo, defaultCarbonConfig)
-	return newTcpGraphiteCarbonForwarer(*forwardTo.Host, *forwardTo.Port, *forwardTo.TimeoutDuration, *forwardTo.BufferSize, *forwardTo.Name, *forwardTo.DrainingThreads)
+	return newTcpGraphiteCarbonForwarer(*forwardTo.Host, *forwardTo.Port, *forwardTo.TimeoutDuration, *forwardTo.BufferSize, *forwardTo.Name, *forwardTo.DrainingThreads, forwardTo.DimensionsOrder)
 }
 
 func (carbonConnection *reconectingGraphiteCarbonConnection) createClientIfNeeded() error {
@@ -72,17 +75,11 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) createClientIfNeede
 }
 
 func (carbonConnection *reconectingGraphiteCarbonConnection) datapointToGraphite(datapoint core.Datapoint) string {
-	ret := []string{}
-	// Note: Key is unused.  It's ambiguous how to add this.  Also, the dimensions aren't exactly
-	//       ordered ....
-	keys := []string{}
 	dims := datapoint.Dimensions()
-	for k := range dims {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		ret = append(ret, dims[k])
+	sortedDims := sorting.SortDimensions(carbonConnection.dimensionComparor, dims)
+	ret := make([]string, 0, len(sortedDims)+1)
+	for _, dim := range sortedDims {
+		ret = append(ret, dims[dim])
 	}
 	ret = append(ret, datapoint.Metric())
 	return strings.Join(ret, ".")

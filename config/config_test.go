@@ -44,6 +44,14 @@ func TestParseForwardTimeout(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestParseForwardOrdering(t *testing.T) {
+	config, err := decodeConfig([]byte(`{"ForwardTo":[{"Timeout":"3s", "DimensionsOrder": ["hi"]}]}`))
+	assert.Nil(t, err)
+	assert.Equal(t, *config.ForwardTo[0].TimeoutDuration, time.Second*3)
+	assert.Equal(t, config.ForwardTo[0].DimensionsOrder[0], "hi")
+	assert.Equal(t, 1, len(config.ForwardTo[0].DimensionsOrder))
+}
+
 func TestParseListenFromTimeout(t *testing.T) {
 	config, err := decodeConfig([]byte(`{"ListenFrom":[{"Timeout":"3s"}]}`))
 	assert.Nil(t, err)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
@@ -106,6 +107,21 @@ func TestProxyForwardError(t *testing.T) {
 		myProxyCommandLineConfiguration.stopChannel <- true
 	}()
 	myProxyCommandLineConfiguration.main()
+}
+
+func TestGetLogrusFormatter(t *testing.T) {
+	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
+		logJSON: true,
+	}
+	_, ok := myProxyCommandLineConfiguration.getLogrusFormatter().(*log.JSONFormatter)
+	assert.True(t, ok)
+}
+
+func TestGetLogrusOutput(t *testing.T) {
+	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
+		logDir: "-",
+	}
+	assert.Equal(t, os.Stdout, myProxyCommandLineConfiguration.getLogrusOutput())
 }
 
 func TestProxyUnknownForwarder(t *testing.T) {
