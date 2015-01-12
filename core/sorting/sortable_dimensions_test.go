@@ -20,7 +20,7 @@ func TestNewOrderedDimensionComparor(t *testing.T) {
 
 func TestLessOrderer(t *testing.T) {
 	v := &orderedDimensionComparor{
-		dimensionOrderMap: map[string]int {
+		dimensionOrderMap: map[string]int{
 			"b": 0,
 		},
 	}
