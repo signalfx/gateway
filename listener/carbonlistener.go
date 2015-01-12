@@ -37,6 +37,7 @@ type carbonListener struct {
 	invalidDatapoints     int64
 	totalConnections      int64
 	activeConnections     int64
+	serverAcceptDeadline  time.Duration
 }
 
 func (listener *carbonListener) GetStats() []core.Datapoint {
@@ -105,7 +106,7 @@ func (listener *carbonListener) startListening() {
 	for atomic.LoadInt32(&listener.isClosed) == 0 {
 		deadlineable, ok := listener.psocket.(*net.TCPListener)
 		if ok {
-			deadlineable.SetDeadline(time.Now().Add(1 * time.Second))
+			deadlineable.SetDeadline(time.Now().Add(listener.serverAcceptDeadline))
 		}
 		conn, err := listener.psocket.Accept()
 		if err != nil {
@@ -128,6 +129,7 @@ var defaultCarbonConfig = &config.ListenFrom{
 	TimeoutDuration:            workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
 	MetricDeconstructor:        workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
 	MetricDeconstructorOptions: workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
+	ServerAcceptDeadline:       workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second),
 }
 
 // CarbonListenerLoader loads a listener for the carbon/graphite protocol from config
@@ -135,12 +137,12 @@ func CarbonListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, list
 	structdefaults.FillDefaultFrom(listenFrom, defaultCarbonConfig)
 	return startListeningCarbonOnPort(
 		*listenFrom.ListenAddr, DatapointStreamingAPI, *listenFrom.TimeoutDuration,
-		*listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions, *listenFrom.Name)
+		*listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions, *listenFrom.Name, *listenFrom.ServerAcceptDeadline)
 }
 
 func startListeningCarbonOnPort(listenAddr string, DatapointStreamingAPI core.DatapointStreamingAPI,
 	timeout time.Duration, metricDeconstructor string,
-	metricDeconstructorOptions string, name string) (DatapointListener, error) {
+	metricDeconstructorOptions string, name string, serverAcceptDeadline time.Duration) (DatapointListener, error) {
 	psocket, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return nil, err
@@ -158,6 +160,7 @@ func startListeningCarbonOnPort(listenAddr string, DatapointStreamingAPI core.Da
 		metricDeconstructor:   deconstructor,
 		name:                  name,
 		finalAddr:             psocket.Addr(),
+		serverAcceptDeadline:  serverAcceptDeadline,
 	}
 	go receiver.startListening()
 	return &receiver, nil

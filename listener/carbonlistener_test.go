@@ -63,7 +63,8 @@ func TestCarbonInvalidCarbonDeconstructorListenerLoader(t *testing.T) {
 
 func TestCarbonListenerLoader(t *testing.T) {
 	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12245"),
+		ListenAddr:           workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12245"),
+		ServerAcceptDeadline: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Millisecond),
 	}
 	sendTo := &basicDatapointStreamingAPI{
 		channel: make(chan core.Datapoint),
@@ -75,7 +76,7 @@ func TestCarbonListenerLoader(t *testing.T) {
 	assert.NotEqual(t, listener, err, "Should be ok to make")
 
 	// Wait for the connection to timeout
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Millisecond)
 
 	conn, err := net.Dial("tcp", *listenFrom.ListenAddr)
 	assert.Equal(t, nil, err, "Should be ok to make")
@@ -93,6 +94,7 @@ func TestCarbonListenerLoader(t *testing.T) {
 		_ = <-sendTo.channel
 	}
 }
+
 func TestCarbonListenerLoader2(t *testing.T) {
 	listenFrom := &config.ListenFrom{
 		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12248"),

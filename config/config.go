@@ -42,6 +42,7 @@ type ListenFrom struct {
 	JSONEngine                 *string
 	Encrypted                  *bool
 	TimeoutDuration            *time.Duration `json:"-"`
+	ServerAcceptDeadline       *time.Duration `json:"-"`
 }
 
 func (listenFrom *ListenFrom) String() string {

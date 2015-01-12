@@ -158,7 +158,7 @@ func TestProxyForwardError(t *testing.T) {
 	filename := fileObj.Name()
 	defer os.Remove(filename)
 
-	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"carbon", "Host":"192.168.100.108", "Timeout": "1s"}]}`), os.FileMode(0666))
+	ioutil.WriteFile(filename, []byte(`{"StatsDelay": "1m", "ForwardTo":[{"Type":"carbon", "Host":"192.168.100.108", "Timeout": "1ms"}]}`), os.FileMode(0666))
 	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
 		configFileName: filename,
 		logDir:         os.TempDir(),
