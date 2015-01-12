@@ -63,6 +63,9 @@ var defaultCarbonConfig = &config.ForwardTo{
 // TcpGraphiteCarbonForwarerLoader loads a carbon forwarder
 func TcpGraphiteCarbonForwarerLoader(forwardTo *config.ForwardTo) (core.StatKeepingStreamingAPI, error) {
 	structdefaults.FillDefaultFrom(forwardTo, defaultCarbonConfig)
+	if forwardTo.Host == nil {
+		return nil, fmt.Errorf("Carbon forwarder requires host config")
+	}
 	return newTcpGraphiteCarbonForwarer(*forwardTo.Host, *forwardTo.Port, *forwardTo.TimeoutDuration, *forwardTo.BufferSize, *forwardTo.Name, *forwardTo.DrainingThreads, forwardTo.DimensionsOrder)
 }
 

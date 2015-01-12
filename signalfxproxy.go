@@ -32,14 +32,18 @@ func writePidFile(pidFileName string) error {
 }
 
 type proxyCommandLineConfigurationT struct {
-	configFileName string
-	pidFileName    string
-	pprofaddr      string
-	logDir         string
-	logMaxSize     int
-	logMaxBackups  int
-	stopChannel    chan bool
-	logJSON        bool
+	configFileName                string
+	pidFileName                   string
+	pprofaddr                     string
+	logDir                        string
+	logMaxSize                    int
+	logMaxBackups                 int
+	stopChannel                   chan bool
+	closeWhenWaitingToStopChannel chan struct{}
+	logJSON                       bool
+	allForwarders                 []core.DatapointStreamingAPI
+	allListeners                  []listener.DatapointListener
+	statDrainThread               core.StatDrainingThread
 }
 
 var proxyCommandLineConfiguration proxyCommandLineConfigurationT
@@ -54,6 +58,12 @@ func init() {
 	flag.IntVar(&proxyCommandLineConfiguration.logMaxBackups, "log_max_backups", 10, "Maximum number of rotated log files to keep")
 	flag.BoolVar(&proxyCommandLineConfiguration.logJSON, "logjson", false, "Log in JSON format (usable with logstash)")
 	proxyCommandLineConfiguration.stopChannel = make(chan bool)
+	proxyCommandLineConfiguration.closeWhenWaitingToStopChannel = make(chan struct{})
+}
+
+func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) blockTillSetupReady() {
+	// A closed channel will never block
+	_ = <-proxyCommandLineConfiguration.closeWhenWaitingToStopChannel
 }
 
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogrusOutput() io.Writer {
@@ -88,7 +98,7 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus
 	})
 }
 
-func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() {
+func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() error {
 	proxyCommandLineConfiguration.setupLogrus()
 	// TODO: Configure this on command line.  Needed because JSON decoding can get kinda slow.
 	numProcs := runtime.NumCPU()
@@ -107,54 +117,59 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() {
 	loadedConfig, err := config.LoadConfig(proxyCommandLineConfiguration.configFileName)
 	if err != nil {
 		log.WithField("err", err).Error("Unable to load config")
-		return
+		return err
 	}
 	log.WithField("config", loadedConfig).Info("Config loaded")
-	allForwarders := []core.DatapointStreamingAPI{}
+	proxyCommandLineConfiguration.allForwarders = make([]core.DatapointStreamingAPI, 0, len(loadedConfig.ForwardTo))
 	allStatKeepers := []core.StatKeeper{}
 	for _, forwardConfig := range loadedConfig.ForwardTo {
 		loader, ok := forwarder.AllForwarderLoaders[forwardConfig.Type]
 		if !ok {
 			log.WithField("type", forwardConfig.Type).Error("Unknown loader type")
-			return
+			return fmt.Errorf("Unknown loader type %s", forwardConfig.Type)
 		}
 		forwarder, err := loader(forwardConfig)
 		if err != nil {
 			log.WithField("err", err).Error("Unable to load config")
-			return
+			return err
 		}
-		allForwarders = append(allForwarders, forwarder)
+		proxyCommandLineConfiguration.allForwarders = append(proxyCommandLineConfiguration.allForwarders, forwarder)
 		allStatKeepers = append(allStatKeepers, forwarder)
 	}
-	multiplexer := forwarder.NewStreamingDatapointDemultiplexer(allForwarders)
+	multiplexer := forwarder.NewStreamingDatapointDemultiplexer(proxyCommandLineConfiguration.allForwarders)
 	allStatKeepers = append(allStatKeepers, multiplexer)
 
-	allListeners := make([]listener.DatapointListener, len(loadedConfig.ListenFrom))
+	proxyCommandLineConfiguration.allListeners = make([]listener.DatapointListener, 0, len(loadedConfig.ListenFrom))
 	for _, forwardConfig := range loadedConfig.ListenFrom {
 		loader, ok := listener.AllListenerLoaders[forwardConfig.Type]
 		if !ok {
 			log.WithField("type", forwardConfig.Type).Error("Unknown loader type")
-			return
+			return fmt.Errorf("Unknown loader type %s", forwardConfig.Type)
 		}
 		listener, err := loader(multiplexer, forwardConfig)
 		if err != nil {
 			log.WithField("err", err).Error("Unable to load config")
-			return
+			return err
 		}
-		allListeners = append(allListeners, listener)
+		proxyCommandLineConfiguration.allListeners = append(proxyCommandLineConfiguration.allListeners, listener)
 		allStatKeepers = append(allStatKeepers, listener)
 	}
 
 	allStatKeepers = append(allStatKeepers, stats.NewGolangStatKeeper())
 
 	if loadedConfig.StatsDelayDuration != nil && *loadedConfig.StatsDelayDuration != 0 {
-		go core.DrainStatsThread(*loadedConfig.StatsDelayDuration, allForwarders, allStatKeepers, proxyCommandLineConfiguration.stopChannel)
+		proxyCommandLineConfiguration.statDrainThread = core.NewStatDrainingThread(*loadedConfig.StatsDelayDuration, proxyCommandLineConfiguration.allForwarders, allStatKeepers, proxyCommandLineConfiguration.stopChannel)
+		go proxyCommandLineConfiguration.statDrainThread.Start()
 	} else {
 		log.Info("Skipping stat keeping")
 	}
 
 	log.Infof("Setup done.  Blocking!")
+	if proxyCommandLineConfiguration.closeWhenWaitingToStopChannel != nil {
+		close(proxyCommandLineConfiguration.closeWhenWaitingToStopChannel)
+	}
 	_ = <-proxyCommandLineConfiguration.stopChannel
+	return nil
 }
 
 func main() {

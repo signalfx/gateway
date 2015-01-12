@@ -4,9 +4,33 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
+	"bufio"
 	"os"
 	"testing"
+	"net"
+	"strings"
 )
+
+var config1 = `
+  {
+    "StatsDelay": "1m",
+    "ListenFrom":[
+      {
+      	"Type":"carbon",
+      	"ListenAddr": "0.0.0.0:0"
+	  }
+    ],
+    "ForwardTo":[
+      {
+      	"Type":"carbon",
+      	"Host":"0.0.0.0",
+      	"DimensionsOrder": ["source", "forwarder"],
+      	"Name": "testForwardTo",
+      	"Port": <<PORT>>
+      }
+    ]
+  }
+`
 
 func TestProxyPidWrite(t *testing.T) {
 	fileObj, _ := ioutil.TempFile("", "gotest")
@@ -18,6 +42,46 @@ func TestProxyPidWrite(t *testing.T) {
 
 func TestProxyPidWriteError(t *testing.T) {
 	assert.Error(t, writePidFile("/root"))
+}
+
+func TestConfigLoadDimensions(t *testing.T) {
+	fileObj, _ := ioutil.TempFile("", "gotest")
+	filename := fileObj.Name()
+	defer os.Remove(filename)
+
+
+	psocket, err := net.Listen("tcp", "0.0.0.0:0")
+	assert.NoError(t, err)
+	defer psocket.Close()
+	portParts := strings.Split(psocket.Addr().String(), ":")
+	port := portParts[len(portParts) - 1]
+	conf := strings.Replace(config1, "<<PORT>>", port, 1)
+
+	ioutil.WriteFile(filename, []byte(conf), os.FileMode(0666))
+	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
+		configFileName:                filename,
+		logDir:                        os.TempDir(),
+		logMaxSize:                    1,
+		logMaxBackups:                 0,
+		stopChannel:                   make(chan bool),
+		closeWhenWaitingToStopChannel: make(chan struct{}),
+	}
+
+	go func() {
+		myProxyCommandLineConfiguration.blockTillSetupReady()
+		assert.Equal(t, 1, len(myProxyCommandLineConfiguration.allListeners))
+		assert.Equal(t, 1, len(myProxyCommandLineConfiguration.allForwarders))
+		myProxyCommandLineConfiguration.statDrainThread.SendStats()
+		c, err := psocket.Accept()
+		defer c.Close()
+		assert.NoError(t, err)
+		reader := bufio.NewReader(c)
+		line, err := reader.ReadString((byte)('\n'))
+		assert.NoError(t,err)
+		assert.Equal(t, "proxy.testForwardTo.", line[0: len("proxy.testForwardTo.")])
+		myProxyCommandLineConfiguration.stopChannel <- true
+	}()
+	assert.NoError(t, myProxyCommandLineConfiguration.main())
 }
 
 func TestProxyInvalidConfig(t *testing.T) {

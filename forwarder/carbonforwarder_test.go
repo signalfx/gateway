@@ -1,6 +1,7 @@
 package forwarder
 
 import (
+	"encoding/json"
 	"errors"
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/a"
@@ -14,6 +15,14 @@ import (
 	"testing"
 	"time"
 )
+
+var testConfig1 = `
+{
+  "Type":"carbon",
+  "Host": "0.0.0.0",
+  "Port": 2013
+}
+`
 
 type mockConn struct {
 	a.Conn
@@ -33,6 +42,25 @@ func (conn *mockConn) Write(bytes []byte) (int, error) {
 	r := conn.writeReturn
 	conn.writeReturn = nil
 	return len(bytes), r
+}
+
+func TestConfig1(t *testing.T) {
+	if true {
+		return;
+	}
+	listenFrom := config.ListenFrom{}
+	// TODO: Enable :0 port and reading back the open port
+	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0")
+	forwardTo := newBasicBufferedForwarder(100, 1, "", 1)
+	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
+	assert.NoError(t, err)
+	defer l.Close()
+
+	var config config.ForwardTo
+	assert.NoError(t, json.Unmarshal([]byte(testConfig1), &config))
+	log.Info("%s", config)
+	_, err = TcpGraphiteCarbonForwarerLoader(&config)
+	assert.NoError(t, err)
 }
 
 func TestInvalidPort(t *testing.T) {

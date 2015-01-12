@@ -23,30 +23,59 @@ type StatKeepingStreamingAPI interface {
 	StatKeeper
 }
 
+
+type StatDrainingThread interface {
+	SendStats()
+	Start()
+}
+
+type statDrainingThreadImpl struct {
+	delay time.Duration
+	sendTo []DatapointStreamingAPI
+	listenFrom []StatKeeper
+	stopChannel <-chan bool
+}
+
+func NewStatDrainingThread(delay time.Duration, sendTo []DatapointStreamingAPI, listenFrom []StatKeeper, stopChannel <-chan bool) StatDrainingThread {
+	return &statDrainingThreadImpl{
+		delay: delay,
+		sendTo: sendTo,
+		listenFrom: listenFrom,
+		stopChannel: stopChannel,
+	}
+}
+
+func (thread* statDrainingThreadImpl) SendStats() {
+	points := []Datapoint{}
+	for _, listenFrom := range thread.listenFrom {
+		log.WithField("listenFrom", listenFrom).Debug("Loading stats")
+		stats := listenFrom.GetStats()
+		log.WithField("stats", stats).Debug("Stats loaded")
+		points = append(points, listenFrom.GetStats()...)
+	}
+	for _, sendTo := range thread.sendTo {
+		for _, dp := range points {
+			sendTo.DatapointsChannel() <- dp
+		}
+	}
+}
+
+func (thread* statDrainingThreadImpl) Start() {
+	log.WithField("listenFrom", thread.listenFrom).Info("Draining stats")
+	for {
+		select {
+		case _ = <-thread.stopChannel:
+			log.Debug("Request to stop stat thread")
+			return
+		case _ = <-time.After(thread.delay):
+			log.Debug("Stat thread waking up")
+		}
+		thread.SendStats()
+	}
+}
+
 // DrainStatsThread starts the stats listening thread that sleeps delay amount between gathering
 // and sending stats
 func DrainStatsThread(delay time.Duration, sendTo []DatapointStreamingAPI, listenFrom []StatKeeper, stopChannel <-chan bool) {
-	log.WithField("listenFrom", listenFrom).Info("Draining stats")
-	for {
-		select {
-		case _ = <-stopChannel:
-			log.Debug("Request to stop stat thread")
-			return
-		case _ = <-time.After(delay):
-			log.Debug("Stat thread waking up")
-		}
 
-		points := []Datapoint{}
-		for _, listenFrom := range listenFrom {
-			log.WithField("listenFrom", listenFrom).Debug("Loading stats")
-			stats := listenFrom.GetStats()
-			log.WithField("stats", stats).Debug("Stats loaded")
-			points = append(points, listenFrom.GetStats()...)
-		}
-		for _, sendTo := range sendTo {
-			for _, dp := range points {
-				sendTo.DatapointsChannel() <- dp
-			}
-		}
-	}
 }
