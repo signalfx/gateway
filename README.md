@@ -201,7 +201,7 @@ to signalfuse at 1s intervals
 
 This config will listen using CollectD's HTTP protocol and forward
 all those metrics to a single graphite listener.  It will collect
-stats at 1s intervals.  It also signals to graphite that what it creates
+stats at 1s intervals.  It also signals to graphite that when it creates
 a graphite name for a metric, it should put the 'source' (which is usually
 proxy) and 'forwarder' (in this case 'graphite-west') first in the graphite
 dot delimited name.
@@ -228,11 +228,12 @@ dot delimited name.
 }
 ```
 
-### SignalFX options
+### SignalFX perf options
 
 This config listens for carbon data on port 2003 and forwards it to signalfuse
 using an internal datapoint buffer size of 1,000,000 and sending with 50 threads
-simultaniously with each thread sending no more than 5000 points in a single call.
+simultaniously with each thread sending no more than 5,000 points in a single
+call.
 
 ```
 {
