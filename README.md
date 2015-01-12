@@ -168,3 +168,85 @@ configure your auth token inside DefaultAuthToken.
             "Name": "testproxy",
         },
 ```
+
+## Example configs
+
+This config will listen for graphite metrics on port 2003 and forward them
+to signalfuse with the token ABCD.  It will also report local stats
+to signalfuse at 1s intervals
+
+```
+{
+  "StatsDelay": "1s",
+  "ListenFrom": [
+    {
+      "Type": "carbon",
+      "ListenAddr" : "0.0.0.0:2003",
+    },
+  ],
+
+  "ForwardTo": [
+    {
+      "type": "signalfx-json",
+      "DefaultAuthToken": "ABCD",
+      "Name": "signalfxforwarder",
+    }
+  ]
+}
+```
+
+This config will listen using CollectD's HTTP protocol and forward
+all those metrics to a single graphite listener.  It will collect
+stats at 1s intervals.  It also signals to graphite that what it creates
+a graphite name for a metric, it should put the 'source' (which is usually
+proxy) and 'forwarder' (in this case 'graphite-west') first in the graphite
+dot delimited name.
+
+```
+{
+  "StatsDelay": "1s",
+  "ListenFrom": [
+    {
+      "Type": "collectd",
+      "ListenAddr" : "0.0.0.0:8081",
+    },
+  ],
+
+  "ForwardTo": [
+    {
+      "type": "carbon",
+      "DefaultAuthToken": "ABCD",
+      "Host": "graphite.database.dc1.com",
+      "DimensionsOrder": ["source", "forwarder"],
+      "Name": "graphite-west"
+    }
+  ]
+}
+```
+
+This config listens for carbon data on port 2003 and forwards it to signalfuse
+using an internal datapoint buffer size of 1,000,000 and sending with 50 threads
+simultaniously with each thread sending no more than 5000 points in a single call.
+
+```
+{
+  "StatsDelay": "1s",
+  "ListenFrom": [
+    {
+      "Type": "carbon",
+      "ListenAddr" : "0.0.0.0:2003",
+    },
+  ],
+
+  "ForwardTo": [
+    {
+      "type": "signalfx-json",
+      "DefaultAuthToken": "ABCD",
+      "Name": "signalfxforwarder",
+      "BufferSize": 1000000,
+      "DrainingThreads": 50,
+      "MaxDrainSize": 5000
+    }
+  ]
+}
+```
