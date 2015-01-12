@@ -46,7 +46,7 @@ func (conn *mockConn) Write(bytes []byte) (int, error) {
 
 func TestConfig1(t *testing.T) {
 	if true {
-		return;
+		return
 	}
 	listenFrom := config.ListenFrom{}
 	// TODO: Enable :0 port and reading back the open port
@@ -61,6 +61,12 @@ func TestConfig1(t *testing.T) {
 	log.Info("%s", config)
 	_, err = TcpGraphiteCarbonForwarerLoader(&config)
 	assert.NoError(t, err)
+}
+
+func TestNoHost(t *testing.T) {
+	var config config.ForwardTo
+	_, err := TcpGraphiteCarbonForwarerLoader(&config)
+	assert.Error(t, err)
 }
 
 func TestInvalidPort(t *testing.T) {

@@ -34,5 +34,5 @@ func TestDrainStatsThread(t *testing.T) {
 	keepers := []StatKeeper{&statKeeper{}}
 	apis := []DatapointStreamingAPI{&datapointStreamingAPI{mychan: c, myDp: myDp}}
 	// We signal draining thread to die when we get a point
-	DrainStatsThread(time.Nanosecond*1, apis, keepers, c)
+	NewStatDrainingThread(time.Nanosecond*1, apis, keepers, c).Start()
 }

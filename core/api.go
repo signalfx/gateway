@@ -23,29 +23,32 @@ type StatKeepingStreamingAPI interface {
 	StatKeeper
 }
 
-
+// StatDrainingThread attaches to the signalfxproxy to periodically send proxy statistics to
+// listeners
 type StatDrainingThread interface {
 	SendStats()
 	Start()
 }
 
 type statDrainingThreadImpl struct {
-	delay time.Duration
-	sendTo []DatapointStreamingAPI
-	listenFrom []StatKeeper
+	delay       time.Duration
+	sendTo      []DatapointStreamingAPI
+	listenFrom  []StatKeeper
 	stopChannel <-chan bool
 }
 
+// NewStatDrainingThread returns a new StatDrainingThread.  The user must explicitly call
+// "go item.Start()" on the returned item.
 func NewStatDrainingThread(delay time.Duration, sendTo []DatapointStreamingAPI, listenFrom []StatKeeper, stopChannel <-chan bool) StatDrainingThread {
 	return &statDrainingThreadImpl{
-		delay: delay,
-		sendTo: sendTo,
-		listenFrom: listenFrom,
+		delay:       delay,
+		sendTo:      sendTo,
+		listenFrom:  listenFrom,
 		stopChannel: stopChannel,
 	}
 }
 
-func (thread* statDrainingThreadImpl) SendStats() {
+func (thread *statDrainingThreadImpl) SendStats() {
 	points := []Datapoint{}
 	for _, listenFrom := range thread.listenFrom {
 		log.WithField("listenFrom", listenFrom).Debug("Loading stats")
@@ -60,7 +63,7 @@ func (thread* statDrainingThreadImpl) SendStats() {
 	}
 }
 
-func (thread* statDrainingThreadImpl) Start() {
+func (thread *statDrainingThreadImpl) Start() {
 	log.WithField("listenFrom", thread.listenFrom).Info("Draining stats")
 	for {
 		select {
@@ -72,10 +75,4 @@ func (thread* statDrainingThreadImpl) Start() {
 		}
 		thread.SendStats()
 	}
-}
-
-// DrainStatsThread starts the stats listening thread that sleeps delay amount between gathering
-// and sending stats
-func DrainStatsThread(delay time.Duration, sendTo []DatapointStreamingAPI, listenFrom []StatKeeper, stopChannel <-chan bool) {
-
 }

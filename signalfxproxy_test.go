@@ -1,14 +1,14 @@
 package main
 
 import (
+	"bufio"
 	log "github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
-	"bufio"
-	"os"
-	"testing"
 	"net"
+	"os"
 	"strings"
+	"testing"
 )
 
 var config1 = `
@@ -49,12 +49,11 @@ func TestConfigLoadDimensions(t *testing.T) {
 	filename := fileObj.Name()
 	defer os.Remove(filename)
 
-
 	psocket, err := net.Listen("tcp", "0.0.0.0:0")
 	assert.NoError(t, err)
 	defer psocket.Close()
 	portParts := strings.Split(psocket.Addr().String(), ":")
-	port := portParts[len(portParts) - 1]
+	port := portParts[len(portParts)-1]
 	conf := strings.Replace(config1, "<<PORT>>", port, 1)
 
 	ioutil.WriteFile(filename, []byte(conf), os.FileMode(0666))
@@ -77,8 +76,8 @@ func TestConfigLoadDimensions(t *testing.T) {
 		assert.NoError(t, err)
 		reader := bufio.NewReader(c)
 		line, err := reader.ReadString((byte)('\n'))
-		assert.NoError(t,err)
-		assert.Equal(t, "proxy.testForwardTo.", line[0: len("proxy.testForwardTo.")])
+		assert.NoError(t, err)
+		assert.Equal(t, "proxy.testForwardTo.", line[0:len("proxy.testForwardTo.")])
 		myProxyCommandLineConfiguration.stopChannel <- true
 	}()
 	assert.NoError(t, myProxyCommandLineConfiguration.main())
