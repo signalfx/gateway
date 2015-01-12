@@ -171,6 +171,8 @@ configure your auth token inside DefaultAuthToken.
 
 ## Example configs
 
+### Basic
+
 This config will listen for graphite metrics on port 2003 and forward them
 to signalfuse with the token ABCD.  It will also report local stats
 to signalfuse at 1s intervals
@@ -194,6 +196,8 @@ to signalfuse at 1s intervals
   ]
 }
 ```
+
+### Graphite Options
 
 This config will listen using CollectD's HTTP protocol and forward
 all those metrics to a single graphite listener.  It will collect
@@ -223,6 +227,8 @@ dot delimited name.
   ]
 }
 ```
+
+### SignalFX options
 
 This config listens for carbon data on port 2003 and forwards it to signalfuse
 using an internal datapoint buffer size of 1,000,000 and sending with 50 threads
