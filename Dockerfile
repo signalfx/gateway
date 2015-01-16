@@ -48,4 +48,4 @@ VOLUME /var/log/sfproxy
 VOLUME /var/config/sfproxy
 EXPOSE 6060
 USER root
-CMD ["/opt/sfproxy/bin/signalfxproxy", "-pprofaddr", "0.0.0.0:6060", "-configfile", "/var/config/sfproxy/sfdbproxy.conf", "-signalfxproxypid", "/var/config/sfproxy/sfproxy.pid" ,"-logdir", "/var/log/sfproxy"]
+CMD ["/opt/sfproxy/bin/signalfxproxy", "-configfile", "/var/config/sfproxy/sfdbproxy.conf", "-signalfxproxypid", "/var/config/sfproxy/sfproxy.pid" ,"-logdir", "/var/log/sfproxy"]

@@ -6,14 +6,18 @@ import (
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"runtime"
+	"time"
 )
 
 type golangStatKeeper struct {
+	startTime time.Time
 }
 
 // NewGolangStatKeeper returns a new stats keeper that can return internal golang stats
 func NewGolangStatKeeper() core.StatKeeper {
-	return &golangStatKeeper{}
+	return &golangStatKeeper{
+		startTime: time.Now(),
+	}
 }
 
 func point(name string, v int64) core.Datapoint {
@@ -37,6 +41,9 @@ func (statKeeper *golangStatKeeper) GetStats() []core.Datapoint {
 	ret = append(
 		ret,
 		point("GOMAXPROCS", int64(runtime.GOMAXPROCS(0))))
+	ret = append(
+		ret,
+		point("process.uptime.ns", time.Now().Sub(statKeeper.startTime).Nanoseconds()))
 	ret = append(
 		ret,
 		point("num_cpu", int64(runtime.NumCPU())))

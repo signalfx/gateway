@@ -7,5 +7,5 @@ import (
 
 func TestGolangStatKeeper(t *testing.T) {
 	s := NewGolangStatKeeper()
-	assert.Equal(t, 29, len(s.GetStats()), "Expected 29 stats")
+	assert.Equal(t, 30, len(s.GetStats()))
 }

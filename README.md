@@ -36,14 +36,6 @@ is already receiving datapoints, such as graphite's carbon database.
   tail -F *
 ```
 
-## Profiling
-
-If you start the proxy with -pprofaddr="0.0.0.0:6060", it will enable pprof
-for the proxy and you can profile it at
-[http://localhost:6060/debug/pprof/](http://localhost:6060/debug/pprof/).  You
-can find more information about how to use pprof at
-[the pprof help page](http://golang.org/pkg/net/http/pprof/).
-
 ## Code layout
 
 You only need to read this if you want to develop the proxy or understand
@@ -228,6 +220,33 @@ dot delimited name.
 }
 ```
 
+### Graphite Dimensions
+
+This config will pull dimensions out of graphite metrics if they fit the commakeys
+format.  That format is "<<METRIC_NAME>>[KEY:VALUE,KEY:VALUE]".  For example,
+"user.hit_rate[host:server1,type:production]".
+
+```
+{
+  "StatsDelay": "1s",
+  "ListenFrom": [
+    {
+      "Type": "carbon",
+      "ListenAddr" : "0.0.0.0:2003",
+      "MetricDeconstructor": "commakeys"
+    },
+  ],
+
+  "ForwardTo": [
+    {
+      "type": "signalfx-json",
+      "DefaultAuthToken": "ABCD",
+      "Name": "signalfxforwarder",
+    }
+  ]
+}
+```
+
 ### SignalFX perf options
 
 This config listens for carbon data on port 2003 and forwards it to signalfuse
@@ -255,5 +274,43 @@ call.
       "MaxDrainSize": 5000
     }
   ]
+}
+```
+
+### SignalFX to SignalFX
+
+This config listens using the signalfx protocol, buffers, then forwards
+points to signalfx.
+
+```
+{
+  "StatsDelay": "1s",
+  "ListenFrom": [
+    {
+      "Type": "signalfx",
+      "ListenAddr" : "0.0.0.0:8080",
+    },
+  ],
+
+  "ForwardTo": [
+    {
+      "type": "signalfx-json",
+      "DefaultAuthToken": "ABCD",
+      "Name": "signalfxforwarder",
+    }
+  ]
+}
+```
+
+### Status Page and profiling
+
+This config only loads a status page.  You can see status information at
+localhost:6009/status, a health page at localhost:6009/health, and profile
+information at localhost:6009/debug/pprof/.  You can learn more about profile
+information on [the pprof help page](http://golang.org/pkg/net/http/pprof/).
+
+```
+{
+  "LocalDebugServer": "0.0.0.0:6009"
 }
 ```

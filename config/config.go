@@ -59,6 +59,9 @@ type LoadedConfig struct {
 	ListenFrom         []*ListenFrom
 	StatsDelay         *string
 	StatsDelayDuration *time.Duration `json:"-"`
+	NumProcs           *int
+	EnableStatusPage   *bool
+	LocalDebugServer   *string
 }
 
 func decodeConfig(configBytes []byte) (*LoadedConfig, error) {

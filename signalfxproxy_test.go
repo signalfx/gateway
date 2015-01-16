@@ -3,6 +3,9 @@ package main
 import (
 	"bufio"
 	log "github.com/Sirupsen/logrus"
+	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
+	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net"
@@ -14,6 +17,7 @@ import (
 var config1 = `
   {
     "StatsDelay": "1m",
+    "NumProcs": 1,
     "ListenFrom":[
       {
       	"Type":"carbon",
@@ -59,7 +63,7 @@ func TestConfigLoadDimensions(t *testing.T) {
 	ioutil.WriteFile(filename, []byte(conf), os.FileMode(0666))
 	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
 		configFileName:                filename,
-		logDir:                        os.TempDir(),
+		logDir:                        "-",
 		logMaxSize:                    1,
 		logMaxBackups:                 0,
 		stopChannel:                   make(chan bool),
@@ -70,13 +74,15 @@ func TestConfigLoadDimensions(t *testing.T) {
 		myProxyCommandLineConfiguration.blockTillSetupReady()
 		assert.Equal(t, 1, len(myProxyCommandLineConfiguration.allListeners))
 		assert.Equal(t, 1, len(myProxyCommandLineConfiguration.allForwarders))
-		myProxyCommandLineConfiguration.statDrainThread.SendStats()
+		dp := core.NewRelativeTimeDatapoint("metric", map[string]string{"source": "proxy", "forwarder": "testForwardTo"}, value.NewIntWire(1), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
+		myProxyCommandLineConfiguration.allForwarders[0].DatapointsChannel() <- dp
 		c, err := psocket.Accept()
 		defer c.Close()
 		assert.NoError(t, err)
 		reader := bufio.NewReader(c)
 		line, err := reader.ReadString((byte)('\n'))
 		assert.NoError(t, err)
+		log.Info(line)
 		assert.Equal(t, "proxy.testForwardTo.", line[0:len("proxy.testForwardTo.")])
 		myProxyCommandLineConfiguration.stopChannel <- true
 	}()

@@ -27,6 +27,7 @@ type StatKeepingStreamingAPI interface {
 // listeners
 type StatDrainingThread interface {
 	SendStats()
+	GetStats() []Datapoint
 	Start()
 }
 
@@ -48,7 +49,7 @@ func NewStatDrainingThread(delay time.Duration, sendTo []DatapointStreamingAPI, 
 	}
 }
 
-func (thread *statDrainingThreadImpl) SendStats() {
+func (thread *statDrainingThreadImpl) GetStats() []Datapoint {
 	points := []Datapoint{}
 	for _, listenFrom := range thread.listenFrom {
 		log.WithField("listenFrom", listenFrom).Debug("Loading stats")
@@ -56,6 +57,11 @@ func (thread *statDrainingThreadImpl) SendStats() {
 		log.WithField("stats", stats).Debug("Stats loaded")
 		points = append(points, listenFrom.GetStats()...)
 	}
+	return points
+}
+
+func (thread *statDrainingThreadImpl) SendStats() {
+	points := thread.GetStats()
 	for _, sendTo := range thread.sendTo {
 		for _, dp := range points {
 			sendTo.DatapointsChannel() <- dp

@@ -10,6 +10,7 @@ import (
 	"github.com/signalfuse/signalfxproxy/forwarder"
 	"github.com/signalfuse/signalfxproxy/listener"
 	"github.com/signalfuse/signalfxproxy/stats"
+	"github.com/signalfuse/signalfxproxy/statuspage"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"io/ioutil"
@@ -100,17 +101,6 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus
 
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() error {
 	proxyCommandLineConfiguration.setupLogrus()
-	// TODO: Configure this on command line.  Needed because JSON decoding can get kinda slow.
-	numProcs := runtime.NumCPU()
-	runtime.GOMAXPROCS(numProcs)
-
-	if proxyCommandLineConfiguration.pprofaddr != "" {
-		go func() {
-			log.WithField("pprofaddr", proxyCommandLineConfiguration.pprofaddr).Info("Opening pprof debug information")
-			err := http.ListenAndServe(proxyCommandLineConfiguration.pprofaddr, nil)
-			log.WithField("err", err).Info("Finished listening")
-		}()
-	}
 	writePidFile(proxyCommandLineConfiguration.pidFileName)
 	log.WithField("configFile", proxyCommandLineConfiguration.configFileName).Info("Looking for config file")
 
@@ -120,8 +110,15 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() erro
 		return err
 	}
 	log.WithField("config", loadedConfig).Info("Config loaded")
+	if loadedConfig.NumProcs != nil {
+		runtime.GOMAXPROCS(*loadedConfig.NumProcs)
+	} else {
+		numProcs := runtime.NumCPU()
+		runtime.GOMAXPROCS(numProcs)
+	}
+
 	proxyCommandLineConfiguration.allForwarders = make([]core.DatapointStreamingAPI, 0, len(loadedConfig.ForwardTo))
-	allStatKeepers := []core.StatKeeper{}
+	allStatKeepers := []core.StatKeeper{stats.NewGolangStatKeeper()}
 	for _, forwardConfig := range loadedConfig.ForwardTo {
 		loader, ok := forwarder.AllForwarderLoaders[forwardConfig.Type]
 		if !ok {
@@ -155,13 +152,26 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() erro
 		allStatKeepers = append(allStatKeepers, listener)
 	}
 
-	allStatKeepers = append(allStatKeepers, stats.NewGolangStatKeeper())
-
 	if loadedConfig.StatsDelayDuration != nil && *loadedConfig.StatsDelayDuration != 0 {
 		proxyCommandLineConfiguration.statDrainThread = core.NewStatDrainingThread(*loadedConfig.StatsDelayDuration, proxyCommandLineConfiguration.allForwarders, allStatKeepers, proxyCommandLineConfiguration.stopChannel)
 		go proxyCommandLineConfiguration.statDrainThread.Start()
 	} else {
 		log.Info("Skipping stat keeping")
+	}
+
+	debugServerAddr := loadedConfig.LocalDebugServer
+	if debugServerAddr == nil {
+		debugServerAddr = &proxyCommandLineConfiguration.pprofaddr
+	}
+	if debugServerAddr != nil && *debugServerAddr != "" {
+		go func() {
+			statusPage := statuspage.NewProxyStatusPage(loadedConfig, allStatKeepers)
+			log.WithField("debugAddr", debugServerAddr).Info("Opening debug server")
+			http.Handle("/status", statusPage.StatusPage())
+			http.Handle("/health", statusPage.HealthPage())
+			err := http.ListenAndServe(*debugServerAddr, nil)
+			log.WithField("err", err).Info("Finished listening")
+		}()
 	}
 
 	log.Infof("Setup done.  Blocking!")

@@ -108,7 +108,7 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint3
 		url:              url,
 		defaultAuthToken: defaultAuthToken,
 		sendVersion:      sendVersion,
-		userAgent:        fmt.Sprintf("SignalfxProxy/0.2 (gover %s)", runtime.Version()),
+		userAgent:        fmt.Sprintf("SignalfxProxy/0.3 (gover %s)", runtime.Version()),
 		tr:               tr,
 		client: &http.Client{
 			Transport: tr,
