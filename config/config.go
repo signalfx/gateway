@@ -62,6 +62,11 @@ type LoadedConfig struct {
 	NumProcs           *int
 	EnableStatusPage   *bool
 	LocalDebugServer   *string
+	PidFilename        *string
+	LogDir             *string
+	LogMaxSize         *int
+	LogMaxBackups      *int
+	LogFormat          *string
 }
 
 func decodeConfig(configBytes []byte) (*LoadedConfig, error) {

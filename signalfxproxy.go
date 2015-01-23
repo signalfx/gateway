@@ -52,12 +52,16 @@ var logSetupSync sync.Once
 
 func init() {
 	flag.StringVar(&proxyCommandLineConfiguration.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
-	flag.StringVar(&proxyCommandLineConfiguration.pidFileName, "signalfxproxypid", "signalfxproxy.pid", "Name of the file to store the PID in")
-	flag.StringVar(&proxyCommandLineConfiguration.pprofaddr, "pprofaddr", "", "Address to open pprof info on")
-	flag.StringVar(&proxyCommandLineConfiguration.logDir, "logdir", os.TempDir(), "Directory to store log files.  If -, will log to stdout")
-	flag.IntVar(&proxyCommandLineConfiguration.logMaxSize, "log_max_size", 100, "Maximum size of log files (in Megabytes)")
-	flag.IntVar(&proxyCommandLineConfiguration.logMaxBackups, "log_max_backups", 10, "Maximum number of rotated log files to keep")
-	flag.BoolVar(&proxyCommandLineConfiguration.logJSON, "logjson", false, "Log in JSON format (usable with logstash)")
+
+	// All of these are deprecated.  We want to use the config file instead
+	flag.StringVar(&proxyCommandLineConfiguration.pidFileName, "signalfxproxypid", "signalfxproxy.pid", "deprecated: Use config file instead...  Name of the file to store the PID in")
+	flag.StringVar(&proxyCommandLineConfiguration.pprofaddr, "pprofaddr", "", "deprecated: Use config file instead...  Address to open pprof info on")
+
+	flag.StringVar(&proxyCommandLineConfiguration.logDir, "logdir", os.TempDir(), "deprecated: Use config file instead...  Directory to store log files.  If -, will log to stdout")
+	flag.IntVar(&proxyCommandLineConfiguration.logMaxSize, "log_max_size", 100, "deprecated: Use config file instead...  Maximum size of log files (in Megabytes)")
+	flag.IntVar(&proxyCommandLineConfiguration.logMaxBackups, "log_max_backups", 10, "deprecated: Use config file instead...  Maximum number of rotated log files to keep")
+	flag.BoolVar(&proxyCommandLineConfiguration.logJSON, "logjson", false, "deprecated: Use config file instead...  Log in JSON format (usable with logstash)")
+
 	proxyCommandLineConfiguration.stopChannel = make(chan bool)
 	proxyCommandLineConfiguration.closeWhenWaitingToStopChannel = make(chan struct{})
 }
@@ -67,30 +71,46 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) blockTillSe
 	_ = <-proxyCommandLineConfiguration.closeWhenWaitingToStopChannel
 }
 
-func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogrusOutput() io.Writer {
-	if proxyCommandLineConfiguration.logDir == "-" {
+func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogrusOutput(loadedConfig *config.LoadedConfig) io.Writer {
+	logDir := proxyCommandLineConfiguration.logDir
+	if loadedConfig.LogDir != nil {
+		logDir = *loadedConfig.LogDir
+	}
+	if logDir == "-" {
 		fmt.Printf("Sending logging to stdout")
 		return os.Stdout
 	}
+	logMaxSize := proxyCommandLineConfiguration.logMaxSize
+	if loadedConfig.LogMaxSize != nil {
+		logMaxSize = *loadedConfig.LogMaxSize
+	}
+	logMaxBackups := proxyCommandLineConfiguration.logMaxBackups
+	if loadedConfig.LogMaxBackups != nil {
+		logMaxBackups = *loadedConfig.LogMaxBackups
+	}
 	lumberjackLogger := &lumberjack.Logger{
-		Filename:   path.Join(proxyCommandLineConfiguration.logDir, "signalfxproxy.log"),
-		MaxSize:    proxyCommandLineConfiguration.logMaxSize, // megabytes
-		MaxBackups: proxyCommandLineConfiguration.logMaxBackups,
+		Filename:   path.Join(logDir, "signalfxproxy.log"),
+		MaxSize:    logMaxSize, // megabytes
+		MaxBackups: logMaxBackups,
 	}
 	fmt.Printf("Sending logging to %s temp is %s\n", lumberjackLogger.Filename, os.TempDir())
 	return lumberjackLogger
 }
 
-func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogrusFormatter() logrus.Formatter {
-	if proxyCommandLineConfiguration.logJSON {
+func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogrusFormatter(loadedConfig *config.LoadedConfig) logrus.Formatter {
+	useJSON := proxyCommandLineConfiguration.logJSON
+	if loadedConfig.LogFormat != nil {
+		useJSON = *loadedConfig.LogFormat == "json"
+	}
+	if useJSON {
 		return &log.JSONFormatter{}
 	}
 	return &log.TextFormatter{DisableColors: true}
 }
 
-func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus() {
-	out := proxyCommandLineConfiguration.getLogrusOutput()
-	formatter := proxyCommandLineConfiguration.getLogrusFormatter()
+func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus(loadedConfig *config.LoadedConfig) {
+	out := proxyCommandLineConfiguration.getLogrusOutput(loadedConfig)
+	formatter := proxyCommandLineConfiguration.getLogrusFormatter(loadedConfig)
 
 	// -race detection in unit tests w/o this
 	logSetupSync.Do(func() {
@@ -100,8 +120,6 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus
 }
 
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() error {
-	proxyCommandLineConfiguration.setupLogrus()
-	writePidFile(proxyCommandLineConfiguration.pidFileName)
 	log.WithField("configFile", proxyCommandLineConfiguration.configFileName).Info("Looking for config file")
 
 	loadedConfig, err := config.LoadConfig(proxyCommandLineConfiguration.configFileName)
@@ -109,6 +127,16 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() erro
 		log.WithField("err", err).Error("Unable to load config")
 		return err
 	}
+	proxyCommandLineConfiguration.setupLogrus(loadedConfig)
+
+	{
+		pidFilename := proxyCommandLineConfiguration.pidFileName
+		if loadedConfig.PidFilename != nil {
+			pidFilename = *loadedConfig.PidFilename
+		}
+		writePidFile(pidFilename)
+	}
+
 	log.WithField("config", loadedConfig).Info("Config loaded")
 	if loadedConfig.NumProcs != nil {
 		runtime.GOMAXPROCS(*loadedConfig.NumProcs)

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
+	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/stretchr/testify/assert"
@@ -18,6 +19,11 @@ var config1 = `
   {
     "StatsDelay": "1m",
     "NumProcs": 1,
+    "LogDir": "sfproxytest.json",
+    "LogMaxSize": 5,
+    "PidFilename": "signalfxproxy.pid",
+    "LogMaxBackups": 5,
+    "LogFormat": "stdout",
     "ListenFrom":[
       {
       	"Type":"carbon",
@@ -182,7 +188,7 @@ func TestGetLogrusFormatter(t *testing.T) {
 	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
 		logJSON: true,
 	}
-	_, ok := myProxyCommandLineConfiguration.getLogrusFormatter().(*log.JSONFormatter)
+	_, ok := myProxyCommandLineConfiguration.getLogrusFormatter(&config.LoadedConfig{}).(*log.JSONFormatter)
 	assert.True(t, ok)
 }
 
@@ -190,7 +196,7 @@ func TestGetLogrusOutput(t *testing.T) {
 	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
 		logDir: "-",
 	}
-	assert.Equal(t, os.Stdout, myProxyCommandLineConfiguration.getLogrusOutput())
+	assert.Equal(t, os.Stdout, myProxyCommandLineConfiguration.getLogrusOutput(&config.LoadedConfig{}))
 }
 
 func TestProxyUnknownForwarder(t *testing.T) {
