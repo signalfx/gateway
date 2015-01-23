@@ -47,6 +47,5 @@ ENV PATH $GOPATH/bin:$PATH
 # Add run command
 VOLUME /var/log/sfproxy
 VOLUME /var/config/sfproxy
-EXPOSE 6060
 USER root
 CMD ["/opt/sfproxy/bin/signalfxproxy", "-configfile", "/var/config/sfproxy/sfdbproxy.conf"]
