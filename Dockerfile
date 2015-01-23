@@ -1,4 +1,4 @@
-FROM phusion/baseimage:0.9.15
+FROM phusion/baseimage:0.9.16
 MAINTAINER Jack Lindamood <jack@signalfuse.com>
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -20,6 +20,7 @@ ADD listener /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/listener
 ADD stats /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/stats
 ADD protocoltypes /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/protocoltypes
 ADD jsonengines /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/jsonengines
+ADD statuspage /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/statuspage
 
 ADD signalfxproxy.go /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
 ADD signalfxproxy_test.go /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/
@@ -37,7 +38,7 @@ RUN go get github.com/golang/lint/golint
 RUN go get code.google.com/p/go.tools/cmd/vet
 RUN go get github.com/stretchr/testify/mock
 RUN go get code.google.com/p/go.tools/cmd/cover
-RUN go env
+RUN go env && go version
 RUN go get github.com/signalfuse/signalfxproxy
 RUN go test github.com/signalfuse/signalfxproxy
 
