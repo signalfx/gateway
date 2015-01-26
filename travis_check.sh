@@ -28,7 +28,7 @@ set +e
 #
 rm -f /tmp/a /tmp/no_100_coverage || exit 1
 go install . || exit 1
-find . -type f -name \*.go | grep -v '.git' | xargs -n1 -P8 go fmt > /tmp/a || exit 1
+find . -type f -name \*.go | grep -v '.git' | xargs -n1 -P8 gofmt -w -l -s > /tmp/a || exit 1
 # I want to print it out for debugging purposes, while still existing if exist
 [[ ! -s /tmp/a ]] || cat /tmp/a
 [[ ! -s /tmp/a ]] || exit 1

@@ -13,7 +13,7 @@ func TestNewProtobufDataPoint(t *testing.T) {
 		Source: workarounds.GolangDoesnotAllowPointerToStringLiteral("asource"),
 		Metric: workarounds.GolangDoesnotAllowPointerToStringLiteral("ametric"),
 		Value:  &com_signalfuse_metrics_protobuf.Datum{IntValue: workarounds.GolangDoesnotAllowPointerToIntLiteral(2)},
-		Dimensions: []*com_signalfuse_metrics_protobuf.Dimension{&com_signalfuse_metrics_protobuf.Dimension{
+		Dimensions: []*com_signalfuse_metrics_protobuf.Dimension{{
 			Key:   workarounds.GolangDoesnotAllowPointerToStringLiteral("key"),
 			Value: workarounds.GolangDoesnotAllowPointerToStringLiteral("value"),
 		}},
