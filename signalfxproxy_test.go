@@ -101,7 +101,7 @@ func TestProxyInvalidConfig(t *testing.T) {
 	defer os.Remove(filename)
 
 	ioutil.WriteFile(filename, []byte{}, os.FileMode(0666))
-	proxyCommandLineConfiguration = proxyCommandLineConfigurationT{
+	proxyCommandLineConfigurationDefault = proxyCommandLineConfigurationT{
 		configFileName: filename,
 		logDir:         os.TempDir(),
 		logMaxSize:     1,
@@ -109,9 +109,9 @@ func TestProxyInvalidConfig(t *testing.T) {
 		stopChannel:    make(chan bool),
 	}
 	go func() {
-		proxyCommandLineConfiguration.stopChannel <- true
+		proxyCommandLineConfigurationDefault.stopChannel <- true
 	}()
-	proxyCommandLineConfiguration.main()
+	proxyCommandLineConfigurationDefault.main()
 }
 
 func TestProxyEmptyConfig(t *testing.T) {
@@ -120,10 +120,10 @@ func TestProxyEmptyConfig(t *testing.T) {
 	defer os.Remove(filename)
 
 	ioutil.WriteFile(filename, []byte(`{}`), os.FileMode(0666))
-	proxyCommandLineConfiguration.configFileName = filename
-	proxyCommandLineConfiguration.pprofaddr = "0.0.0.0:0"
+	proxyCommandLineConfigurationDefault.configFileName = filename
+	proxyCommandLineConfigurationDefault.pprofaddr = "0.0.0.0:0"
 	go func() {
-		proxyCommandLineConfiguration.stopChannel <- true
+		proxyCommandLineConfigurationDefault.stopChannel <- true
 	}()
 	main()
 }

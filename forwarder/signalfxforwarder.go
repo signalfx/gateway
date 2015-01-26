@@ -241,16 +241,20 @@ func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[
 	}
 	connector.v1MetricLoadedCacheMutex.Lock()
 	defer connector.v1MetricLoadedCacheMutex.Unlock()
+	verifyMetricCreationBody(metricCreationBody, postBody, respBody, connector.v1MetricLoadedCache)
+	log.WithFields(log.Fields{"jsonBytes": jsonBytes, "respBody": respBody}).Debug("Metric creation finished")
+	return nil
+}
+
+func verifyMetricCreationBody(metricCreationBody []protocoltypes.SignalfxMetricCreationResponse, postBody []protocoltypes.SignalfxMetricCreationStruct, respBody []byte, v1MetricLoadedCache map[string]struct{}) {
 	for index, resp := range metricCreationBody {
 		metricName := postBody[index].MetricName
 		if resp.Code == 0 || resp.Code == 409 {
-			connector.v1MetricLoadedCache[metricName] = struct{}{}
+			v1MetricLoadedCache[metricName] = struct{}{}
 		} else {
 			log.WithFields(log.Fields{"metricName": metricName, "respBody": string(respBody)}).Warn("Unable to create metric")
 		}
 	}
-	log.WithFields(log.Fields{"jsonBytes": jsonBytes, "respBody": respBody}).Debug("Metric creation finished")
-	return nil
 }
 
 func (connector *signalfxJSONConnector) figureOutReasonableSource(point core.Datapoint) string {
