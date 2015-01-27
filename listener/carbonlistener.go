@@ -40,6 +40,10 @@ type carbonListener struct {
 	serverAcceptDeadline  time.Duration
 }
 
+func (listener *carbonListener) GetAddr() net.Addr {
+	return listener.psocket.Addr()
+}
+
 func (listener *carbonListener) GetStats() []core.Datapoint {
 	ret := []core.Datapoint{}
 	stats := map[string]int64{

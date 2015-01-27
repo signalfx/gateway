@@ -63,7 +63,7 @@ func TestCarbonInvalidCarbonDeconstructorListenerLoader(t *testing.T) {
 
 func TestCarbonListenerLoader(t *testing.T) {
 	listenFrom := &config.ListenFrom{
-		ListenAddr:           workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12245"),
+		ListenAddr:           workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0"),
 		ServerAcceptDeadline: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Millisecond),
 	}
 	sendTo := &basicDatapointStreamingAPI{
@@ -72,13 +72,14 @@ func TestCarbonListenerLoader(t *testing.T) {
 	listener, err := CarbonListenerLoader(sendTo, listenFrom)
 	assert.Equal(t, nil, err, "Should be ok to make")
 	defer listener.Close()
+	listeningDialAddress := fmt.Sprintf("0.0.0.0:%d", getPortFromListener(listener))
 	assert.Equal(t, 4, len(listener.GetStats()), "Should have no stats")
 	assert.NotEqual(t, listener, err, "Should be ok to make")
 
 	// Wait for the connection to timeout
 	time.Sleep(3 * time.Millisecond)
 
-	conn, err := net.Dial("tcp", *listenFrom.ListenAddr)
+	conn, err := net.Dial("tcp", listeningDialAddress)
 	assert.Equal(t, nil, err, "Should be ok to make")
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "%s %d %d\n\nINVALIDLINE", "ametric", 2, 2)
@@ -95,20 +96,26 @@ func TestCarbonListenerLoader(t *testing.T) {
 	}
 }
 
+func getPortFromListener(l interface{}) uint16 {
+	return (uint16)(l.(NetworkListener).GetAddr().(*net.TCPAddr).Port)
+}
+
 func TestCarbonListenerLoader2(t *testing.T) {
 	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12248"),
+		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0"),
 	}
 	sendTo := &basicDatapointStreamingAPI{
 		channel: make(chan core.Datapoint),
 	}
 	listener, err := CarbonListenerLoader(sendTo, listenFrom)
+	listeningDialAddress := fmt.Sprintf("0.0.0.0:%d", getPortFromListener(listener))
 	assert.Equal(t, nil, err, "Should be ok to make")
 	defer listener.Close()
+	assert.Equal(t, "tcp", listener.(NetworkListener).GetAddr().Network())
 	carbonlistener, _ := listener.(*carbonListener)
 	carbonlistener.metricDeconstructor, err = metricdeconstructor.Load("commakeys", "")
 	assert.Nil(t, err)
-	conn, err := net.Dial("tcp", *listenFrom.ListenAddr)
+	conn, err := net.Dial("tcp", listeningDialAddress)
 	assert.Equal(t, nil, err, "Should be ok to make")
 	buf := bytes.Buffer{}
 	fmt.Fprintf(&buf, "a.metric.name[host:bob,type:dev] 3 3")
@@ -130,7 +137,7 @@ func TestCarbonListenerLoader2(t *testing.T) {
 			return nil, errors.New("error reading from reader")
 		})
 		defer readerReadBytesObj.Reset()
-		conn, err = net.Dial("tcp", *listenFrom.ListenAddr)
+		conn, err = net.Dial("tcp", listeningDialAddress)
 		assert.Equal(t, nil, err, "Should be ok to make")
 		var buf2 bytes.Buffer
 		fmt.Fprintf(&buf2, "ametric 2 2\n")
@@ -148,7 +155,7 @@ func TestCarbonListenerLoader2(t *testing.T) {
 			return []byte("ametric 3 2\n"), io.EOF
 		})
 		defer readerReadBytesObj.Reset()
-		conn, err = net.Dial("tcp", *listenFrom.ListenAddr)
+		conn, err = net.Dial("tcp", listeningDialAddress)
 		assert.Equal(t, nil, err, "Should be ok to make")
 		var buf3 bytes.Buffer
 		fmt.Fprintf(&buf3, "ametric 3 2\n")

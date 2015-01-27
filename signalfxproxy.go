@@ -225,7 +225,7 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() erro
 		log.Info("Skipping stat keeping")
 	}
 
-	setupDebugServer(allStatKeepers, loadedConfig, proxyCommandLineConfiguration.pidFileName)
+	setupDebugServer(allStatKeepers, loadedConfig, proxyCommandLineConfiguration.pprofaddr)
 
 	log.Infof("Setup done.  Blocking!")
 	if proxyCommandLineConfiguration.closeWhenWaitingToStopChannel != nil {
