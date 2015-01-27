@@ -260,7 +260,7 @@ func (streamer *listenerServer) protobufDecoderFunction() func(*http.Request) er
 }
 
 var defaultConfig = &config.ListenFrom{
-	ListenAddr:      workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12345"),
+	ListenAddr:      workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:12345"),
 	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
 	Name:            workarounds.GolangDoesnotAllowPointerToStringLiteral("signalfxlistener"),
 	JSONEngine:      workarounds.GolangDoesnotAllowPointerToStringLiteral("native"),

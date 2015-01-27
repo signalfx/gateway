@@ -87,7 +87,7 @@ func TestFilterSignalfxString(t *testing.T) {
 func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	// TODO: Break this out into smaller tests
 	listenFromSignalfx := config.ListenFrom{}
-	listenFromSignalfx.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0")
+	listenFromSignalfx.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
 
 	finalDatapointDestination := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.SignalFxListenerLoader(finalDatapointDestination, &listenFromSignalfx)
@@ -97,9 +97,9 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	port := getListenerPort(l)
 
 	forwardTo := config.ForwardTo{
-		URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral(fmt.Sprintf("http://0.0.0.0:%d/v1/datapoint", port)),
+		URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral(fmt.Sprintf("http://127.0.0.1:%d/v1/datapoint", port)),
 		TimeoutDuration:   workarounds.GolangDoesnotAllowPointerToDurationLiteral(time.Second * 1),
-		MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral(fmt.Sprintf("http://0.0.0.0:%d/v1/metric", port)),
+		MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral(fmt.Sprintf("http://127.0.0.1:%d/v1/metric", port)),
 		DefaultAuthToken:  workarounds.GolangDoesnotAllowPointerToStringLiteral("AUTH_TOKEN"),
 		DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral("proxy-source"),
 		SourceDimensions:  workarounds.GolangDoesnotAllowPointerToStringLiteral("username,ignored,hostname"),
@@ -167,11 +167,11 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	assert.Equal(t, true, ok, "Expected asource")
 	assert.Equal(t, "asource", dpRecieved.Dimensions()["sf_source"], "Expected asource for %s", dpRecieved)
 
-	sfForwarder.MetricCreationURL = "http://0.0.0.0:21/asfd" // invalid
+	sfForwarder.MetricCreationURL = "http://127.0.0.1:21/asfd" // invalid
 	dpSent = core.NewRelativeTimeDatapoint("anotermetric", map[string]string{}, value.NewFloatWire(2.0), com_signalfuse_metrics_protobuf.MetricType_COUNTER, -1)
 	sfForwarder.process([]core.Datapoint{dpSent})
 	assert.Equal(t, 0, len(finalDatapointDestination.datapointsChannel), "Expect no metrics")
-	sfForwarder.MetricCreationURL = fmt.Sprintf("http://0.0.0.0:%d/v1/metric", port)
+	sfForwarder.MetricCreationURL = fmt.Sprintf("http://127.0.0.1:%d/v1/metric", port)
 
 	err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{})
 	assert.Equal(t, nil, err, "Expected no error making no metrics")
@@ -188,10 +188,10 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 		assert.Contains(t, err.Error(), "ioutil", "Expected ioutil issue")
 	}()
 
-	sfForwarder.MetricCreationURL = fmt.Sprintf("http://0.0.0.0:%d/vmetric", port)
+	sfForwarder.MetricCreationURL = fmt.Sprintf("http://127.0.0.1:%d/vmetric", port)
 	err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"m": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
 	assert.Contains(t, err.Error(), "invalid status code", "Expected status code 404")
-	sfForwarder.MetricCreationURL = fmt.Sprintf("http://0.0.0.0:%d/v1/metric", port)
+	sfForwarder.MetricCreationURL = fmt.Sprintf("http://127.0.0.1:%d/v1/metric", port)
 
 	func() {
 		ioutilReadAllObj.UseFunction(func(r io.Reader) ([]byte, error) { return []byte("InvalidJson"), nil })
@@ -232,12 +232,12 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	assert.Equal(t, nil, err, "Expected no error making metrics")
 
 	prevURL := sfForwarder.url
-	sfForwarder.url = "http://0.0.0.0:12333/vvv/s"
+	sfForwarder.url = "http://127.0.0.1:12333/vvv/s"
 	err = sfForwarder.process([]core.Datapoint{dpSent})
 	assert.Contains(t, err.Error(), "connection refused", "Expected error posting points")
 	sfForwarder.url = prevURL
 
-	sfForwarder.url = fmt.Sprintf("http://0.0.0.0:%d/v1/metric", port)
+	sfForwarder.url = fmt.Sprintf("http://127.0.0.1:%d/v1/metric", port)
 	err = sfForwarder.process([]core.Datapoint{dpSent})
 	assert.Contains(t, err.Error(), "invalid status code", "Expected error posting points to metric creation url")
 	sfForwarder.url = prevURL

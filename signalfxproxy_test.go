@@ -28,13 +28,13 @@ var config1 = `
     "ListenFrom":[
       {
       	"Type":"carbon",
-      	"ListenAddr": "0.0.0.0:0"
+      	"ListenAddr": "127.0.0.1:0"
 	  }
     ],
     "ForwardTo":[
       {
       	"Type":"carbon",
-      	"Host":"0.0.0.0",
+      	"Host":"127.0.0.1",
       	"DimensionsOrder": ["source", "forwarder"],
       	"Name": "testForwardTo",
       	"Port": <<PORT>>
@@ -60,7 +60,7 @@ func TestConfigLoadDimensions(t *testing.T) {
 	filename := fileObj.Name()
 	defer os.Remove(filename)
 
-	psocket, err := net.Listen("tcp", "0.0.0.0:0")
+	psocket, err := net.Listen("tcp", "127.0.0.1:0")
 	assert.NoError(t, err)
 	defer psocket.Close()
 	portParts := strings.Split(psocket.Addr().String(), ":")
@@ -122,7 +122,7 @@ func TestProxyEmptyConfig(t *testing.T) {
 
 	ioutil.WriteFile(filename, []byte(`{}`), os.FileMode(0666))
 	proxyCommandLineConfigurationDefault.configFileName = filename
-	proxyCommandLineConfigurationDefault.pprofaddr = "0.0.0.0:0"
+	proxyCommandLineConfigurationDefault.pprofaddr = "127.0.0.1:0"
 	go func() {
 		proxyCommandLineConfigurationDefault.stopChannel <- true
 	}()

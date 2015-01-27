@@ -22,7 +22,7 @@ import (
 
 func TestInvalidSignalfxJSONForwarderLoader(t *testing.T) {
 	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:999999"),
+		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:999999"),
 	}
 	sendTo := &basicDatapointStreamingAPI{}
 	_, err := SignalFxListenerLoader(sendTo, listenFrom)
@@ -158,7 +158,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 		channel: make(chan core.Datapoint),
 	}
 	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12349"),
+		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:12349"),
 	}
 
 	listener, err := SignalFxListenerLoader(sendTo, listenFrom)
@@ -168,7 +168,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 
 	defer listener.Close()
 
-	req, _ := http.NewRequest("POST", "http://0.0.0.0:12349/v1/datapoint", bytes.NewBuffer([]byte(`{"metric":"ametric", "source":"asource", "value" : 3}{}`)))
+	req, _ := http.NewRequest("POST", "http://127.0.0.1:12349/v1/datapoint", bytes.NewBuffer([]byte(`{"metric":"ametric", "source":"asource", "value" : 3}{}`)))
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	var dp core.Datapoint
@@ -187,7 +187,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 
 	req, _ = http.NewRequest(
 		"POST",
-		"http://0.0.0.0:12349/v2/datapoint",
+		"http://127.0.0.1:12349/v2/datapoint",
 		bytes.NewBuffer([]byte(`{"unused":[], "gauge":[{"metric":"noval", "value":{"a":"b"}}, {"metric":"metrictwo", "value": 3}]}`)),
 	)
 	req.Header.Set("Content-Type", "application/json")
@@ -208,7 +208,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 
 	req, _ = http.NewRequest(
 		"POST",
-		"http://0.0.0.0:12349/v1/collectd",
+		"http://127.0.0.1:12349/v1/collectd",
 		bytes.NewBuffer([]byte(testCollectdBody)),
 	)
 	req.Header.Set("Content-Type", "application/json")
@@ -229,29 +229,29 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	assert.Equal(t, "df_complex.free", dp.Metric(), "Should get metric back!")
 	assert.Equal(t, 4, len(dp.Dimensions()), "Should get metric back!")
 
-	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/datapoint", bytes.NewBuffer([]byte(`INVALIDJSON`)))
+	req, _ = http.NewRequest("POST", "http://127.0.0.1:12349/v1/datapoint", bytes.NewBuffer([]byte(`INVALIDJSON`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
 	assert.Equal(t, resp.StatusCode, 400, "Request should not work")
 	assert.Equal(t, nil, err, "Should not get an error making request")
 
-	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/datapoint", bytes.NewBuffer([]byte(`{}`)))
+	req, _ = http.NewRequest("POST", "http://127.0.0.1:12349/v1/datapoint", bytes.NewBuffer([]byte(`{}`)))
 	req.Header.Set("Content-Type", "UNKNOWNTYPE")
 	resp, err = client.Do(req)
 	assert.Equal(t, resp.StatusCode, http.StatusBadRequest, "Request should not work")
 	assert.Equal(t, nil, err, "Should not get an error making request")
 
-	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/metric", bytes.NewBuffer([]byte(`[{"sf_metric": "nowacounter", "sf_metricType":"COUNTER"}]`)))
+	req, _ = http.NewRequest("POST", "http://127.0.0.1:12349/v1/metric", bytes.NewBuffer([]byte(`[{"sf_metric": "nowacounter", "sf_metricType":"COUNTER"}]`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
 	assert.Equal(t, resp.StatusCode, 200, "Request should work")
 
-	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/metric", bytes.NewBuffer([]byte(`[{"sf_metric": "invalid", "sf_metricType":"INVALIDTYPE"}]`)))
+	req, _ = http.NewRequest("POST", "http://127.0.0.1:12349/v1/metric", bytes.NewBuffer([]byte(`[{"sf_metric": "invalid", "sf_metricType":"INVALIDTYPE"}]`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
 	assert.Equal(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: invalid type")
 
-	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/metric", bytes.NewBuffer([]byte(`INVALIDJSONFORMETRIC`)))
+	req, _ = http.NewRequest("POST", "http://127.0.0.1:12349/v1/metric", bytes.NewBuffer([]byte(`INVALIDJSONFORMETRIC`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
 	assert.Equal(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: invalid type")
@@ -263,7 +263,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	}
 	dpInBytes, _ := proto.Marshal(protoDatapoint)
 	varintBytes := proto.EncodeVarint(uint64(len(dpInBytes)))
-	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/datapoint", bytes.NewBuffer(append(varintBytes, dpInBytes...)))
+	req, _ = http.NewRequest("POST", "http://127.0.0.1:12349/v1/datapoint", bytes.NewBuffer(append(varintBytes, dpInBytes...)))
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	gotPointChan = make(chan bool)
 	go func() {
@@ -280,7 +280,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 		Datapoints: []*com_signalfuse_metrics_protobuf.DataPoint{protoDatapoint},
 	}
 	dpInBytes, _ = proto.Marshal(uploadMsg)
-	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v2/datapoint", bytes.NewBuffer(dpInBytes))
+	req, _ = http.NewRequest("POST", "http://127.0.0.1:12349/v2/datapoint", bytes.NewBuffer(dpInBytes))
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	go func() {
 		dp = <-sendTo.channel
@@ -292,7 +292,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	assert.Equal(t, "asource", dp.Dimensions()["sf_source"], "Expect source back")
 	assert.Equal(t, "2", dp.Value().WireValue(), "Expect 2 back")
 
-	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v2/datapoint", bytes.NewBuffer([]byte(`invalid`)))
+	req, _ = http.NewRequest("POST", "http://127.0.0.1:12349/v2/datapoint", bytes.NewBuffer([]byte(`invalid`)))
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	resp, err = client.Do(req)
 	assert.Equal(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: length issue")
@@ -313,12 +313,12 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	jsonXXXMarshal = func(interface{}) ([]byte, error) {
 		return nil, errors.New("Unable to marshal json")
 	}
-	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v1/metric", bytes.NewBuffer([]byte(`[{"sf_metric": "nowacounter", "sf_metricType":"COUNTER"}]`)))
+	req, _ = http.NewRequest("POST", "http://127.0.0.1:12349/v1/metric", bytes.NewBuffer([]byte(`[{"sf_metric": "nowacounter", "sf_metricType":"COUNTER"}]`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
 	assert.Equal(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: json issue")
 
-	req, _ = http.NewRequest("POST", "http://0.0.0.0:12349/v2/datapoint", bytes.NewBuffer([]byte(`[{"sf_metric": "nowacounter", "sf_metricType":"COUNTER"}]`)))
+	req, _ = http.NewRequest("POST", "http://127.0.0.1:12349/v2/datapoint", bytes.NewBuffer([]byte(`[{"sf_metric": "nowacounter", "sf_metricType":"COUNTER"}]`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
 	assert.Equal(t, resp.StatusCode, http.StatusBadRequest, "Request should not work: json issue")

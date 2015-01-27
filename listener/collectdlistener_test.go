@@ -76,7 +76,7 @@ const testCollectdBody = `[
 
 func TestInvalidListen(t *testing.T) {
 	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:999999"),
+		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:999999"),
 	}
 	sendTo := &basicDatapointStreamingAPI{}
 	_, err := CollectdListenerLoader(sendTo, listenFrom)
@@ -106,7 +106,7 @@ func TestCollectDListener(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, collectdListener)
 
-	req, _ := http.NewRequest("POST", "http://0.0.0.0:8081/post-collectd", bytes.NewBuffer([]byte(jsonBody)))
+	req, _ := http.NewRequest("POST", "http://127.0.0.1:8081/post-collectd", bytes.NewBuffer([]byte(jsonBody)))
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	go func() {
@@ -131,13 +131,13 @@ func TestCollectDListener(t *testing.T) {
 
 	assert.Equal(t, 4, len(collectdListener.GetStats()), "Request should work")
 
-	req, _ = http.NewRequest("POST", "http://0.0.0.0:8081/post-collectd", bytes.NewBuffer([]byte(`invalidjson`)))
+	req, _ = http.NewRequest("POST", "http://127.0.0.1:8081/post-collectd", bytes.NewBuffer([]byte(`invalidjson`)))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
 	assert.Nil(t, err)
 	assert.Equal(t, resp.StatusCode, 400, "Request should work")
 
-	req, _ = http.NewRequest("POST", "http://0.0.0.0:8081/post-collectd", bytes.NewBuffer([]byte(jsonBody)))
+	req, _ = http.NewRequest("POST", "http://127.0.0.1:8081/post-collectd", bytes.NewBuffer([]byte(jsonBody)))
 	req.Header.Set("Content-Type", "application/plaintext")
 	resp, err = client.Do(req)
 	assert.Nil(t, err)

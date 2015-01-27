@@ -21,7 +21,7 @@ import (
 var testConfig1 = `
 {
   "Type":"carbon",
-  "Host": "0.0.0.0",
+  "Host": "127.0.0.1",
   "Port": 2013
 }
 `
@@ -52,7 +52,7 @@ func TestConfig1(t *testing.T) {
 	}
 	listenFrom := config.ListenFrom{}
 	// TODO: Enable :0 port and reading back the open port
-	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0")
+	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
 	forwardTo := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	assert.NoError(t, err)
@@ -97,13 +97,13 @@ func getListenerPort(l listener.DatapointListener) uint16 {
 func TestCreation(t *testing.T) {
 	listenFrom := config.ListenFrom{}
 	// TODO: Enable :0 port and reading back the open port
-	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0")
+	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
 	forwardTo := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, 4, len(l.GetStats()), "Expect no stats")
-	forwarder, err := newTcpGraphiteCarbonForwarer("0.0.0.0", getListenerPort(l), time.Second, 10, "", 1, []string{"zzfirst"})
+	forwarder, err := newTcpGraphiteCarbonForwarer("127.0.0.1", getListenerPort(l), time.Second, 10, "", 1, []string{"zzfirst"})
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, "", forwarder.Name(), "Expect no name")
 	assert.Equal(t, 0, len(forwarder.GetStats()), "Expect no stats")
@@ -120,12 +120,12 @@ func TestCreation(t *testing.T) {
 
 func TestDeadlineError(t *testing.T) {
 	listenFrom := config.ListenFrom{}
-	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0")
+	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
 
 	forwardTo := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
-	carbonForwarder, err := newTcpGraphiteCarbonForwarer("0.0.0.0", getListenerPort(l), time.Second, 10, "", 1, []string{})
+	carbonForwarder, err := newTcpGraphiteCarbonForwarer("127.0.0.1", getListenerPort(l), time.Second, 10, "", 1, []string{})
 	assert.Equal(t, nil, err, "Expect no error")
 
 	dpSent := core.NewRelativeTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
@@ -142,12 +142,12 @@ func TestDeadlineError(t *testing.T) {
 
 func TestWriteError(t *testing.T) {
 	listenFrom := config.ListenFrom{}
-	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0")
+	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
 
 	forwardTo := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
-	forwarder, err := newTcpGraphiteCarbonForwarer("0.0.0.0", getListenerPort(l), time.Second, 10, "", 1, []string{})
+	forwarder, err := newTcpGraphiteCarbonForwarer("127.0.0.1", getListenerPort(l), time.Second, 10, "", 1, []string{})
 	assert.Equal(t, nil, err, "Expect no error")
 
 	dpSent := core.NewRelativeTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
@@ -164,13 +164,13 @@ func TestWriteError(t *testing.T) {
 
 func TestCarbonWrite(t *testing.T) {
 	listenFrom := config.ListenFrom{}
-	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0")
+	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
 	forwardTo := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, 4, len(l.GetStats()), "Expect no stats")
-	forwarder, err := newTcpGraphiteCarbonForwarer("0.0.0.0", getListenerPort(l), time.Second, 10, "", 1, []string{})
+	forwarder, err := newTcpGraphiteCarbonForwarer("127.0.0.1", getListenerPort(l), time.Second, 10, "", 1, []string{})
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, "", forwarder.Name(), "Expect no name")
 	assert.Equal(t, 0, len(forwarder.GetStats()), "Expect no stats")
@@ -187,18 +187,18 @@ func TestCarbonWrite(t *testing.T) {
 
 func TestFailedConn(t *testing.T) {
 	listenFrom := config.ListenFrom{}
-	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0")
+	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
 	forwardTo := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.CarbonListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, 4, len(l.GetStats()), "Expect no stats")
-	forwarder, err := newTcpGraphiteCarbonForwarer("0.0.0.0", getListenerPort(l), time.Second, 10, "", 1, []string{})
+	forwarder, err := newTcpGraphiteCarbonForwarer("127.0.0.1", getListenerPort(l), time.Second, 10, "", 1, []string{})
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, "", forwarder.Name(), "Expect no name")
 	assert.Equal(t, 0, len(forwarder.GetStats()), "Expect no stats")
 	forwarder.openConnection = nil // Connection should remake itself
-	forwarder.connectionAddress = "0.0.0.0:1"
+	forwarder.connectionAddress = "127.0.0.1:1"
 	dpSent := core.NewRelativeTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
 	log.Info("Sending a dp")
 	forwarder.DatapointsChannel() <- dpSent

@@ -106,7 +106,7 @@ func (streamer *collectdListenerServer) handleCollectd(writter http.ResponseWrit
 }
 
 var defaultCollectdConfig = &config.ListenFrom{
-	ListenAddr:      workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:8081"),
+	ListenAddr:      workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:8081"),
 	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
 	ListenPath:      workarounds.GolangDoesnotAllowPointerToStringLiteral("/post-collectd"),
 	JSONEngine:      workarounds.GolangDoesnotAllowPointerToStringLiteral("native"),

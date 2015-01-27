@@ -45,7 +45,7 @@ func TestCarbonCoverOriginalReaderReadBytes(t *testing.T) {
 
 func TestCarbonInvalidCarbonListenerLoader(t *testing.T) {
 	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:999999"),
+		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:999999"),
 	}
 	sendTo := &basicDatapointStreamingAPI{}
 	_, err := CarbonListenerLoader(sendTo, listenFrom)
@@ -54,7 +54,7 @@ func TestCarbonInvalidCarbonListenerLoader(t *testing.T) {
 
 func TestCarbonInvalidCarbonDeconstructorListenerLoader(t *testing.T) {
 	listenFrom := &config.ListenFrom{
-		ListenAddr:          workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12247"),
+		ListenAddr:          workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:12247"),
 		MetricDeconstructor: workarounds.GolangDoesnotAllowPointerToStringLiteral("UNKNOWN"),
 	}
 	sendTo := &basicDatapointStreamingAPI{}
@@ -64,7 +64,7 @@ func TestCarbonInvalidCarbonDeconstructorListenerLoader(t *testing.T) {
 
 func TestCarbonListenerLoader(t *testing.T) {
 	listenFrom := &config.ListenFrom{
-		ListenAddr:           workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0"),
+		ListenAddr:           workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0"),
 		ServerAcceptDeadline: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Millisecond),
 	}
 	sendTo := &basicDatapointStreamingAPI{
@@ -73,7 +73,7 @@ func TestCarbonListenerLoader(t *testing.T) {
 	listener, err := CarbonListenerLoader(sendTo, listenFrom)
 	assert.Equal(t, nil, err, "Should be ok to make")
 	defer listener.Close()
-	listeningDialAddress := fmt.Sprintf("0.0.0.0:%d", getPortFromListener(listener))
+	listeningDialAddress := fmt.Sprintf("127.0.0.1:%d", getPortFromListener(listener))
 	assert.Equal(t, 4, len(listener.GetStats()), "Should have no stats")
 	assert.NotEqual(t, listener, err, "Should be ok to make")
 
@@ -103,13 +103,13 @@ func getPortFromListener(l interface{}) uint16 {
 
 func TestCarbonListenerLoader2(t *testing.T) {
 	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0"),
+		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0"),
 	}
 	sendTo := &basicDatapointStreamingAPI{
 		channel: make(chan core.Datapoint),
 	}
 	listener, err := CarbonListenerLoader(sendTo, listenFrom)
-	listeningDialAddress := fmt.Sprintf("0.0.0.0:%d", getPortFromListener(listener))
+	listeningDialAddress := fmt.Sprintf("127.0.0.1:%d", getPortFromListener(listener))
 	assert.Equal(t, nil, err, "Should be ok to make")
 	defer listener.Close()
 	assert.Equal(t, "tcp", listener.(NetworkListener).GetAddr().Network())
@@ -171,7 +171,7 @@ func TestCarbonListenerLoader2(t *testing.T) {
 
 func BenchmarkCarbonListening(b *testing.B) {
 	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0"),
+		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0"),
 	}
 	bytesToSend := []byte("ametric 123 1234\n")
 	sendTo := &basicDatapointStreamingAPI{
