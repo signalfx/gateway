@@ -1,6 +1,7 @@
 package forwarder
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,7 +21,7 @@ func TestNewStreamingDatapointDemultiplexer(t *testing.T) {
 	m.DatapointsChannel() <- dpSent
 
 	// Wait for something to get on the chan
-	for m.totalDatapoints == 0 {
+	for atomic.LoadInt64(&m.totalDatapoints) == 0 {
 		time.Sleep(time.Millisecond)
 	}
 
@@ -29,9 +30,14 @@ func TestNewStreamingDatapointDemultiplexer(t *testing.T) {
 	m.DatapointsChannel() <- dpSent
 
 	// Wait for something to get on the chan
-	for m.totalDatapoints == 1 {
+	for atomic.LoadInt64(&m.totalDatapoints) == 1 {
 		time.Sleep(time.Millisecond)
 	}
+
+	for atomic.LoadInt64(&m.droppedPoints[0]) == 0 {
+		time.Sleep(time.Millisecond)
+	}
+
 	assert.Equal(t, value.NewIntWire(1), m.GetStats()[0].Value(), "Expect one dropped point")
 	assert.Equal(t, value.NewIntWire(2), m.GetStats()[1].Value(), "Expect one dropped point")
 	assert.Equal(t, 3, len(m.GetStats()), "Expect three stats")
