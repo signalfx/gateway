@@ -1,6 +1,7 @@
 package forwarder
 
 import (
+	"fmt"
 	"testing"
 
 	log "github.com/Sirupsen/logrus"
@@ -86,21 +87,23 @@ func TestFilterSignalfxString(t *testing.T) {
 func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	// TODO: Break this out into smaller tests
 	listenFromSignalfx := config.ListenFrom{}
-	listenFromSignalfx.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:12345")
-
-	forwardTo := config.ForwardTo{
-		URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("http://0.0.0.0:12345/v1/datapoint"),
-		TimeoutDuration:   workarounds.GolangDoesnotAllowPointerToDurationLiteral(time.Second * 1),
-		MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral("http://0.0.0.0:12345/v1/metric"),
-		DefaultAuthToken:  workarounds.GolangDoesnotAllowPointerToStringLiteral("AUTH_TOKEN"),
-		DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral("proxy-source"),
-		SourceDimensions:  workarounds.GolangDoesnotAllowPointerToStringLiteral("username,ignored,hostname"),
-	}
+	listenFromSignalfx.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("0.0.0.0:0")
 
 	finalDatapointDestination := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.SignalFxListenerLoader(finalDatapointDestination, &listenFromSignalfx)
 	defer l.Close()
 	assert.Equal(t, nil, err, "Expect no error")
+
+	port := getListenerPort(l)
+
+	forwardTo := config.ForwardTo{
+		URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral(fmt.Sprintf("http://0.0.0.0:%d/v1/datapoint", port)),
+		TimeoutDuration:   workarounds.GolangDoesnotAllowPointerToDurationLiteral(time.Second * 1),
+		MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral(fmt.Sprintf("http://0.0.0.0:%d/v1/metric", port)),
+		DefaultAuthToken:  workarounds.GolangDoesnotAllowPointerToStringLiteral("AUTH_TOKEN"),
+		DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral("proxy-source"),
+		SourceDimensions:  workarounds.GolangDoesnotAllowPointerToStringLiteral("username,ignored,hostname"),
+	}
 
 	forwarder, err := SignalfxJSONForwarderLoader(&forwardTo)
 	assert.Equal(t, nil, err, "Expect no error")
@@ -168,7 +171,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	dpSent = core.NewRelativeTimeDatapoint("anotermetric", map[string]string{}, value.NewFloatWire(2.0), com_signalfuse_metrics_protobuf.MetricType_COUNTER, -1)
 	sfForwarder.process([]core.Datapoint{dpSent})
 	assert.Equal(t, 0, len(finalDatapointDestination.datapointsChannel), "Expect no metrics")
-	sfForwarder.MetricCreationURL = "http://0.0.0.0:12345/v1/metric"
+	sfForwarder.MetricCreationURL = fmt.Sprintf("http://0.0.0.0:%d/v1/metric", port)
 
 	err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{})
 	assert.Equal(t, nil, err, "Expected no error making no metrics")
@@ -185,10 +188,10 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 		assert.Contains(t, err.Error(), "ioutil", "Expected ioutil issue")
 	}()
 
-	sfForwarder.MetricCreationURL = "http://0.0.0.0:12345/vmetric"
+	sfForwarder.MetricCreationURL = fmt.Sprintf("http://0.0.0.0:%d/vmetric", port)
 	err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"m": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
 	assert.Contains(t, err.Error(), "invalid status code", "Expected status code 404")
-	sfForwarder.MetricCreationURL = "http://0.0.0.0:12345/v1/metric"
+	sfForwarder.MetricCreationURL = fmt.Sprintf("http://0.0.0.0:%d/v1/metric", port)
 
 	func() {
 		ioutilReadAllObj.UseFunction(func(r io.Reader) ([]byte, error) { return []byte("InvalidJson"), nil })
@@ -234,7 +237,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	assert.Contains(t, err.Error(), "connection refused", "Expected error posting points")
 	sfForwarder.url = prevURL
 
-	sfForwarder.url = "http://0.0.0.0:12345/v1/metric"
+	sfForwarder.url = fmt.Sprintf("http://0.0.0.0:%d/v1/metric", port)
 	err = sfForwarder.process([]core.Datapoint{dpSent})
 	assert.Contains(t, err.Error(), "invalid status code", "Expected error posting points to metric creation url")
 	sfForwarder.url = prevURL

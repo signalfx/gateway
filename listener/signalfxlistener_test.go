@@ -164,6 +164,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	listener, err := SignalFxListenerLoader(sendTo, listenFrom)
 	assert.Equal(t, nil, err, "Should not get an error making")
 	assert.Equal(t, 16, len(listener.GetStats()), "Should have no stats")
+	assert.Equal(t, "tcp", listener.(NetworkListener).GetAddr().Network())
 
 	defer listener.Close()
 

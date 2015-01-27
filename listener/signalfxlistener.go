@@ -54,6 +54,10 @@ type listenerServer struct {
 	errorProtobufDecoderCallsv2  int64
 }
 
+func (streamer *listenerServer) GetAddr() net.Addr {
+	return streamer.listener.Addr()
+}
+
 func (streamer *listenerServer) GetStats() []core.Datapoint {
 	ret := []core.Datapoint{}
 	stats := map[string]int64{
