@@ -4,7 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,7 +25,6 @@ func TestForwarderStopForwarder(t *testing.T) {
 	f := newBasicBufferedForwarder(100, uint32(10), "aname", 1)
 	f.DatapointsChannel() <- nil
 	f.DatapointsChannel() <- nil
-	log.Info("Hello")
 	seenPointsChan := make(chan int, 2)
 	// nil should make it stop itself
 	f.start(func(dp []core.Datapoint) error {
@@ -40,5 +38,8 @@ func TestForwarderStopForwarder(t *testing.T) {
 	assert.Equal(t, 2, seenPoints, "Expect two points")
 	assert.NotEqual(t, nil, f.start(nil), "Shouldn't be able to start twice")
 	f.blockingDrainStopChan <- true
+
 	f.stop() // Should not block if chan has an item
+	dps := f.blockingDrainUpTo()
+	assert.Equal(t, 0, len(dps))
 }
