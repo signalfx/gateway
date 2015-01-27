@@ -1,13 +1,14 @@
 package forwarder
 
 import (
+	"sync/atomic"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
-	"sync/atomic"
-	"time"
 )
 
 type streamingDemultiplexerImpl struct {

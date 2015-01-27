@@ -2,11 +2,12 @@ package protocoltypes
 
 import (
 	"errors"
+	"os"
+	"testing"
+
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/stretchr/testify/assert"
-	"os"
-	"testing"
 )
 
 func TestNewOnHostDatapoint(t *testing.T) {

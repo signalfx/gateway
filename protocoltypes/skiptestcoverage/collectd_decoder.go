@@ -3,9 +3,10 @@ package skiptestcoverage
 import (
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/cep21/megajson/scanner"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
-	"io"
 )
 
 // CollectdJSONWriteFormatJSONDecoder is the struct that decodes CollectDJson format

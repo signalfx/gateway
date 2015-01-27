@@ -2,10 +2,11 @@ package forwarder
 
 import (
 	"errors"
+	"testing"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestForwarderBasicBufferedForwarder(t *testing.T) {

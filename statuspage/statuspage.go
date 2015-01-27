@@ -3,11 +3,12 @@ package statuspage
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/signalfuse/signalfxproxy/core"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/signalfuse/signalfxproxy/config"
+	"github.com/signalfuse/signalfxproxy/core"
 )
 
 // ProxyStatusPage holds status information about the running process that you can expose with

@@ -2,10 +2,18 @@ package listener
 
 import (
 	"bufio"
-	"code.google.com/p/goprotobuf/proto"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"code.google.com/p/goprotobuf/proto"
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
@@ -15,13 +23,6 @@ import (
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/jsonengines"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
-	"io"
-	"net"
-	"net/http"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 type listenerServer struct {

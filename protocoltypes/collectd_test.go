@@ -2,10 +2,11 @@ package protocoltypes
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 const testCollectdBody = `[

@@ -5,16 +5,17 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"testing"
+	"time"
+
 	"github.com/cep21/gohelpers/a"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/listener/metricdeconstructor"
 	"github.com/stretchr/testify/assert"
-	"io"
-	"net"
-	"testing"
-	"time"
 )
 
 var readerReadBytesObj a.ReaderReadBytesObj

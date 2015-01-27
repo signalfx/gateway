@@ -33,6 +33,11 @@ find . -type f -name \*.go | grep -v '.git' | xargs -n1 -P8 gofmt -w -l -s > /tm
 [[ ! -s /tmp/a ]] || cat /tmp/a
 [[ ! -s /tmp/a ]] || exit 1
 
+find . -type f -name \*.go | grep -v '.git' | xargs -n1 -P8 goimports -w -l > /tmp/a || exit 1
+# I want to print it out for debugging purposes, while still existing if exist
+[[ ! -s /tmp/a ]] || cat /tmp/a
+[[ ! -s /tmp/a ]] || exit 1
+
 gocyclo -over 10 . | grep -v skiptestcoverage > /tmp/a
 [[ ! -s /tmp/a ]] || cat /tmp/a
 [[ ! -s /tmp/a ]] || exit 1

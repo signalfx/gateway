@@ -1,13 +1,14 @@
 package forwarder
 
 import (
+	"io/ioutil"
+	"os"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
-	"io/ioutil"
-	"os"
 )
 
 func originalFileWrite(f *os.File, str string) (int, error) {

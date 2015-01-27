@@ -1,10 +1,11 @@
 package value
 
 import (
+	"testing"
+
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestIntWire(t *testing.T) {

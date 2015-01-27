@@ -2,6 +2,12 @@ package listener
 
 import (
 	"bufio"
+	"io"
+	"net"
+	"strings"
+	"sync/atomic"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
@@ -11,11 +17,6 @@ import (
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/listener/metricdeconstructor"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
-	"io"
-	"net"
-	"strings"
-	"sync/atomic"
-	"time"
 )
 
 func originalReaderReadBytes(reader *bufio.Reader, delim byte) ([]byte, error) {

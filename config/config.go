@@ -2,11 +2,12 @@ package config
 
 import (
 	"encoding/json"
+	"io/ioutil"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/stringhelper"
 	"github.com/cep21/xdgbasedir"
-	"io/ioutil"
-	"time"
 )
 
 // ForwardTo configures where we forward datapoints to

@@ -1,6 +1,8 @@
 package forwarder
 
 import (
+	"testing"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/a"
 	"github.com/cep21/gohelpers/workarounds"
@@ -11,14 +13,14 @@ import (
 	"github.com/signalfuse/signalfxproxy/listener"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"github.com/stretchr/testify/assert"
-	"testing"
 	//	"time"
-	"code.google.com/p/goprotobuf/proto"
 	"encoding/json"
 	"errors"
 	"io"
 	"io/ioutil"
 	"time"
+
+	"code.google.com/p/goprotobuf/proto"
 )
 
 var jsonUnmarshalObj a.JsonUnmarshalObj

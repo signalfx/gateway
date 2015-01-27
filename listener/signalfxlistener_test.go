@@ -3,20 +3,21 @@ package listener
 import (
 	"bufio"
 	"bytes"
-	"code.google.com/p/goprotobuf/proto"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
+	"net/http"
+	"strings"
+	"sync"
+	"testing"
+
+	"code.google.com/p/goprotobuf/proto"
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
-	"net/http"
-	"strings"
-	"sync"
-	"testing"
 )
 
 func TestInvalidSignalfxJSONForwarderLoader(t *testing.T) {

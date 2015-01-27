@@ -3,6 +3,10 @@ package forwarder
 import (
 	"encoding/json"
 	"errors"
+	"net"
+	"testing"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/a"
 	"github.com/cep21/gohelpers/workarounds"
@@ -12,9 +16,6 @@ import (
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/listener"
 	"github.com/stretchr/testify/assert"
-	"net"
-	"testing"
-	"time"
 )
 
 var testConfig1 = `

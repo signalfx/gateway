@@ -2,6 +2,7 @@ package protocoltypes
 
 import (
 	"fmt"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core"

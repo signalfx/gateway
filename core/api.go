@@ -1,8 +1,9 @@
 package core
 
 import (
-	log "github.com/Sirupsen/logrus"
 	"time"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 // DatapointStreamingAPI is the interface servers we send data to

@@ -1,11 +1,12 @@
 package protocoltypes
 
 import (
+	"os"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
-	"os"
 )
 
 var osXXXHostname = os.Hostname

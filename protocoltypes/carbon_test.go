@@ -2,9 +2,10 @@ package protocoltypes
 
 import (
 	"errors"
+	"testing"
+
 	"github.com/signalfuse/signalfxproxy/listener/metricdeconstructor"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 type errorDeconstructor struct{}

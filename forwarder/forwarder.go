@@ -2,11 +2,12 @@ package forwarder
 
 import (
 	"errors"
+	"sync"
+	"sync/atomic"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
-	"sync"
-	"sync/atomic"
 )
 
 // ProcessingFunction is a function that can process datapoints for the basic buffered forwarder

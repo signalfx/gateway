@@ -2,8 +2,9 @@ package value
 
 import (
 	"errors"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"strconv"
+
+	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 )
 
 type datumWire struct {

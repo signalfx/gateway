@@ -2,18 +2,9 @@ package forwarder
 
 import (
 	"bytes"
-	"code.google.com/p/goprotobuf/proto"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	log "github.com/Sirupsen/logrus"
-	"github.com/cep21/gohelpers/structdefaults"
-	"github.com/cep21/gohelpers/workarounds"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
-	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/signalfuse/signalfxproxy/core"
-	"github.com/signalfuse/signalfxproxy/core/value"
-	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -22,6 +13,16 @@ import (
 	"sync"
 	"time"
 	"unicode"
+
+	"code.google.com/p/goprotobuf/proto"
+	log "github.com/Sirupsen/logrus"
+	"github.com/cep21/gohelpers/structdefaults"
+	"github.com/cep21/gohelpers/workarounds"
+	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
+	"github.com/signalfuse/signalfxproxy/config"
+	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/core/value"
+	"github.com/signalfuse/signalfxproxy/protocoltypes"
 )
 
 var jsonXXXMarshal = json.Marshal

@@ -3,6 +3,7 @@ package skiptestcoverage
 // Should be in same package as collectd_decoder.go
 import (
 	"fmt"
+
 	"github.com/cep21/megajson/scanner"
 )
 

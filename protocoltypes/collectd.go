@@ -1,11 +1,12 @@
 package protocoltypes
 
 import (
+	"strings"
+	"time"
+
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
-	"strings"
-	"time"
 )
 
 // CollectdJSONWriteBody is the full POST body of collectd's write_http format

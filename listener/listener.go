@@ -1,9 +1,10 @@
 package listener
 
 import (
+	"net"
+
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
-	"net"
 )
 
 // A DatapointListener is an object that listens for input datapoints

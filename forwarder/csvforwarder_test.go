@@ -2,6 +2,10 @@ package forwarder
 
 import (
 	"errors"
+	"io/ioutil"
+	"os"
+	"testing"
+
 	"github.com/cep21/gohelpers/a"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
@@ -9,9 +13,6 @@ import (
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
-	"os"
-	"testing"
 )
 
 var fileStub a.FileWriteStringObj

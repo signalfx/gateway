@@ -2,12 +2,13 @@ package listener
 
 import (
 	"bytes"
+	"net/http"
+	"testing"
+
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"testing"
 )
 
 const testCollectdBody = `[

@@ -1,9 +1,10 @@
 package core
 
 import (
-	"github.com/stretchr/testify/mock"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/mock"
 )
 
 type statKeeper struct {

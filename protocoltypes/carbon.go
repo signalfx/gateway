@@ -2,13 +2,14 @@ package protocoltypes
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/listener/metricdeconstructor"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // CarbonReady signals an object can be directly converted to a carbon datapoint send

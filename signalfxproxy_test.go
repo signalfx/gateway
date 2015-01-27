@@ -2,17 +2,18 @@ package main
 
 import (
 	"bufio"
+	"io/ioutil"
+	"net"
+	"os"
+	"strings"
+	"testing"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
-	"net"
-	"os"
-	"strings"
-	"testing"
 )
 
 var config1 = `

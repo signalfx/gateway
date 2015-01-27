@@ -3,9 +3,10 @@ package jsonengines
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"github.com/signalfuse/signalfxproxy/protocoltypes/skiptestcoverage"
-	"io"
 )
 
 // JSONDecodingEngine creates a JSON decoder

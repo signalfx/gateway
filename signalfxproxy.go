@@ -3,15 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/Sirupsen/logrus"
-	log "github.com/Sirupsen/logrus"
-	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/signalfuse/signalfxproxy/core"
-	"github.com/signalfuse/signalfxproxy/forwarder"
-	"github.com/signalfuse/signalfxproxy/listener"
-	"github.com/signalfuse/signalfxproxy/stats"
-	"github.com/signalfuse/signalfxproxy/statuspage"
-	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -21,6 +12,16 @@ import (
 	"runtime"
 	"strconv"
 	"sync"
+
+	"github.com/Sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
+	"github.com/signalfuse/signalfxproxy/config"
+	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/forwarder"
+	"github.com/signalfuse/signalfxproxy/listener"
+	"github.com/signalfuse/signalfxproxy/stats"
+	"github.com/signalfuse/signalfxproxy/statuspage"
+	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 )
 
 func writePidFile(pidFileName string) error {

@@ -1,12 +1,13 @@
 package stats
 
 import (
+	"runtime"
+	"time"
+
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
-	"runtime"
-	"time"
 )
 
 type golangStatKeeper struct {

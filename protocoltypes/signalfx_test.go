@@ -1,11 +1,12 @@
 package protocoltypes
 
 import (
+	"testing"
+
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestNewProtobufDataPoint(t *testing.T) {

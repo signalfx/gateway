@@ -1,6 +1,11 @@
 package listener
 
 import (
+	"net"
+	"net/http"
+	"sync/atomic"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
@@ -10,10 +15,6 @@ import (
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/jsonengines"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
-	"net"
-	"net/http"
-	"sync/atomic"
-	"time"
 )
 
 type collectdListenerServer struct {

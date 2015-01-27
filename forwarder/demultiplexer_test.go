@@ -1,12 +1,13 @@
 package forwarder
 
 import (
+	"testing"
+	"time"
+
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 )
 
 func TestNewStreamingDatapointDemultiplexer(t *testing.T) {

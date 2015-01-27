@@ -1,13 +1,14 @@
 package statuspage
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/stats"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 )
 
 func TestHealthPage(t *testing.T) {

@@ -3,6 +3,12 @@ package forwarder
 import (
 	"bytes"
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
@@ -10,11 +16,6 @@ import (
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/sorting"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
-	"net"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 type reconectingGraphiteCarbonConnection struct {
