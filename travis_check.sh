@@ -64,9 +64,9 @@ find . -type f -name \*.go | grep -v '.git' | xargs -n1 -P8 go vet > /tmp/a || e
 #
 # ---- Check for 100% code coverage and data races.  Increase possiblity of
 #      races with cpu 2.  Timeout long running tests.  Should really be 1s, but
-#      want to give travis-ci some time
+#      want to give travis-ci some time.
 #
-go test -cover -race -parallel=8 -timeout 3s -cpu 2  ./... | grep -v 'skiptestcoverage' | grep -v "100.0% of statements" > /tmp/no_100_coverage
+go test -cover -covermode atomic -race -parallel=8 -timeout 3s -cpu 4  ./... | grep -v 'skiptestcoverage' | grep -v "100.0% of statements" > /tmp/no_100_coverage
 [[ ! -s /tmp/no_100_coverage ]] || cat /tmp/no_100_coverage
 [[ ! -s /tmp/no_100_coverage ]] || exit 1
 
