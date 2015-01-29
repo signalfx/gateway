@@ -223,7 +223,7 @@ dot delimited name.
 ### Graphite Dimensions
 
 This config will pull dimensions out of graphite metrics if they fit the commakeys
-format.  That format is "__METRIC_NAME__\[KEY:VALUE,KEY:VALUE]".  For example,
+format.  That format is "_METRIC_NAME_\[KEY:VALUE,KEY:VALUE]".  For example,
 "user.hit_rate\[host:server1,type:production]".
 
 ```
