@@ -13,7 +13,7 @@ shellcheck travis_check.sh || exit 1
 #
 # Note: there is one line (a curl) that we can't help but make long
 echo -e "# Ignore Header" > /tmp/ignore_header.md
-cat /tmp/ignore_header.md README.md | grep -v curl | grep -v 'Build Status' | mdl || exit 1
+cat /tmp/ignore_header.md README.md | grep -v curl | grep -v 'Build Status' | mdl --warnings || exit 1
 
 #
 # ---- Check JSON
