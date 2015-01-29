@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/listener/metricdeconstructor"
 	"github.com/stretchr/testify/assert"
 )
@@ -30,7 +31,7 @@ func TestNewCarbonDatapoint(t *testing.T) {
 	assert.NotEqual(t, nil, err, "Line should be invalid")
 
 	dp, _ = NewCarbonDatapoint("hello 3.3 3", identityParser)
-	f, _ := dp.Value().FloatValue()
+	f := dp.Value().(value.FloatValue).FloatValue()
 	assert.Equal(t, 3.3, f, "Should get value back")
 
 	carbonDp, _ := dp.(CarbonReady)

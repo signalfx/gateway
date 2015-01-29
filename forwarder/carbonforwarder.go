@@ -104,7 +104,7 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) drainDatapointChann
 			fmt.Fprintf(&buf, "%s\n", carbonReadyDatapoint.ToCarbonLine())
 		} else {
 			fmt.Fprintf(&buf, "%s %s %d\n", carbonConnection.datapointToGraphite(datapoint),
-				datapoint.Value().WireValue(),
+				datapoint.Value(),
 				datapoint.Timestamp().UnixNano()/time.Second.Nanoseconds())
 		}
 	}

@@ -182,7 +182,7 @@ func TestCarbonWrite(t *testing.T) {
 	log.Info("Looking for DP back")
 	dp := <-forwardTo.datapointsChannel
 	assert.Equal(t, "lineitem", dp.Metric(), "Expect metric back")
-	assert.Equal(t, "3", dp.Value().WireValue(), "Expect value back")
+	assert.Equal(t, "3", dp.Value().String(), "Expect value back")
 }
 
 func TestFailedConn(t *testing.T) {

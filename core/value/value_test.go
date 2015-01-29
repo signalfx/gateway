@@ -10,50 +10,31 @@ import (
 
 func TestIntWire(t *testing.T) {
 	iv := NewIntWire(3)
-	assert.Equal(t, iv.String(), "3", "Expect 3")
-	i, err := iv.IntValue()
-	assert.Equal(t, int64(3), i, "Expect 3")
-	assert.Equal(t, nil, err, "Expect 3")
-	f, err := iv.FloatValue()
-	assert.Equal(t, 3.0, f, "Expect 3")
+	assert.Equal(t, iv.String(), "3")
+	i := iv.IntValue()
+	assert.Equal(t, int64(3), i)
 }
 
 func TestFloatWire(t *testing.T) {
 	iv := NewFloatWire(3)
-	assert.Equal(t, iv.String(), "3", "Expect 3")
-	_, err := iv.IntValue()
-	assert.NotEqual(t, nil, err, "Expect float only")
-	f, err := iv.FloatValue()
-	assert.Equal(t, 3.0, f, "Expect 3")
+	assert.Equal(t, iv.String(), "3")
+	f := iv.FloatValue()
+	assert.Equal(t, 3.0, f)
 }
 
 func TestStrWire(t *testing.T) {
 	iv := NewStrWire("val")
-	assert.Equal(t, iv.String(), "val", "Expect val")
-	_, err := iv.IntValue()
-	assert.NotEqual(t, nil, err, "Expect no int")
-	_, err = iv.FloatValue()
-	assert.NotEqual(t, nil, err, "Expect no float")
+	assert.Equal(t, iv.String(), "val")
 }
 
 func TestDatumValue(t *testing.T) {
 	iv := NewDatumWire(&com_signalfuse_metrics_protobuf.Datum{DoubleValue: workarounds.GolangDoesnotAllowPointerToFloat64Literal(3.0)})
-	assert.Equal(t, iv.String(), "doubleValue:3 ", "Expect 3")
-	assert.Equal(t, iv.WireValue(), "3", "Expect 3")
-	_, err := iv.IntValue()
-	assert.NotEqual(t, nil, err, "Expect float only")
-	f, err := iv.FloatValue()
-	assert.Equal(t, 3.0, f, "Expect 3")
+	assert.Equal(t, iv.String(), "3")
+	assert.Equal(t, iv.(FloatValue).FloatValue(), 3.0)
 
 	iv = NewDatumWire(&com_signalfuse_metrics_protobuf.Datum{IntValue: workarounds.GolangDoesnotAllowPointerToIntLiteral(3)})
-	assert.Equal(t, iv.WireValue(), "3", "Expect 3")
-	i, err := iv.IntValue()
-	assert.Equal(t, int64(3), i, "Expect 3")
-	assert.Equal(t, nil, err, "Expect float only")
-
-	_, err = iv.FloatValue()
-	assert.NotEqual(t, nil, err, "Expect float only")
+	assert.Equal(t, iv.(IntDatapoint).IntValue(), 3)
 
 	iv = NewDatumWire(&com_signalfuse_metrics_protobuf.Datum{StrValue: workarounds.GolangDoesnotAllowPointerToStringLiteral("hello")})
-	assert.Equal(t, iv.WireValue(), "hello", "Expect hello")
+	assert.Equal(t, iv.String(), "hello")
 }

@@ -29,7 +29,8 @@ func (comparor *orderedDimensionComparor) Less(_ map[string]string, currentOrder
 	return keyi < keyj
 }
 
-// NewOrderedDimensionComparor creates a sorter that sorts dimensions in dimensionsOrder order
+// NewOrderedDimensionComparor creates a sorter that sorts dimensions in dimensionsOrder order, putting
+// any dimension inside dimensionsOrder ahead of any dimension not inside dimensionsOrder
 func NewOrderedDimensionComparor(dimensionsOrder []string) DimensionComparor {
 	dimensionOrderMap := make(map[string]int)
 	for index, strVal := range dimensionsOrder {
@@ -40,7 +41,8 @@ func NewOrderedDimensionComparor(dimensionsOrder []string) DimensionComparor {
 	}
 }
 
-// SortDimensions uses a DimensionComparor to return the sorted order of a dimension map
+// SortDimensions uses a DimensionComparor to return the sorted order of a dimension map.  Useful for
+// products that don't support dimension maps and require dimensions in a specific order
 func SortDimensions(comparor DimensionComparor, dimensions map[string]string) []string {
 	dims := make([]string, 0, len(dimensions))
 	for k := range dimensions {

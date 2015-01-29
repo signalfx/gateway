@@ -31,7 +31,7 @@ type ForwardTo struct {
 	DimensionsOrder   []string
 }
 
-// ListenFrom configures where we forward datapoints to
+// ListenFrom configures how we listen for datapoints to forward
 type ListenFrom struct {
 	Type                       string
 	ListenAddr                 *string

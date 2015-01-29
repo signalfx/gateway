@@ -116,7 +116,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	dpSent := core.NewAbsoluteTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
 	forwarder.DatapointsChannel() <- dpSent
 	dpRecieved := <-finalDatapointDestination.datapointsChannel
-	i, _ := dpRecieved.Value().IntValue()
+	i := dpRecieved.Value().(value.IntDatapoint).IntValue()
 	assert.Equal(t, int64(2), i, "Expect 2 back")
 	assert.Equal(t, "proxy-source", dpRecieved.Dimensions()["sf_source"], "Expect ahost back")
 
@@ -124,20 +124,20 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	dpSent = core.NewAbsoluteTimeDatapoint("metric", map[string]string{"cpusize": "big", "hostname": "ahost"}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
 	forwarder.DatapointsChannel() <- dpSent
 	dpRecieved = <-finalDatapointDestination.datapointsChannel
-	i, _ = dpRecieved.Value().IntValue()
+	i = dpRecieved.Value().(value.IntDatapoint).IntValue()
 	assert.Equal(t, int64(2), i, "Expect 2 back")
 	assert.Equal(t, "ahost", dpRecieved.Dimensions()["sf_source"], "Expect ahost back")
 
-	dpSent = core.NewAbsoluteTimeDatapoint("metric", map[string]string{}, value.NewFloatWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
+	dpSent = core.NewAbsoluteTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
 	forwarder.DatapointsChannel() <- dpSent
 	dpRecieved = <-finalDatapointDestination.datapointsChannel
-	f, _ := dpRecieved.Value().FloatValue()
-	assert.Equal(t, 2.0, f, "Expect 2 back")
+	i = dpRecieved.Value().(value.IntDatapoint).IntValue()
+	assert.Equal(t, 2, i, "Expect 2 back")
 
 	dpStr := core.NewAbsoluteTimeDatapoint("metric", map[string]string{}, value.NewStrWire("astr"), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
 	forwarder.DatapointsChannel() <- dpStr
 	dpRecieved = <-finalDatapointDestination.datapointsChannel
-	assert.Equal(t, "astr", dpRecieved.Value().WireValue(), "Expect 2 back")
+	assert.Equal(t, "astr", dpRecieved.Value().String(), "Expect 2 back")
 
 	// No source should mean we don't ask for the metric
 	sfForwarder.defaultSource = ""
@@ -149,7 +149,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	dpSent = core.NewAbsoluteTimeDatapoint("metric", map[string]string{}, value.NewFloatWire(2.0), com_signalfuse_metrics_protobuf.MetricType_COUNTER, timeToSend)
 	forwarder.DatapointsChannel() <- dpSent
 	dpRecieved = <-finalDatapointDestination.datapointsChannel
-	f, _ = dpRecieved.Value().FloatValue()
+	f := dpRecieved.Value().(value.FloatValue).FloatValue()
 	assert.Equal(t, 2.0, f, "Expect 2 back")
 	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_COUNTER, dpRecieved.MetricType(), "Expect 2 back")
 
@@ -168,10 +168,13 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	assert.Equal(t, "asource", dpRecieved.Dimensions()["sf_source"], "Expected asource for %s", dpRecieved)
 
 	sfForwarder.MetricCreationURL = "http://127.0.0.1:21/asfd" // invalid
-	dpSent = core.NewRelativeTimeDatapoint("anotermetric", map[string]string{}, value.NewFloatWire(2.0), com_signalfuse_metrics_protobuf.MetricType_COUNTER, -1)
+	dpSent = core.NewRelativeTimeDatapoint("anotermetric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_COUNTER, -1)
 	sfForwarder.process([]core.Datapoint{dpSent})
 	assert.Equal(t, 0, len(finalDatapointDestination.datapointsChannel), "Expect no metrics")
 	sfForwarder.MetricCreationURL = fmt.Sprintf("http://127.0.0.1:%d/v1/metric", port)
+
+	_, _, err = sfForwarder.encodePostBodyV2([]core.Datapoint{core.NewRelativeTimeDatapoint("anotermetric", map[string]string{}, value.NewFloatWire(2.0), com_signalfuse_metrics_protobuf.MetricType_COUNTER, -1)})
+	assert.NoError(t, err)
 
 	err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{})
 	assert.Equal(t, nil, err, "Expected no error making no metrics")

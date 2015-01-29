@@ -14,6 +14,7 @@ import (
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/listener/metricdeconstructor"
 	"github.com/stretchr/testify/assert"
 )
@@ -89,7 +90,7 @@ func TestCarbonListenerLoader(t *testing.T) {
 	assert.Equal(t, nil, err, "Should be ok to write")
 	datapoint := <-sendTo.channel
 	assert.Equal(t, "ametric", datapoint.Metric(), "Should be metric")
-	i, _ := datapoint.Value().IntValue()
+	i := datapoint.Value().(value.IntDatapoint).IntValue()
 	assert.Equal(t, int64(2), i, "Should get 2")
 
 	for len(sendTo.channel) > 0 {
@@ -126,7 +127,7 @@ func TestCarbonListenerLoader2(t *testing.T) {
 	datapoint := <-sendTo.channel
 	assert.Equal(t, "a.metric.name", datapoint.Metric(), "Should be metric")
 	assert.Equal(t, map[string]string{"host": "bob", "type": "dev"}, datapoint.Dimensions(), "Did not parse dimensions")
-	i, _ := datapoint.Value().IntValue()
+	i := datapoint.Value().(value.IntDatapoint).IntValue()
 	assert.Equal(t, int64(3), i, "Should get 3")
 
 	carbonlistener.metricDeconstructor, _ = metricdeconstructor.Load("", "")
@@ -164,7 +165,7 @@ func TestCarbonListenerLoader2(t *testing.T) {
 		conn.Close()
 		_ = <-readerErrorSignal
 		datapoint = <-sendTo.channel
-		i, _ = datapoint.Value().IntValue()
+		i = datapoint.Value().(value.IntDatapoint).IntValue()
 		assert.Equal(t, int64(3), i, "Should get 3")
 	}()
 }

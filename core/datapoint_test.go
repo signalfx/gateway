@@ -14,9 +14,8 @@ func TestRelativeDatapoint(t *testing.T) {
 		value.NewIntWire(1), com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER, 0)
 	assert.Equal(t, "metric", dp.Metric(), "Unexpected metric")
 	assert.Equal(t, "bob", dp.Dimensions()["host"], "Unexpected dimensions")
-	iv, err := dp.Value().IntValue()
+	iv := dp.Value().(value.IntDatapoint).IntValue()
 	assert.Equal(t, int64(1), iv, "Unexpected value")
-	assert.Equal(t, nil, err, "Unexpected value")
 	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER, dp.MetricType(), "Unexpected type")
 	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER, dp.MetricType(), "Unexpected time")
 

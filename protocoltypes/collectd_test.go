@@ -6,6 +6,7 @@ import (
 
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
+	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -130,6 +131,6 @@ func TestCollectdJsonDecoding(t *testing.T) {
 	dp = NewCollectdDatapoint((*postFormat)[3], uint(0))
 	assert.Equal(t, "free", dp.Metric(), "Metric not named correctly")
 	dp = NewCollectdDatapoint((*postFormat)[4], uint(0))
-	f, _ := dp.Value().FloatValue()
+	f := dp.Value().(value.FloatValue).FloatValue()
 	assert.Equal(t, 5.36202e+09, f, "Cannot parse value correctly")
 }

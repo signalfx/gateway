@@ -135,12 +135,15 @@ func (connector *signalfxJSONConnector) encodePostBodyV2(datapoints []core.Datap
 			Timestamp:  dp.Timestamp().UnixNano() / time.Millisecond.Nanoseconds(),
 			Dimensions: dp.Dimensions(),
 		}
-		f, err := dp.Value().FloatValue()
-		if err == nil {
-			bsf.Value = f
-		} else {
-			bsf.Value = dp.Value().WireValue()
+		switch t := dp.Value().(type) {
+		case value.FloatValue:
+			bsf.Value = t.FloatValue()
+		case value.IntDatapoint:
+			bsf.Value = t.IntValue()
+		default:
+			bsf.Value = t.String()
 		}
+
 		_, ok := bodyToSend[dp.MetricType().String()]
 		if !ok {
 			bodyToSend[dp.MetricType().String()] = make([]*protocoltypes.BodySendFormatV2, 0)
@@ -170,16 +173,18 @@ func (connector *signalfxJSONConnector) encodePostBodyProtobufV2(datapoints []co
 }
 
 func datumForPoint(pv value.DatapointValue) *com_signalfuse_metrics_protobuf.Datum {
-	i, err := pv.IntValue()
-	if err == nil {
-		return &com_signalfuse_metrics_protobuf.Datum{IntValue: &i}
+
+	switch t := pv.(type) {
+	case value.IntDatapoint:
+		x := t.IntValue()
+		return &com_signalfuse_metrics_protobuf.Datum{IntValue: &x}
+	case value.FloatValue:
+		x := t.FloatValue()
+		return &com_signalfuse_metrics_protobuf.Datum{DoubleValue: &x}
+	default:
+		x := t.String()
+		return &com_signalfuse_metrics_protobuf.Datum{StrValue: &x}
 	}
-	f, err := pv.FloatValue()
-	if err == nil {
-		return &com_signalfuse_metrics_protobuf.Datum{DoubleValue: &f}
-	}
-	s := pv.WireValue()
-	return &com_signalfuse_metrics_protobuf.Datum{StrValue: &s}
 }
 
 func (connector *signalfxJSONConnector) metricCreationLoop() {

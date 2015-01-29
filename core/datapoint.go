@@ -100,7 +100,7 @@ func (datapoint *relativeTimeDatapoint) RelativeTime() int64 {
 }
 
 func (datapoint *relativeTimeDatapoint) String() string {
-	return fmt.Sprintf("RelDP[%s\t%s\t%s\t%s\t%s(%d)]", datapoint.Metric(), datapoint.Dimensions(), datapoint.Value().WireValue(), datapoint.MetricType(), datapoint.Timestamp().String(), datapoint.relativeTime)
+	return fmt.Sprintf("RelDP[%s\t%s\t%s\t%s\t%s(%d)]", datapoint.Metric(), datapoint.Dimensions(), datapoint.Value(), datapoint.MetricType(), datapoint.Timestamp().String(), datapoint.relativeTime)
 }
 
 // NewRelativeTimeDatapoint creates a new datapoint who's time is a value relative to when it's recieved

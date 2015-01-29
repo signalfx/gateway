@@ -1,9 +1,10 @@
 package value
 
-// DatapointValue is the value of a datapoint being written
+import "fmt"
+
+// A DatapointValue is the value being sent between servers.  It is usually a floating point
+// but different systems support different types of values.  All values must be printable in some
+// human readable interface
 type DatapointValue interface {
-	WireValue() string
-	FloatValue() (float64, error)
-	IntValue() (int64, error)
-	String() string
+	fmt.Stringer
 }

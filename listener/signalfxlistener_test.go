@@ -274,7 +274,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	_ = <-gotPointChan
 	assert.Equal(t, resp.StatusCode, 200, "Request should work")
 	assert.Equal(t, "asource", dp.Dimensions()["sf_source"], "Expect source back")
-	assert.Equal(t, "2", dp.Value().WireValue(), "Expect 2 back")
+	assert.Equal(t, "2", dp.Value().String(), "Expect 2 back")
 
 	uploadMsg := &com_signalfuse_metrics_protobuf.DataPointUploadMessage{
 		Datapoints: []*com_signalfuse_metrics_protobuf.DataPoint{protoDatapoint},
@@ -290,7 +290,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	_ = <-gotPointChan
 	assert.Equal(t, resp.StatusCode, 200, "Request should work")
 	assert.Equal(t, "asource", dp.Dimensions()["sf_source"], "Expect source back")
-	assert.Equal(t, "2", dp.Value().WireValue(), "Expect 2 back")
+	assert.Equal(t, "2", dp.Value().String(), "Expect 2 back")
 
 	req, _ = http.NewRequest("POST", "http://127.0.0.1:12349/v2/datapoint", bytes.NewBuffer([]byte(`invalid`)))
 	req.Header.Set("Content-Type", "application/x-protobuf")
