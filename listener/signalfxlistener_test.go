@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"code.google.com/p/goprotobuf/proto"
@@ -153,6 +154,24 @@ func TestSignalfxJSONForwarderInvalidJSONEngine(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func BenchmarkAtomicInc(b *testing.B) {
+	var l int64
+	l = 0
+	for i := int64(0); i < int64(b.N); i++ {
+		atomic.AddInt64(&l, i)
+	}
+	b.SetBytes(int64(b.N * 8))
+}
+
+func BenchmarkRegularInc(b *testing.B) {
+	var l int64
+	l = 0
+	for i := int64(0); i < int64(b.N); i++ {
+		l += i
+	}
+	b.SetBytes(int64(b.N * 8))
+}
+
 func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	sendTo := &basicDatapointStreamingAPI{
 		channel: make(chan core.Datapoint),
@@ -163,7 +182,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 
 	listener, err := SignalFxListenerLoader(sendTo, listenFrom)
 	assert.Equal(t, nil, err, "Should not get an error making")
-	assert.Equal(t, 16, len(listener.GetStats()), "Should have no stats")
+	assert.Equal(t, 20, len(listener.GetStats()))
 	assert.Equal(t, "tcp", listener.(NetworkListener).GetAddr().Network())
 
 	defer listener.Close()

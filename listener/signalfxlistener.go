@@ -77,6 +77,39 @@ func (streamer *listenerServer) GetStats() []core.Datapoint {
 		"active_protobuf_v2_calls": atomic.LoadInt64(&streamer.activeProtobufDecoderCallsv2),
 		"error_protobuf_v2_calls":  atomic.LoadInt64(&streamer.errorProtobufDecoderCallsv2),
 	}
+
+	ret = append(
+		ret,
+		protocoltypes.NewOnHostDatapointDimensions(
+			"total_points",
+			value.NewIntWire(atomic.LoadInt64(&streamer.protobufPoints)),
+			com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+			map[string]string{"listener": streamer.name, "type": "protobuf"}))
+
+	ret = append(
+		ret,
+		protocoltypes.NewOnHostDatapointDimensions(
+			"total_points",
+			value.NewIntWire(atomic.LoadInt64(&streamer.jsonPoints)),
+			com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+			map[string]string{"listener": streamer.name, "type": "json"}))
+
+	ret = append(
+		ret,
+		protocoltypes.NewOnHostDatapointDimensions(
+			"total_points",
+			value.NewIntWire(atomic.LoadInt64(&streamer.protobufPointsV2)),
+			com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+			map[string]string{"listener": streamer.name, "type": "protobuf_v2"}))
+
+	ret = append(
+		ret,
+		protocoltypes.NewOnHostDatapointDimensions(
+			"total_points",
+			value.NewIntWire(atomic.LoadInt64(&streamer.jsonPointsV2)),
+			com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+			map[string]string{"listener": streamer.name, "type": "json_v2"}))
+
 	for k, v := range stats {
 		keyParts := strings.SplitN(k, "_", 2)
 
