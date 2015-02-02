@@ -26,7 +26,7 @@ func TestNewStreamingDatapointDemultiplexer(t *testing.T) {
 	}
 
 	assert.Equal(t, value.NewIntWire(0), m.GetStats()[0].Value(), "Expect zero dropped point")
-	assert.Equal(t, 3, len(m.GetStats()), "Expect three stats")
+	assert.Equal(t, 4, len(m.GetStats()), "Expect three stats")
 	m.DatapointsChannel() <- dpSent
 
 	// Wait for something to get on the chan
@@ -40,5 +40,5 @@ func TestNewStreamingDatapointDemultiplexer(t *testing.T) {
 
 	assert.Equal(t, value.NewIntWire(1), m.GetStats()[0].Value(), "Expect one dropped point")
 	assert.Equal(t, value.NewIntWire(2), m.GetStats()[1].Value(), "Expect one dropped point")
-	assert.Equal(t, 3, len(m.GetStats()), "Expect three stats")
+	assert.Equal(t, 4, len(m.GetStats()), "Expect three stats")
 }

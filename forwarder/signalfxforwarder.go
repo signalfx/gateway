@@ -378,7 +378,7 @@ func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datap
 }
 
 func (connector *signalfxJSONConnector) GetStats() []core.Datapoint {
-	return []core.Datapoint{}
+	return connector.basicBufferedForwarder.GetStats()
 }
 
 func (connector *signalfxJSONConnector) encodePostBody(datapoints []core.Datapoint) ([]byte, string, error) {

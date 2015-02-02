@@ -46,11 +46,6 @@ func newTcpGraphiteCarbonForwarer(host string, port uint16, timeout time.Duratio
 	return ret, nil
 }
 
-func (carbonConnection *reconectingGraphiteCarbonConnection) GetStats() []core.Datapoint {
-	ret := []core.Datapoint{}
-	return ret
-}
-
 var defaultCarbonConfig = &config.ForwardTo{
 	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
 	BufferSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(10000)),
@@ -76,6 +71,10 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) createClientIfNeede
 		carbonConnection.openConnection, err = net.Dial("tcp", carbonConnection.connectionAddress)
 	}
 	return err
+}
+
+func (carbonConnection *reconectingGraphiteCarbonConnection) GetStats() []core.Datapoint {
+	return carbonConnection.basicBufferedForwarder.GetStats()
 }
 
 func (carbonConnection *reconectingGraphiteCarbonConnection) datapointToGraphite(datapoint core.Datapoint) string {

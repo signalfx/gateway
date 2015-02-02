@@ -69,6 +69,11 @@ func (streamer *streamingDemultiplexerImpl) GetStats() []core.Datapoint {
 		com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
 		map[string]string{"forwarder": streamer.Name()}))
 	ret = append(ret, protocoltypes.NewOnHostDatapointDimensions(
+		"datapoint_backup_size",
+		value.NewIntWire(int64(len(streamer.datapointChannel))),
+		com_signalfuse_metrics_protobuf.MetricType_GAUGE,
+		map[string]string{"forwarder": streamer.Name()}))
+	ret = append(ret, protocoltypes.NewOnHostDatapointDimensions(
 		"datapoint_delay",
 		value.NewIntWire(atomic.LoadInt64(&streamer.latestDatapointDelay)),
 		com_signalfuse_metrics_protobuf.MetricType_GAUGE,

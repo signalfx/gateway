@@ -6,8 +6,11 @@ import (
 	"sync/atomic"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/core/value"
+	"github.com/signalfuse/signalfxproxy/protocoltypes"
 )
 
 // ProcessingFunction is a function that can process datapoints for the basic buffered forwarder
@@ -31,6 +34,15 @@ type Loader func(*config.ForwardTo) (core.StatKeepingStreamingAPI, error)
 
 func (forwarder *basicBufferedForwarder) DatapointsChannel() chan<- core.Datapoint {
 	return forwarder.datapointsChannel
+}
+func (forwarder *basicBufferedForwarder) GetStats() []core.Datapoint {
+	ret := []core.Datapoint{}
+	ret = append(ret, protocoltypes.NewOnHostDatapointDimensions(
+		"datapoint_backup_size",
+		value.NewIntWire(int64(len(forwarder.datapointsChannel))),
+		com_signalfuse_metrics_protobuf.MetricType_GAUGE,
+		map[string]string{"forwarder": forwarder.Name()}))
+	return ret
 }
 
 func (forwarder *basicBufferedForwarder) blockingDrainUpTo() []core.Datapoint {

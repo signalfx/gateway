@@ -108,7 +108,7 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	forwarder, err := SignalfxJSONForwarderLoader(&forwardTo)
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, "signalfx-forwarder", forwarder.Name(), "Expect no error")
-	assert.Equal(t, 0, len(forwarder.GetStats()), "Expect no stats")
+	assert.Equal(t, 1, len(forwarder.GetStats()), "Expect no stats")
 
 	sfForwarder, _ := forwarder.(*signalfxJSONConnector)
 
