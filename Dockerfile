@@ -39,7 +39,7 @@ RUN go get code.google.com/p/go.tools/cmd/vet
 RUN go get github.com/stretchr/testify/mock
 RUN go get code.google.com/p/go.tools/cmd/cover
 RUN go env && go version
-RUN go get github.com/signalfuse/signalfxproxy
+RUN go get -t github.com/signalfuse/signalfxproxy
 RUN go test github.com/signalfuse/signalfxproxy
 
 ENV PATH $GOPATH/bin:$PATH
