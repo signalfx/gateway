@@ -5,9 +5,13 @@ import (
 	"net/http"
 	"testing"
 
+	"net/http/httptest"
+	"strings"
+
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/jsonengines"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -143,4 +147,31 @@ func TestCollectDListener(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, resp.StatusCode, 400, "Request should work (Plaintext not supported)")
 
+}
+
+func BenchmarkCollectdListener(b *testing.B) {
+	bytes := int64(0)
+
+	jsonEngine, _ := jsonengines.Load("")
+
+	for i := 0; i < b.N; i++ {
+		sendTo := &basicDatapointStreamingAPI{
+			channel: make(chan core.Datapoint, 6),
+		}
+
+		listener := &collectdListenerServer{
+			datapointStreamingAPI: sendTo,
+			decodingEngine:        jsonEngine,
+		}
+		writter := httptest.NewRecorder()
+		body := strings.NewReader(testCollectdBody)
+		req, err := http.NewRequest("GET", "http://example.com/collectd", body)
+		req.Header.Add("Content-type", "application/json")
+		bytes += int64(len(testCollectdBody))
+		listener.handleCollectd(writter, req)
+		assert.NoError(b, err)
+		assert.Equal(b, 5, len(sendTo.channel))
+
+	}
+	b.SetBytes(bytes)
 }
