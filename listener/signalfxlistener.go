@@ -31,7 +31,7 @@ type listenerServer struct {
 	metricCreationsMap      map[string]com_signalfuse_metrics_protobuf.MetricType
 	metricCreationsMapMutex sync.Mutex
 
-	collectdHandler       *collectdListenerServer
+	collectdHandler       collectdJsonDecoder
 	datapointStreamingAPI core.DatapointStreamingAPI
 
 	protobufPoints   int64
@@ -129,7 +129,7 @@ func (streamer *listenerServer) GetStats() []core.Datapoint {
 				t,
 				map[string]string{"listener": streamer.name, "type": keyType}))
 	}
-	ret = append(ret, streamer.collectdHandler.GetStats()...)
+	ret = append(ret, streamer.collectdHandler.GetStats(map[string]string{"listener": streamer.name})...)
 	return ret
 }
 
@@ -401,17 +401,17 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 		listener:                listener,
 		metricCreationsMap:      make(map[string]com_signalfuse_metrics_protobuf.MetricType),
 		metricCreationsMapMutex: sync.Mutex{},
-		collectdHandler: &collectdListenerServer{
-			name:                  name + "_collectd",
-			listener:              nil,
-			datapointStreamingAPI: DatapointStreamingAPI,
-			decodingEngine:        decodingEngine,
+		collectdHandler: collectdJsonDecoder {
+			decodingEngine: decodingEngine,
+			datapointTracker: DatapointTracker {
+				DatapointStreamingAPI: DatapointStreamingAPI,
+			},
 		},
 		datapointStreamingAPI: DatapointStreamingAPI,
 	}
 
 	collectdHandlerV1 := func(writter http.ResponseWriter, req *http.Request) {
-		listenServer.collectdHandler.handleCollectd(writter, req)
+		listenServer.collectdHandler.ServeHTTP(writter, req)
 	}
 
 	datapointHandlerV1 := func(writter http.ResponseWriter, req *http.Request) {

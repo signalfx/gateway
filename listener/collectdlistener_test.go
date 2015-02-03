@@ -5,14 +5,17 @@ import (
 	"net/http"
 	"testing"
 
-	"net/http/httptest"
-	"strings"
+//	"net/http/httptest"
+//	"strings"
 
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
-	"github.com/signalfuse/signalfxproxy/jsonengines"
+//	"github.com/signalfuse/signalfxproxy/jsonengines"
 	"github.com/stretchr/testify/assert"
+	"strings"
+	"net/http/httptest"
+	"github.com/signalfuse/signalfxproxy/jsonengines"
 )
 
 const testCollectdBody = `[
@@ -131,7 +134,7 @@ func TestCollectDListener(t *testing.T) {
 	}()
 	resp, err := client.Do(req)
 	assert.Nil(t, err)
-	assert.Equal(t, resp.StatusCode, 200, "Request should work")
+	assert.Equal(t, resp.StatusCode, http.StatusOK, "Request should work")
 
 	assert.Equal(t, 4, len(collectdListener.GetStats()), "Request should work")
 
@@ -139,13 +142,13 @@ func TestCollectDListener(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
 	assert.Nil(t, err)
-	assert.Equal(t, resp.StatusCode, 400, "Request should work")
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Request should work")
 
 	req, _ = http.NewRequest("POST", "http://127.0.0.1:8081/post-collectd", bytes.NewBuffer([]byte(jsonBody)))
 	req.Header.Set("Content-Type", "application/plaintext")
 	resp, err = client.Do(req)
 	assert.Nil(t, err)
-	assert.Equal(t, resp.StatusCode, 400, "Request should work (Plaintext not supported)")
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode, "Request should work (Plaintext not supported)")
 
 }
 
@@ -159,19 +162,21 @@ func BenchmarkCollectdListener(b *testing.B) {
 			channel: make(chan core.Datapoint, 6),
 		}
 
-		listener := &collectdListenerServer{
-			datapointStreamingAPI: sendTo,
-			decodingEngine:        jsonEngine,
+		decoder := collectdJsonDecoder {
+			decodingEngine: jsonEngine,
+			datapointTracker: DatapointTracker {
+				DatapointStreamingAPI: sendTo,
+			},
 		}
 		writter := httptest.NewRecorder()
 		body := strings.NewReader(testCollectdBody)
 		req, err := http.NewRequest("GET", "http://example.com/collectd", body)
 		req.Header.Add("Content-type", "application/json")
+		decoder.ServeHTTP(writter, req)
 		bytes += int64(len(testCollectdBody))
-		listener.handleCollectd(writter, req)
+//		listener.handleCollectd(writter, req)
 		assert.NoError(b, err)
 		assert.Equal(b, 5, len(sendTo.channel))
-
 	}
 	b.SetBytes(bytes)
 }

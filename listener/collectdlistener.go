@@ -9,50 +9,25 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
-	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/jsonengines"
+	"github.com/gorilla/mux"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
+	"github.com/codegangsta/negroni"
+	"fmt"
 )
 
 type collectdListenerServer struct {
 	name                  string
 	listener              net.Listener
-	server                *http.Server
-	datapointStreamingAPI core.DatapointStreamingAPI
-	decodingEngine        jsonengines.JSONDecodingEngine
-
-	activeConnections int64
-	totalConnections  int64
-	totalDatapoints   int64
-	invalidRequests   int64
+	server                http.Server
+	collectdDecoder collectdJsonDecoder
 }
 
 func (streamer *collectdListenerServer) GetStats() []core.Datapoint {
 	ret := []core.Datapoint{}
-	stats := map[string]int64{
-		"total_datapoints":   atomic.LoadInt64(&streamer.totalDatapoints),
-		"invalid_requests":   atomic.LoadInt64(&streamer.invalidRequests),
-		"total_connections":  atomic.LoadInt64(&streamer.totalConnections),
-		"active_connections": atomic.LoadInt64(&streamer.activeConnections),
-	}
-	for k, v := range stats {
-		var t com_signalfuse_metrics_protobuf.MetricType
-		if k == "active_connections" {
-			t = com_signalfuse_metrics_protobuf.MetricType_GAUGE
-		} else {
-			t = com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER
-		}
-		ret = append(
-			ret,
-			protocoltypes.NewOnHostDatapointDimensions(
-				k,
-				value.NewIntWire(v),
-				t,
-				map[string]string{"listener": streamer.name}))
-	}
+	ret = append(ret, streamer.collectdDecoder.GetStats(map[string]string{"listener": streamer.name})...)
 	return ret
 }
 
@@ -60,49 +35,38 @@ func (streamer *collectdListenerServer) Close() {
 	streamer.listener.Close()
 }
 
-func (streamer *collectdListenerServer) jsonDecode(req *http.Request) error {
-	atomic.AddInt64(&streamer.totalConnections, 1)
-	atomic.AddInt64(&streamer.activeConnections, 1)
-	defer atomic.AddInt64(&streamer.activeConnections, -1)
-	//	dec := json.NewDecoder(req.Body)
-	d, err := streamer.decodingEngine.DecodeCollectdJSONWriteBody(req.Body)
-	//	var d protocoltypes.CollectdJSONWriteBody
+type collectdJsonDecoder struct {
+	TotalErrors int64
+	decodingEngine        jsonengines.JSONDecodingEngine
+	datapointTracker DatapointTracker
+	metricTracker MetricTrackingMiddleware
+}
+
+func (decoder *collectdJsonDecoder) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	d, err := decoder.decodingEngine.DecodeCollectdJSONWriteBody(req.Body)
 	if err != nil {
-		atomic.AddInt64(&streamer.invalidRequests, 1)
-		return err
+		atomic.AddInt64(&decoder.TotalErrors, 1)
+		rw.WriteHeader(http.StatusBadRequest)
+		rw.Write([]byte(fmt.Sprintf("Unable to decode json: %s", err.Error())))
+		return
 	}
 	for _, f := range d {
 		if f.TypeS != nil && f.Time != nil {
 			for i := range f.Dsnames {
 				if i < len(f.Dstypes) && i < len(f.Values) {
-					atomic.AddInt64(&streamer.totalDatapoints, 1)
-					streamer.datapointStreamingAPI.DatapointsChannel() <- protocoltypes.NewCollectdDatapoint(f, uint(i))
+					decoder.datapointTracker.AddDatapoint(protocoltypes.NewCollectdDatapoint(f, uint(i)))
 				}
 			}
 		}
 	}
-	return nil
+	rw.Write([]byte(`"OK"`))
 }
 
-func (streamer *collectdListenerServer) handleCollectd(writter http.ResponseWriter, req *http.Request) {
-	knownTypes := map[string]func(*http.Request) error{
-		"application/json": streamer.jsonDecode,
-	}
-	contentType := req.Header.Get("Content-type")
-	decoderFunc, ok := knownTypes[contentType]
-
-	if !ok {
-		writter.WriteHeader(http.StatusBadRequest)
-		writter.Write([]byte(`{msg:"Unknown content type"}`))
-		return
-	}
-	err := decoderFunc(req)
-	if err != nil {
-		writter.WriteHeader(http.StatusBadRequest)
-		writter.Write([]byte(err.Error()))
-	} else {
-		writter.WriteHeader(http.StatusOK)
-	}
+func (decoder *collectdJsonDecoder) GetStats(dimensions map[string]string) []core.Datapoint {
+	ret := []core.Datapoint{}
+	ret = append(ret, decoder.datapointTracker.GetStats(dimensions)...)
+	ret = append(ret, decoder.metricTracker.GetStats(dimensions)...)
+	return ret
 }
 
 var defaultCollectdConfig = &config.ListenFrom{
@@ -126,30 +90,34 @@ func CollectdListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, li
 // StartListeningCollectDHTTPOnPort servers http collectd requests
 func StartListeningCollectDHTTPOnPort(DatapointStreamingAPI core.DatapointStreamingAPI,
 	listenAddr string, listenPath string, clientTimeout time.Duration, decodingEngine jsonengines.JSONDecodingEngine) (DatapointListener, error) {
-	mux := http.NewServeMux()
 
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return nil, err
 	}
-	server := &http.Server{
-		Handler:      mux,
-		Addr:         listenAddr,
-		ReadTimeout:  clientTimeout,
-		WriteTimeout: clientTimeout,
-	}
+
+	r := mux.NewRouter()
 
 	listenServer := collectdListenerServer{
 		listener:              listener,
-		server:                server,
-		datapointStreamingAPI: DatapointStreamingAPI,
-		decodingEngine:        decodingEngine,
+		server:                http.Server{
+			Handler:      r,
+			Addr:         listenAddr,
+			ReadTimeout:  clientTimeout,
+			WriteTimeout: clientTimeout,
+		},
+		collectdDecoder: collectdJsonDecoder {
+			decodingEngine: decodingEngine,
+			datapointTracker: DatapointTracker {
+				DatapointStreamingAPI: DatapointStreamingAPI,
+			},
+		},
 	}
 
-	mux.HandleFunc(
-		listenPath,
-		listenServer.handleCollectd)
+	baseNegroni := negroni.New(&listenServer.collectdDecoder.metricTracker)
+	baseNegroni.UseHandler(&listenServer.collectdDecoder)
+	r.Path(listenPath).Headers("Content-type", "application/json").Handler(baseNegroni)
 
-	go server.Serve(listener)
+	go listenServer.server.Serve(listener)
 	return &listenServer, err
 }
