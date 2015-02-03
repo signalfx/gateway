@@ -4,14 +4,15 @@ import (
 	"net/http"
 	"sync/atomic"
 	"time"
-	"github.com/signalfuse/signalfxproxy/core"
+
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
-	"github.com/signalfuse/signalfxproxy/protocoltypes"
+	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
+	"github.com/signalfuse/signalfxproxy/protocoltypes"
 )
 
 type DatapointTracker struct {
-	TotalDatapoints int64
+	TotalDatapoints       int64
 	DatapointStreamingAPI core.DatapointStreamingAPI
 }
 
@@ -33,8 +34,8 @@ func (t *DatapointTracker) GetStats(dimensions map[string]string) []core.Datapoi
 }
 
 type MetricTrackingMiddleware struct {
-	TotalConnections  int64
-	ActiveConnections int64
+	TotalConnections      int64
+	ActiveConnections     int64
 	TotalProcessingTimeNs int64
 }
 
@@ -51,8 +52,8 @@ func (m *MetricTrackingMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Req
 func (m *MetricTrackingMiddleware) GetStats(dimensions map[string]string) []core.Datapoint {
 	ret := []core.Datapoint{}
 	stats := map[string]int64{
-		"total_connections":  atomic.LoadInt64(&m.TotalConnections),
-		"total_time_ns":  atomic.LoadInt64(&m.TotalProcessingTimeNs),
+		"total_connections": atomic.LoadInt64(&m.TotalConnections),
+		"total_time_ns":     atomic.LoadInt64(&m.TotalProcessingTimeNs),
 	}
 	for k, v := range stats {
 		ret = append(

@@ -5,17 +5,18 @@ import (
 	"net/http"
 	"testing"
 
-//	"net/http/httptest"
-//	"strings"
+	//	"net/http/httptest"
+	//	"strings"
 
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
-//	"github.com/signalfuse/signalfxproxy/jsonengines"
-	"github.com/stretchr/testify/assert"
-	"strings"
+	//	"github.com/signalfuse/signalfxproxy/jsonengines"
 	"net/http/httptest"
+	"strings"
+
 	"github.com/signalfuse/signalfxproxy/jsonengines"
+	"github.com/stretchr/testify/assert"
 )
 
 const testCollectdBody = `[
@@ -162,9 +163,9 @@ func BenchmarkCollectdListener(b *testing.B) {
 			channel: make(chan core.Datapoint, 6),
 		}
 
-		decoder := collectdJsonDecoder {
+		decoder := collectdJsonDecoder{
 			decodingEngine: jsonEngine,
-			datapointTracker: DatapointTracker {
+			datapointTracker: DatapointTracker{
 				DatapointStreamingAPI: sendTo,
 			},
 		}
@@ -174,7 +175,7 @@ func BenchmarkCollectdListener(b *testing.B) {
 		req.Header.Add("Content-type", "application/json")
 		decoder.ServeHTTP(writter, req)
 		bytes += int64(len(testCollectdBody))
-//		listener.handleCollectd(writter, req)
+		//		listener.handleCollectd(writter, req)
 		assert.NoError(b, err)
 		assert.Equal(b, 5, len(sendTo.channel))
 	}

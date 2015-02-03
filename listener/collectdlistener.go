@@ -6,27 +6,30 @@ import (
 	"sync/atomic"
 	"time"
 
+	"fmt"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
+	"github.com/codegangsta/negroni"
+	"github.com/gorilla/mux"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/jsonengines"
-	"github.com/gorilla/mux"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
-	"github.com/codegangsta/negroni"
-	"fmt"
 )
 
 type collectdListenerServer struct {
-	name                  string
-	listener              net.Listener
-	server                http.Server
-	collectdDecoder collectdJsonDecoder
+	name                     string
+	listener                 net.Listener
+	server                   http.Server
+	collectdDecoder          collectdJsonDecoder
+	metricTrackingMiddleware MetricTrackingMiddleware
 }
 
 func (streamer *collectdListenerServer) GetStats() []core.Datapoint {
 	ret := []core.Datapoint{}
+	ret = append(ret, streamer.metricTrackingMiddleware.GetStats(map[string]string{"listener": streamer.name})...)
 	ret = append(ret, streamer.collectdDecoder.GetStats(map[string]string{"listener": streamer.name})...)
 	return ret
 }
@@ -36,10 +39,9 @@ func (streamer *collectdListenerServer) Close() {
 }
 
 type collectdJsonDecoder struct {
-	TotalErrors int64
-	decodingEngine        jsonengines.JSONDecodingEngine
+	TotalErrors      int64
+	decodingEngine   jsonengines.JSONDecodingEngine
 	datapointTracker DatapointTracker
-	metricTracker MetricTrackingMiddleware
 }
 
 func (decoder *collectdJsonDecoder) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -62,10 +64,10 @@ func (decoder *collectdJsonDecoder) ServeHTTP(rw http.ResponseWriter, req *http.
 	rw.Write([]byte(`"OK"`))
 }
 
+// Usually want "listener: "<Name>"
 func (decoder *collectdJsonDecoder) GetStats(dimensions map[string]string) []core.Datapoint {
 	ret := []core.Datapoint{}
 	ret = append(ret, decoder.datapointTracker.GetStats(dimensions)...)
-	ret = append(ret, decoder.metricTracker.GetStats(dimensions)...)
 	return ret
 }
 
@@ -99,24 +101,23 @@ func StartListeningCollectDHTTPOnPort(DatapointStreamingAPI core.DatapointStream
 	r := mux.NewRouter()
 
 	listenServer := collectdListenerServer{
-		listener:              listener,
-		server:                http.Server{
+		listener: listener,
+		server: http.Server{
 			Handler:      r,
 			Addr:         listenAddr,
 			ReadTimeout:  clientTimeout,
 			WriteTimeout: clientTimeout,
 		},
-		collectdDecoder: collectdJsonDecoder {
+		collectdDecoder: collectdJsonDecoder{
 			decodingEngine: decodingEngine,
-			datapointTracker: DatapointTracker {
+			datapointTracker: DatapointTracker{
 				DatapointStreamingAPI: DatapointStreamingAPI,
 			},
 		},
 	}
 
-	baseNegroni := negroni.New(&listenServer.collectdDecoder.metricTracker)
-	baseNegroni.UseHandler(&listenServer.collectdDecoder)
-	r.Path(listenPath).Headers("Content-type", "application/json").Handler(baseNegroni)
+	n := negroni.New(&listenServer.metricTrackingMiddleware, negroni.Wrap(&listenServer.collectdDecoder))
+	r.Path(listenPath).Headers("Content-type", "application/json").Handler(n)
 
 	go listenServer.server.Serve(listener)
 	return &listenServer, err

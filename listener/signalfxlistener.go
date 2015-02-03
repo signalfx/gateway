@@ -17,6 +17,8 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
+	"github.com/codegangsta/negroni"
+	"github.com/gorilla/mux"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
@@ -33,6 +35,8 @@ type listenerServer struct {
 
 	collectdHandler       collectdJsonDecoder
 	datapointStreamingAPI core.DatapointStreamingAPI
+
+	collectdTracking MetricTrackingMiddleware
 
 	protobufPoints   int64
 	jsonPoints       int64
@@ -130,6 +134,7 @@ func (streamer *listenerServer) GetStats() []core.Datapoint {
 				map[string]string{"listener": streamer.name, "type": keyType}))
 	}
 	ret = append(ret, streamer.collectdHandler.GetStats(map[string]string{"listener": streamer.name})...)
+	ret = append(ret, streamer.collectdTracking.GetStats(map[string]string{"listener": streamer.name})...)
 	return ret
 }
 
@@ -352,7 +357,7 @@ type decoderFunc func() func(*http.Request) error
 // StartServingHTTPOnPort servers http requests for Signalfx datapoints
 func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.DatapointStreamingAPI,
 	clientTimeout time.Duration, name string, decodingEngine jsonengines.JSONDecodingEngine) (DatapointListener, error) {
-	mux := http.NewServeMux()
+	r := mux.NewRouter()
 
 	datapointHandler := func(
 		writter http.ResponseWriter,
@@ -388,7 +393,7 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 	}
 
 	server := http.Server{
-		Handler:      mux,
+		Handler:      r,
 		Addr:         listenAddr,
 		ReadTimeout:  clientTimeout,
 		WriteTimeout: clientTimeout,
@@ -401,17 +406,13 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 		listener:                listener,
 		metricCreationsMap:      make(map[string]com_signalfuse_metrics_protobuf.MetricType),
 		metricCreationsMapMutex: sync.Mutex{},
-		collectdHandler: collectdJsonDecoder {
+		collectdHandler: collectdJsonDecoder{
 			decodingEngine: decodingEngine,
-			datapointTracker: DatapointTracker {
+			datapointTracker: DatapointTracker{
 				DatapointStreamingAPI: DatapointStreamingAPI,
 			},
 		},
 		datapointStreamingAPI: DatapointStreamingAPI,
-	}
-
-	collectdHandlerV1 := func(writter http.ResponseWriter, req *http.Request) {
-		listenServer.collectdHandler.ServeHTTP(writter, req)
 	}
 
 	datapointHandlerV1 := func(writter http.ResponseWriter, req *http.Request) {
@@ -462,22 +463,23 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 		datapointHandler(writter, req, knownTypes, total, active, error)
 	}
 
-	mux.HandleFunc(
+	r.HandleFunc(
 		"/datapoint",
 		datapointHandlerV1)
-	mux.HandleFunc(
+	r.HandleFunc(
 		"/v1/datapoint",
 		datapointHandlerV1)
-	mux.HandleFunc(
+	r.HandleFunc(
 		"/v2/datapoint",
 		datapointHandlerV2)
-	mux.HandleFunc(
-		"/v1/collectd",
-		collectdHandlerV1)
-	mux.HandleFunc(
+
+	n := negroni.New(&listenServer.collectdTracking, negroni.Wrap(&listenServer.collectdHandler))
+	r.Path("/v1/collectd").Headers("Content-type", "application/json").Handler(n)
+
+	r.HandleFunc(
 		"/v1/metric",
 		listenServer.metricHandler)
-	mux.HandleFunc(
+	r.HandleFunc(
 		"/metric",
 		listenServer.metricHandler)
 	go server.Serve(listener)
