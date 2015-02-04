@@ -43,7 +43,7 @@ type proxyCommandLineConfigurationT struct {
 	stopChannel                   chan bool
 	closeWhenWaitingToStopChannel chan struct{}
 	logJSON                       bool
-	allForwarders                 []core.DatapointStreamingAPI
+	allForwarders                 []core.StatKeepingStreamingAPI
 	allListeners                  []listener.DatapointListener
 	statDrainThread               core.StatDrainingThread
 }
@@ -120,8 +120,8 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus
 	})
 }
 
-func setupForwarders(loadedConfig *config.LoadedConfig) ([]core.DatapointStreamingAPI, error) {
-	allForwarders := make([]core.DatapointStreamingAPI, 0, len(loadedConfig.ForwardTo))
+func setupForwarders(loadedConfig *config.LoadedConfig) ([]core.StatKeepingStreamingAPI, error) {
+	allForwarders := make([]core.StatKeepingStreamingAPI, 0, len(loadedConfig.ForwardTo))
 	allStatKeepers := []core.StatKeeper{stats.NewGolangStatKeeper()}
 	for _, forwardConfig := range loadedConfig.ForwardTo {
 		loader, ok := forwarder.AllForwarderLoaders[forwardConfig.Type]
@@ -175,6 +175,22 @@ func setupDebugServer(allStatKeepers []core.StatKeeper, loadedConfig *config.Loa
 	}
 }
 
+func recast(input []core.StatKeepingStreamingAPI) []core.DatapointStreamingAPI {
+	var ret []core.DatapointStreamingAPI
+	for _, i := range input {
+		ret = append(ret, i)
+	}
+	return ret
+}
+
+func recastSK(input []listener.DatapointListener) []core.StatKeeper {
+	var ret []core.StatKeeper
+	for _, i := range input {
+		ret = append(ret, i)
+	}
+	return ret
+}
+
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() error {
 	log.WithField("configFile", proxyCommandLineConfiguration.configFileName).Info("Looking for config file")
 
@@ -206,7 +222,7 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() erro
 		return err
 	}
 	allStatKeepers := []core.StatKeeper{stats.NewGolangStatKeeper()}
-	multiplexer := forwarder.NewStreamingDatapointDemultiplexer(proxyCommandLineConfiguration.allForwarders)
+	multiplexer := forwarder.NewStreamingDatapointDemultiplexer(recast(proxyCommandLineConfiguration.allForwarders))
 	allStatKeepers = append(allStatKeepers, multiplexer)
 
 	proxyCommandLineConfiguration.allListeners, err = setupListeners(loadedConfig, multiplexer)
@@ -215,12 +231,14 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() erro
 	}
 	// I wish I could do this, but golang doesn't allow append() of super/sub types
 	// allStatKeepers = append(allStatKeepers, proxyCommandLineConfiguration.allListeners...)
-	for _, listener := range proxyCommandLineConfiguration.allListeners {
-		allStatKeepers = append(allStatKeepers, listener)
+	allStatKeepers = append(allStatKeepers, recastSK(proxyCommandLineConfiguration.allListeners)...)
+
+	for _, forwarder := range proxyCommandLineConfiguration.allForwarders {
+		allStatKeepers = append(allStatKeepers, forwarder)
 	}
 
 	if loadedConfig.StatsDelayDuration != nil && *loadedConfig.StatsDelayDuration != 0 {
-		proxyCommandLineConfiguration.statDrainThread = core.NewStatDrainingThread(*loadedConfig.StatsDelayDuration, proxyCommandLineConfiguration.allForwarders, allStatKeepers, proxyCommandLineConfiguration.stopChannel)
+		proxyCommandLineConfiguration.statDrainThread = core.NewStatDrainingThread(*loadedConfig.StatsDelayDuration, recast(proxyCommandLineConfiguration.allForwarders), allStatKeepers, proxyCommandLineConfiguration.stopChannel)
 		go proxyCommandLineConfiguration.statDrainThread.Start()
 	} else {
 		log.Info("Skipping stat keeping")
