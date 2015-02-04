@@ -32,9 +32,7 @@ ADD signalfxproxy_test.go /opt/go/src/github.com/signalfuse/signalfxproxy/
 
 ADD exampleSfdbproxy.conf /opt/go/src/github.com/signalfuse/signalfxproxy/
 ADD travis_check.sh /opt/go/src/github.com/signalfuse/signalfxproxy/
-ADD install.sh /opt/go/src/github.com/signalfuse/signalfxproxy/
 ADD signalfxproxy /opt/go/src/github.com/signalfuse/signalfxproxy/
-RUN ln -s /opt/go/src/github.com/signalfuse/signalfxproxy/signalfxproxy /etc/init.d/signalfxproxy
 
 ADD README.md /opt/go/src/github.com/signalfuse/signalfxproxy/
 
@@ -45,6 +43,8 @@ RUN go env && go version
 # even inside the image
 RUN go get -t -d -v github.com/signalfuse/signalfxproxy/...
 RUN go test -cpu 2 -parallel 8 github.com/signalfuse/signalfxproxy/...
+RUN go install -v -x github.com/signalfuse/signalfxproxy
+RUN touch /opt/go/bin/signalfxproxy
 
 ENV PATH $GOPATH/bin:$PATH
 
