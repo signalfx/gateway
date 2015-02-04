@@ -4,8 +4,15 @@ import (
 	"fmt"
 	"testing"
 
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"runtime/debug"
+	"time"
+
+	"code.google.com/p/goprotobuf/proto"
 	log "github.com/Sirupsen/logrus"
-	"github.com/cep21/gohelpers/a"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
@@ -14,22 +21,9 @@ import (
 	"github.com/signalfuse/signalfxproxy/listener"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 	"github.com/stretchr/testify/assert"
-	//	"time"
-	"encoding/json"
-	"errors"
-	"io"
-	"io/ioutil"
-	"time"
-
-	"code.google.com/p/goprotobuf/proto"
 )
 
-var jsonUnmarshalObj a.JsonUnmarshalObj
-var ioutilReadAllObj a.IoutilReadAllObj
-
 func init() {
-	jsonXXXUnmarshal = jsonUnmarshalObj.Execute
-	ioutilXXXReadAll = ioutilReadAllObj.Execute
 	log.SetLevel(log.DebugLevel)
 }
 
@@ -84,33 +78,35 @@ func TestFilterSignalfxString(t *testing.T) {
 	assert.Equal(t, "_hello_bob1__", filterSignalfxKey(".hello:bob1_&"), "Filter not working")
 }
 
-func TestSignalfxJSONForwarderLoader(t *testing.T) {
+func setupServerForwarder(t *testing.T) (*basicBufferedForwarder, listener.DatapointListener, *signalfxJSONConnector) {
 	// TODO: Break this out into smaller tests
 	listenFromSignalfx := config.ListenFrom{}
 	listenFromSignalfx.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
 
 	finalDatapointDestination := newBasicBufferedForwarder(100, 1, "", 1)
 	l, err := listener.SignalFxListenerLoader(finalDatapointDestination, &listenFromSignalfx)
-	defer l.Close()
 	assert.Equal(t, nil, err, "Expect no error")
 
 	port := getListenerPort(l)
 
 	forwardTo := config.ForwardTo{
-		URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral(fmt.Sprintf("http://127.0.0.1:%d/v1/datapoint", port)),
-		TimeoutDuration:   workarounds.GolangDoesnotAllowPointerToDurationLiteral(time.Second * 1),
-		MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral(fmt.Sprintf("http://127.0.0.1:%d/v1/metric", port)),
-		DefaultAuthToken:  workarounds.GolangDoesnotAllowPointerToStringLiteral("AUTH_TOKEN"),
-		DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral("proxy-source"),
-		SourceDimensions:  workarounds.GolangDoesnotAllowPointerToStringLiteral("username,ignored,hostname"),
+		URL:              workarounds.GolangDoesnotAllowPointerToStringLiteral(fmt.Sprintf("http://127.0.0.1:%d/v2/datapoint", port)),
+		TimeoutDuration:  workarounds.GolangDoesnotAllowPointerToDurationLiteral(time.Second * 1),
+		DefaultAuthToken: workarounds.GolangDoesnotAllowPointerToStringLiteral("AUTH_TOKEN"),
+		DefaultSource:    workarounds.GolangDoesnotAllowPointerToStringLiteral("proxy-source"),
+		SourceDimensions: workarounds.GolangDoesnotAllowPointerToStringLiteral("username,ignored,hostname"),
 	}
 
 	forwarder, err := SignalfxJSONForwarderLoader(&forwardTo)
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, "signalfx-forwarder", forwarder.Name(), "Expect no error")
 	assert.Equal(t, 1, len(forwarder.GetStats()), "Expect no stats")
+	return finalDatapointDestination, l, forwarder.(*signalfxJSONConnector)
+}
 
-	sfForwarder, _ := forwarder.(*signalfxJSONConnector)
+func TestDefaultSource(t *testing.T) {
+	finalDatapointDestination, l, forwarder := setupServerForwarder(t)
+	defer l.Close()
 
 	timeToSend := time.Now().Round(time.Second)
 	dpSent := core.NewAbsoluteTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
@@ -119,146 +115,159 @@ func TestSignalfxJSONForwarderLoader(t *testing.T) {
 	i := dpRecieved.Value().(value.IntDatapoint).IntValue()
 	assert.Equal(t, int64(2), i, "Expect 2 back")
 	assert.Equal(t, "proxy-source", dpRecieved.Dimensions()["sf_source"], "Expect ahost back")
+	assert.Equal(t, timeToSend, dpRecieved.Timestamp())
+}
 
-	timeToSend = time.Now().Round(time.Second)
-	dpSent = core.NewAbsoluteTimeDatapoint("metric", map[string]string{"cpusize": "big", "hostname": "ahost"}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
+func TestSetSource(t *testing.T) {
+	finalDatapointDestination, l, forwarder := setupServerForwarder(t)
+	defer l.Close()
+
+	timeToSend := time.Now().Round(time.Second)
+	dpSent := core.NewAbsoluteTimeDatapoint("metric", map[string]string{"cpusize": "big", "hostname": "ahost"}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
 	forwarder.DatapointsChannel() <- dpSent
-	dpRecieved = <-finalDatapointDestination.datapointsChannel
-	i = dpRecieved.Value().(value.IntDatapoint).IntValue()
+	dpRecieved := <-finalDatapointDestination.datapointsChannel
+	i := dpRecieved.Value().(value.IntDatapoint).IntValue()
 	assert.Equal(t, int64(2), i, "Expect 2 back")
 	assert.Equal(t, "ahost", dpRecieved.Dimensions()["sf_source"], "Expect ahost back")
+	assert.Equal(t, timeToSend, dpRecieved.Timestamp())
+}
 
-	dpSent = core.NewAbsoluteTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
-	forwarder.DatapointsChannel() <- dpSent
-	dpRecieved = <-finalDatapointDestination.datapointsChannel
-	i = dpRecieved.Value().(value.IntDatapoint).IntValue()
-	assert.Equal(t, 2, i, "Expect 2 back")
-
-	dpStr := core.NewAbsoluteTimeDatapoint("metric", map[string]string{}, value.NewStrWire("astr"), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
-	forwarder.DatapointsChannel() <- dpStr
-	dpRecieved = <-finalDatapointDestination.datapointsChannel
-	assert.Equal(t, "astr", dpRecieved.Value().String(), "Expect 2 back")
-
-	// No source should mean we don't ask for the metric
-	sfForwarder.defaultSource = ""
-	dp := &metricPanicDatapoint{dpSent}
-	err = sfForwarder.process([]core.Datapoint{dp})
-	sfForwarder.defaultSource = "proxy"
-	assert.Equal(t, nil, err, "Expect no error")
-
-	dpSent = core.NewAbsoluteTimeDatapoint("metric", map[string]string{}, value.NewFloatWire(2.0), com_signalfuse_metrics_protobuf.MetricType_COUNTER, timeToSend)
-	forwarder.DatapointsChannel() <- dpSent
-	dpRecieved = <-finalDatapointDestination.datapointsChannel
-	f := dpRecieved.Value().(value.FloatValue).FloatValue()
-	assert.Equal(t, 2.0, f, "Expect 2 back")
-	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_COUNTER, dpRecieved.MetricType(), "Expect 2 back")
-
-	dpSent = core.NewRelativeTimeDatapoint("metric", map[string]string{}, value.NewFloatWire(2.0), com_signalfuse_metrics_protobuf.MetricType_COUNTER, -1)
-	forwarder.DatapointsChannel() <- dpSent
-	dpRecieved = <-finalDatapointDestination.datapointsChannel
-	ts, _ := dpRecieved.(core.TimeRelativeDatapoint)
-	assert.Equal(t, int64(-1), ts.RelativeTime(), "Expect -1 time ago")
-
-	log.WithField("chanlen", len(finalDatapointDestination.datapointsChannel)).Info("Starting failing test")
-	dpSent = core.NewRelativeTimeDatapoint("metricnowacounter", map[string]string{"sf_source": "asource"}, value.NewFloatWire(2.0), com_signalfuse_metrics_protobuf.MetricType_COUNTER, -1)
-	forwarder.DatapointsChannel() <- dpSent
-	dpRecieved = <-finalDatapointDestination.datapointsChannel
-	_, ok := sfForwarder.v1MetricLoadedCache["metricnowacounter"]
-	assert.Equal(t, true, ok, "Expected asource")
-	assert.Equal(t, "asource", dpRecieved.Dimensions()["sf_source"], "Expected asource for %s", dpRecieved)
-
-	sfForwarder.MetricCreationURL = "http://127.0.0.1:21/asfd" // invalid
-	dpSent = core.NewRelativeTimeDatapoint("anotermetric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_COUNTER, -1)
-	sfForwarder.process([]core.Datapoint{dpSent})
-	assert.Equal(t, 0, len(finalDatapointDestination.datapointsChannel), "Expect no metrics")
-	sfForwarder.MetricCreationURL = fmt.Sprintf("http://127.0.0.1:%d/v1/metric", port)
-
-	_, _, err = sfForwarder.encodePostBodyV2([]core.Datapoint{core.NewRelativeTimeDatapoint("anotermetric", map[string]string{}, value.NewFloatWire(2.0), com_signalfuse_metrics_protobuf.MetricType_COUNTER, -1)})
+func TestSignalfxJSONForwarderLoaderOldVersion(t *testing.T) {
+	forwardTo := config.ForwardTo{
+		FormatVersion:    workarounds.GolangDoesnotAllowPointerToUintLiteral(1),
+		DefaultAuthToken: workarounds.GolangDoesnotAllowPointerToStringLiteral("AUTH_TOKEN"),
+	}
+	_, err := SignalfxJSONForwarderLoader(&forwardTo)
 	assert.NoError(t, err)
+}
 
-	err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{})
-	assert.Equal(t, nil, err, "Expected no error making no metrics")
+func TestNoSource(t *testing.T) {
+	finalDatapointDestination, l, forwarder := setupServerForwarder(t)
+	defer l.Close()
 
-	jsonXXXMarshal = func(interface{}) ([]byte, error) { return nil, errors.New("json marshal issue") }
-	err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"m": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
-	assert.NotEqual(t, nil, err, "Expected no error making no metrics")
-	jsonXXXMarshal = json.Marshal
+	forwarder.defaultSource = ""
+	timeToSend := time.Now().Round(time.Second)
+	dpSent := core.NewAbsoluteTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
+	forwarder.DatapointsChannel() <- dpSent
+	dpRecieved := <-finalDatapointDestination.datapointsChannel
+	i := dpRecieved.Value().(value.IntDatapoint).IntValue()
+	assert.Equal(t, 2, i, "Expect 2 back")
+	val, exists := dpRecieved.Dimensions()["sf_source"]
+	assert.False(t, exists, val)
+}
 
-	func() {
-		ioutilReadAllObj.UseFunction(func(r io.Reader) ([]byte, error) { return nil, errors.New("ioutil") })
-		defer ioutilReadAllObj.Reset()
-		err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"m": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
-		assert.Contains(t, err.Error(), "ioutil", "Expected ioutil issue")
-	}()
+func TestDatumForPoint(t *testing.T) {
+	assert.Equal(t, 3, datumForPoint(value.NewIntWire(3)).GetIntValue())
+	assert.Equal(t, 0.0, datumForPoint(value.NewIntWire(3)).GetDoubleValue())
+	assert.Equal(t, .1, datumForPoint(value.NewFloatWire(.1)).GetDoubleValue())
+	assert.Equal(t, "hi", datumForPoint(value.NewStrWire("hi")).GetStrValue())
+}
 
-	sfForwarder.MetricCreationURL = fmt.Sprintf("http://127.0.0.1:%d/vmetric", port)
-	err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"m": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
-	assert.Contains(t, err.Error(), "invalid status code", "Expected status code 404")
-	sfForwarder.MetricCreationURL = fmt.Sprintf("http://127.0.0.1:%d/v1/metric", port)
+func TestCoreDatapointToProtobuf(t *testing.T) {
+	c := signalfxJSONConnector{
+		dimensionSources: []string{},
+	}
+	point := core.NewRelativeTimeDatapoint("metric", map[string]string{}, value.NewIntWire(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
 
-	func() {
-		ioutilReadAllObj.UseFunction(func(r io.Reader) ([]byte, error) { return []byte("InvalidJson"), nil })
-		defer ioutilReadAllObj.Reset()
-		err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"m": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
-		assert.Contains(t, err.Error(), "invalid character", "Expected ioutil issue")
-	}()
+	dp := c.coreDatapointToProtobuf(point)
+	assert.Equal(t, 0, dp.GetTimestamp())
+}
 
-	func() {
-		ioutilReadAllObj.UseFunction(func(r io.Reader) ([]byte, error) { return []byte("InvalidJson"), nil })
-		defer ioutilReadAllObj.Reset()
-		err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"m": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
-		assert.Contains(t, err.Error(), "invalid character", "Expected ioutil issue")
-	}()
+func TestConnectorProcessProtoError(t *testing.T) {
+	f := signalfxJSONConnector{
+		protoMarshal: func(pb proto.Message) ([]byte, error) {
+			return nil, fmt.Errorf("Marshal error")
+		},
+	}
+	err := f.process([]core.Datapoint{})
+	assert.Equal(t, "Marshal error", err.Error())
+}
 
-	func() {
-		ioutilReadAllObj.UseFunction(func(r io.Reader) ([]byte, error) { return []byte(`[{"code":203}]`), nil })
-		defer ioutilReadAllObj.Reset()
-		err = sfForwarder.createMetricsOfType(map[string]com_signalfuse_metrics_protobuf.MetricType{"wontexist": com_signalfuse_metrics_protobuf.MetricType_COUNTER})
-		assert.Equal(t, nil, err, "Expected no error making no metrics")
-		_, ok = sfForwarder.v1MetricLoadedCache["wontexist"]
-		assert.Equal(t, false, ok, "Should not make")
-	}()
+type roundTripTest func(r *http.Request) (*http.Response, error)
 
-	protoXXXMarshal = func(r proto.Message) ([]byte, error) { return nil, errors.New("proto encode error") }
-	_, _, err = sfForwarder.encodePostBodyV1([]core.Datapoint{dpSent})
-	assert.Equal(t, "proto encode error", err.Error(), "Expected error encoding protobufs")
-	protoXXXMarshal = proto.Marshal
+func (r roundTripTest) RoundTrip(req *http.Request) (*http.Response, error) {
+	return r(req)
+}
 
-	sfForwarder.sendVersion = 2
-	_, _, err = sfForwarder.encodePostBody([]core.Datapoint{dpSent, dpStr})
-	sfForwarder.sendVersion = 1
-	assert.Equal(t, nil, err, "Expected no error making metrics")
+func TestClientReqError(t *testing.T) {
+	f := signalfxJSONConnector{
+		client: &http.Client{
+			Transport: roundTripTest(func(r *http.Request) (*http.Response, error) {
+				debug.PrintStack()
+				return nil, fmt.Errorf("Unable to execute http request")
+			}),
+		},
+	}
+	err := f.process([]core.Datapoint{})
+	assert.Contains(t, err.Error(), "Unable to execute http request")
+}
 
-	sfForwarder.sendVersion = 3
-	_, _, err = sfForwarder.encodePostBody([]core.Datapoint{dpSent, dpStr})
-	sfForwarder.sendVersion = 1
-	assert.Equal(t, nil, err, "Expected no error making metrics")
+type readError struct {
+}
 
-	prevURL := sfForwarder.url
-	sfForwarder.url = "http://127.0.0.1:12333/vvv/s"
-	err = sfForwarder.process([]core.Datapoint{dpSent})
-	assert.Contains(t, err.Error(), "connection refused", "Expected error posting points")
-	sfForwarder.url = prevURL
+func (r *readError) Read([]byte) (int, error) {
+	return 0, fmt.Errorf("Read error!")
+}
 
-	sfForwarder.url = fmt.Sprintf("http://127.0.0.1:%d/v1/metric", port)
-	err = sfForwarder.process([]core.Datapoint{dpSent})
-	assert.Contains(t, err.Error(), "invalid status code", "Expected error posting points to metric creation url")
-	sfForwarder.url = prevURL
+func TestResponseBodyError(t *testing.T) {
+	f := signalfxJSONConnector{
+		client: &http.Client{
+			Transport: roundTripTest(func(r *http.Request) (*http.Response, error) {
+				r2 := http.Response{
+					Body: ioutil.NopCloser(&readError{}),
+				}
+				return &r2, nil
+			}),
+		},
+	}
+	err := f.process([]core.Datapoint{})
+	assert.Equal(t, "Read error!", err.Error())
+}
 
-	ioutilXXXReadAll = func(r io.Reader) ([]byte, error) { return nil, errors.New("ioutil") }
-	err = sfForwarder.process([]core.Datapoint{dpSent})
-	assert.Equal(t, "ioutil", err.Error(), "Expected ioutil decoding response")
-	ioutilXXXReadAll = ioutil.ReadAll
+func TestResponseBadStatus(t *testing.T) {
+	f := signalfxJSONConnector{
+		client: &http.Client{
+			Transport: roundTripTest(func(r *http.Request) (*http.Response, error) {
+				r2 := http.Response{
+					Body:       ioutil.NopCloser(bytes.NewBufferString("")),
+					StatusCode: 404,
+				}
+				return &r2, nil
+			}),
+		},
+	}
+	err := f.process([]core.Datapoint{})
+	assert.Contains(t, err.Error(), "invalid status code")
+}
 
-	func() {
-		jsonUnmarshalObj.UseFunction(func([]byte, interface{}) error { return errors.New("jsonUnmarshalError") })
-		defer jsonUnmarshalObj.Reset()
-		err = sfForwarder.process([]core.Datapoint{dpSent})
-		assert.Equal(t, "jsonUnmarshalError", err.Error(), "Expected ioutil decoding response")
-	}()
+func TestResponseBadJSON(t *testing.T) {
+	f := signalfxJSONConnector{
+		client: &http.Client{
+			Transport: roundTripTest(func(r *http.Request) (*http.Response, error) {
+				r2 := http.Response{
+					Body:       ioutil.NopCloser(bytes.NewBufferString("INVALID_JSON")),
+					StatusCode: 200,
+				}
+				return &r2, nil
+			}),
+		},
+	}
+	err := f.process([]core.Datapoint{})
+	assert.IsType(t, &json.SyntaxError{}, err)
+}
 
-	ioutilXXXReadAll = func(r io.Reader) ([]byte, error) { return []byte(`"invalidbody"`), nil }
-	err = sfForwarder.process([]core.Datapoint{dpSent})
-	assert.Contains(t, err.Error(), "Body decode error", "Expected body decoding error")
-	ioutilXXXReadAll = ioutil.ReadAll
+func TestResponseBadBody(t *testing.T) {
+	f := signalfxJSONConnector{
+		client: &http.Client{
+			Transport: roundTripTest(func(r *http.Request) (*http.Response, error) {
+				r2 := http.Response{
+					Body:       ioutil.NopCloser(bytes.NewBufferString(`"BAD"`)),
+					StatusCode: 200,
+				}
+				return &r2, nil
+			}),
+		},
+	}
+	err := f.process([]core.Datapoint{})
+	assert.Contains(t, err.Error(), "Body decode error")
 }

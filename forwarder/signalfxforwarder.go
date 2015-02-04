@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
 
@@ -22,49 +21,23 @@ import (
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
-	"github.com/signalfuse/signalfxproxy/protocoltypes"
 )
-
-var jsonXXXMarshal = json.Marshal
-var protoXXXMarshal = proto.Marshal
-var jsonXXXUnmarshal = json.Unmarshal
-var ioutilXXXReadAll = ioutil.ReadAll
-
-type metricCreationRequest struct {
-	toCreate        map[string]com_signalfuse_metrics_protobuf.MetricType
-	responseChannel chan (error)
-}
 
 type signalfxJSONConnector struct {
 	*basicBufferedForwarder
-	url                string
-	metricCreationChan chan *metricCreationRequest
-	connectionTimeout  time.Duration
-	defaultAuthToken   string
-	tr                 *http.Transport
-	sendVersion        int
-	client             *http.Client
-	userAgent          string
-	defaultSource      string
-	dimensionSources   []string
-	// Map of all metric names to if we've created them with their metric type
-	v1MetricLoadedCache      map[string]struct{}
-	v1MetricLoadedCacheMutex sync.Mutex
-	MetricCreationURL        string
+	url               string
+	connectionTimeout time.Duration
+	defaultAuthToken  string
+	tr                *http.Transport
+	client            *http.Client
+	userAgent         string
+	defaultSource     string
+	dimensionSources  []string
+
+	protoMarshal protoMarshalStub
 }
 
-var defaultConfigV1 = &config.ForwardTo{
-	URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfuse.com/v1/datapoint"),
-	DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
-	MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfuse.com/v1/metric?bulkupdate=true"),
-	TimeoutDuration:   workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
-	BufferSize:        workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(10000)),
-	DrainingThreads:   workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(5)),
-	Name:              workarounds.GolangDoesnotAllowPointerToStringLiteral("signalfx-forwarder"),
-	MaxDrainSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1000)),
-	SourceDimensions:  workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
-	FormatVersion:     workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1)),
-}
+type protoMarshalStub func(pb proto.Message) ([]byte, error)
 
 var defaultConfigV2 = &config.ForwardTo{
 	URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfuse.com/v2/datapoint"),
@@ -81,21 +54,23 @@ var defaultConfigV2 = &config.ForwardTo{
 
 // SignalfxJSONForwarderLoader loads a json forwarder forwarding points from proxy to SignalFx
 func SignalfxJSONForwarderLoader(forwardTo *config.ForwardTo) (core.StatKeepingStreamingAPI, error) {
-	if forwardTo.FormatVersion == nil || *forwardTo.FormatVersion == 1 {
-		structdefaults.FillDefaultFrom(forwardTo, defaultConfigV1)
-	} else if *forwardTo.FormatVersion == 2 || *forwardTo.FormatVersion == 3 {
-		structdefaults.FillDefaultFrom(forwardTo, defaultConfigV2)
+	if forwardTo.FormatVersion == nil {
+		forwardTo.FormatVersion = workarounds.GolangDoesnotAllowPointerToUintLiteral(3)
 	}
+	if *forwardTo.FormatVersion == 1 {
+		log.WithField("forwardTo", forwardTo).Warn("Old formats not supported in signalfxforwarder.  Using newer format.  Please update config to use format version 2 or 3")
+	}
+	structdefaults.FillDefaultFrom(forwardTo, defaultConfigV2)
 	log.WithField("forwardTo", forwardTo).Info("Creating signalfx forwarder using final config")
 	return NewSignalfxJSONForwarer(*forwardTo.URL, *forwardTo.TimeoutDuration, *forwardTo.BufferSize,
-		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads, *forwardTo.Name, *forwardTo.MetricCreationURL,
-		*forwardTo.MaxDrainSize, *forwardTo.DefaultSource, *forwardTo.SourceDimensions, int(*forwardTo.FormatVersion))
+		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads, *forwardTo.Name,
+		*forwardTo.MaxDrainSize, *forwardTo.DefaultSource, *forwardTo.SourceDimensions)
 }
 
 // NewSignalfxJSONForwarer creates a new JSON forwarder
 func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint32,
-	defaultAuthToken string, drainingThreads uint32, name string, MetricCreationURL string,
-	maxDrainSize uint32, defaultSource string, sourceDimensions string, sendVersion int) (core.StatKeepingStreamingAPI, error) {
+	defaultAuthToken string, drainingThreads uint32, name string,
+	maxDrainSize uint32, defaultSource string, sourceDimensions string) (core.StatKeepingStreamingAPI, error) {
 	tr := &http.Transport{
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 		MaxIdleConnsPerHost:   int(drainingThreads) * 2,
@@ -108,53 +83,18 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint3
 		basicBufferedForwarder: newBasicBufferedForwarder(bufferSize, maxDrainSize, name, drainingThreads),
 		url:              url,
 		defaultAuthToken: defaultAuthToken,
-		sendVersion:      sendVersion,
 		userAgent:        fmt.Sprintf("SignalfxProxy/0.3 (gover %s)", runtime.Version()),
 		tr:               tr,
 		client: &http.Client{
 			Transport: tr,
 		},
-		connectionTimeout:   timeout,
-		v1MetricLoadedCache: map[string]struct{}{},
-		MetricCreationURL:   MetricCreationURL,
-		defaultSource:       defaultSource,
-		metricCreationChan:  make(chan *metricCreationRequest),
+		connectionTimeout: timeout,
+		defaultSource:     defaultSource,
 		// sf_source is always a dimension that can be a source
 		dimensionSources: append([]string{"sf_source"}, strings.Split(sourceDimensions, ",")...),
 	}
 	ret.start(ret.process)
-	go ret.metricCreationLoop()
 	return ret, nil
-}
-
-func (connector *signalfxJSONConnector) encodePostBodyV2(datapoints []core.Datapoint) ([]byte, string, error) {
-	bodyToSend := make(protocoltypes.SignalfxJSONDatapointV2)
-	for _, dp := range datapoints {
-		bsf := &protocoltypes.BodySendFormatV2{
-			Metric:     dp.Metric(),
-			Timestamp:  dp.Timestamp().UnixNano() / time.Millisecond.Nanoseconds(),
-			Dimensions: dp.Dimensions(),
-		}
-		switch t := dp.Value().(type) {
-		case value.FloatValue:
-			bsf.Value = t.FloatValue()
-		case value.IntDatapoint:
-			bsf.Value = t.IntValue()
-		default:
-			bsf.Value = t.String()
-		}
-
-		_, ok := bodyToSend[dp.MetricType().String()]
-		if !ok {
-			bodyToSend[dp.MetricType().String()] = make([]*protocoltypes.BodySendFormatV2, 0)
-		}
-		bodyToSend[dp.MetricType().String()] = append(bodyToSend[dp.MetricType().String()], bsf)
-	}
-	jsonBytes, err := jsonXXXMarshal(&bodyToSend)
-	log.WithField("jsonBytes", jsonBytes).WithField("bodyToSend", bodyToSend).Debug("Posting from signalfxforwarder")
-
-	// Now we can send datapoints
-	return jsonBytes, "application/json", err
 }
 
 func (connector *signalfxJSONConnector) encodePostBodyProtobufV2(datapoints []core.Datapoint) ([]byte, string, error) {
@@ -165,7 +105,11 @@ func (connector *signalfxJSONConnector) encodePostBodyProtobufV2(datapoints []co
 	msg := &com_signalfuse_metrics_protobuf.DataPointUploadMessage{
 		Datapoints: dps,
 	}
-	protobytes, err := protoXXXMarshal(msg)
+	protoMarshal := connector.protoMarshal
+	if protoMarshal == nil {
+		protoMarshal = proto.Marshal
+	}
+	protobytes, err := protoMarshal(msg)
 	log.WithFields(log.Fields{"protobytes": protobytes, "dps": dps}).Debug("Posting from V2")
 
 	// Now we can send datapoints
@@ -187,82 +131,6 @@ func datumForPoint(pv value.DatapointValue) *com_signalfuse_metrics_protobuf.Dat
 	}
 }
 
-func (connector *signalfxJSONConnector) metricCreationLoop() {
-	for {
-		log.Debug("Waiting for creation request")
-		request := <-connector.metricCreationChan
-		log.WithField("request", request).Debug("Got creation request")
-		resp := connector.createMetricsOfType(request.toCreate)
-		request.responseChannel <- resp
-	}
-}
-
-func (connector *signalfxJSONConnector) createMetricsOfType(metricsToCreate map[string]com_signalfuse_metrics_protobuf.MetricType) error {
-	if len(metricsToCreate) == 0 {
-		return nil
-	}
-	postBody := []protocoltypes.SignalfxMetricCreationStruct{}
-	for metricName, metricType := range metricsToCreate {
-		postBody = append(postBody, protocoltypes.SignalfxMetricCreationStruct{
-			MetricName: metricName,
-			MetricType: metricType.String(),
-		})
-	}
-	jsonBytes, err := jsonXXXMarshal(&postBody)
-	if err != nil {
-		log.WithField("err", err).Warn("Unable to marshal body")
-		return err
-	}
-	log.WithFields(log.Fields{"jsonBytes": jsonBytes, "postBody": postBody}).Debug("Posting create metrics")
-
-	req, _ := http.NewRequest("POST", connector.MetricCreationURL, bytes.NewBuffer(jsonBytes))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-SF-TOKEN", connector.defaultAuthToken)
-	req.Header.Set("User-Agent", connector.userAgent)
-
-	req.Header.Set("Connection", "Keep-Alive")
-	log.WithField("req", req).Debug("Posting request")
-	resp, err := connector.client.Do(req)
-
-	if err != nil {
-		log.WithField("err", err).Warn("Unable to POST request")
-		return err
-	}
-
-	defer resp.Body.Close()
-	respBody, err := ioutilXXXReadAll(resp.Body)
-	if err != nil {
-		log.WithField("err", err).Warn("Unable to verify response body")
-		return err
-	}
-	if resp.StatusCode != 200 {
-		log.WithField("respBody", string(respBody)).Warn("Metric creation failed")
-		return fmt.Errorf("invalid status code: %d", resp.StatusCode)
-	}
-	var metricCreationBody []protocoltypes.SignalfxMetricCreationResponse
-	err = jsonXXXUnmarshal(respBody, &metricCreationBody)
-	if err != nil {
-		log.WithFields(log.Fields{"respBody": string(respBody), "err": err}).Warn("Unable to unmarshall")
-		return err
-	}
-	connector.v1MetricLoadedCacheMutex.Lock()
-	defer connector.v1MetricLoadedCacheMutex.Unlock()
-	verifyMetricCreationBody(metricCreationBody, postBody, respBody, connector.v1MetricLoadedCache)
-	log.WithFields(log.Fields{"jsonBytes": jsonBytes, "respBody": respBody}).Debug("Metric creation finished")
-	return nil
-}
-
-func verifyMetricCreationBody(metricCreationBody []protocoltypes.SignalfxMetricCreationResponse, postBody []protocoltypes.SignalfxMetricCreationStruct, respBody []byte, v1MetricLoadedCache map[string]struct{}) {
-	for index, resp := range metricCreationBody {
-		metricName := postBody[index].MetricName
-		if resp.Code == 0 || resp.Code == 409 {
-			v1MetricLoadedCache[metricName] = struct{}{}
-		} else {
-			log.WithFields(log.Fields{"metricName": metricName, "respBody": string(respBody)}).Warn("Unable to create metric")
-		}
-	}
-}
-
 func (connector *signalfxJSONConnector) figureOutReasonableSource(point core.Datapoint) string {
 	for _, sourceName := range connector.dimensionSources {
 		thisPointSource := point.Dimensions()[sourceName]
@@ -273,16 +141,8 @@ func (connector *signalfxJSONConnector) figureOutReasonableSource(point core.Dat
 	return connector.defaultSource
 }
 
-func (connector *signalfxJSONConnector) requiresSource() bool {
-	return connector.sendVersion == 0 || connector.sendVersion == 1
-}
-
 func (connector *signalfxJSONConnector) coreDatapointToProtobuf(point core.Datapoint) *com_signalfuse_metrics_protobuf.DataPoint {
 	thisPointSource := connector.figureOutReasonableSource(point)
-	if thisPointSource == "" && connector.requiresSource() {
-		log.WithField("point", point).Warn("unable to figure out a reasonable source")
-		return nil
-	}
 	m := point.Metric()
 	ts := point.Timestamp().UnixNano() / time.Millisecond.Nanoseconds()
 	relativeTimeDp, ok := point.(core.TimeRelativeDatapoint)
@@ -330,74 +190,16 @@ func filterSignalfxKey(str string) string {
 	}, str)
 }
 
-func (connector *signalfxJSONConnector) encodePostBodyV1(datapoints []core.Datapoint) ([]byte, string, error) {
-	var msgBody []byte
-	metricsToBeCreated := make(map[string]com_signalfuse_metrics_protobuf.MetricType)
-	for _, point := range datapoints {
-		if point.MetricType() != com_signalfuse_metrics_protobuf.MetricType_GAUGE {
-			preCreated := func() bool {
-				connector.v1MetricLoadedCacheMutex.Lock()
-				defer connector.v1MetricLoadedCacheMutex.Unlock()
-				_, ok := connector.v1MetricLoadedCache[point.Metric()]
-				return ok
-			}()
-
-			if !preCreated {
-				metricsToBeCreated[point.Metric()] = point.MetricType()
-			}
-		}
-		v := connector.coreDatapointToProtobuf(point)
-		if v == nil {
-			continue
-		}
-		log.WithField("v", v).Debug("Single datapoint to signalfx")
-		encodedBytes, err := protoXXXMarshal(v)
-		if err != nil {
-			return nil, "", err
-		}
-		msgBody = append(msgBody, proto.EncodeVarint(uint64(len(encodedBytes)))...)
-		msgBody = append(msgBody, encodedBytes...)
-	}
-	log.WithFields(log.Fields{"msgBody": msgBody, "len": len(msgBody)}).Debug("Posting body")
-
-	if len(metricsToBeCreated) > 0 {
-		// Create metrics if we need to
-		creationRequest := &metricCreationRequest{
-			toCreate:        metricsToBeCreated,
-			responseChannel: make(chan error),
-		}
-		log.Debug("Trying to create metrics first")
-		connector.metricCreationChan <- creationRequest
-		err := <-creationRequest.responseChannel
-		if err != nil {
-			return nil, "", err
-		}
-		log.Debug("Metric creation OK")
-	}
-	return msgBody, "application/x-protobuf", nil
-}
-
 func (connector *signalfxJSONConnector) GetStats() []core.Datapoint {
 	return connector.basicBufferedForwarder.GetStats()
 }
 
-func (connector *signalfxJSONConnector) encodePostBody(datapoints []core.Datapoint) ([]byte, string, error) {
-	switch connector.sendVersion {
-	case 3:
-		return connector.encodePostBodyProtobufV2(datapoints)
-	case 2:
-		return connector.encodePostBodyV2(datapoints)
-	default:
-		return connector.encodePostBodyV1(datapoints)
-	}
-}
-
 func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) error {
 	log.WithFields(log.Fields{"len": len(datapoints), "datapoints": datapoints}).Debug("Processing dp")
-	jsonBytes, bodyType, err := connector.encodePostBody(datapoints)
+	jsonBytes, bodyType, err := connector.encodePostBodyProtobufV2(datapoints)
 
 	if err != nil {
-		log.WithField("err", err).Warn("Unable to marshal json")
+		log.WithField("err", err).Warn("Unable to marshal object")
 		return err
 	}
 	req, _ := http.NewRequest("POST", connector.url, bytes.NewBuffer(jsonBytes))
@@ -416,7 +218,7 @@ func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) err
 
 	log.WithField("resp", resp).Debug("POST response")
 	defer resp.Body.Close()
-	respBody, err := ioutilXXXReadAll(resp.Body)
+	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.WithField("err", err).Warn("Unable to verify response body")
 		return err
@@ -426,7 +228,7 @@ func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) err
 		return fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
 	var body string
-	err = jsonXXXUnmarshal(respBody, &body)
+	err = json.Unmarshal(respBody, &body)
 	if err != nil {
 		log.WithFields(log.Fields{"body": string(respBody), "err": err}).Warn("Unable to unmarshal")
 		return err
