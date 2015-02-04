@@ -4,19 +4,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/assert"
 )
 
 type statKeeper struct {
-	mock.Mock
 }
 
 func (m *statKeeper) GetStats() []Datapoint {
 	return []Datapoint{nil}
 }
 
+type dimensionStatKeeper struct {
+}
+
+func (m *dimensionStatKeeper) GetStats(_ map[string]string) []Datapoint {
+	return []Datapoint{nil}
+}
+
 type datapointStreamingAPI struct {
-	mock.Mock
 	mychan chan bool
 	myDp   chan Datapoint
 }
@@ -36,4 +41,16 @@ func TestDrainStatsThread(t *testing.T) {
 	apis := []DatapointStreamingAPI{&datapointStreamingAPI{mychan: c, myDp: myDp}}
 	// We signal draining thread to die when we get a point
 	NewStatDrainingThread(time.Nanosecond*1, apis, keepers, c).Start()
+}
+
+func TestCombineStats(t *testing.T) {
+	assert.Equal(t, 2, len(CombineStats([]StatKeeper{&statKeeper{}, &statKeeper{}})))
+}
+
+func TestStatKeeperWrap(t *testing.T) {
+	w := &StatKeeperWrap{
+		Base:       []DimensionStatKeeper{&dimensionStatKeeper{}},
+		Dimensions: nil,
+	}
+	assert.Equal(t, 1, len(w.GetStats()))
 }

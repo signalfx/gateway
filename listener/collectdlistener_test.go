@@ -4,17 +4,11 @@ import (
 	"bytes"
 	"net/http"
 	"testing"
-
-	//	"net/http/httptest"
-	//	"strings"
-
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
-	//	"github.com/signalfuse/signalfxproxy/jsonengines"
 	"net/http/httptest"
 	"strings"
-
 	"github.com/signalfuse/signalfxproxy/jsonengines"
 	"github.com/stretchr/testify/assert"
 )
@@ -163,7 +157,7 @@ func BenchmarkCollectdListener(b *testing.B) {
 			channel: make(chan core.Datapoint, 6),
 		}
 
-		decoder := collectdJsonDecoder{
+		decoder := collectdJSONDecoder{
 			decodingEngine: jsonEngine,
 			datapointTracker: DatapointTracker{
 				DatapointStreamingAPI: sendTo,

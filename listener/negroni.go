@@ -4,23 +4,25 @@ import (
 	"net/http"
 	"sync/atomic"
 	"time"
-
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/core/value"
 	"github.com/signalfuse/signalfxproxy/protocoltypes"
 )
 
+// DatapointTracker counts datapoints given to a streaming API
 type DatapointTracker struct {
 	TotalDatapoints       int64
 	DatapointStreamingAPI core.DatapointStreamingAPI
 }
 
+// AddDatapoint to a tracking, sending it to the channel
 func (t *DatapointTracker) AddDatapoint(dp core.Datapoint) {
 	t.DatapointStreamingAPI.DatapointsChannel() <- dp
 	atomic.AddInt64(&t.TotalDatapoints, 1)
 }
 
+// GetStats returns the number of calls to AddDatapoint
 func (t *DatapointTracker) GetStats(dimensions map[string]string) []core.Datapoint {
 	ret := []core.Datapoint{}
 	ret = append(
@@ -33,6 +35,7 @@ func (t *DatapointTracker) GetStats(dimensions map[string]string) []core.Datapoi
 	return ret
 }
 
+// MetricTrackingMiddleware is a negroni handler that tracks connection stats
 type MetricTrackingMiddleware struct {
 	TotalConnections      int64
 	ActiveConnections     int64
@@ -49,6 +52,7 @@ func (m *MetricTrackingMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Req
 	atomic.AddInt64(&m.TotalProcessingTimeNs, reqDuration.Nanoseconds())
 }
 
+// GetStats returns stats on total connections, active connections, and total processing time
 func (m *MetricTrackingMiddleware) GetStats(dimensions map[string]string) []core.Datapoint {
 	ret := []core.Datapoint{}
 	stats := map[string]int64{

@@ -18,6 +18,36 @@ type StatKeeper interface {
 	GetStats() []Datapoint
 }
 
+// DimensionStatKeeper works like a stat keeper but requires input dimensions to any stats
+// it creates
+type DimensionStatKeeper interface {
+	GetStats(dimensions map[string]string) []Datapoint
+}
+
+// StatKeeperWrap pretends to be a StatKeeper by wrapping DimensionStatKeeper with dimensions
+type StatKeeperWrap struct {
+	Base       []DimensionStatKeeper
+	Dimensions map[string]string
+}
+
+// GetStats returns any stats from this wrappers stat keepers
+func (k *StatKeeperWrap) GetStats() []Datapoint {
+	r := []Datapoint{}
+	for _, s := range k.Base {
+		r = append(r, s.GetStats(k.Dimensions)...)
+	}
+	return r
+}
+
+// CombineStats from multiple keepers in the order given as parameters.
+func CombineStats(keepers []StatKeeper) []Datapoint {
+	ret := []Datapoint{}
+	for _, r := range keepers {
+		ret = append(ret, r.GetStats()...)
+	}
+	return ret
+}
+
 // StatKeepingStreamingAPI both keeps stats and can stream datapoints
 type StatKeepingStreamingAPI interface {
 	DatapointStreamingAPI

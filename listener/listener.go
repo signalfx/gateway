@@ -2,7 +2,6 @@ package listener
 
 import (
 	"net"
-
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 )

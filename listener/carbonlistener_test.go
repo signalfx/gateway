@@ -9,7 +9,6 @@ import (
 	"net"
 	"testing"
 	"time"
-
 	"github.com/cep21/gohelpers/a"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/signalfxproxy/config"

@@ -5,9 +5,7 @@ import (
 	"net/http"
 	"sync/atomic"
 	"time"
-
 	"fmt"
-
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
@@ -20,31 +18,27 @@ import (
 )
 
 type collectdListenerServer struct {
-	name                     string
-	listener                 net.Listener
-	server                   http.Server
-	collectdDecoder          collectdJsonDecoder
-	metricTrackingMiddleware MetricTrackingMiddleware
+	name        string
+	listener    net.Listener
+	server      http.Server
+	statKeepers []core.StatKeeper
 }
 
 func (streamer *collectdListenerServer) GetStats() []core.Datapoint {
-	ret := []core.Datapoint{}
-	ret = append(ret, streamer.metricTrackingMiddleware.GetStats(map[string]string{"listener": streamer.name})...)
-	ret = append(ret, streamer.collectdDecoder.GetStats(map[string]string{"listener": streamer.name})...)
-	return ret
+	return core.CombineStats(streamer.statKeepers)
 }
 
 func (streamer *collectdListenerServer) Close() {
 	streamer.listener.Close()
 }
 
-type collectdJsonDecoder struct {
+type collectdJSONDecoder struct {
 	TotalErrors      int64
 	decodingEngine   jsonengines.JSONDecodingEngine
 	datapointTracker DatapointTracker
 }
 
-func (decoder *collectdJsonDecoder) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+func (decoder *collectdJSONDecoder) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	d, err := decoder.decodingEngine.DecodeCollectdJSONWriteBody(req.Body)
 	if err != nil {
 		atomic.AddInt64(&decoder.TotalErrors, 1)
@@ -65,7 +59,7 @@ func (decoder *collectdJsonDecoder) ServeHTTP(rw http.ResponseWriter, req *http.
 }
 
 // Usually want "listener: "<Name>"
-func (decoder *collectdJsonDecoder) GetStats(dimensions map[string]string) []core.Datapoint {
+func (decoder *collectdJSONDecoder) GetStats(dimensions map[string]string) []core.Datapoint {
 	ret := []core.Datapoint{}
 	ret = append(ret, decoder.datapointTracker.GetStats(dimensions)...)
 	return ret
@@ -75,6 +69,7 @@ var defaultCollectdConfig = &config.ListenFrom{
 	ListenAddr:      workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:8081"),
 	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
 	ListenPath:      workarounds.GolangDoesnotAllowPointerToStringLiteral("/post-collectd"),
+	Name:            workarounds.GolangDoesnotAllowPointerToStringLiteral("collectd"),
 	JSONEngine:      workarounds.GolangDoesnotAllowPointerToStringLiteral("native"),
 }
 
@@ -86,12 +81,12 @@ func CollectdListenerLoader(DatapointStreamingAPI core.DatapointStreamingAPI, li
 	if err != nil {
 		return nil, err
 	}
-	return StartListeningCollectDHTTPOnPort(DatapointStreamingAPI, *listenFrom.ListenAddr, *listenFrom.ListenPath, *listenFrom.TimeoutDuration, engine)
+	return StartListeningCollectDHTTPOnPort(DatapointStreamingAPI, *listenFrom.ListenAddr, *listenFrom.ListenPath, *listenFrom.TimeoutDuration, engine, *listenFrom.Name)
 }
 
 // StartListeningCollectDHTTPOnPort servers http collectd requests
 func StartListeningCollectDHTTPOnPort(DatapointStreamingAPI core.DatapointStreamingAPI,
-	listenAddr string, listenPath string, clientTimeout time.Duration, decodingEngine jsonengines.JSONDecodingEngine) (DatapointListener, error) {
+	listenAddr string, listenPath string, clientTimeout time.Duration, decodingEngine jsonengines.JSONDecodingEngine, name string) (DatapointListener, error) {
 
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
@@ -100,7 +95,15 @@ func StartListeningCollectDHTTPOnPort(DatapointStreamingAPI core.DatapointStream
 
 	r := mux.NewRouter()
 
+	collectdDecoder := collectdJSONDecoder{
+		decodingEngine: decodingEngine,
+		datapointTracker: DatapointTracker{
+			DatapointStreamingAPI: DatapointStreamingAPI,
+		},
+	}
+
 	listenServer := collectdListenerServer{
+		name:     name,
 		listener: listener,
 		server: http.Server{
 			Handler:      r,
@@ -108,15 +111,16 @@ func StartListeningCollectDHTTPOnPort(DatapointStreamingAPI core.DatapointStream
 			ReadTimeout:  clientTimeout,
 			WriteTimeout: clientTimeout,
 		},
-		collectdDecoder: collectdJsonDecoder{
-			decodingEngine: decodingEngine,
-			datapointTracker: DatapointTracker{
-				DatapointStreamingAPI: DatapointStreamingAPI,
-			},
-		},
 	}
 
-	n := negroni.New(&listenServer.metricTrackingMiddleware, negroni.Wrap(&listenServer.collectdDecoder))
+	middleware := MetricTrackingMiddleware{}
+
+	listenServer.statKeepers = append(listenServer.statKeepers, &core.StatKeeperWrap{
+		Base:       []core.DimensionStatKeeper{&middleware, &collectdDecoder},
+		Dimensions: map[string]string{"listener": name},
+	})
+
+	n := negroni.New(&middleware, negroni.Wrap(&collectdDecoder))
 	r.Path(listenPath).Headers("Content-type", "application/json").Handler(n)
 
 	go listenServer.server.Serve(listener)
