@@ -1,11 +1,12 @@
 package listener
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"sync/atomic"
 	"time"
-	"fmt"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"

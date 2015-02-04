@@ -3,12 +3,13 @@ package listener
 import (
 	"bytes"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
-	"net/http/httptest"
-	"strings"
 	"github.com/signalfuse/signalfxproxy/jsonengines"
 	"github.com/stretchr/testify/assert"
 )
