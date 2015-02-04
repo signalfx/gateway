@@ -46,7 +46,7 @@ type MetricTrackingMiddleware struct {
 func (m *MetricTrackingMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	atomic.AddInt64(&m.TotalConnections, 1)
 	atomic.AddInt64(&m.ActiveConnections, 1)
-	defer atomic.AddInt64(&m.ActiveConnections, 1)
+	defer atomic.AddInt64(&m.ActiveConnections, -1)
 	start := time.Now()
 	next(rw, r)
 	reqDuration := time.Since(start)
