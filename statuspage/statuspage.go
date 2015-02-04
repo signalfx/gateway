@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 
+	"runtime"
+
 	"github.com/signalfuse/signalfxproxy/config"
 	"github.com/signalfuse/signalfxproxy/core"
 )
@@ -34,6 +36,7 @@ func NewProxyStatusPage(loadedConfig *config.LoadedConfig, statKeepers []core.St
 
 func (proxy *proxyStatusPageImpl) StatusPage() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Write(([]byte)(fmt.Sprintf("Golang version: %s\n", runtime.Version())))
 		w.Write(([]byte)("Loaded config (raw):\n"))
 		w.Write(([]byte)(fmt.Sprintf("%+v", proxy.loadedConfig)))
 
