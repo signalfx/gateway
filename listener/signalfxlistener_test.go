@@ -413,3 +413,15 @@ func BenchmarkRegularInc(b *testing.B) {
 	}
 	b.SetBytes(int64(b.N * 8))
 }
+
+func TestFullyReadFromBuffer(t *testing.T) {
+	s := ""
+	for i := 0 ; i < 99999;i++ {
+		s += "X"
+	}
+	reader := bytes.NewBufferString(s)
+	bufferedBody := bufio.NewReaderSize(reader, 32768)
+	buf, err := fullyReadFromBuffer(bufferedBody, uint64(99999))
+	assert.NoError(t, err)
+	assert.True(t, len(buf) == 99999)
+}
