@@ -185,7 +185,7 @@ func (decoder *protobufDecoderV2) Read(req *http.Request) error {
 	bufferedBody := bufio.NewReaderSize(req.Body, 32768)
 	buf, err := fullyReadFromBuffer(bufferedBody, uint64(req.ContentLength))
 	if err != nil {
-		log.WithField("err", err).WithField("len", len(buf)).Warn("Unable to fully read from buffer")
+		log.WithField("err", err).WithField("len", len(buf)).WithField("content-len", req.ContentLength).Warn("Unable to fully read from buffer")
 		return err
 	}
 	err = proto.Unmarshal(buf, &msg)
