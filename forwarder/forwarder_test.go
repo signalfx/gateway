@@ -54,6 +54,7 @@ func TestEmptyBlockingDrain(t *testing.T) {
 	f.DatapointsChannel() <- nil
 	seenPointsChan := make(chan int, 2)
 	f.start(func(dp []core.Datapoint) error {
+		assert.Equal(t, 1, f.callsInFlight)
 		fmt.Printf("Saw %d points", len(dp))
 		seenPointsChan <- len(dp)
 		return nil
@@ -62,6 +63,7 @@ func TestEmptyBlockingDrain(t *testing.T) {
 	f.stop()
 	assert.Equal(t, 2, seenPoints)
 	assert.Equal(t, 0, f.totalProcessErrors)
+	assert.Equal(t, 0, f.callsInFlight)
 	assert.Equal(t, 0, f.processErrorPoints)
 	assert.True(t, f.totalProcessTimeNs > 0)
 }

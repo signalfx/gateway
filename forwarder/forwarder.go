@@ -149,7 +149,9 @@ func (forwarder *basicBufferedForwarder) start(processor ProcessingFunction) err
 				start := time.Now()
 				atomic.AddInt64(&forwarder.totalDatapoints, int64(len(datapoints)))
 				atomic.AddInt64(&forwarder.totalProcessCalls, 1)
+				atomic.AddInt64(&forwarder.callsInFlight, 1)
 				err := processor(datapoints)
+				atomic.AddInt64(&forwarder.callsInFlight, -1)
 				atomic.AddInt64(&forwarder.totalProcessTimeNs, time.Since(start).Nanoseconds())
 				if err != nil {
 					atomic.AddInt64(&forwarder.totalProcessErrors, 1)
