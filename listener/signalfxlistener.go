@@ -322,6 +322,7 @@ type decoderFunc func() func(*http.Request) error
 // StartServingHTTPOnPort servers http requests for Signalfx datapoints
 func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.DatapointStreamingAPI,
 	clientTimeout time.Duration, name string, decodingEngine jsonengines.JSONDecodingEngine) (DatapointListener, error) {
+
 	r := mux.NewRouter()
 
 	server := http.Server{
@@ -346,6 +347,7 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 	r.Handle("/v1/metric", &metricHandler)
 	r.Handle("/metric", &metricHandler)
 
+	listenServer.statKeepers = append(listenServer.statKeepers, setupNotFoundHandler(r, name))
 	listenServer.statKeepers = append(listenServer.statKeepers, setupProtobufV1(DatapointStreamingAPI, r, name, &metricHandler))
 	listenServer.statKeepers = append(listenServer.statKeepers, setupJSONV1(DatapointStreamingAPI, r, name, &metricHandler))
 	listenServer.statKeepers = append(listenServer.statKeepers, setupProtobufV2(DatapointStreamingAPI, r, name))
@@ -354,6 +356,15 @@ func StartServingHTTPOnPort(listenAddr string, DatapointStreamingAPI core.Datapo
 
 	go server.Serve(listener)
 	return &listenServer, err
+}
+
+func setupNotFoundHandler(r *mux.Router, name string) core.StatKeeper {
+	metricTracking := MetricTrackingMiddleware{}
+	r.NotFoundHandler = negroni.New(&metricTracking, negroni.Wrap(http.NotFoundHandler()))
+	return &core.StatKeeperWrap{
+		Base:       []core.DimensionStatKeeper{&metricTracking},
+		Dimensions: map[string]string{"listener": name, "type": "unknown"},
+	}
 }
 
 func setupProtobufV1(DatapointStreamingAPI core.DatapointStreamingAPI, r *mux.Router, name string, typeGetter MericTypeGetter) core.StatKeeper {
