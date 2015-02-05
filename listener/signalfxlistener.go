@@ -123,10 +123,13 @@ func (decoder *protobufDecoderV1) Read(req *http.Request) error {
 			return errProtobufTooLarge
 		}
 		// Get the varint out
-		fullyReadFromBuffer(bufferedBody, uint64(bytesRead))
-		//buf = make([]byte, num)
-		buf, err = fullyReadFromBuffer(bufferedBody, num)
-		if int(num) != len(buf) {
+		buf = make([]byte, bytesRead)
+		io.ReadFull(bufferedBody, buf)
+
+		// Get the structure out
+		buf = make([]byte, num)
+		_, err = io.ReadFull(bufferedBody, buf)
+		if err != nil {
 			return fmt.Errorf("unable to fully read protobuf message: %s", err)
 		}
 		var msg com_signalfuse_metrics_protobuf.DataPoint
@@ -182,10 +185,13 @@ func (decoder *protobufDecoderV2) Read(req *http.Request) error {
 		return errInvalidContentLength
 	}
 	var msg com_signalfuse_metrics_protobuf.DataPointUploadMessage
-	bufferedBody := bufio.NewReaderSize(req.Body, 32768)
-	buf, err := fullyReadFromBuffer(bufferedBody, uint64(req.ContentLength))
+	//	bufferedBody := bufio.NewReaderSize(req.Body, 32768)
+	//	buf, err := fullyReadFromBuffer(bufferedBody, uint64(req.ContentLength))
+
+	buf := make([]byte, req.ContentLength)
+	readLen, err := io.ReadFull(req.Body, buf)
 	if err != nil {
-		log.WithField("err", err).WithField("len", len(buf)).WithField("content-len", req.ContentLength).Warn("Unable to fully read from buffer")
+		log.WithField("err", err).WithField("len", readLen).WithField("content-len", req.ContentLength).Warn("Unable to fully read from buffer")
 		return err
 	}
 	err = proto.Unmarshal(buf, &msg)
@@ -227,20 +233,6 @@ func (decoder *jsonDecoderV2) Read(req *http.Request) error {
 		}
 	}
 	return nil
-}
-
-func fullyReadFromBuffer(buffer *bufio.Reader, numBytes uint64) ([]byte, error) {
-	totalBytesRead := uint64(0)
-	buf := make([]byte, numBytes)
-	for numBytes > totalBytesRead {
-		n, err := buffer.Read(buf[totalBytesRead:numBytes])
-		totalBytesRead += uint64(n)
-		if err != nil || n == 0 {
-			return buf[0:totalBytesRead], err
-		}
-
-	}
-	return buf, nil
 }
 
 var defaultConfig = &config.ListenFrom{

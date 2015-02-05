@@ -1,7 +1,6 @@
 package listener
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -40,20 +39,6 @@ type myReaderType struct{}
 
 func (reader *myReaderType) Read(b []byte) (int, error) {
 	return 0, errors.New("can not read")
-}
-
-func TestReadFully(t *testing.T) {
-	myReader := &myReaderType{}
-	reader := bufio.NewReader(myReader)
-	_, err := fullyReadFromBuffer(reader, 10)
-	assert.NotEqual(t, nil, err, "Should get an error making")
-
-	_, err = fullyReadFromBuffer(bufio.NewReader(bytes.NewBuffer([]byte("abcde"))), 7)
-	assert.NotEqual(t, nil, err, "Should get an error making (EOF or something)")
-
-	result, err := fullyReadFromBuffer(bufio.NewReader(bytes.NewBuffer([]byte("abcdefg"))), 5)
-	assert.Equal(t, nil, err, "Should not get an error")
-	assert.Equal(t, "abcde", string(result), "Expect my result back")
 }
 
 type errorReader struct{}
@@ -412,16 +397,4 @@ func BenchmarkRegularInc(b *testing.B) {
 		l += i
 	}
 	b.SetBytes(int64(b.N * 8))
-}
-
-func TestFullyReadFromBuffer(t *testing.T) {
-	s := ""
-	for i := 0 ; i < 99999;i++ {
-		s += "X"
-	}
-	reader := bytes.NewBufferString(s)
-	bufferedBody := bufio.NewReaderSize(reader, 32768)
-	buf, err := fullyReadFromBuffer(bufferedBody, uint64(99999))
-	assert.NoError(t, err)
-	assert.True(t, len(buf) == 99999)
 }
