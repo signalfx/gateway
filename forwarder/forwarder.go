@@ -5,6 +5,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
@@ -17,15 +19,23 @@ import (
 type ProcessingFunction func([]core.Datapoint) error
 
 type basicBufferedForwarder struct {
-	datapointsChannel     (chan core.Datapoint)
-	bufferSize            uint32
-	maxDrainSize          uint32
-	name                  string
-	numDrainingThreads    uint32
-	started               bool
-	stopped               int32
-	threadsWaitingToDie   sync.WaitGroup
-	blockingDrainStopChan chan bool
+	datapointsChannel      (chan core.Datapoint)
+	bufferSize             uint32
+	maxDrainSize           uint32
+	name                   string
+	numDrainingThreads     uint32
+	started                bool
+	stopped                int32
+	threadsWaitingToDie    sync.WaitGroup
+	blockingDrainStopChan  chan bool
+	blockingDrainWaitMutex sync.Mutex
+
+	totalProcessErrors int64
+	totalDatapoints    int64
+	totalProcessCalls  int64
+	processErrorPoints int64
+	totalProcessTimeNs int64
+	callsInFlight      int64
 }
 
 // Loader is the function definition of a function that can load a config
@@ -36,19 +46,59 @@ func (forwarder *basicBufferedForwarder) DatapointsChannel() chan<- core.Datapoi
 	return forwarder.datapointsChannel
 }
 func (forwarder *basicBufferedForwarder) GetStats() []core.Datapoint {
-	ret := []core.Datapoint{}
+	ret := make([]core.Datapoint, 0, 2)
 	ret = append(ret, protocoltypes.NewOnHostDatapointDimensions(
 		"datapoint_backup_size",
 		value.NewIntWire(int64(len(forwarder.datapointsChannel))),
+		com_signalfuse_metrics_protobuf.MetricType_GAUGE,
+		map[string]string{"forwarder": forwarder.Name()}))
+
+	ret = append(ret, protocoltypes.NewOnHostDatapointDimensions(
+		"total_process_errors",
+		value.NewIntWire(atomic.LoadInt64(&forwarder.totalProcessErrors)),
+		com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+		map[string]string{"forwarder": forwarder.Name()}))
+
+	ret = append(ret, protocoltypes.NewOnHostDatapointDimensions(
+		"total_datapoints",
+		value.NewIntWire(atomic.LoadInt64(&forwarder.totalDatapoints)),
+		com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+		map[string]string{"forwarder": forwarder.Name()}))
+
+	ret = append(ret, protocoltypes.NewOnHostDatapointDimensions(
+		"total_process_calls",
+		value.NewIntWire(atomic.LoadInt64(&forwarder.totalProcessCalls)),
+		com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+		map[string]string{"forwarder": forwarder.Name()}))
+
+	ret = append(ret, protocoltypes.NewOnHostDatapointDimensions(
+		"process_error_datapoints",
+		value.NewIntWire(atomic.LoadInt64(&forwarder.processErrorPoints)),
+		com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+		map[string]string{"forwarder": forwarder.Name()}))
+
+	ret = append(ret, protocoltypes.NewOnHostDatapointDimensions(
+		"process_time_ns",
+		value.NewIntWire(atomic.LoadInt64(&forwarder.totalProcessTimeNs)),
+		com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+		map[string]string{"forwarder": forwarder.Name()}))
+
+	ret = append(ret, protocoltypes.NewOnHostDatapointDimensions(
+		"calls_in_flight",
+		value.NewIntWire(atomic.LoadInt64(&forwarder.callsInFlight)),
 		com_signalfuse_metrics_protobuf.MetricType_GAUGE,
 		map[string]string{"forwarder": forwarder.Name()}))
 	return ret
 }
 
 func (forwarder *basicBufferedForwarder) blockingDrainUpTo() []core.Datapoint {
-	// Block for at least one point
-	datapoints := []core.Datapoint{}
+	// We block the mutex so we allow one drainer to fully drain until we use another
+	forwarder.blockingDrainWaitMutex.Lock()
+	defer forwarder.blockingDrainWaitMutex.Unlock()
 
+	datapoints := make([]core.Datapoint, 0, forwarder.maxDrainSize)
+
+	// Block for at least one point
 	select {
 	case datapoint := <-forwarder.datapointsChannel:
 		datapoints = append(datapoints, datapoint)
@@ -59,11 +109,9 @@ func (forwarder *basicBufferedForwarder) blockingDrainUpTo() []core.Datapoint {
 	}
 Loop:
 	for uint32(len(datapoints)) < forwarder.maxDrainSize {
-		log.WithFields(log.Fields{"len": len(datapoints), "maxDrain": forwarder.maxDrainSize, "chanSize": len(forwarder.datapointsChannel)}).Debug("Less than size")
 		select {
 		case datapoint := <-forwarder.datapointsChannel:
 			datapoints = append(datapoints, datapoint)
-			log.Debug("Got another point to increase size")
 			continue
 		default:
 			log.WithField("len", len(forwarder.datapointsChannel)).Debug("Nothing on channel")
@@ -95,8 +143,17 @@ func (forwarder *basicBufferedForwarder) start(processor ProcessingFunction) err
 			defer forwarder.threadsWaitingToDie.Done()
 			for atomic.LoadInt32(&forwarder.stopped) == 0 {
 				datapoints := forwarder.blockingDrainUpTo()
+				if len(datapoints) == 0 {
+					continue
+				}
+				start := time.Now()
+				atomic.AddInt64(&forwarder.totalDatapoints, int64(len(datapoints)))
+				atomic.AddInt64(&forwarder.totalProcessCalls, 1)
 				err := processor(datapoints)
+				atomic.AddInt64(&forwarder.totalProcessTimeNs, time.Since(start).Nanoseconds())
 				if err != nil {
+					atomic.AddInt64(&forwarder.totalProcessErrors, 1)
+					atomic.AddInt64(&forwarder.processErrorPoints, int64(len(datapoints)))
 					log.WithField("err", err).Warn("Unable to process datapoints")
 					continue
 				}

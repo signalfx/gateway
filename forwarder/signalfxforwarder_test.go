@@ -100,7 +100,7 @@ func setupServerForwarder(t *testing.T) (*basicBufferedForwarder, listener.Datap
 	forwarder, err := SignalfxJSONForwarderLoader(&forwardTo)
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, "signalfx-forwarder", forwarder.Name(), "Expect no error")
-	assert.Equal(t, 1, len(forwarder.GetStats()), "Expect no stats")
+	assert.Equal(t, 7, len(forwarder.GetStats()))
 	return finalDatapointDestination, l, forwarder.(*signalfxJSONConnector)
 }
 

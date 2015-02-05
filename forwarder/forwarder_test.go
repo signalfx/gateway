@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"fmt"
+
 	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/stretchr/testify/assert"
 )
@@ -36,10 +38,30 @@ func TestForwarderStopForwarder(t *testing.T) {
 	seenPoints := <-seenPointsChan
 	f.stop()
 	assert.Equal(t, 2, seenPoints, "Expect two points")
+	assert.Equal(t, 1, f.totalProcessErrors)
+	assert.Equal(t, 2, f.processErrorPoints)
 	assert.NotEqual(t, nil, f.start(nil), "Shouldn't be able to start twice")
 	f.blockingDrainStopChan <- true
 
 	f.stop() // Should not block if chan has an item
 	dps := f.blockingDrainUpTo()
 	assert.Equal(t, 0, len(dps))
+}
+
+func TestEmptyBlockingDrain(t *testing.T) {
+	f := newBasicBufferedForwarder(100, uint32(10), "aname", 2)
+	f.DatapointsChannel() <- nil
+	f.DatapointsChannel() <- nil
+	seenPointsChan := make(chan int, 2)
+	f.start(func(dp []core.Datapoint) error {
+		fmt.Printf("Saw %d points", len(dp))
+		seenPointsChan <- len(dp)
+		return nil
+	})
+	seenPoints := <-seenPointsChan
+	f.stop()
+	assert.Equal(t, 2, seenPoints)
+	assert.Equal(t, 0, f.totalProcessErrors)
+	assert.Equal(t, 0, f.processErrorPoints)
+	assert.True(t, f.totalProcessTimeNs > 0)
 }
