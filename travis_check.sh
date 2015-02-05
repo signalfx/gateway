@@ -13,7 +13,7 @@ shellcheck travis_check.sh || exit 1
 #
 # Note: there is one line (a curl) that we can't help but make long
 echo -e "# Ignore Header" > /tmp/ignore_header.md
-cat /tmp/ignore_header.md README.md | grep -v curl | grep -v 'Build Status' | mdl --warnings || exit 1
+cat /tmp/ignore_header.md README.md | grep -av curl | grep -av 'Build Status' | mdl --warnings || exit 1
 
 #
 # ---- Check JSON
@@ -28,7 +28,7 @@ set +e
 #
 rm -f /tmp/a /tmp/no_100_coverage || exit 1
 go install . || exit 1
-find . -type f -name \*.go | grep -v '.git' | xargs -n1 -P8 gofmt -w -l -s > /tmp/a || exit 1
+find . -type f -name \*.go | grep -av '.git' | xargs -n1 -P8 gofmt -w -l -s > /tmp/a || exit 1
 # I want to print it out for debugging purposes, while still existing if exist
 [[ ! -s /tmp/a ]] || cat /tmp/a
 [[ ! -s /tmp/a ]] || exit 1
@@ -36,7 +36,7 @@ find . -type f -name \*.go | grep -v '.git' | xargs -n1 -P8 gofmt -w -l -s > /tm
 #
 # ---- goimports will reorg the imports
 #
-find . -type f -name \*.go | grep -v '.git' | xargs -n1 -P8 goimports -w -l > /tmp/a || exit 1
+find . -type f -name \*.go | grep -av '.git' | xargs -n1 -P8 goimports -w -l > /tmp/a || exit 1
 [[ ! -s /tmp/a ]] || cat /tmp/a
 [[ ! -s /tmp/a ]] || exit 1
 
@@ -50,14 +50,14 @@ gocyclo -over 10 . | grep -v skiptestcoverage > /tmp/a
 #
 # ---- go lint does static variable name and doc checks
 #
-find . -type f -name \*.go | grep -v ".git" | xargs -n1 -P8 golint > /tmp/a || exit 1
+find . -type f -name \*.go | grep -av ".git" | xargs -n1 -P8 golint > /tmp/a || exit 1
 [[ ! -s /tmp/a ]] || cat /tmp/a
 [[ ! -s /tmp/a ]] || exit 1
 
 #
 # ---- go vet will do basic static error checking
 #
-find . -type f -name \*.go | grep -v '.git' | xargs -n1 -P8 go vet > /tmp/a || exit 1
+find . -type f -name \*.go | grep -av '.git' | xargs -n1 -P8 go vet > /tmp/a || exit 1
 [[ ! -s /tmp/a ]] || cat /tmp/a
 [[ ! -s /tmp/a ]] || exit 1
 
@@ -66,7 +66,7 @@ find . -type f -name \*.go | grep -v '.git' | xargs -n1 -P8 go vet > /tmp/a || e
 #      races with cpu 2.  Timeout long running tests.  Should really be 1s, but
 #      want to give travis-ci some time.
 #
-go test -cover -covermode atomic -race -parallel=8 -timeout 3s -cpu 4  ./... | grep -v 'skiptestcoverage' | grep -v "100.0% of statements" > /tmp/no_100_coverage
+go test -cover -covermode atomic -race -parallel=8 -timeout 3s -cpu 4  ./... | grep -av 'skiptestcoverage' | grep -av "100.0% of statements" > /tmp/no_100_coverage
 [[ ! -s /tmp/no_100_coverage ]] || cat /tmp/no_100_coverage
 [[ ! -s /tmp/no_100_coverage ]] || exit 1
 
