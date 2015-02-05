@@ -98,7 +98,7 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint3
 }
 
 func (connector *signalfxJSONConnector) encodePostBodyProtobufV2(datapoints []core.Datapoint) ([]byte, string, error) {
-	dps := []*com_signalfuse_metrics_protobuf.DataPoint{}
+	dps := make([]*com_signalfuse_metrics_protobuf.DataPoint, 0, len(datapoints))
 	for _, dp := range datapoints {
 		dps = append(dps, connector.coreDatapointToProtobuf(dp))
 	}
@@ -110,7 +110,6 @@ func (connector *signalfxJSONConnector) encodePostBodyProtobufV2(datapoints []co
 		protoMarshal = proto.Marshal
 	}
 	protobytes, err := protoMarshal(msg)
-	log.WithFields(log.Fields{"protobytes": protobytes, "dps": dps}).Debug("Posting from V2")
 
 	// Now we can send datapoints
 	return protobytes, "application/x-protobuf", err
@@ -164,7 +163,7 @@ func (connector *signalfxJSONConnector) coreDatapointToProtobuf(point core.Datap
 }
 
 func mapToDimensions(dimensions map[string]string) []*com_signalfuse_metrics_protobuf.Dimension {
-	ret := []*com_signalfuse_metrics_protobuf.Dimension{}
+	ret := make([]*com_signalfuse_metrics_protobuf.Dimension, 0, len(dimensions))
 	for k, v := range dimensions {
 		if k == "" || v == "" {
 			continue
@@ -181,13 +180,15 @@ func mapToDimensions(dimensions map[string]string) []*com_signalfuse_metrics_pro
 	return ret
 }
 
+func runeFilterMap(r rune) rune {
+	if unicode.IsDigit(r) || unicode.IsLetter(r) || r == '_' {
+		return r
+	}
+	return '_'
+}
+
 func filterSignalfxKey(str string) string {
-	return strings.Map(func(r rune) rune {
-		if unicode.IsDigit(r) || unicode.IsLetter(r) || r == '_' {
-			return r
-		}
-		return '_'
-	}, str)
+	return strings.Map(runeFilterMap, str)
 }
 
 func (connector *signalfxJSONConnector) GetStats() []core.Datapoint {
@@ -195,7 +196,7 @@ func (connector *signalfxJSONConnector) GetStats() []core.Datapoint {
 }
 
 func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) error {
-	log.WithFields(log.Fields{"len": len(datapoints), "datapoints": datapoints}).Debug("Processing dp")
+	log.WithField("len", len(datapoints)).Debug("Processing dp")
 	jsonBytes, bodyType, err := connector.encodePostBodyProtobufV2(datapoints)
 
 	if err != nil {
@@ -208,7 +209,6 @@ func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) err
 	req.Header.Set("User-Agent", connector.userAgent)
 
 	req.Header.Set("Connection", "Keep-Alive")
-	log.WithFields(log.Fields{"Request": req, "jsonBytes": jsonBytes}).Debug("JSON Request")
 	resp, err := connector.client.Do(req)
 
 	if err != nil {
@@ -216,7 +216,6 @@ func (connector *signalfxJSONConnector) process(datapoints []core.Datapoint) err
 		return err
 	}
 
-	log.WithField("resp", resp).Debug("POST response")
 	defer resp.Body.Close()
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {

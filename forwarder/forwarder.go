@@ -114,7 +114,6 @@ Loop:
 			datapoints = append(datapoints, datapoint)
 			continue
 		default:
-			log.WithField("len", len(forwarder.datapointsChannel)).Debug("Nothing on channel")
 			// Nothing left.  Flush this.
 			break Loop
 		}
@@ -146,13 +145,13 @@ func (forwarder *basicBufferedForwarder) start(processor ProcessingFunction) err
 				if len(datapoints) == 0 {
 					continue
 				}
-				start := time.Now()
 				atomic.AddInt64(&forwarder.totalDatapoints, int64(len(datapoints)))
 				atomic.AddInt64(&forwarder.totalProcessCalls, 1)
 				atomic.AddInt64(&forwarder.callsInFlight, 1)
+				start := time.Now()
 				err := processor(datapoints)
-				atomic.AddInt64(&forwarder.callsInFlight, -1)
 				atomic.AddInt64(&forwarder.totalProcessTimeNs, time.Since(start).Nanoseconds())
+				atomic.AddInt64(&forwarder.callsInFlight, -1)
 				if err != nil {
 					atomic.AddInt64(&forwarder.totalProcessErrors, 1)
 					atomic.AddInt64(&forwarder.processErrorPoints, int64(len(datapoints)))

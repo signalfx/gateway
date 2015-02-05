@@ -185,8 +185,6 @@ func (decoder *protobufDecoderV2) Read(req *http.Request) error {
 		return errInvalidContentLength
 	}
 	var msg com_signalfuse_metrics_protobuf.DataPointUploadMessage
-	//	bufferedBody := bufio.NewReaderSize(req.Body, 32768)
-	//	buf, err := fullyReadFromBuffer(bufferedBody, uint64(req.ContentLength))
 
 	buf := make([]byte, req.ContentLength)
 	readLen, err := io.ReadFull(req.Body, buf)
