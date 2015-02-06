@@ -18,23 +18,7 @@ RUN mkdir -p /go
 # Invalidate cache so "go get" gets the latest code
 RUN mkdir -p /opt/go/src/github.com/signalfuse/signalfxproxy/
 
-ADD config /opt/go/src/github.com/signalfuse/signalfxproxy/config
-ADD core /opt/go/src/github.com/signalfuse/signalfxproxy/core
-ADD forwarder /opt/go/src/github.com/signalfuse/signalfxproxy/forwarder
-ADD listener /opt/go/src/github.com/signalfuse/signalfxproxy/listener
-ADD stats /opt/go/src/github.com/signalfuse/signalfxproxy/stats
-ADD protocoltypes /opt/go/src/github.com/signalfuse/signalfxproxy/protocoltypes
-ADD jsonengines /opt/go/src/github.com/signalfuse/signalfxproxy/jsonengines
-ADD statuspage /opt/go/src/github.com/signalfuse/signalfxproxy/statuspage
-
-ADD signalfxproxy.go /opt/go/src/github.com/signalfuse/signalfxproxy/
-ADD signalfxproxy_test.go /opt/go/src/github.com/signalfuse/signalfxproxy/
-
-ADD exampleSfdbproxy.conf /opt/go/src/github.com/signalfuse/signalfxproxy/
-ADD travis_check.sh /opt/go/src/github.com/signalfuse/signalfxproxy/
-ADD signalfxproxy /opt/go/src/github.com/signalfuse/signalfxproxy/
-
-ADD README.md /opt/go/src/github.com/signalfuse/signalfxproxy/
+ADD . /opt/go/src/github.com/signalfuse/signalfxproxy
 
 ENV GOPATH /opt/go
 RUN go env && go version
