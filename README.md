@@ -42,8 +42,8 @@ You only need to read this if you want to develop the proxy or understand
 the proxy's code.
 
 The proxy is divided into two main components: [forwarder](protocol/carbon/carbonforwarder.go)
-and [listener](protocol/carbon/carbonlistener.go).  The forwarder and listener are glued together
-by the [demultiplexer](protocol/demultiplexer/demultiplexer.go).
+and [listener](protocol/carbon/carbonlistener.go).  The forwarder and listener
+are glued together by the [demultiplexer](protocol/demultiplexer/demultiplexer.go).
 
 When a listener receives a datapoint, it converts the datapoint into a
 basic [datapoint type](datapoint/datapoint.go).  This core datapoint type is
