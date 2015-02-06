@@ -286,7 +286,9 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() erro
 	return nil
 }
 
+var flagParse = flag.Parse
+
 func main() {
-	flag.Parse()
+	flagParse()
 	proxyCommandLineConfigurationDefault.main()
 }

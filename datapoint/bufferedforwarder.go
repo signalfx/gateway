@@ -137,8 +137,8 @@ func (forwarder *BufferedForwarder) Start(processor ProcessingFunction) error {
 	}
 	forwarder.started = true
 	for i := uint32(0); i < forwarder.numDrainingThreads; i++ {
+		forwarder.threadsWaitingToDie.Add(1)
 		go func() {
-			forwarder.threadsWaitingToDie.Add(1)
 			defer forwarder.threadsWaitingToDie.Done()
 			for atomic.LoadInt32(&forwarder.stopped) == 0 {
 				datapoints := forwarder.blockingDrainUpTo()

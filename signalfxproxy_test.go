@@ -42,6 +42,12 @@ var config1 = `
   }
 `
 
+func init() {
+	flagParse = func() {
+		// Don't parse flags while testing main()
+	}
+}
+
 func TestProxyPidWrite(t *testing.T) {
 	fileObj, _ := ioutil.TempFile("", "gotest")
 	filename := fileObj.Name()
