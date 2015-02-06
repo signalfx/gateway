@@ -11,8 +11,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/signalfuse/signalfxproxy/core"
-	"github.com/signalfuse/signalfxproxy/core/value"
+	"github.com/signalfuse/signalfxproxy/datapoint"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -81,8 +80,8 @@ func TestConfigLoadDimensions(t *testing.T) {
 		myProxyCommandLineConfiguration.blockTillSetupReady()
 		assert.Equal(t, 1, len(myProxyCommandLineConfiguration.allListeners))
 		assert.Equal(t, 1, len(myProxyCommandLineConfiguration.allForwarders))
-		dp := core.NewRelativeTimeDatapoint("metric", map[string]string{"source": "proxy", "forwarder": "testForwardTo"}, value.NewIntWire(1), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
-		myProxyCommandLineConfiguration.allForwarders[0].DatapointsChannel() <- dp
+		dp := datapoint.NewRelativeTime("metric", map[string]string{"source": "proxy", "forwarder": "testForwardTo"}, datapoint.NewIntValue(1), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
+		myProxyCommandLineConfiguration.allForwarders[0].Channel() <- dp
 		c, err := psocket.Accept()
 		defer c.Close()
 		assert.NoError(t, err)
@@ -189,7 +188,7 @@ func TestGetLogrusFormatter(t *testing.T) {
 	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
 		logJSON: true,
 	}
-	_, ok := myProxyCommandLineConfiguration.getLogrusFormatter(&config.LoadedConfig{}).(*log.JSONFormatter)
+	_, ok := myProxyCommandLineConfiguration.getLogrusFormatter(&config.ProxyConfig{}).(*log.JSONFormatter)
 	assert.True(t, ok)
 }
 
@@ -197,7 +196,7 @@ func TestGetLogrusOutput(t *testing.T) {
 	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
 		logDir: "-",
 	}
-	assert.Equal(t, os.Stdout, myProxyCommandLineConfiguration.getLogrusOutput(&config.LoadedConfig{}))
+	assert.Equal(t, os.Stdout, myProxyCommandLineConfiguration.getLogrusOutput(&config.ProxyConfig{}))
 }
 
 func TestProxyUnknownForwarder(t *testing.T) {

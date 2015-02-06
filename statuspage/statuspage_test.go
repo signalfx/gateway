@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/signalfuse/signalfxproxy/core"
 	"github.com/signalfuse/signalfxproxy/stats"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,7 +13,7 @@ import (
 func TestHealthPage(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := http.Request{}
-	page := NewProxyStatusPage(nil, nil)
+	page := New(nil, nil)
 	page.HealthPage()(w, &r)
 	assert.NotNil(t, page)
 	assert.Equal(t, "OK", w.Body.String())
@@ -23,8 +22,8 @@ func TestHealthPage(t *testing.T) {
 func TestStatusPage(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := http.Request{}
-	loadedConfig := config.LoadedConfig{}
-	page := NewProxyStatusPage(&loadedConfig, []core.StatKeeper{stats.NewGolangStatKeeper()})
+	loadedConfig := config.ProxyConfig{}
+	page := New(&loadedConfig, []stats.Keeper{stats.NewGolangKeeper()})
 	page.StatusPage()(w, &r)
 	assert.NotNil(t, page)
 	assert.Contains(t, w.Body.String(), "Args")

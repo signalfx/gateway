@@ -12,7 +12,7 @@ import (
 )
 
 func TestInvalidConfig(t *testing.T) {
-	_, err := LoadConfig("invalidodesnotexist___SDFSDFSD")
+	_, err := Load("invalidodesnotexist___SDFSDFSD")
 	assert.Error(t, err)
 }
 
@@ -74,21 +74,21 @@ func TestFileLoading(t *testing.T) {
 
 }
 
-func TestLoadConfig(t *testing.T) {
+func TestLoad(t *testing.T) {
 	fileObj, _ := ioutil.TempFile("", "gotest")
 	filename := fileObj.Name()
 	defer os.Remove(filename)
 
 	err := ioutil.WriteFile(filename, []byte(`{"ListenFrom":[{"Timeout":"3s"}]}`), os.FileMode(0644))
 	defer os.Remove(filename)
-	_, err = LoadConfig(filename)
+	_, err = Load(filename)
 	prev := xdgbasedirGetConfigFileLocation
 	xdgbasedirGetConfigFileLocation = func(string) (string, error) { return "", errors.New("bad") }
 	defer func() { xdgbasedirGetConfigFileLocation = prev }()
-	_, err = LoadConfig(filename)
+	_, err = Load(filename)
 	assert.Equal(t, "bad", fmt.Sprintf("%s", err), "Expect error when xdg loading fails")
 	xdgbasedirGetConfigFileLocation = func(string) (string, error) { return filename, nil }
-	_, err = LoadConfig(filename)
+	_, err = Load(filename)
 	assert.Nil(t, err)
 
 }

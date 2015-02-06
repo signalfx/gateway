@@ -10,7 +10,8 @@ import (
 	"runtime"
 
 	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/signalfuse/signalfxproxy/core"
+	"github.com/signalfuse/signalfxproxy/datapoint"
+	"github.com/signalfuse/signalfxproxy/stats"
 )
 
 // ProxyStatusPage holds status information about the running process that you can expose with
@@ -21,13 +22,13 @@ type ProxyStatusPage interface {
 }
 
 type proxyStatusPageImpl struct {
-	loadedConfig *config.LoadedConfig
-	statKeepers  []core.StatKeeper
+	loadedConfig *config.ProxyConfig
+	statKeepers  []stats.Keeper
 }
 
-// NewProxyStatusPage returns a new ProxyStatusPage that will expose the given config and stats from
+// New returns a new ProxyStatusPage that will expose the given config and stats from
 // statKeepers
-func NewProxyStatusPage(loadedConfig *config.LoadedConfig, statKeepers []core.StatKeeper) ProxyStatusPage {
+func New(loadedConfig *config.ProxyConfig, statKeepers []stats.Keeper) ProxyStatusPage {
 	return &proxyStatusPageImpl{
 		loadedConfig: loadedConfig,
 		statKeepers:  statKeepers,
@@ -49,9 +50,9 @@ func (proxy *proxyStatusPageImpl) StatusPage() http.HandlerFunc {
 		w.Write(([]byte)("\nArgs:\n"))
 		w.Write(([]byte)(strings.Join(os.Args, "\n")))
 		w.Write(([]byte)("\nStats:\n"))
-		stats := []core.Datapoint{}
+		stats := []datapoint.Datapoint{}
 		for _, keeper := range proxy.statKeepers {
-			stats = append(stats, keeper.GetStats()...)
+			stats = append(stats, keeper.Stats()...)
 		}
 		for _, stat := range stats {
 			w.Write(([]byte)(stat.String() + "\n"))

@@ -5,40 +5,38 @@ import (
 	"time"
 
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
-	"github.com/signalfuse/signalfxproxy/core"
-	"github.com/signalfuse/signalfxproxy/core/value"
-	"github.com/signalfuse/signalfxproxy/protocoltypes"
+	"github.com/signalfuse/signalfxproxy/datapoint"
 )
 
-type golangStatKeeper struct {
+type golangKeeper struct {
 	startTime time.Time
 }
 
-// NewGolangStatKeeper returns a new stats keeper that can return internal golang stats
-func NewGolangStatKeeper() core.StatKeeper {
-	return &golangStatKeeper{
+// NewGolangKeeper returns a new stats keeper that can return internal golang stats
+func NewGolangKeeper() Keeper {
+	return &golangKeeper{
 		startTime: time.Now(),
 	}
 }
 
-func point(name string, v int64) core.Datapoint {
-	return protocoltypes.NewOnHostDatapointDimensions(
+func point(name string, v int64) datapoint.Datapoint {
+	return datapoint.NewOnHostDatapointDimensions(
 		name,
-		value.NewIntWire(v),
+		datapoint.NewIntValue(v),
 		com_signalfuse_metrics_protobuf.MetricType_GAUGE,
 		map[string]string{"stattype": "golang_sys"})
 }
 
-func pointc(name string, v int64) core.Datapoint {
-	return protocoltypes.NewOnHostDatapointDimensions(
+func pointc(name string, v int64) datapoint.Datapoint {
+	return datapoint.NewOnHostDatapointDimensions(
 		name,
-		value.NewIntWire(v),
+		datapoint.NewIntValue(v),
 		com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
 		map[string]string{"stattype": "golang_sys"})
 }
 
-func (statKeeper *golangStatKeeper) GetStats() []core.Datapoint {
-	ret := []core.Datapoint{}
+func (statKeeper *golangKeeper) Stats() []datapoint.Datapoint {
+	ret := []datapoint.Datapoint{}
 	ret = append(
 		ret,
 		point("GOMAXPROCS", int64(runtime.GOMAXPROCS(0))))

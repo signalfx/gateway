@@ -54,8 +54,8 @@ func (forwardTo *ForwardTo) String() string {
 	return stringhelper.GenericFromString(forwardTo)
 }
 
-// LoadedConfig is the full config as presented inside the proxy config file
-type LoadedConfig struct {
+// ProxyConfig is the full config as presented inside the proxy config file
+type ProxyConfig struct {
 	ForwardTo          []*ForwardTo
 	ListenFrom         []*ListenFrom
 	StatsDelay         *string
@@ -70,8 +70,8 @@ type LoadedConfig struct {
 	LogFormat          *string
 }
 
-func decodeConfig(configBytes []byte) (*LoadedConfig, error) {
-	var config LoadedConfig
+func decodeConfig(configBytes []byte) (*ProxyConfig, error) {
+	var config ProxyConfig
 	if err := json.Unmarshal(configBytes, &config); err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func decodeConfig(configBytes []byte) (*LoadedConfig, error) {
 	return &config, nil
 }
 
-func loadConfig(configFile string) (*LoadedConfig, error) {
+func loadConfig(configFile string) (*ProxyConfig, error) {
 	configBytes, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		return nil, err
@@ -113,8 +113,8 @@ func loadConfig(configFile string) (*LoadedConfig, error) {
 
 var xdgbasedirGetConfigFileLocation = xdgbasedir.GetConfigFileLocation
 
-// LoadConfig loads proxy configuration from a filename that is in an xdg configuration location
-func LoadConfig(configFile string) (*LoadedConfig, error) {
+// Load loads proxy configuration from a filename that is in an xdg configuration location
+func Load(configFile string) (*ProxyConfig, error) {
 	filename, err := xdgbasedirGetConfigFileLocation(configFile)
 	if err != nil {
 		return nil, err
