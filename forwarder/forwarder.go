@@ -45,6 +45,7 @@ type Loader func(*config.ForwardTo) (core.StatKeepingStreamingAPI, error)
 func (forwarder *basicBufferedForwarder) DatapointsChannel() chan<- core.Datapoint {
 	return forwarder.datapointsChannel
 }
+
 func (forwarder *basicBufferedForwarder) GetStats() []core.Datapoint {
 	ret := make([]core.Datapoint, 0, 2)
 	ret = append(ret, protocoltypes.NewOnHostDatapointDimensions(
