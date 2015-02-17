@@ -50,7 +50,7 @@ func TestForwarderLoaderDefaults(t *testing.T) {
 	forwarder, err := ForwarderLoader(&forwardTo)
 	sfForwarder, _ := forwarder.(*signalfxJSONConnector)
 	assert.Nil(t, err)
-	assert.Equal(t, "https://api.signalfuse.com/v2/datapoint", sfForwarder.url, "URL should change for version 2")
+	assert.Equal(t, "https://ingest.signalfx.com/v2/datapoint", sfForwarder.url, "URL should change for version 2")
 }
 
 func TestMapToDimensions(t *testing.T) {

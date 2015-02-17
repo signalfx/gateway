@@ -40,7 +40,7 @@ type signalfxJSONConnector struct {
 type protoMarshalStub func(pb proto.Message) ([]byte, error)
 
 var defaultConfigV2 = &config.ForwardTo{
-	URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfuse.com/v2/datapoint"),
+	URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("https://ingest.signalfx.com/v2/datapoint"),
 	DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
 	MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral(""), // Not used
 	TimeoutDuration:   workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 60),
