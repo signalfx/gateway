@@ -177,6 +177,11 @@ type protobufDecoderV2 struct {
 var errInvalidContentLength = fmt.Errorf("Invalid Content Length")
 
 func (decoder *protobufDecoderV2) Read(req *http.Request) error {
+	return DecodeProtobufV2(req, &decoder.datapointTracker)
+}
+
+// DecodeProtobufV2 will take a request of signalfx's V2 protocol buffers and forward them to datapointTracker
+func DecodeProtobufV2(req *http.Request, datapointTracker datapoint.Adder) error {
 	if req.ContentLength == -1 {
 		return errInvalidContentLength
 	}
@@ -194,7 +199,7 @@ func (decoder *protobufDecoderV2) Read(req *http.Request) error {
 	}
 	for _, protoDb := range msg.GetDatapoints() {
 		dp := NewProtobufDataPointWithType(protoDb, com_signalfuse_metrics_protobuf.MetricType_GAUGE)
-		decoder.datapointTracker.AddDatapoint(dp)
+		datapointTracker.AddDatapoint(dp)
 	}
 	return nil
 }
@@ -204,6 +209,11 @@ type jsonDecoderV2 struct {
 }
 
 func (decoder *jsonDecoderV2) Read(req *http.Request) error {
+	return DecodeJSONV2(req, &decoder.datapointTracker)
+}
+
+// DecodeJSONV2 accepts datapoints in signalfx's v2 JSON format and forwards them to datapointTracker
+func DecodeJSONV2(req *http.Request, datapointTracker datapoint.Adder) error {
 	dec := json.NewDecoder(req.Body)
 	var d JSONDatapointV2
 	if err := dec.Decode(&d); err != nil {
@@ -222,7 +232,7 @@ func (decoder *jsonDecoderV2) Read(req *http.Request) error {
 				log.WithField("err", err).Warn("Unable to get value for datapoint")
 			} else {
 				dp := datapoint.NewRelativeTime(jsonDatapoint.Metric, jsonDatapoint.Dimensions, v, com_signalfuse_metrics_protobuf.MetricType(mt), jsonDatapoint.Timestamp)
-				decoder.datapointTracker.AddDatapoint(dp)
+				datapointTracker.AddDatapoint(dp)
 			}
 		}
 	}

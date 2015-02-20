@@ -8,6 +8,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestAddrFunc(t *testing.T) {
+	i := 0
+	f := func(dp Datapoint) {
+		i++
+	}
+	x := AddrFunc(f)
+	x.AddDatapoint(nil)
+	assert.Equal(t, 1, i)
+}
+
 func TestRelativeDatapoint(t *testing.T) {
 	dp := NewRelativeTime("metric", map[string]string{"host": "bob"},
 		NewIntValue(1), com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER, 0)

@@ -136,6 +136,19 @@ type Tracker struct {
 	Streamer        Streamer
 }
 
+// Adder can receive datapoints.  Usually these are just forwarded to a channel.
+type Adder interface {
+	AddDatapoint(dp Datapoint)
+}
+
+// AddrFunc is a wrapper for any function that takes a datapoint, to turn it into an Addr type
+type AddrFunc func(Datapoint)
+
+// AddDatapoint to this caller, forwarding it to the wrapped function
+func (a AddrFunc) AddDatapoint(dp Datapoint) {
+	a(dp)
+}
+
 // AddDatapoint to a tracking, sending it to the channel
 func (t *Tracker) AddDatapoint(dp Datapoint) {
 	t.Streamer.Channel() <- dp

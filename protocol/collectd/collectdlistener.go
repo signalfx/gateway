@@ -41,22 +41,31 @@ type JSONDecoder struct {
 	DatapointTracker datapoint.Tracker
 }
 
-func (decoder *JSONDecoder) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	d, err := decoder.DecodingEngine.DecodeJSONWriteBody(req.Body)
+// DecodeJSON of a collectd HTTP request using collectd's native JSON http protocol
+func DecodeJSON(req *http.Request, decodingEngine JSONEngine, datapointTracker datapoint.Adder) error {
+	d, err := decodingEngine.DecodeJSONWriteBody(req.Body)
 	if err != nil {
-		atomic.AddInt64(&decoder.TotalErrors, 1)
-		rw.WriteHeader(http.StatusBadRequest)
-		rw.Write([]byte(fmt.Sprintf("Unable to decode json: %s", err.Error())))
-		return
+		return err
 	}
 	for _, f := range d {
 		if f.TypeS != nil && f.Time != nil {
 			for i := range f.Dsnames {
 				if i < len(f.Dstypes) && i < len(f.Values) {
-					decoder.DatapointTracker.AddDatapoint(NewCollectdDatapoint(f, uint(i)))
+					datapointTracker.AddDatapoint(NewCollectdDatapoint(f, uint(i)))
 				}
 			}
 		}
+	}
+	return nil
+}
+
+func (decoder *JSONDecoder) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	err := DecodeJSON(req, decoder.DecodingEngine, &decoder.DatapointTracker)
+	if err != nil {
+		atomic.AddInt64(&decoder.TotalErrors, 1)
+		rw.WriteHeader(http.StatusBadRequest)
+		rw.Write([]byte(fmt.Sprintf("Unable to decode json: %s", err.Error())))
+		return
 	}
 	rw.Write([]byte(`"OK"`))
 }
