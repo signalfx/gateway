@@ -53,35 +53,28 @@ func NewCollectdDatapoint(point *JSONWriteFormat, index uint) datapoint.Datapoin
 	dimensions := make(map[string]string)
 	metricType := metricTypeFromDsType(dstype)
 	metricName, usedParts := getReasonableMetricName(point, index)
-	if point.Host != nil {
-		dimensions["host"] = *point.Host
-	}
-	if point.Plugin != nil {
-		dimensions["plugin"] = *point.Plugin
-	}
-	if point.PluginInstance != nil {
-		dimensions["plugin_instance"] = *point.PluginInstance
-	}
-	if point.TypeInstance != nil {
-		_, usedInMetricName := usedParts["type_instance"]
-		if !usedInMetricName {
-			dimensions["type_instance"] = *point.TypeInstance
-		}
-	}
-	if point.TypeS != nil {
-		_, usedInMetricName := usedParts["type"]
-		if !usedInMetricName {
-			dimensions["type"] = *point.TypeS
-		}
-	}
-	if dsname != nil {
-		_, usedInMetricName := usedParts["dsname"]
-		if !usedInMetricName {
-			dimensions["dsname"] = *dsname
-		}
-	}
+	// Don't add empty dimensions
+	addIfNotNullOrEmpty(dimensions, "host", true, point.Host)
+	addIfNotNullOrEmpty(dimensions, "plugin", true, point.Plugin)
+	addIfNotNullOrEmpty(dimensions, "plugin_instance", true, point.PluginInstance)
+
+	_, usedInMetricName := usedParts["type_instance"]
+	addIfNotNullOrEmpty(dimensions, "type_instance", usedInMetricName, point.TypeInstance)
+
+	_, usedInMetricName = usedParts["type"]
+	addIfNotNullOrEmpty(dimensions, "type", usedInMetricName, point.TypeS)
+
+	_, usedInMetricName = usedParts["dsname"]
+	addIfNotNullOrEmpty(dimensions, "dsname", usedInMetricName, dsname)
+
 	timestamp := time.Unix(0, int64(float64(time.Second)**point.Time))
 	return datapoint.NewAbsoluteTime(metricName, dimensions, datapoint.NewFloatValue(*val), metricType, timestamp)
+}
+
+func addIfNotNullOrEmpty(dimensions map[string]string, key string, cond bool, val *string) {
+	if cond && val != nil && *val != "" {
+		dimensions[key] = *val
+	}
 }
 
 func getReasonableMetricName(point *JSONWriteFormat, index uint) (string, map[string]struct{}) {
