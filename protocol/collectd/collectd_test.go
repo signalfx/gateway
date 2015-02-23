@@ -106,6 +106,24 @@ const testDecodeCollectdBody = `[
         "values": [
             5.36202e+09
         ]
+    },
+    {
+        "dsnames": [
+            "value"
+        ],
+        "dstypes": [
+            "derive"
+        ],
+        "host": "i-b13d1e5f",
+        "interval": 10.0,
+        "plugin": "memory",
+        "plugin_instance": "",
+        "time": 1415062577.4949999,
+        "type": "memory",
+        "type_instance": "free",
+        "values": [
+            5.36202e+09
+        ]
     }
 ]`
 
@@ -119,7 +137,7 @@ func TestMetricTypeFromDsType(t *testing.T) {
 func TestCollectdJsonDecoding(t *testing.T) {
 	postFormat := new([]*JSONWriteFormat)
 	assert.Nil(t, json.Unmarshal([]byte(testDecodeCollectdBody), &postFormat))
-	assert.Equal(t, 5, len(*postFormat), "Expect 5 elements")
+	assert.Equal(t, 6, len(*postFormat))
 	dp := NewCollectdDatapoint((*postFormat)[0], uint(0))
 	assert.Equal(t, "load.shortterm", dp.Metric(), "Metric not named correctly")
 	dp = NewCollectdDatapoint((*postFormat)[1], uint(0))
@@ -131,4 +149,9 @@ func TestCollectdJsonDecoding(t *testing.T) {
 	dp = NewCollectdDatapoint((*postFormat)[4], uint(0))
 	f := dp.Value().(datapoint.FloatValue).Float()
 	assert.Equal(t, 5.36202e+09, f, "Cannot parse value correctly")
+
+	dp = NewCollectdDatapoint((*postFormat)[5], uint(0))
+	assert.Equal(t, "memory.free", dp.Metric())
+	assert.Equal(t, 3, len(dp.Dimensions()))
+
 }

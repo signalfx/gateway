@@ -59,13 +59,13 @@ func NewCollectdDatapoint(point *JSONWriteFormat, index uint) datapoint.Datapoin
 	addIfNotNullOrEmpty(dimensions, "plugin_instance", true, point.PluginInstance)
 
 	_, usedInMetricName := usedParts["type_instance"]
-	addIfNotNullOrEmpty(dimensions, "type_instance", usedInMetricName, point.TypeInstance)
+	addIfNotNullOrEmpty(dimensions, "type_instance", !usedInMetricName, point.TypeInstance)
 
 	_, usedInMetricName = usedParts["type"]
-	addIfNotNullOrEmpty(dimensions, "type", usedInMetricName, point.TypeS)
+	addIfNotNullOrEmpty(dimensions, "type", !usedInMetricName, point.TypeS)
 
 	_, usedInMetricName = usedParts["dsname"]
-	addIfNotNullOrEmpty(dimensions, "dsname", usedInMetricName, dsname)
+	addIfNotNullOrEmpty(dimensions, "dsname", !usedInMetricName, dsname)
 
 	timestamp := time.Unix(0, int64(float64(time.Second)**point.Time))
 	return datapoint.NewAbsoluteTime(metricName, dimensions, datapoint.NewFloatValue(*val), metricType, timestamp)
