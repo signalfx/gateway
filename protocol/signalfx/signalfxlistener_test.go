@@ -139,7 +139,6 @@ func TestSignalfxProtobufV1Handler(t *testing.T) {
 }
 
 func TestSignalfxProtobufV1Decoder(t *testing.T) {
-
 	defer log.SetLevel(log.GetLevel())
 	log.SetLevel(log.DebugLevel)
 	typeGetter := metricHandler{
@@ -384,8 +383,7 @@ func TestSignalfxJSONForwarderInvalidJSONEngine(t *testing.T) {
 }
 
 func BenchmarkAtomicInc(b *testing.B) {
-	var l int64
-	l = 0
+	l := int64(0)
 	for i := int64(0); i < int64(b.N); i++ {
 		atomic.AddInt64(&l, i)
 	}
@@ -393,8 +391,7 @@ func BenchmarkAtomicInc(b *testing.B) {
 }
 
 func BenchmarkRegularInc(b *testing.B) {
-	var l int64
-	l = 0
+	l := int64(0)
 	for i := int64(0); i < int64(b.N); i++ {
 		l += i
 	}

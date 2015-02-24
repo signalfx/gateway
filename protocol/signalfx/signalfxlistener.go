@@ -185,7 +185,6 @@ func DecodeProtobufV2(req *http.Request, datapointTracker datapoint.Adder) error
 	if req.ContentLength == -1 {
 		return errInvalidContentLength
 	}
-	var msg com_signalfuse_metrics_protobuf.DataPointUploadMessage
 
 	buf := make([]byte, req.ContentLength)
 	readLen, err := io.ReadFull(req.Body, buf)
@@ -193,6 +192,7 @@ func DecodeProtobufV2(req *http.Request, datapointTracker datapoint.Adder) error
 		log.WithField("err", err).WithField("len", readLen).WithField("content-len", req.ContentLength).Warn("Unable to fully read from buffer")
 		return err
 	}
+	var msg com_signalfuse_metrics_protobuf.DataPointUploadMessage
 	err = proto.Unmarshal(buf, &msg)
 	if err != nil {
 		return err
@@ -321,7 +321,6 @@ type decoderFunc func() func(*http.Request) error
 // StartServingHTTPOnPort servers http requests for Signalfx datapoints
 func StartServingHTTPOnPort(listenAddr string, Streamer datapoint.Streamer,
 	clientTimeout time.Duration, name string, decodingEngine collectd.JSONEngine) (stats.ClosableKeeper, error) {
-
 	r := mux.NewRouter()
 
 	server := http.Server{
@@ -421,7 +420,6 @@ func setupJSONV1(Streamer datapoint.Streamer, r *mux.Router, name string, typeGe
 }
 
 func setupProtobufV2(Streamer datapoint.Streamer, r *mux.Router, name string) stats.Keeper {
-
 	protobufDecoderV2 := protobufDecoderV2{
 		datapointTracker: datapoint.Tracker{
 			Streamer: Streamer,
