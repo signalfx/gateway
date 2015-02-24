@@ -122,16 +122,18 @@ func TestDeadlineError(t *testing.T) {
 	carbonForwarder, err := newTcpGraphiteCarbonForwarer("127.0.0.1", nettest.TcpPort(l.(*carbonListener).psocket), time.Second, 10, "", []string{})
 	assert.Equal(t, nil, err, "Expect no error")
 
-	dpSent := datapoint.NewRelativeTime("metric", map[string]string{}, datapoint.NewIntValue(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
 	mockConn := mockConn{
 		setDeadlineBlock: make(chan bool),
 	}
 	mockConn.deadlineReturn = errors.New("deadline error")
 	carbonForwarder.openConnection = &mockConn
-	carbonForwarder.Channel() <- dpSent
+
 	assert.Equal(t, 0, len(forwardTo.DatapointsChannel), "Expect drain from chan")
-	_ = <-mockConn.setDeadlineBlock
+	assert.NotNil(t, mockConn.deadlineReturn)
+	go carbonForwarder.drainDatapointChannel(nil)
+	<-mockConn.setDeadlineBlock
 	assert.Equal(t, 0, len(forwardTo.DatapointsChannel), "Expect no stats")
+	assert.Nil(t, mockConn.deadlineReturn)
 }
 
 func TestWriteError(t *testing.T) {
