@@ -186,6 +186,7 @@ func DecodeProtobufV2(req *http.Request, datapointTracker datapoint.Adder) error
 		return errInvalidContentLength
 	}
 
+	// TODO: Source of memory creation.  Maybe pass buf in?
 	buf := make([]byte, req.ContentLength)
 	readLen, err := io.ReadFull(req.Body, buf)
 	if err != nil {
