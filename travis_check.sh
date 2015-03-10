@@ -1,5 +1,6 @@
 #!/bin/bash
 set -x
+
 #
 # ---- Check shell scripts
 # 
