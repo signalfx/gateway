@@ -6,8 +6,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
-	"github.com/signalfuse/signalfxproxy/datapoint"
-	"github.com/signalfuse/signalfxproxy/stats"
+	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/stats"
 )
 
 type streamingDemultiplexerImpl struct {

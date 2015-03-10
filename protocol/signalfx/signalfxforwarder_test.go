@@ -15,10 +15,10 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
-	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/signalfuse/signalfxproxy/datapoint"
-	"github.com/signalfuse/signalfxproxy/nettest"
-	"github.com/signalfuse/signalfxproxy/stats"
+	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/nettest"
+	"github.com/signalfx/metricproxy/stats"
 
 	"github.com/stretchr/testify/assert"
 )

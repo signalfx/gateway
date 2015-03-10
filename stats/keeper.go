@@ -4,7 +4,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/signalfuse/signalfxproxy/datapoint"
+	"github.com/signalfx/metricproxy/datapoint"
 )
 
 // A Keeper contains datapoints that describe its state and can be reported upstream
@@ -56,7 +56,7 @@ type StatKeepingStreamer interface {
 	Name() string
 }
 
-// DrainingThread attaches to the signalfxproxy to periodically send proxy statistics to
+// DrainingThread attaches to the metricproxy to periodically send proxy statistics to
 // listeners
 type DrainingThread interface {
 	SendStats()

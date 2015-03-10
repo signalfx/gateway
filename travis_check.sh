@@ -4,7 +4,7 @@ set -x
 # ---- Check shell scripts
 # 
 shellcheck install.sh || exit 1
-shellcheck signalfxproxy || exit 1
+shellcheck metricproxy || exit 1
 # Yo dawg
 shellcheck travis_check.sh || exit 1
 

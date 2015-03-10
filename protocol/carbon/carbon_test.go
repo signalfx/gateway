@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/signalfuse/signalfxproxy/datapoint"
-	"github.com/signalfuse/signalfxproxy/protocol/carbon/metricdeconstructor"
+	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
 	"github.com/stretchr/testify/assert"
 )
 

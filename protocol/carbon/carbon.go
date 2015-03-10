@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
-	"github.com/signalfuse/signalfxproxy/datapoint"
-	"github.com/signalfuse/signalfxproxy/protocol/carbon/metricdeconstructor"
+	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
 )
 
 // Native signals an object can be directly converted to a carbon datapoint send

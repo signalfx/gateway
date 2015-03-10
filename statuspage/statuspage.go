@@ -9,9 +9,9 @@ import (
 
 	"runtime"
 
-	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/signalfuse/signalfxproxy/datapoint"
-	"github.com/signalfuse/signalfxproxy/stats"
+	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/stats"
 )
 
 // ProxyStatusPage holds status information about the running process that you can expose with

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
-	"github.com/signalfuse/signalfxproxy/datapoint"
+	"github.com/signalfx/metricproxy/datapoint"
 )
 
 // RequestCounter is a negroni handler that tracks connection stats

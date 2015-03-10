@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/signalfuse/signalfxproxy/datapoint"
-	"github.com/signalfuse/signalfxproxy/datapoint/dptest"
-	"github.com/signalfuse/signalfxproxy/nettest"
+	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/datapoint/dptest"
+	"github.com/signalfx/metricproxy/nettest"
 	"github.com/stretchr/testify/assert"
 )
 

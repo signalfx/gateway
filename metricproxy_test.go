@@ -10,8 +10,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
-	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/signalfuse/signalfxproxy/datapoint"
+	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/metricproxy/datapoint"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +21,7 @@ var config1 = `
     "NumProcs": 1,
     "LogDir": "sfproxytest.json",
     "LogMaxSize": 5,
-    "PidFilename": "signalfxproxy.pid",
+    "PidFilename": "metricproxy.pid",
     "LogMaxBackups": 5,
     "LogFormat": "stdout",
     "ListenFrom":[

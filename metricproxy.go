@@ -15,15 +15,15 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	log "github.com/Sirupsen/logrus"
-	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/signalfuse/signalfxproxy/datapoint"
-	"github.com/signalfuse/signalfxproxy/protocol/carbon"
-	"github.com/signalfuse/signalfxproxy/protocol/collectd"
-	"github.com/signalfuse/signalfxproxy/protocol/csv"
-	"github.com/signalfuse/signalfxproxy/protocol/demultiplexer"
-	"github.com/signalfuse/signalfxproxy/protocol/signalfx"
-	"github.com/signalfuse/signalfxproxy/stats"
-	"github.com/signalfuse/signalfxproxy/statuspage"
+	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/protocol/carbon"
+	"github.com/signalfx/metricproxy/protocol/collectd"
+	"github.com/signalfx/metricproxy/protocol/csv"
+	"github.com/signalfx/metricproxy/protocol/demultiplexer"
+	"github.com/signalfx/metricproxy/protocol/signalfx"
+	"github.com/signalfx/metricproxy/stats"
+	"github.com/signalfx/metricproxy/statuspage"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -79,7 +79,7 @@ func init() {
 	flag.StringVar(&proxyCommandLineConfigurationDefault.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
 
 	// All of these are deprecated.  We want to use the config file instead
-	flag.StringVar(&proxyCommandLineConfigurationDefault.pidFileName, "signalfxproxypid", "signalfxproxy.pid", "deprecated: Use config file instead...  Name of the file to store the PID in")
+	flag.StringVar(&proxyCommandLineConfigurationDefault.pidFileName, "metricproxypid", "metricproxy.pid", "deprecated: Use config file instead...  Name of the file to store the PID in")
 	flag.StringVar(&proxyCommandLineConfigurationDefault.pprofaddr, "pprofaddr", "", "deprecated: Use config file instead...  Address to open pprof info on")
 
 	flag.StringVar(&proxyCommandLineConfigurationDefault.logDir, "logdir", os.TempDir(), "deprecated: Use config file instead...  Directory to store log files.  If -, will log to stdout")
@@ -114,7 +114,7 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogrusOu
 		logMaxBackups = *loadedConfig.LogMaxBackups
 	}
 	lumberjackLogger := &lumberjack.Logger{
-		Filename:   path.Join(logDir, "signalfxproxy.log"),
+		Filename:   path.Join(logDir, "metricproxy.log"),
 		MaxSize:    logMaxSize, // megabytes
 		MaxBackups: logMaxBackups,
 	}

@@ -1,32 +1,32 @@
-# signalfxproxy [![Build Status](https://travis-ci.org/signalfuse/signalfxproxy.svg?branch=master)](https://travis-ci.org/signalfuse/signalfxproxy) [![Docker Repository on Quay.io](https://quay.io/repository/signalfuse/signalfxproxy/status "Docker Repository on Quay.io")](https://quay.io/repository/signalfuse/signalfxproxy)
+# metricproxy [![Build Status](https://travis-ci.org/signalfx/metricproxy.svg?branch=master)](https://travis-ci.org/signalfx/metricproxy) [![Docker Repository on Quay.io](https://quay.io/repository/signalfx/metricproxy/status "Docker Repository on Quay.io")](https://quay.io/repository/signalfx/metricproxy)
 
 The proxy is a multilingual datapoint demultiplexer that can accept time
-series data from the statsd, carbon, or signalfuse protocols and emit
+series data from the statsd, carbon, or signalfx protocols and emit
 those datapoints to a series of servers on the statsd, carbon, or
-signalfuse protocol.  The proxy is ideally placed on the same server as
+signalfx protocol.  The proxy is ideally placed on the same server as
 either another aggregator, such as statsd, or on a central server that
 is already receiving datapoints, such as graphite's carbon database.
 
 ## Install and upgrade
 
 ```
-  curl -s https://raw.githubusercontent.com/signalfuse/signalfxproxy/master/install.sh | sudo sh
+  curl -s https://raw.githubusercontent.com/signalfx/metricproxy/master/install.sh | sudo sh
   # Config at    /etc/sfdbconfig.conf
-  # Binary at    /opt/sfproxy/bin/signalfxproxy
+  # Binary at    /opt/sfproxy/bin/metricproxy
   # Logs at      /var/log/sfproxy
-  # PID file at  /var/run/signalfxproxy.pid
+  # PID file at  /var/run/metricproxy.pid
  ```
 
 ## Running
 
 ```
-   /etc/init.d/signalfxproxy start
+   /etc/init.d/metricproxy start
  ```
 
 ## Stopping the daemon
 
 ```
-   /etc/init.d/signalfxproxy stop
+   /etc/init.d/metricproxy stop
  ```
 
 ## Debugging
@@ -76,7 +76,7 @@ env variable is set correctly.
 ## Docker
 
 The proxy comes with a [docker image](Dockerfile) that is built and deployed
-to [quay.io](https://quay.io/repository/signalfuse/signalfxproxy).  It assumes
+to [quay.io](https://quay.io/repository/signalfx/metricproxy).  It assumes
 you will have a sfdbconfig.json file cross mounted to
 /var/config/sfproxy/sfdbconfig.json for the docker container.
 
@@ -166,8 +166,8 @@ configure your auth token inside DefaultAuthToken.
 ### Basic
 
 This config will listen for graphite metrics on port 2003 and forward them
-to signalfuse with the token ABCD.  It will also report local stats
-to signalfuse at 1s intervals
+to signalfx with the token ABCD.  It will also report local stats
+to signalfx at 1s intervals
 
 ```
 {
@@ -249,7 +249,7 @@ format.  That format is "\_METRIC_NAME\_\[KEY:VALUE,KEY:VALUE]".  For example,
 
 ### SignalFX perf options
 
-This config listens for carbon data on port 2003 and forwards it to signalfuse
+This config listens for carbon data on port 2003 and forwards it to signalfx
 using an internal datapoint buffer size of 1,000,000 and sending with 50 threads
 simultaniously with each thread sending no more than 5,000 points in a single
 call.

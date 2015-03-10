@@ -1,6 +1,6 @@
 package dptest
 
-import "github.com/signalfuse/signalfxproxy/datapoint"
+import "github.com/signalfx/metricproxy/datapoint"
 
 // BasicStreamer is the simplest implementation of a datapoint.streamer
 type BasicStreamer struct {

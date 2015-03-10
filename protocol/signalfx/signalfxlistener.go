@@ -19,11 +19,11 @@ import (
 	"github.com/codegangsta/negroni"
 	"github.com/gorilla/mux"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
-	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/signalfuse/signalfxproxy/datapoint"
-	"github.com/signalfuse/signalfxproxy/protocol/collectd"
-	"github.com/signalfuse/signalfxproxy/reqcounter"
-	"github.com/signalfuse/signalfxproxy/stats"
+	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/protocol/collectd"
+	"github.com/signalfx/metricproxy/reqcounter"
+	"github.com/signalfx/metricproxy/stats"
 )
 
 type listenerServer struct {

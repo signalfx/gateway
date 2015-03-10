@@ -1,7 +1,7 @@
 #!/bin/sh
 set -x
 
-/etc/init.d/signalfxproxy stop || echo "Proxy not currently running"
+/etc/init.d/metricproxy stop || echo "Proxy not currently running"
 YUM_CMD=$(which yum)
 APT_GET_CMD=$(which apt-get)
 GO_CMD=$(which go)
@@ -20,14 +20,14 @@ else
 fi
 
 rm -rf /opt/sfproxy
-rm -f /etc/init.d/signalfxproxy
+rm -f /etc/init.d/metricproxy
 mkdir -p /opt/sfproxy
 cd /opt/sfproxy
-env GOPATH="$(pwd)" go get -u github.com/signalfuse/signalfxproxy
-ln -s /opt/sfproxy/src/github.com/signalfuse/signalfxproxy/signalfxproxy /etc/init.d/signalfxproxy
-if [ ! -f /opt/sfproxy/bin/signalfxproxy ]; then
+env GOPATH="$(pwd)" go get -u github.com/signalfx/metricproxy
+ln -s /opt/sfproxy/src/github.com/signalfx/metricproxy/metricproxy /etc/init.d/metricproxy
+if [ ! -f /opt/sfproxy/bin/metricproxy ]; then
     echo "Unable to install proxy"
     exit 1
 fi
-echo "Install ok!  To run execute 'sudo /etc/init.d/signalfxproxy start'"
-/etc/init.d/signalfxproxy locations
+echo "Install ok!  To run execute 'sudo /etc/init.d/metricproxy start'"
+/etc/init.d/metricproxy locations

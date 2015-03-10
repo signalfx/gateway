@@ -12,10 +12,10 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/signalfuse/signalfxproxy/datapoint"
-	"github.com/signalfuse/signalfxproxy/dimensions"
-	"github.com/signalfuse/signalfxproxy/stats"
+	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/dimensions"
+	"github.com/signalfx/metricproxy/stats"
 )
 
 type reconectingGraphiteCarbonConnection struct {

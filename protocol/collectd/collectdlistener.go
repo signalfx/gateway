@@ -11,12 +11,12 @@ import (
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/gorilla/mux"
-	"github.com/signalfuse/signalfxproxy/config"
+	"github.com/signalfx/metricproxy/config"
 
 	"github.com/codegangsta/negroni"
-	"github.com/signalfuse/signalfxproxy/datapoint"
-	"github.com/signalfuse/signalfxproxy/reqcounter"
-	"github.com/signalfuse/signalfxproxy/stats"
+	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/reqcounter"
+	"github.com/signalfx/metricproxy/stats"
 )
 
 type listenerServer struct {

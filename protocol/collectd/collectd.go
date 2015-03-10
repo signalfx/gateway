@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
-	"github.com/signalfuse/signalfxproxy/datapoint"
+	"github.com/signalfx/metricproxy/datapoint"
 )
 
 // JSONWriteBody is the full POST body of collectd's write_http format

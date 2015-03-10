@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/signalfuse/signalfxproxy/config"
-	"github.com/signalfuse/signalfxproxy/stats"
+	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/metricproxy/stats"
 	"github.com/stretchr/testify/assert"
 )
 
