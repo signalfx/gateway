@@ -55,7 +55,7 @@ func localSetup(t *testing.T) (stats.ClosableKeeper, chan datapoint.Datapoint, s
 	}
 	engine, _ := collectd.LoadEngine("")
 	server, err := StartServingHTTPOnPort("127.0.0.1:0", sendTo, time.Second, "test_server", engine)
-	baseURI := fmt.Sprintf("http://127.0.0.1:%d", nettest.TcpPort(server.(*listenerServer).listener))
+	baseURI := fmt.Sprintf("http://127.0.0.1:%d", nettest.TCPPort(server.(*listenerServer).listener))
 	assert.NotNil(t, server)
 	assert.NoError(t, err)
 	return server, sendTo.Chan, baseURI

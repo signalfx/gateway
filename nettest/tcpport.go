@@ -8,7 +8,7 @@ type NetworkListener interface {
 	Addr() net.Addr
 }
 
-// TcpPort of the listener address.  If the listener isn't TCP, this may panic()
-func TcpPort(l NetworkListener) uint16 {
+// TCPPort of the listener address.  If the listener isn't TCP, this may panic()
+func TCPPort(l NetworkListener) uint16 {
 	return (uint16)(l.Addr().(*net.TCPAddr).Port)
 }

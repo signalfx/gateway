@@ -87,7 +87,7 @@ func setupServerForwarder(t *testing.T) (*datapoint.BufferedForwarder, stats.Clo
 	l, err := ListenerLoader(finalDatapointDestination, &listenFromSignalfx)
 	assert.Equal(t, nil, err, "Expect no error")
 
-	port := nettest.TcpPort(l.(*listenerServer).listener)
+	port := nettest.TCPPort(l.(*listenerServer).listener)
 
 	forwardTo := config.ForwardTo{
 		URL:              workarounds.GolangDoesnotAllowPointerToStringLiteral(fmt.Sprintf("http://127.0.0.1:%d/v2/datapoint", port)),

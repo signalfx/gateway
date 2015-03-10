@@ -44,7 +44,7 @@ func TestCarbonHandleConnection(t *testing.T) {
 	listener, err := ListenerLoader(sendTo, listenFrom)
 	defer listener.Close()
 
-	listeningDialAddress := fmt.Sprintf("127.0.0.1:%d", nettest.TcpPort(listener.(*carbonListener).psocket))
+	listeningDialAddress := fmt.Sprintf("127.0.0.1:%d", nettest.TCPPort(listener.(*carbonListener).psocket))
 
 	conn, err := net.Dial("tcp", listeningDialAddress)
 	assert.NoError(t, err)
@@ -64,7 +64,7 @@ func TestListenerLoader(t *testing.T) {
 	listener, err := ListenerLoader(sendTo, listenFrom)
 	assert.Equal(t, nil, err, "Should be ok to make")
 	defer listener.Close()
-	listeningDialAddress := fmt.Sprintf("127.0.0.1:%d", nettest.TcpPort(listener.(*carbonListener).psocket))
+	listeningDialAddress := fmt.Sprintf("127.0.0.1:%d", nettest.TCPPort(listener.(*carbonListener).psocket))
 	assert.Equal(t, 4, len(listener.Stats()), "Should have no stats")
 	assert.NotEqual(t, listener, err, "Should be ok to make")
 
