@@ -97,7 +97,7 @@ func TestCreation(t *testing.T) {
 	defer l.Close()
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, 4, len(l.Stats()), "Expect no stats")
-	forwarder, err := newTcpGraphiteCarbonForwarer("127.0.0.1", nettest.TCPPort(l.(*carbonListener).psocket), time.Second, 10, "", []string{"zzfirst"})
+	forwarder, err := newTCPGraphiteCarbonForwarer("127.0.0.1", nettest.TCPPort(l.(*carbonListener).psocket), time.Second, 10, "", []string{"zzfirst"})
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, "", forwarder.Name(), "Expect no name")
 	assert.Equal(t, 7, len(forwarder.Stats()))
@@ -119,7 +119,7 @@ func TestDeadlineError(t *testing.T) {
 	forwardTo := datapoint.NewBufferedForwarder(100, 1, "", 1)
 	l, err := ListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
-	carbonForwarder, err := newTcpGraphiteCarbonForwarer("127.0.0.1", nettest.TCPPort(l.(*carbonListener).psocket), time.Second, 10, "", []string{})
+	carbonForwarder, err := newTCPGraphiteCarbonForwarer("127.0.0.1", nettest.TCPPort(l.(*carbonListener).psocket), time.Second, 10, "", []string{})
 	assert.Equal(t, nil, err, "Expect no error")
 
 	mockConn := mockConn{
@@ -143,7 +143,7 @@ func TestWriteError(t *testing.T) {
 	forwardTo := datapoint.NewBufferedForwarder(100, 1, "", 1)
 	l, err := ListenerLoader(forwardTo, &listenFrom)
 	defer l.Close()
-	forwarder, err := newTcpGraphiteCarbonForwarer("127.0.0.1", nettest.TCPPort(l.(*carbonListener).psocket), time.Second, 10, "", []string{})
+	forwarder, err := newTCPGraphiteCarbonForwarer("127.0.0.1", nettest.TCPPort(l.(*carbonListener).psocket), time.Second, 10, "", []string{})
 	assert.Equal(t, nil, err, "Expect no error")
 
 	dpSent := datapoint.NewRelativeTime("metric", map[string]string{}, datapoint.NewIntValue(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
@@ -166,7 +166,7 @@ func TestCarbonWrite(t *testing.T) {
 	defer l.Close()
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, 4, len(l.Stats()), "Expect no stats")
-	forwarder, err := newTcpGraphiteCarbonForwarer("127.0.0.1", nettest.TCPPort(l.(*carbonListener).psocket), time.Second, 10, "", []string{})
+	forwarder, err := newTCPGraphiteCarbonForwarer("127.0.0.1", nettest.TCPPort(l.(*carbonListener).psocket), time.Second, 10, "", []string{})
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, "", forwarder.Name(), "Expect no name")
 	forwarder.openConnection = nil // Connection should remake itself
@@ -188,7 +188,7 @@ func TestFailedConn(t *testing.T) {
 	defer l.Close()
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, 4, len(l.Stats()), "Expect no stats")
-	forwarder, err := newTcpGraphiteCarbonForwarer("127.0.0.1", nettest.TCPPort(l.(*carbonListener).psocket), time.Second, 10, "", []string{})
+	forwarder, err := newTCPGraphiteCarbonForwarer("127.0.0.1", nettest.TCPPort(l.(*carbonListener).psocket), time.Second, 10, "", []string{})
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, "", forwarder.Name(), "Expect no name")
 	forwarder.openConnection = nil // Connection should remake itself
