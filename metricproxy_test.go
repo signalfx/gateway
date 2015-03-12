@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"fmt"
+	"io"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfx/metricproxy/config"
@@ -88,12 +91,21 @@ func TestConfigLoadDimensions(t *testing.T) {
 		assert.Equal(t, 1, len(myProxyCommandLineConfiguration.allForwarders))
 		dp := datapoint.NewRelativeTime("metric", map[string]string{"source": "proxy", "forwarder": "testForwardTo"}, datapoint.NewIntValue(1), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
 		myProxyCommandLineConfiguration.allForwarders[0].Channel() <- dp
-		c, err := psocket.Accept()
-		defer c.Close()
+		// Keep going, but skip empty line and EOF
+		line := ""
+		for {
+			c, err := psocket.Accept()
+			defer c.Close()
+			assert.NoError(t, err)
+			reader := bufio.NewReader(c)
+			line, err = reader.ReadString((byte)('\n'))
+			if line == "" && err == io.EOF {
+				continue
+			}
+			break
+		}
 		assert.NoError(t, err)
-		reader := bufio.NewReader(c)
-		line, err := reader.ReadString((byte)('\n'))
-		assert.NoError(t, err)
+		fmt.Printf("line is %s\n", line)
 		log.Info(line)
 		assert.Equal(t, "proxy.testForwardTo.", line[0:len("proxy.testForwardTo.")])
 		myProxyCommandLineConfiguration.stopChannel <- true

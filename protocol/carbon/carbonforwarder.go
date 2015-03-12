@@ -21,10 +21,10 @@ import (
 type reconectingGraphiteCarbonConnection struct {
 	datapoint.BufferedForwarder
 	dimensionComparor dimensions.Ordering
-	openConnection    net.Conn
 	connectionAddress string
 	connectionTimeout time.Duration
 	connectionLock    sync.Mutex
+	dialer            func(network, address string, timeout time.Duration) (net.Conn, error)
 }
 
 // NewTcpGraphiteCarbonForwarer creates a new forwarder for sending points to carbon
@@ -36,10 +36,10 @@ func newTCPGraphiteCarbonForwarer(host string, port uint16, timeout time.Duratio
 	if err != nil {
 		return nil, err
 	}
+	conn.Close()
 	ret := &reconectingGraphiteCarbonConnection{
 		dimensionComparor: dimensions.NewOrdering(dimensionOrder),
 		BufferedForwarder: *datapoint.NewBufferedForwarder(bufferSize, 100, name, 1),
-		openConnection:    conn,
 		connectionTimeout: timeout,
 		connectionAddress: connectionAddress}
 	ret.Start(ret.drainDatapointChannel)
@@ -50,7 +50,7 @@ var defaultForwarderConfig = &config.ForwardTo{
 	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
 	BufferSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(10000)),
 	Port:            workarounds.GolangDoesnotAllowPointerToUint16Literal(2003),
-	DrainingThreads: workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1)),
+	DrainingThreads: workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(5)),
 	Name:            workarounds.GolangDoesnotAllowPointerToStringLiteral("carbonforwarder"),
 	MaxDrainSize:    workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1000)),
 	DimensionsOrder: []string{},
@@ -63,14 +63,6 @@ func ForwarderLoader(forwardTo *config.ForwardTo) (stats.StatKeepingStreamer, er
 		return nil, fmt.Errorf("Carbon forwarder requires host config")
 	}
 	return newTCPGraphiteCarbonForwarer(*forwardTo.Host, *forwardTo.Port, *forwardTo.TimeoutDuration, *forwardTo.BufferSize, *forwardTo.Name, forwardTo.DimensionsOrder)
-}
-
-func (carbonConnection *reconectingGraphiteCarbonConnection) createClientIfNeeded() error {
-	var err error
-	if carbonConnection.openConnection == nil {
-		carbonConnection.openConnection, err = net.Dial("tcp", carbonConnection.connectionAddress)
-	}
-	return err
 }
 
 func (carbonConnection *reconectingGraphiteCarbonConnection) Stats() []datapoint.Datapoint {
@@ -89,10 +81,16 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) datapointToGraphite
 }
 
 func (carbonConnection *reconectingGraphiteCarbonConnection) drainDatapointChannel(datapoints []datapoint.Datapoint) error {
-	if err := carbonConnection.createClientIfNeeded(); err != nil {
+	dialer := carbonConnection.dialer
+	if dialer == nil {
+		dialer = net.DialTimeout
+	}
+	openConnection, err := dialer("tcp", carbonConnection.connectionAddress, carbonConnection.connectionTimeout)
+	if err != nil {
 		return err
 	}
-	err := carbonConnection.openConnection.SetDeadline(time.Now().Add(carbonConnection.connectionTimeout))
+	defer openConnection.Close()
+	err = openConnection.SetDeadline(time.Now().Add(carbonConnection.connectionTimeout))
 	if err != nil {
 		return err
 	}
@@ -108,7 +106,7 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) drainDatapointChann
 		}
 	}
 	log.WithField("buf", buf).Debug("Will write to graphite")
-	_, err = buf.WriteTo(carbonConnection.openConnection)
+	_, err = buf.WriteTo(openConnection)
 	if err != nil {
 		return err
 	}
