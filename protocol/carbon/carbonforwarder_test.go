@@ -117,7 +117,6 @@ func TestCreation(t *testing.T) {
 	assert.Equal(t, "first.bob.myhost.last.metric", dp.Metric(), "Expect metric back")
 	assert.Equal(t, dpSent.Timestamp(), dp.Timestamp(), "Expect metric back")
 
-
 	// Test creating a new connection if pool is empty
 	for forwarder.pool.Get() != nil {
 	}
