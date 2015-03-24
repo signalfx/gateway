@@ -133,7 +133,7 @@ func TestCollectDListener(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, resp.StatusCode, http.StatusOK, "Request should work")
 
-	assert.Equal(t, 4, len(collectdListener.Stats()), "Request should work")
+	assert.Equal(t, 5, len(collectdListener.Stats()), "Request should work")
 
 	req, _ = http.NewRequest("POST", "http://127.0.0.1:8081/post-collectd", bytes.NewBuffer([]byte(`invalidjson`)))
 	req.Header.Set("Content-Type", "application/json")
@@ -149,6 +149,63 @@ func TestCollectDListener(t *testing.T) {
 
 }
 
+func TestCollectDListenerWithQueryParams(t *testing.T) {
+	jsonBody := testCollectdBody
+
+	sendTo := &dptest.BasicStreamer{
+		Chan: make(chan datapoint.Datapoint),
+	}
+	collectdDecoder := JSONDecoder{
+		DecodingEngine: &NativeMarshallJSONDecoder{},
+		DatapointTracker: datapoint.Tracker{
+			Streamer: sendTo,
+		},
+	}
+
+	req, _ := http.NewRequest("POST", "http://127.0.0.1:8081/post-collectd?sfxdim_foo=bar&sfxdim_zam=narf&sfxdim_empty=&pleaseignore=true", bytes.NewBuffer([]byte(jsonBody)))
+	req.Header.Set("Content-Type", "application/json")
+
+	loadExpectedDims := map[string]string{"foo": "bar", "zam": "narf", "plugin": "load", "host": "i-b13d1e5f"}
+	memoryExpectedDims := map[string]string{"host": "i-b13d1e5f", "plugin": "memory", "dsname": "value", "foo": "bar", "zam": "narf"}
+	dfComplexExpectedDims := map[string]string{"plugin": "df", "plugin_instance": "dev", "dsname": "value", "foo": "bar", "zam": "narf", "host": "i-b13d1e5f"}
+	go func() {
+		dp := <-sendTo.Chan
+		assert.Equal(t, "load.shortterm", dp.Metric(), "Metric not named correctly")
+		assert.Equal(t, loadExpectedDims, dp.Dimensions(), "Dimensions not set correctly")
+
+		dp = <-sendTo.Chan
+		assert.Equal(t, "load.midterm", dp.Metric(), "Metric not named correctly")
+		assert.Equal(t, loadExpectedDims, dp.Dimensions(), "Dimensions not set correctly")
+
+		dp = <-sendTo.Chan
+		assert.Equal(t, "load.longterm", dp.Metric(), "Metric not named correctly")
+		assert.Equal(t, loadExpectedDims, dp.Dimensions(), "Dimensions not set correctly")
+
+		dp = <-sendTo.Chan
+		assert.Equal(t, "memory.used", dp.Metric(), "Metric not named correctly")
+		assert.Equal(t, memoryExpectedDims, dp.Dimensions(), "Dimensions not set correctly")
+
+		dp = <-sendTo.Chan
+		assert.Equal(t, "df_complex.free", dp.Metric(), "Metric not named correctly")
+		assert.Equal(t, dfComplexExpectedDims, dp.Dimensions(), "Dimensions not set correctly")
+	}()
+	resp := httptest.NewRecorder()
+	collectdDecoder.ServeHTTP(resp, req)
+	assert.Equal(t, resp.Code, http.StatusOK, "Request should work")
+
+	//assert.Equal(t, 4, len(collectdListener.Stats()), "Request should work")
+
+	req, _ = http.NewRequest("POST", "http://127.0.0.1:8081/post-collectd", bytes.NewBuffer([]byte(`invalidjson`)))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp = httptest.NewRecorder()
+	collectdDecoder.ServeHTTP(resp, req)
+
+	assert.Equal(t, collectdDecoder.TotalBlankDims, 1)
+
+	assert.Equal(t, http.StatusBadRequest, resp.Code, "Request should work")
+
+}
 func BenchmarkCollectdListener(b *testing.B) {
 	bytes := int64(0)
 
