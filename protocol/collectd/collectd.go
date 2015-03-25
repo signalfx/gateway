@@ -48,9 +48,17 @@ func isNilOrEmpty(str *string) bool {
 }
 
 // NewCollectdDatapoint creates a new datapoint from collectd's write_http endpoint JSON format
-func NewCollectdDatapoint(point *JSONWriteFormat, index uint) datapoint.Datapoint {
+// defaultDimensions are added to the datapoint created, but will be overridden by any dimension
+// values in the JSON
+func NewCollectdDatapoint(point *JSONWriteFormat, index uint, defaultDimensions map[string]string) datapoint.Datapoint {
 	dstype, val, dsname := point.Dstypes[index], point.Values[index], point.Dsnames[index]
-	dimensions := make(map[string]string)
+	// if you add another  dimension that we read from the json update this number
+	const MaxCollectDDims = 6
+	dimensions := make(map[string]string, len(defaultDimensions)+MaxCollectDDims)
+	for k, v := range defaultDimensions {
+		dimensions[k] = v
+	}
+
 	metricType := metricTypeFromDsType(dstype)
 	metricName, usedParts := getReasonableMetricName(point, index)
 	// Don't add empty dimensions

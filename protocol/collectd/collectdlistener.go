@@ -13,7 +13,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/signalfx/metricproxy/config"
 
+	"strings"
+
 	"github.com/codegangsta/negroni"
+	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfx/metricproxy/datapoint"
 	"github.com/signalfx/metricproxy/reqcounter"
 	"github.com/signalfx/metricproxy/stats"
@@ -37,12 +40,35 @@ func (streamer *listenerServer) Close() {
 // JSONDecoder can decode collectd's native JSON datapoint format
 type JSONDecoder struct {
 	TotalErrors      int64
+	TotalBlankDims   int64
 	DecodingEngine   JSONEngine
 	DatapointTracker datapoint.Tracker
 }
 
+const sfxDimQueryParamPrefix string = "sfxdim_"
+
+// getDefaultDims parses any query params from req that start with sfxDimQueryParamPrefix
+// and treats them as if they were dimensions on all of the datapoints in the request
+func getDefaultDims(req *http.Request, totalDroppedDims *int64) map[string]string {
+	params := req.URL.Query()
+	defaultDims := make(map[string]string)
+	for key := range params {
+		if strings.HasPrefix(key, sfxDimQueryParamPrefix) {
+			value := params.Get(key)
+			if len(value) == 0 {
+				atomic.AddInt64(totalDroppedDims, 1)
+				continue
+			}
+			key = key[len(sfxDimQueryParamPrefix):]
+			defaultDims[key] = value
+		}
+	}
+	return defaultDims
+}
+
 // DecodeJSON of a collectd HTTP request using collectd's native JSON http protocol
-func DecodeJSON(req *http.Request, decodingEngine JSONEngine, datapointTracker datapoint.Adder) error {
+func DecodeJSON(req *http.Request, decodingEngine JSONEngine, datapointTracker datapoint.Adder, totalDroppedDims *int64) error {
+	defaultDims := getDefaultDims(req, totalDroppedDims)
 	d, err := decodingEngine.DecodeJSONWriteBody(req.Body)
 	if err != nil {
 		return err
@@ -51,7 +77,7 @@ func DecodeJSON(req *http.Request, decodingEngine JSONEngine, datapointTracker d
 		if f.TypeS != nil && f.Time != nil {
 			for i := range f.Dsnames {
 				if i < len(f.Dstypes) && i < len(f.Values) {
-					datapointTracker.AddDatapoint(NewCollectdDatapoint(f, uint(i)))
+					datapointTracker.AddDatapoint(NewCollectdDatapoint(f, uint(i), defaultDims))
 				}
 			}
 		}
@@ -60,7 +86,7 @@ func DecodeJSON(req *http.Request, decodingEngine JSONEngine, datapointTracker d
 }
 
 func (decoder *JSONDecoder) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	err := DecodeJSON(req, decoder.DecodingEngine, &decoder.DatapointTracker)
+	err := DecodeJSON(req, decoder.DecodingEngine, &decoder.DatapointTracker, &decoder.TotalBlankDims)
 	if err != nil {
 		atomic.AddInt64(&decoder.TotalErrors, 1)
 		rw.WriteHeader(http.StatusBadRequest)
@@ -74,6 +100,11 @@ func (decoder *JSONDecoder) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 func (decoder *JSONDecoder) Stats(dimensions map[string]string) []datapoint.Datapoint {
 	ret := []datapoint.Datapoint{}
 	ret = append(ret, decoder.DatapointTracker.Stats(dimensions)...)
+	ret = append(ret, datapoint.NewOnHostDatapointDimensions(
+		"total_blank_dims",
+		datapoint.NewIntValue(decoder.TotalBlankDims),
+		com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+		dimensions))
 	return ret
 }
 
