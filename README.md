@@ -150,7 +150,7 @@ the carbon server is.
 
 #### signalfx-json
 
-You can write datapoints to SiganlFuse with this endpoint.  You will need to
+You can write datapoints to SignalFx with this endpoint.  You will need to
 configure your auth token inside DefaultAuthToken.
 
 ```
@@ -247,7 +247,7 @@ format.  That format is "\_METRIC_NAME\_\[KEY:VALUE,KEY:VALUE]".  For example,
 }
 ```
 
-### SignalFX perf options
+### SignalFx perf options
 
 This config listens for carbon data on port 2003 and forwards it to signalfx
 using an internal datapoint buffer size of 1,000,000 and sending with 50 threads
@@ -277,7 +277,7 @@ call.
 }
 ```
 
-### SignalFX to SignalFX
+### SignalFx to SignalFx
 
 This config listens using the signalfx protocol, buffers, then forwards
 points to signalfx.
