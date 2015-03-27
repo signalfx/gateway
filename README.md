@@ -176,6 +176,7 @@ to signalfx at 1s intervals
     {
       "Type": "carbon",
       "ListenAddr" : "0.0.0.0:2003",
+      "Timeout" : "2m"
     },
   ],
 
@@ -183,7 +184,7 @@ to signalfx at 1s intervals
     {
       "type": "signalfx-json",
       "DefaultAuthToken": "ABCD",
-      "Name": "signalfxforwarder",
+      "Name": "signalfxforwarder"
     }
   ]
 }
