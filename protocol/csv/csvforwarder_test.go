@@ -1,98 +1,61 @@
 package csv
 
 import (
-	"errors"
 	"io/ioutil"
 	"os"
 	"testing"
 
-	"github.com/cep21/gohelpers/a"
+	"errors"
+
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/datapoint/dptest"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
 )
 
-var fileStub a.FileWriteStringObj
-
-func init() {
-	fileXXXWriteString = fileStub.Execute
-}
-
-func TestCsvCoverFileWrite(t *testing.T) {
+func TestFilenameForwarder(t *testing.T) {
+	ctx := context.Background()
 	fileObj, _ := ioutil.TempFile("", "gotest")
 	filename := fileObj.Name()
 	defer os.Remove(filename)
-	_, err := originalFileWrite(fileObj, "test")
-	assert.Nil(t, err)
-}
-
-func TestForwarderLoader(t *testing.T) {
-	defer os.Remove("datapoints.csv")
-	f, err := ioutil.TempFile("", "TestForwarderLoader")
+	conf := &config.ForwardTo{
+		Filename: workarounds.GolangDoesnotAllowPointerToStringLiteral(fileObj.Name()),
+	}
+	f, err := ForwarderLoader(conf)
+	defer f.Close()
 	assert.NoError(t, err)
-	f.Close()
-	defer os.Remove(f.Name())
-	forwardTo := config.ForwardTo{
-		Filename: workarounds.GolangDoesnotAllowPointerToStringLiteral(f.Name()),
+	assert.NoError(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dptest.DP()}))
+	assert.Equal(t, 0, len(f.Stats()))
+}
+
+func TestFilenameForwarderBadFilename(t *testing.T) {
+	_, err := NewForwarder("abcd", "/")
+	assert.Error(t, err)
+}
+
+func TestFilenameForwarderBadOpen(t *testing.T) {
+	ctx := context.Background()
+	fileObj, _ := ioutil.TempFile("", "gotest")
+	defer os.Remove(fileObj.Name())
+
+	f, _ := NewForwarder("unused", fileObj.Name())
+
+	f.filename = "/"
+	assert.Error(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{}))
+}
+
+func TestFilenameForwarderBadWrite(t *testing.T) {
+	ctx := context.Background()
+	fileObj, _ := ioutil.TempFile("", "gotest")
+	defer os.Remove(fileObj.Name())
+	conf := &config.ForwardTo{
+		Filename: workarounds.GolangDoesnotAllowPointerToStringLiteral(fileObj.Name()),
 	}
-	cl, err := ForwarderLoader(&forwardTo)
-	assert.Equal(t, nil, err, "Expect no error")
-	assert.Equal(t, 0, len(cl.Stats()), "Expect no stats")
-
-	dpSent := datapoint.NewRelativeTime("metric", map[string]string{}, datapoint.NewIntValue(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
-	cl.Channel() <- dpSent
-}
-
-func TestCsvInvalidFilenameForwarderLoader(t *testing.T) {
-
-	defer func() { os.Remove("datapoints.csv") }()
-	forwardTo := config.ForwardTo{
-		Filename: workarounds.GolangDoesnotAllowPointerToStringLiteral("/root"),
+	f, _ := ForwarderLoader(conf)
+	f.writeString = func(f *os.File, s string) (ret int, err error) {
+		return 0, errors.New("nope")
 	}
-	osXXXRemove = func(s string) error { return nil }
-	_, err := ForwarderLoader(&forwardTo)
-	osXXXRemove = os.Remove
-
-	assert.NotEqual(t, nil, err, "Expect no error")
-}
-
-func TestCsvInvalidOpen(t *testing.T) {
-	defer func() { os.Remove("datapoints.csv") }()
-	forwardTo := config.ForwardTo{}
-	cl, err := ForwarderLoader(&forwardTo)
-	assert.Equal(t, nil, err, "Expect no error")
-	assert.Equal(t, 0, len(cl.Stats()), "Expect no stats")
-
-	dpSent := datapoint.NewRelativeTime("metric", map[string]string{}, datapoint.NewIntValue(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
-	clOrig, ok := cl.(*filenameForwarder)
-	assert.Equal(t, true, ok, "Expect no error")
-	clOrig.filename = "/root"
-	cl.Channel() <- dpSent
-}
-
-func TestCsvRemoveError(t *testing.T) {
-	defer func() { os.Remove("datapoints.csv") }()
-	forwardTo := config.ForwardTo{}
-	osXXXRemove = func(s string) error { return errors.New("unable to remove") }
-	defer func() { osXXXRemove = os.Remove }()
-	_, err := ForwarderLoader(&forwardTo)
-	assert.NotEqual(t, nil, err, "Expect remove error")
-}
-
-func TestCsvWriteError(t *testing.T) {
-	defer func() { os.Remove("datapoints.csv") }()
-	forwardTo := config.ForwardTo{}
-	c := make(chan bool)
-	fileStub.UseFunction(func(f *os.File, str string) (int, error) {
-		defer func() { c <- true }()
-		return 0, errors.New("an error")
-	})
-	defer fileStub.Reset()
-	cl, _ := ForwarderLoader(&forwardTo)
-	dpSent := datapoint.NewRelativeTime("metric", map[string]string{}, datapoint.NewIntValue(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
-	cl.Channel() <- dpSent
-	_ = <-c
-	// Expect this chan to be eventually drained
+	assert.Error(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dptest.DP()}))
 }

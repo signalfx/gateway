@@ -9,25 +9,32 @@ import (
 	"sync"
 	"time"
 
+	"errors"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/datapoint"
-	"github.com/signalfx/metricproxy/dimensions"
+	"github.com/signalfx/metricproxy/datapoint/dpbuffered"
+	"github.com/signalfx/metricproxy/datapoint/dpdimsort"
+	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/stats"
+	"golang.org/x/net/context"
 )
 
-type reconectingGraphiteCarbonConnection struct {
-	datapoint.BufferedForwarder
-	dimensionComparor dimensions.Ordering
+// Forwarder is a sink that forwards points to a carbon endpoint
+type Forwarder struct {
+	dimensionComparor dpdimsort.Ordering
 	connectionAddress string
 	connectionTimeout time.Duration
-	connectionLock    sync.Mutex
 
 	pool   connPool
 	dialer func(network, address string, timeout time.Duration) (net.Conn, error)
 }
+
+var _ dpsink.Sink = &Forwarder{}
 
 // connPool pools connections for reuse
 type connPool struct {
@@ -56,8 +63,28 @@ func (pool *connPool) Return(conn net.Conn) {
 	pool.conns = append(pool.conns, conn)
 }
 
-// NewTcpGraphiteCarbonForwarer creates a new forwarder for sending points to carbon
-func newTCPGraphiteCarbonForwarer(host string, port uint16, timeout time.Duration, bufferSize uint32, name string, dimensionOrder []string, drainingThreads uint32, maxDrainSize uint32) (*reconectingGraphiteCarbonConnection, error) {
+func nonNil(err1 error, err2 error) error {
+	if err1 != nil {
+		return err1
+	}
+	return err2
+}
+
+// Close clears the connection pool
+func (pool *connPool) Close() error {
+	var err error
+	for {
+		c := pool.Get()
+		if c == nil {
+			return err
+		}
+		e2 := c.Close()
+		err = nonNil(err, e2)
+	}
+}
+
+// NewForwarder creates a new unbuffered forwarder for sending points to carbon
+func NewForwarder(host string, port uint16, timeout time.Duration, dimensionOrder []string, drainingThreads uint32) (*Forwarder, error) {
 	connectionAddress := net.JoinHostPort(host, strconv.FormatUint(uint64(port), 10))
 	var d net.Dialer
 	d.Deadline = time.Now().Add(timeout)
@@ -65,17 +92,16 @@ func newTCPGraphiteCarbonForwarer(host string, port uint16, timeout time.Duratio
 	if err != nil {
 		return nil, err
 	}
-	ret := &reconectingGraphiteCarbonConnection{
-		dimensionComparor: dimensions.NewOrdering(dimensionOrder),
-		BufferedForwarder: *datapoint.NewBufferedForwarder(bufferSize, maxDrainSize, name, drainingThreads),
+	ret := &Forwarder{
+		dimensionComparor: dpdimsort.NewOrdering(dimensionOrder),
 		connectionTimeout: timeout,
 		connectionAddress: connectionAddress,
+		dialer:            net.DialTimeout,
 		pool: connPool{
 			conns: make([]net.Conn, 0, drainingThreads),
 		},
 	}
 	ret.pool.Return(conn)
-	ret.Start(ret.drainDatapointChannel)
 	return ret, nil
 }
 
@@ -89,38 +115,51 @@ var defaultForwarderConfig = &config.ForwardTo{
 	DimensionsOrder: []string{},
 }
 
-// ForwarderLoader loads a carbon forwarder
-func ForwarderLoader(forwardTo *config.ForwardTo) (stats.StatKeepingStreamer, error) {
+var errRequiredHost = errors.New("carbon forwarder requires host config")
+
+// ForwarderLoader loads a carbon forwarder that is buffered
+func ForwarderLoader(ctx context.Context, forwardTo *config.ForwardTo) (protocol.Forwarder, error) {
 	structdefaults.FillDefaultFrom(forwardTo, defaultForwarderConfig)
 	if forwardTo.Host == nil {
-		return nil, fmt.Errorf("Carbon forwarder requires host config")
+		return nil, errRequiredHost
 	}
-	return newTCPGraphiteCarbonForwarer(*forwardTo.Host, *forwardTo.Port, *forwardTo.TimeoutDuration, *forwardTo.BufferSize, *forwardTo.Name, forwardTo.DimensionsOrder, *forwardTo.DrainingThreads, *forwardTo.MaxDrainSize)
+	fwd, err := NewForwarder(*forwardTo.Host, *forwardTo.Port, *forwardTo.TimeoutDuration, forwardTo.DimensionsOrder, *forwardTo.DrainingThreads)
+	if err != nil {
+		return nil, err
+	}
+	counter := &dpsink.Counter{}
+	dims := map[string]string{
+		"forwarder": *forwardTo.Name,
+	}
+	buffer := dpbuffered.NewBufferedForwarder(ctx, *(&dpbuffered.Config{}).FromConfig(forwardTo), fwd)
+	return &protocol.CompositeForwarder{
+		Sink:   dpsink.FromChain(buffer, counter.SinkMiddleware),
+		Keeper: stats.ToKeeperMany(dims, counter, buffer),
+		Closer: protocol.CompositeCloser(protocol.OkCloser(buffer.Close), fwd),
+	}, nil
 }
 
-func (carbonConnection *reconectingGraphiteCarbonConnection) Stats() []datapoint.Datapoint {
-	return carbonConnection.BufferedForwarder.Stats()
+// Close empties out the connections' pool of open connections
+func (carbonConnection *Forwarder) Close() error {
+	return carbonConnection.pool.Close()
 }
 
-func (carbonConnection *reconectingGraphiteCarbonConnection) datapointToGraphite(dp datapoint.Datapoint) string {
-	dims := dp.Dimensions()
+func (carbonConnection *Forwarder) datapointToGraphite(dp *datapoint.Datapoint) string {
+	dims := dp.Dimensions
 	sortedDims := carbonConnection.dimensionComparor.Sort(dims)
 	ret := make([]string, 0, len(sortedDims)+1)
 	for _, dim := range sortedDims {
 		ret = append(ret, dims[dim])
 	}
-	ret = append(ret, dp.Metric())
+	ret = append(ret, dp.Metric)
 	return strings.Join(ret, ".")
 }
 
-func (carbonConnection *reconectingGraphiteCarbonConnection) drainDatapointChannel(datapoints []datapoint.Datapoint) (err error) {
+// AddDatapoints sends the points to a carbon endpoint.  Tries to reuse open connections
+func (carbonConnection *Forwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) (err error) {
 	openConnection := carbonConnection.pool.Get()
 	if openConnection == nil {
-		dialer := carbonConnection.dialer
-		if dialer == nil {
-			dialer = net.DialTimeout
-		}
-		openConnection, err = dialer("tcp", carbonConnection.connectionAddress, carbonConnection.connectionTimeout)
+		openConnection, err = carbonConnection.dialer("tcp", carbonConnection.connectionAddress, carbonConnection.connectionTimeout)
 		if err != nil {
 			return
 		}
@@ -138,14 +177,14 @@ func (carbonConnection *reconectingGraphiteCarbonConnection) drainDatapointChann
 		return
 	}
 	var buf bytes.Buffer
-	for _, dp := range datapoints {
-		carbonReadyDatapoint, ok := dp.(Native)
-		if ok {
-			fmt.Fprintf(&buf, "%s\n", carbonReadyDatapoint.ToCarbonLine())
+	for _, dp := range points {
+		carbonLine, exists := NativeCarbonLine(dp)
+		if exists {
+			fmt.Fprintf(&buf, "%s\n", carbonLine)
 		} else {
 			fmt.Fprintf(&buf, "%s %s %d\n", carbonConnection.datapointToGraphite(dp),
-				dp.Value(),
-				dp.Timestamp().UnixNano()/time.Second.Nanoseconds())
+				dp.Value,
+				dp.Timestamp.UnixNano()/time.Second.Nanoseconds())
 		}
 	}
 	log.WithField("buf", buf).Debug("Will write to graphite")

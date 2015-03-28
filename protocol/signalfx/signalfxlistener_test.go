@@ -22,18 +22,18 @@ import (
 	"github.com/signalfx/metricproxy/datapoint"
 	"github.com/signalfx/metricproxy/datapoint/dptest"
 	"github.com/signalfx/metricproxy/nettest"
-	"github.com/signalfx/metricproxy/protocol/collectd"
-	"github.com/signalfx/metricproxy/stats"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
 )
 
 func TestInvalidForwarderLoader(t *testing.T) {
 	listenFrom := &config.ListenFrom{
 		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:999999"),
 	}
-	sendTo := &dptest.BasicStreamer{}
-	_, err := ListenerLoader(sendTo, listenFrom)
+	sendTo := dptest.NewBasicSink()
+	ctx := context.Background()
+	_, err := ListenerLoader(ctx, sendTo, listenFrom)
 	assert.NotEqual(t, nil, err, "Should get an error making")
 }
 
@@ -46,22 +46,20 @@ func (reader *myReaderType) Read(b []byte) (int, error) {
 type errorReader struct{}
 
 func (errorReader *errorReader) Read([]byte) (int, error) {
-	return 0, errors.New("Could not read")
+	return 0, errors.New("could not read")
 }
 
-func localSetup(t *testing.T) (stats.ClosableKeeper, chan datapoint.Datapoint, string) {
-	sendTo := &dptest.BasicStreamer{
-		Chan: make(chan datapoint.Datapoint),
-	}
-	engine, _ := collectd.LoadEngine("")
-	server, err := StartServingHTTPOnPort("127.0.0.1:0", sendTo, time.Second, "test_server", engine)
-	baseURI := fmt.Sprintf("http://127.0.0.1:%d", nettest.TCPPort(server.(*listenerServer).listener))
+func localSetup(t *testing.T) (*ListenerServer, *dptest.BasicSink, string) {
+	sendTo := dptest.NewBasicSink()
+	ctx := context.Background()
+	server, err := StartServingHTTPOnPort(ctx, sendTo, "127.0.0.1:0", time.Second, "test_server")
+	baseURI := fmt.Sprintf("http://127.0.0.1:%d", nettest.TCPPort(server.listener))
 	assert.NotNil(t, server)
 	assert.NoError(t, err)
-	return server, sendTo.Chan, baseURI
+	return server, sendTo, baseURI
 }
 
-func verifyFailure(t *testing.T, method string, baseURI string, contentType string, path string, body io.Reader, channel <-chan datapoint.Datapoint) {
+func verifyFailure(t *testing.T, method string, baseURI string, contentType string, path string, body io.Reader) {
 	req, err := http.NewRequest(method, baseURI+path, body)
 	assert.NoError(t, err)
 	client := &http.Client{}
@@ -76,26 +74,29 @@ func verifyFailure(t *testing.T, method string, baseURI string, contentType stri
 	assert.Equal(t, 0, len(doneSignal))
 }
 
-func verifyRequest(t *testing.T, baseURI string, contentType string, path string, body io.Reader, channel <-chan datapoint.Datapoint, metricName string, metricValue datapoint.Value) {
+func verifyRequest(t *testing.T, baseURI string, contentType string, path string, body io.Reader, channel *dptest.BasicSink, metricName string, metricValue datapoint.Value) {
 	req, err := http.NewRequest("POST", baseURI+path, body)
 	assert.NoError(t, err)
 	client := &http.Client{}
 	doneSignal := make(chan struct{})
-	var dpOut datapoint.Datapoint
+	var dpOut *datapoint.Datapoint
 	go func() {
-		dpOut = <-channel
+		dpOut = channel.Next()
 		doneSignal <- struct{}{}
 	}()
 	if contentType != "" {
 		req.Header.Add("Content-Type", contentType)
 	}
+	log.WithField("req", req).Debug("Doing req")
 	resp, err := client.Do(req)
+	log.Debug("Done req")
 	log.Debug(resp)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	log.Debug("Waiting for signal")
 	_ = <-doneSignal
-	assert.Equal(t, metricName, dpOut.Metric())
-	assert.Equal(t, metricValue, dpOut.Value())
+	assert.Equal(t, metricName, dpOut.Metric)
+	assert.Equal(t, metricValue, dpOut.Value)
 }
 
 func TestSignalfxJsonV1Handler(t *testing.T) {
@@ -114,7 +115,8 @@ func TestSignalfxJSONV1Decoder(t *testing.T) {
 	req := &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBuffer([]byte("INVALID_JSON"))),
 	}
-	e := decoder.Read(req)
+	ctx := context.Background()
+	e := decoder.Read(ctx, req)
 	assert.Error(t, e)
 }
 
@@ -144,33 +146,31 @@ func TestSignalfxProtobufV1Decoder(t *testing.T) {
 	typeGetter := metricHandler{
 		metricCreationsMap: make(map[string]com_signalfuse_metrics_protobuf.MetricType),
 	}
-	sendTo := &dptest.BasicStreamer{
-		Chan: make(chan datapoint.Datapoint),
-	}
+	sendTo := dptest.NewBasicSink()
+	ctx := context.Background()
+
 	decoder := protobufDecoderV1{
 		typeGetter: &typeGetter,
-		datapointTracker: datapoint.Tracker{
-			Streamer: sendTo,
-		},
+		sink:       sendTo,
 	}
 	req := &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBuffer([]byte("INVALID_PROTOBUF"))),
 	}
-	e := decoder.Read(req)
+	e := decoder.Read(ctx, req)
 	assert.Error(t, e)
 
 	varintBytes := proto.EncodeVarint(uint64(100))
 	req = &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBuffer(varintBytes)),
 	}
-	e = decoder.Read(req)
+	e = decoder.Read(ctx, req)
 	assert.Error(t, e, "Should get error without anything left to read")
 
 	varintBytes = proto.EncodeVarint(uint64(0))
 	req = &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBuffer(append(varintBytes, []byte("asfasdfsda")...))),
 	}
-	e = decoder.Read(req)
+	e = decoder.Read(ctx, req)
 	assert.Error(t, e, "Should get error reading len zero")
 
 	varintBytes = proto.EncodeVarint(uint64(200000))
@@ -178,7 +178,7 @@ func TestSignalfxProtobufV1Decoder(t *testing.T) {
 	req = &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBuffer(append(varintBytes, []byte("abasdfsadfafdsc")...))),
 	}
-	e = decoder.Read(req)
+	e = decoder.Read(ctx, req)
 	assert.Equal(t, errProtobufTooLarge, e, "Should get error reading len zero")
 
 	varintBytes = proto.EncodeVarint(uint64(999999999))
@@ -186,23 +186,23 @@ func TestSignalfxProtobufV1Decoder(t *testing.T) {
 	req = &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBuffer([]byte{byte(255), byte(147), byte(235), byte(235), byte(235)})),
 	}
-	e = decoder.Read(req)
+	e = decoder.Read(ctx, req)
 	assert.Equal(t, errInvalidProtobufVarint, e)
 
 	req = &http.Request{
 		Body: ioutil.NopCloser(&errorReader{}),
 	}
-	e = decoder.Read(req)
+	e = decoder.Read(ctx, req)
 	assert.Error(t, e, "Should get error reading if reader fails")
 
 	varintBytes = proto.EncodeVarint(uint64(20))
 	req = &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBuffer(append(varintBytes, []byte("01234567890123456789")...))),
 	}
-	e = decoder.Read(req)
+	e = decoder.Read(ctx, req)
 	assert.Contains(t, e.Error(), "proto")
 
-	assert.Equal(t, 0, len(sendTo.Chan))
+	assert.Equal(t, 0, len(sendTo.PointsChan))
 }
 
 func TestSignalfxJSONV2Decoder(t *testing.T) {
@@ -211,7 +211,8 @@ func TestSignalfxJSONV2Decoder(t *testing.T) {
 		Body: ioutil.NopCloser(bytes.NewBuffer([]byte("INVALID_JSON"))),
 	}
 	req.ContentLength = -1
-	e := decoder.Read(req)
+	ctx := context.Background()
+	e := decoder.Read(ctx, req)
 	_ = e.(*json.SyntaxError)
 }
 
@@ -230,20 +231,21 @@ func TestSignalfxProtoV2Decoder(t *testing.T) {
 		Body: ioutil.NopCloser(bytes.NewBufferString("")),
 	}
 	req.ContentLength = -1
-	assert.Equal(t, errInvalidContentLength, decoder.Read(req))
+	ctx := context.Background()
+	assert.Equal(t, errInvalidContentLength, decoder.Read(ctx, req))
 
 	req = &http.Request{
 		Body: ioutil.NopCloser(&errorReader{}),
 	}
 	req.ContentLength = 1
-	e := decoder.Read(req)
-	assert.Equal(t, "Could not read", e.Error())
+	e := decoder.Read(ctx, req)
+	assert.Equal(t, "could not read", e.Error())
 
 	req = &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBufferString("INVALID_JSON")),
 	}
 	req.ContentLength = int64(len("INVALID_JSON"))
-	e = decoder.Read(req)
+	e = decoder.Read(ctx, req)
 	assert.Contains(t, e.Error(), "unknown wire type")
 }
 
@@ -314,7 +316,7 @@ func TestMetricHandler(t *testing.T) {
 
 	rw = httptest.NewRecorder()
 	handler.jsonMarshal = func(v interface{}) ([]byte, error) {
-		return nil, fmt.Errorf("Unable to marshal")
+		return nil, fmt.Errorf("unable to marshal")
 	}
 	w = bytes.NewBuffer(b)
 	req = &http.Request{
@@ -328,27 +330,27 @@ func TestMetricHandler(t *testing.T) {
 func TestStatSize(t *testing.T) {
 	listener, _, _ := localSetup(t)
 	defer listener.Close()
-	assert.Equal(t, 28, len(listener.Stats()))
+	assert.Equal(t, 54, len(listener.Stats()))
 }
 
 func TestInvalidContentType(t *testing.T) {
-	listener, channel, baseURI := localSetup(t)
+	listener, _, baseURI := localSetup(t)
 	defer listener.Close()
 	// Test no content type
 	body := bytes.NewBuffer([]byte(`{"metric":"ametric", "source":"asource", "value" : 3}{}`))
-	verifyFailure(t, "GET", baseURI, "application/json", "/datapoint", body, channel)
-	verifyFailure(t, "GET", baseURI, "", "/datapoint", body, channel)
-	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/v1/datapoint", body, channel)
-	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/datapoint", body, channel)
-	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/v2/datapoint", body, channel)
-	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/v1/collectd", body, channel)
-	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/metric", body, channel)
-	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/v1/metric", body, channel)
+	verifyFailure(t, "GET", baseURI, "application/json", "/datapoint", body)
+	verifyFailure(t, "GET", baseURI, "", "/datapoint", body)
+	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/v1/datapoint", body)
+	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/datapoint", body)
+	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/v2/datapoint", body)
+	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/v1/collectd", body)
+	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/metric", body)
+	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/v1/metric", body)
 }
 
 type errTest string
 
-func (e errTest) Read(_ *http.Request) error {
+func (e errTest) Read(_ context.Context, _ *http.Request) error {
 	s := string(e)
 	if s == "" {
 		return nil
@@ -360,26 +362,16 @@ func TestErrorTrackerHandler(t *testing.T) {
 	e := ErrorTrackerHandler{
 		reader: errTest(""),
 	}
+	ctx := context.Background()
 	rw := httptest.NewRecorder()
-	e.ServeHTTP(rw, nil)
+	e.ServeHTTPC(ctx, rw, nil)
 	assert.Equal(t, 0, e.TotalErrors)
 	assert.Equal(t, `"OK"`, rw.Body.String())
 	e.reader = errTest("hi")
 	rw = httptest.NewRecorder()
-	e.ServeHTTP(rw, nil)
+	e.ServeHTTPC(ctx, rw, nil)
 	assert.Equal(t, `hi`, rw.Body.String())
 	assert.Equal(t, 1, e.TotalErrors)
-}
-
-func TestSignalfxJSONForwarderInvalidJSONEngine(t *testing.T) {
-	sendTo := &dptest.BasicStreamer{
-		Chan: make(chan datapoint.Datapoint),
-	}
-	listenFrom := &config.ListenFrom{
-		JSONEngine: workarounds.GolangDoesnotAllowPointerToStringLiteral("unknown"),
-	}
-	_, err := ListenerLoader(sendTo, listenFrom)
-	assert.Error(t, err)
 }
 
 func BenchmarkAtomicInc(b *testing.B) {

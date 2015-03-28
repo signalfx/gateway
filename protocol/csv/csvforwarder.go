@@ -9,49 +9,47 @@ import (
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/datapoint"
-	"github.com/signalfx/metricproxy/stats"
+	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/metricproxy/protocol"
+	"golang.org/x/net/context"
 )
 
-func originalFileWrite(f *os.File, str string) (int, error) {
-	return f.WriteString(str)
-}
-
-var fileXXXWriteString = originalFileWrite
-
 var csvDefaultConfig = &config.ForwardTo{
-	Filename:        workarounds.GolangDoesnotAllowPointerToStringLiteral("datapoints.csv"),
-	DrainingThreads: workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1)),
-	Name:            workarounds.GolangDoesnotAllowPointerToStringLiteral("filename-drainer"),
-	MaxDrainSize:    workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(100)),
-	BufferSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(100)),
+	Filename: workarounds.GolangDoesnotAllowPointerToStringLiteral("datapoints.csv"),
+	Name:     workarounds.GolangDoesnotAllowPointerToStringLiteral("filename-drainer"),
 }
 
 // ForwarderLoader loads a CSV forwarder forwarding points from proxy to a file
-func ForwarderLoader(forwardTo *config.ForwardTo) (stats.StatKeepingStreamer, error) {
+func ForwarderLoader(forwardTo *config.ForwardTo) (*FilenameForwarder, error) {
 	structdefaults.FillDefaultFrom(forwardTo, csvDefaultConfig)
 	log.WithField("forwardTo", forwardTo).Info("Creating CSV using final config")
-	return NewForwarder(*forwardTo.BufferSize, *forwardTo.Name, *forwardTo.Filename, *forwardTo.MaxDrainSize)
+	return NewForwarder(*forwardTo.Name, *forwardTo.Filename)
 }
 
-type filenameForwarder struct {
-	datapoint.BufferedForwarder
-	filename string
+var _ protocol.Forwarder = &FilenameForwarder{}
+
+// FilenameForwarder prints datapoints to a file
+type FilenameForwarder struct {
+	filename    string
+	writeString func(f *os.File, s string) (ret int, err error)
 }
 
-func (connector *filenameForwarder) Stats() []datapoint.Datapoint {
-	ret := []datapoint.Datapoint{}
-	return ret
+var _ dpsink.Sink = &FilenameForwarder{}
+
+// Stats returns an empty list
+func (connector *FilenameForwarder) Stats() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{}
 }
 
-func (connector *filenameForwarder) process(datapoints []datapoint.Datapoint) error {
+// AddDatapoints writes the points to a file
+func (connector *FilenameForwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
 	file, err := os.OpenFile(connector.filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.FileMode(0666))
 	if err != nil {
 		return err
 	}
-	defer file.Sync()
 	defer file.Close()
-	for _, dp := range datapoints {
-		_, err := fileXXXWriteString(file, dp.String()+"\n")
+	for _, dp := range points {
+		_, err := connector.writeString(file, dp.String()+"\n")
 		if err != nil {
 			return err
 		}
@@ -59,22 +57,20 @@ func (connector *filenameForwarder) process(datapoints []datapoint.Datapoint) er
 	return nil
 }
 
-var osXXXRemove = os.Remove
+// Close does nothing.  We foolishly reopen the file on each AddDatapoints
+func (connector *FilenameForwarder) Close() error {
+	return nil
+}
 
-// NewForwarder creates a new CSV forwarder
-func NewForwarder(bufferSize uint32, name string, filename string, maxDrainSize uint32) (stats.StatKeepingStreamer, error) {
-	ret := &filenameForwarder{
-		BufferedForwarder: *datapoint.NewBufferedForwarder(bufferSize, maxDrainSize, name, uint32(1)),
-		filename:          filename,
-	}
-	err := osXXXRemove(filename)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
+// NewForwarder creates a new filename forwarder
+func NewForwarder(name string, filename string) (*FilenameForwarder, error) {
+	ret := &FilenameForwarder{
+		writeString: func(f *os.File, s string) (ret int, err error) { return f.WriteString(s) },
+		filename:    filename,
 	}
 	if err := ioutil.WriteFile(filename, []byte{}, os.FileMode(0666)); err != nil {
 		log.WithField("filename", filename).Info("Unable to verify write for file")
 		return nil, err
 	}
-	ret.Start(ret.process)
 	return ret, nil
 }

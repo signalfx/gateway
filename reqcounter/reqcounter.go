@@ -5,8 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/web"
 )
 
 // RequestCounter is a negroni handler that tracks connection stats
@@ -16,19 +16,30 @@ type RequestCounter struct {
 	TotalProcessingTimeNs int64
 }
 
-func (m *RequestCounter) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+var _ web.HTTPConstructor = (&RequestCounter{}).Wrap
+var _ web.NextHTTP = (&RequestCounter{}).ServeHTTP
+
+// Wrap returns a handler that forwards calls to next and counts the calls forwarded
+func (m *RequestCounter) Wrap(next http.Handler) http.Handler {
+	f := func(w http.ResponseWriter, r *http.Request) {
+		m.ServeHTTP(w, r, next)
+	}
+	return http.HandlerFunc(f)
+}
+
+func (m *RequestCounter) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Handler) {
 	atomic.AddInt64(&m.TotalConnections, 1)
 	atomic.AddInt64(&m.ActiveConnections, 1)
 	defer atomic.AddInt64(&m.ActiveConnections, -1)
 	start := time.Now()
-	next(rw, r)
+	next.ServeHTTP(rw, r)
 	reqDuration := time.Since(start)
 	atomic.AddInt64(&m.TotalProcessingTimeNs, reqDuration.Nanoseconds())
 }
 
 // Stats returns stats on total connections, active connections, and total processing time
-func (m *RequestCounter) Stats(dimensions map[string]string) []datapoint.Datapoint {
-	ret := []datapoint.Datapoint{}
+func (m *RequestCounter) Stats(dimensions map[string]string) []*datapoint.Datapoint {
+	ret := []*datapoint.Datapoint{}
 	stats := map[string]int64{
 		"total_connections": atomic.LoadInt64(&m.TotalConnections),
 		"total_time_ns":     atomic.LoadInt64(&m.TotalProcessingTimeNs),
@@ -39,7 +50,7 @@ func (m *RequestCounter) Stats(dimensions map[string]string) []datapoint.Datapoi
 			datapoint.NewOnHostDatapointDimensions(
 				k,
 				datapoint.NewIntValue(v),
-				com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+				datapoint.Counter,
 				dimensions))
 	}
 	ret = append(
@@ -47,7 +58,7 @@ func (m *RequestCounter) Stats(dimensions map[string]string) []datapoint.Datapoi
 		datapoint.NewOnHostDatapointDimensions(
 			"active_connections",
 			datapoint.NewIntValue(atomic.LoadInt64(&m.ActiveConnections)),
-			com_signalfuse_metrics_protobuf.MetricType_GAUGE,
+			datapoint.Gauge,
 			dimensions))
 	return ret
 }

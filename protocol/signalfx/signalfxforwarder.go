@@ -1,17 +1,18 @@
 package signalfx
 
 import (
-	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"runtime"
 	"strings"
 	"time"
 	"unicode"
+
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
 
 	"code.google.com/p/goprotobuf/proto"
 	log "github.com/Sirupsen/logrus"
@@ -20,11 +21,15 @@ import (
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/datapoint/dpbuffered"
+	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/stats"
+	"golang.org/x/net/context"
 )
 
-type signalfxJSONConnector struct {
-	datapoint.BufferedForwarder
+// Forwarder controls forwarding datapoints to SignalFx
+type Forwarder struct {
 	url               string
 	connectionTimeout time.Duration
 	defaultAuthToken  string
@@ -34,10 +39,8 @@ type signalfxJSONConnector struct {
 	defaultSource     string
 	dimensionSources  []string
 
-	protoMarshal protoMarshalStub
+	protoMarshal func(pb proto.Message) ([]byte, error)
 }
-
-type protoMarshalStub func(pb proto.Message) ([]byte, error)
 
 var defaultConfigV2 = &config.ForwardTo{
 	URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("https://ingest.signalfx.com/v2/datapoint"),
@@ -53,7 +56,13 @@ var defaultConfigV2 = &config.ForwardTo{
 }
 
 // ForwarderLoader loads a json forwarder forwarding points from proxy to SignalFx
-func ForwarderLoader(forwardTo *config.ForwardTo) (stats.StatKeepingStreamer, error) {
+func ForwarderLoader(ctx context.Context, forwardTo *config.ForwardTo) (protocol.Forwarder, error) {
+	f, _, err := ForwarderLoader1(ctx, forwardTo)
+	return f, err
+}
+
+// ForwarderLoader1 is a more strictly typed version of ForwarderLoader
+func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo) (protocol.Forwarder, *Forwarder, error) {
 	if forwardTo.FormatVersion == nil {
 		forwardTo.FormatVersion = workarounds.GolangDoesnotAllowPointerToUintLiteral(3)
 	}
@@ -62,15 +71,26 @@ func ForwarderLoader(forwardTo *config.ForwardTo) (stats.StatKeepingStreamer, er
 	}
 	structdefaults.FillDefaultFrom(forwardTo, defaultConfigV2)
 	log.WithField("forwardTo", forwardTo).Info("Creating signalfx forwarder using final config")
-	return NewSignalfxJSONForwarer(*forwardTo.URL, *forwardTo.TimeoutDuration, *forwardTo.BufferSize,
+	fwd := NewSignalfxJSONForwarer(*forwardTo.URL, *forwardTo.TimeoutDuration, *forwardTo.BufferSize,
 		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads, *forwardTo.Name,
 		*forwardTo.MaxDrainSize, *forwardTo.DefaultSource, *forwardTo.SourceDimensions)
+
+	counter := &dpsink.Counter{}
+	dims := map[string]string{
+		"forwarder": *forwardTo.Name,
+	}
+	buffer := dpbuffered.NewBufferedForwarder(ctx, *(&dpbuffered.Config{}).FromConfig(forwardTo), fwd)
+	return &protocol.CompositeForwarder{
+		Sink:   dpsink.FromChain(buffer, counter.SinkMiddleware),
+		Keeper: stats.ToKeeperMany(dims, counter, buffer),
+		Closer: protocol.CompositeCloser(protocol.OkCloser(buffer.Close)),
+	}, fwd, nil
 }
 
 // NewSignalfxJSONForwarer creates a new JSON forwarder
 func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint32,
 	defaultAuthToken string, drainingThreads uint32, name string,
-	maxDrainSize uint32, defaultSource string, sourceDimensions string) (stats.StatKeepingStreamer, error) {
+	maxDrainSize uint32, defaultSource string, sourceDimensions string) *Forwarder {
 	tr := &http.Transport{
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 		MaxIdleConnsPerHost:   int(drainingThreads) * 2,
@@ -79,25 +99,24 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint3
 			return net.DialTimeout(network, addr, timeout)
 		},
 	}
-	ret := &signalfxJSONConnector{
-		BufferedForwarder: *datapoint.NewBufferedForwarder(bufferSize, maxDrainSize, name, drainingThreads),
-		url:               url,
-		defaultAuthToken:  defaultAuthToken,
-		userAgent:         fmt.Sprintf("SignalfxProxy/0.3 (gover %s)", runtime.Version()),
-		tr:                tr,
+	ret := &Forwarder{
+		url:              url,
+		defaultAuthToken: defaultAuthToken,
+		userAgent:        fmt.Sprintf("SignalfxProxy/0.3 (gover %s)", runtime.Version()),
+		tr:               tr,
 		client: &http.Client{
 			Transport: tr,
 		},
 		connectionTimeout: timeout,
+		protoMarshal:      proto.Marshal,
 		defaultSource:     defaultSource,
 		// sf_source is always a dimension that can be a source
 		dimensionSources: append([]string{"sf_source"}, strings.Split(sourceDimensions, ",")...),
 	}
-	ret.Start(ret.process)
-	return ret, nil
+	return ret
 }
 
-func (connector *signalfxJSONConnector) encodePostBodyProtobufV2(datapoints []datapoint.Datapoint) ([]byte, string, error) {
+func (connector *Forwarder) encodePostBodyProtobufV2(datapoints []*datapoint.Datapoint) ([]byte, string, error) {
 	dps := make([]*com_signalfuse_metrics_protobuf.DataPoint, 0, len(datapoints))
 	for _, dp := range datapoints {
 		dps = append(dps, connector.coreDatapointToProtobuf(dp))
@@ -105,18 +124,13 @@ func (connector *signalfxJSONConnector) encodePostBodyProtobufV2(datapoints []da
 	msg := &com_signalfuse_metrics_protobuf.DataPointUploadMessage{
 		Datapoints: dps,
 	}
-	protoMarshal := connector.protoMarshal
-	if protoMarshal == nil {
-		protoMarshal = proto.Marshal
-	}
-	protobytes, err := protoMarshal(msg)
+	protobytes, err := connector.protoMarshal(msg)
 
 	// Now we can send datapoints
 	return protobytes, "application/x-protobuf", err
 }
 
 func datumForPoint(pv datapoint.Value) *com_signalfuse_metrics_protobuf.Datum {
-
 	switch t := pv.(type) {
 	case datapoint.IntValue:
 		x := t.Int()
@@ -130,9 +144,9 @@ func datumForPoint(pv datapoint.Value) *com_signalfuse_metrics_protobuf.Datum {
 	}
 }
 
-func (connector *signalfxJSONConnector) figureOutReasonableSource(point datapoint.Datapoint) string {
+func (connector *Forwarder) figureOutReasonableSource(point *datapoint.Datapoint) string {
 	for _, sourceName := range connector.dimensionSources {
-		thisPointSource := point.Dimensions()[sourceName]
+		thisPointSource := point.Dimensions[sourceName]
 		if thisPointSource != "" {
 			return thisPointSource
 		}
@@ -140,21 +154,17 @@ func (connector *signalfxJSONConnector) figureOutReasonableSource(point datapoin
 	return connector.defaultSource
 }
 
-func (connector *signalfxJSONConnector) coreDatapointToProtobuf(point datapoint.Datapoint) *com_signalfuse_metrics_protobuf.DataPoint {
+func (connector *Forwarder) coreDatapointToProtobuf(point *datapoint.Datapoint) *com_signalfuse_metrics_protobuf.DataPoint {
 	thisPointSource := connector.figureOutReasonableSource(point)
-	m := point.Metric()
-	ts := point.Timestamp().UnixNano() / time.Millisecond.Nanoseconds()
-	relativeTimeDp, ok := point.(datapoint.TimeRelativeDatapoint)
-	if ok {
-		ts = relativeTimeDp.RelativeTime()
-	}
-	mt := point.MetricType()
+	m := point.Metric
+	ts := point.Timestamp.UnixNano() / time.Millisecond.Nanoseconds()
+	mt := toMT(point.MetricType)
 	v := &com_signalfuse_metrics_protobuf.DataPoint{
 		Metric:     &m,
 		Timestamp:  &ts,
-		Value:      datumForPoint(point.Value()),
+		Value:      datumForPoint(point.Value),
 		MetricType: &mt,
-		Dimensions: mapToDimensions(point.Dimensions()),
+		Dimensions: mapToDimensions(point.Dimensions),
 	}
 	if thisPointSource != "" {
 		v.Source = &thisPointSource
@@ -180,6 +190,10 @@ func mapToDimensions(dimensions map[string]string) []*com_signalfuse_metrics_pro
 	return ret
 }
 
+func filterSignalfxKey(str string) string {
+	return strings.Map(runeFilterMap, str)
+}
+
 func runeFilterMap(r rune) rune {
 	if unicode.IsDigit(r) || unicode.IsLetter(r) || r == '_' {
 		return r
@@ -187,16 +201,8 @@ func runeFilterMap(r rune) rune {
 	return '_'
 }
 
-func filterSignalfxKey(str string) string {
-	return strings.Map(runeFilterMap, str)
-}
-
-func (connector *signalfxJSONConnector) Stats() []datapoint.Datapoint {
-	return connector.BufferedForwarder.Stats()
-}
-
-func (connector *signalfxJSONConnector) process(datapoints []datapoint.Datapoint) error {
-	log.WithField("len", len(datapoints)).Debug("Processing dp")
+// AddDatapoints forwards datapoints to SignalFx
+func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*datapoint.Datapoint) error {
 	jsonBytes, bodyType, err := connector.encodePostBodyProtobufV2(datapoints)
 
 	if err != nil {
@@ -209,6 +215,8 @@ func (connector *signalfxJSONConnector) process(datapoints []datapoint.Datapoint
 	req.Header.Set("User-Agent", connector.userAgent)
 
 	req.Header.Set("Connection", "Keep-Alive")
+
+	// TODO: Set timeout from ctx
 	resp, err := connector.client.Do(req)
 
 	if err != nil {
@@ -234,7 +242,7 @@ func (connector *signalfxJSONConnector) process(datapoints []datapoint.Datapoint
 	}
 	if body != "OK" {
 		log.WithField("body", body).Warn("Response not OK")
-		return fmt.Errorf("Body decode error: %s", body)
+		return fmt.Errorf("body decode error: %s", body)
 	}
 	return nil
 }

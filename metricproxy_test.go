@@ -11,11 +11,13 @@ import (
 	"fmt"
 	"io"
 
+	"time"
+
 	log "github.com/Sirupsen/logrus"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/datapoint"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
 )
 
 var config1 = `
@@ -67,6 +69,7 @@ func TestConfigLoadDimensions(t *testing.T) {
 	fileObj, _ := ioutil.TempFile("", "gotest")
 	filename := fileObj.Name()
 	defer os.Remove(filename)
+	ctx := context.Background()
 
 	psocket, err := net.Listen("tcp", "127.0.0.1:0")
 	assert.NoError(t, err)
@@ -80,6 +83,7 @@ func TestConfigLoadDimensions(t *testing.T) {
 		configFileName:                filename,
 		logDir:                        "-",
 		logMaxSize:                    1,
+		ctx:                           ctx,
 		logMaxBackups:                 0,
 		stopChannel:                   make(chan bool),
 		closeWhenWaitingToStopChannel: make(chan struct{}),
@@ -89,8 +93,8 @@ func TestConfigLoadDimensions(t *testing.T) {
 		myProxyCommandLineConfiguration.blockTillSetupReady()
 		assert.Equal(t, 1, len(myProxyCommandLineConfiguration.allListeners))
 		assert.Equal(t, 1, len(myProxyCommandLineConfiguration.allForwarders))
-		dp := datapoint.NewRelativeTime("metric", map[string]string{"source": "proxy", "forwarder": "testForwardTo"}, datapoint.NewIntValue(1), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
-		myProxyCommandLineConfiguration.allForwarders[0].Channel() <- dp
+		dp := datapoint.New("metric", map[string]string{"source": "proxy", "forwarder": "testForwardTo"}, datapoint.NewIntValue(1), datapoint.Gauge, time.Now())
+		myProxyCommandLineConfiguration.allForwarders[0].AddDatapoints(ctx, []*datapoint.Datapoint{dp})
 		// Keep going, but skip empty line and EOF
 		line := ""
 		for {
@@ -125,6 +129,7 @@ func TestProxyInvalidConfig(t *testing.T) {
 		logMaxSize:     1,
 		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
+		ctx:            context.Background(),
 	}
 	go func() {
 		proxyCommandLineConfigurationDefault.stopChannel <- true
@@ -157,6 +162,7 @@ func TestProxyOkLoading(t *testing.T) {
 		logMaxSize:     1,
 		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
+		ctx:            context.Background(),
 	}
 	go func() {
 		myProxyCommandLineConfiguration.stopChannel <- true
@@ -176,6 +182,7 @@ func TestProxyListenerError(t *testing.T) {
 		logMaxSize:     1,
 		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
+		ctx:            context.Background(),
 	}
 	go func() {
 		myProxyCommandLineConfiguration.stopChannel <- true
@@ -195,6 +202,7 @@ func TestProxyForwardError(t *testing.T) {
 		logMaxSize:     1,
 		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
+		ctx:            context.Background(),
 	}
 	go func() {
 		myProxyCommandLineConfiguration.stopChannel <- true
@@ -229,6 +237,7 @@ func TestProxyUnknownForwarder(t *testing.T) {
 		logMaxSize:     1,
 		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
+		ctx:            context.Background(),
 	}
 	go func() {
 		myProxyCommandLineConfiguration.stopChannel <- true
@@ -248,9 +257,18 @@ func TestProxyUnknownListener(t *testing.T) {
 		logMaxSize:     1,
 		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
+		ctx:            context.Background(),
 	}
 	go func() {
 		myProxyCommandLineConfiguration.stopChannel <- true
 	}()
 	myProxyCommandLineConfiguration.main()
+}
+
+func TestAllListeners(t *testing.T) {
+	for _, l := range allListenerLoaders {
+		assert.Panics(t, func() {
+			l(nil, nil, nil)
+		})
+	}
 }

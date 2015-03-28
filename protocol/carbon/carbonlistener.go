@@ -11,42 +11,55 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
-	"github.com/signalfx/metricproxy/stats"
+	"golang.org/x/net/context"
 )
 
-type carbonListener struct {
-	totalPoints          *uint64
-	psocket              net.Listener
-	Streamer             datapoint.Streamer
-	connectionTimeout    time.Duration
-	isClosed             int32
-	metricDeconstructor  metricdeconstructor.MetricDeconstructor
-	name                 string
-	totalDatapoints      int64
-	invalidDatapoints    int64
-	totalConnections     int64
-	activeConnections    int64
+type listenerConfig struct {
 	serverAcceptDeadline time.Duration
+	connectionTimeout    time.Duration
+	name                 string
 }
 
-func (listener *carbonListener) Stats() []datapoint.Datapoint {
-	ret := []datapoint.Datapoint{}
+// Listener once setup will listen for carbon protocol points to forward on
+type Listener struct {
+	psocket             net.Listener
+	sink                dpsink.Sink
+	metricDeconstructor metricdeconstructor.MetricDeconstructor
+
+	stats listenerStats
+	conf  listenerConfig
+	ctx   context.Context
+}
+
+var _ protocol.Listener = &Listener{}
+
+type listenerStats struct {
+	totalDatapoints   int64
+	invalidDatapoints int64
+	totalConnections  int64
+	activeConnections int64
+}
+
+// Stats reports information about the total points seen by carbon
+func (listener *Listener) Stats() []*datapoint.Datapoint {
+	ret := []*datapoint.Datapoint{}
 	stats := map[string]int64{
-		"total_datapoints":   atomic.LoadInt64(&listener.totalDatapoints),
-		"invalid_datapoints": atomic.LoadInt64(&listener.invalidDatapoints),
-		"total_connections":  atomic.LoadInt64(&listener.totalConnections),
-		"active_connections": atomic.LoadInt64(&listener.activeConnections),
+		"total_datapoints":   atomic.LoadInt64(&listener.stats.totalDatapoints),
+		"invalid_datapoints": atomic.LoadInt64(&listener.stats.invalidDatapoints),
+		"total_connections":  atomic.LoadInt64(&listener.stats.totalConnections),
+		"active_connections": atomic.LoadInt64(&listener.stats.activeConnections),
 	}
 	for k, v := range stats {
-		var t com_signalfuse_metrics_protobuf.MetricType
+		var t datapoint.MetricType
 		if k == "active_connections" {
-			t = com_signalfuse_metrics_protobuf.MetricType_GAUGE
+			t = datapoint.Gauge
 		} else {
-			t = com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER
+			t = datapoint.Counter
 		}
 		ret = append(
 			ret,
@@ -54,14 +67,14 @@ func (listener *carbonListener) Stats() []datapoint.Datapoint {
 				k,
 				datapoint.NewIntValue(v),
 				t,
-				map[string]string{"listener": listener.name}))
+				map[string]string{"listener": listener.conf.name}))
 	}
 	return ret
 }
 
-func (listener *carbonListener) Close() {
-	listener.psocket.Close()
-	atomic.StoreInt32(&listener.isClosed, 1)
+// Close the exposed carbon port
+func (listener *Listener) Close() error {
+	return listener.psocket.Close()
 }
 
 type carbonListenConn interface {
@@ -70,14 +83,14 @@ type carbonListenConn interface {
 	SetDeadline(t time.Time) error
 }
 
-func (listener *carbonListener) handleConnection(conn carbonListenConn) error {
+func (listener *Listener) handleConnection(conn carbonListenConn) error {
 	reader := bufio.NewReader(conn)
-	atomic.AddInt64(&listener.totalConnections, 1)
-	atomic.AddInt64(&listener.activeConnections, 1)
+	atomic.AddInt64(&listener.stats.totalConnections, 1)
+	atomic.AddInt64(&listener.stats.activeConnections, 1)
 	defer conn.Close()
-	defer atomic.AddInt64(&listener.activeConnections, -1)
+	defer atomic.AddInt64(&listener.stats.activeConnections, -1)
 	for {
-		conn.SetDeadline(time.Now().Add(listener.connectionTimeout))
+		conn.SetDeadline(time.Now().Add(listener.conf.connectionTimeout))
 		bytes, err := reader.ReadBytes((byte)('\n'))
 		if err != nil && err != io.EOF {
 			log.WithField("err", err).Warn("Listening for carbon data returned an error (Note: We timeout idle connections)")
@@ -87,12 +100,12 @@ func (listener *carbonListener) handleConnection(conn carbonListenConn) error {
 		if line != "" {
 			dp, err := NewCarbonDatapoint(line, listener.metricDeconstructor)
 			if err != nil {
-				atomic.AddInt64(&listener.invalidDatapoints, 1)
+				atomic.AddInt64(&listener.stats.invalidDatapoints, 1)
 				log.WithFields(log.Fields{"line": line, "err": err}).Warn("Received data on a carbon port, but it doesn't look like carbon data")
 				return err
 			}
-			atomic.AddInt64(&listener.totalDatapoints, 1)
-			listener.Streamer.Channel() <- dp
+			listener.sink.AddDatapoints(listener.ctx, []*datapoint.Datapoint{dp})
+			atomic.AddInt64(&listener.stats.totalDatapoints, 1)
 		}
 
 		if err == io.EOF {
@@ -101,11 +114,12 @@ func (listener *carbonListener) handleConnection(conn carbonListenConn) error {
 	}
 }
 
-func (listener *carbonListener) startListening() {
-	for atomic.LoadInt32(&listener.isClosed) == 0 {
+func (listener *Listener) startListening() {
+	defer log.Info("Carbon listener closed")
+	for {
 		deadlineable, ok := listener.psocket.(*net.TCPListener)
 		if ok {
-			deadlineable.SetDeadline(time.Now().Add(listener.serverAcceptDeadline))
+			deadlineable.SetDeadline(time.Now().Add(listener.conf.serverAcceptDeadline))
 		}
 		conn, err := listener.psocket.Accept()
 		if err != nil {
@@ -119,7 +133,6 @@ func (listener *carbonListener) startListening() {
 		}
 		go listener.handleConnection(conn)
 	}
-	log.Info("Carbon listener closed")
 }
 
 var defaultListenerConfig = &config.ListenFrom{
@@ -132,16 +145,22 @@ var defaultListenerConfig = &config.ListenFrom{
 }
 
 // ListenerLoader loads a listener for the carbon/graphite protocol from config
-func ListenerLoader(Streamer datapoint.Streamer, listenFrom *config.ListenFrom) (stats.ClosableKeeper, error) {
+func ListenerLoader(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (*Listener, error) {
 	structdefaults.FillDefaultFrom(listenFrom, defaultListenerConfig)
-	return startListeningCarbonOnPort(
-		*listenFrom.ListenAddr, Streamer, *listenFrom.TimeoutDuration,
-		*listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions, *listenFrom.Name, *listenFrom.ServerAcceptDeadline)
+	conf := listenerConfig{
+		serverAcceptDeadline: *listenFrom.ServerAcceptDeadline,
+		connectionTimeout:    *listenFrom.TimeoutDuration,
+		name:                 *listenFrom.Name,
+	}
+	//  *listenFrom.Name
+	return NewListener(
+		ctx, sink, conf, *listenFrom.ListenAddr,
+		*listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions)
 }
 
-func startListeningCarbonOnPort(listenAddr string, Streamer datapoint.Streamer,
-	timeout time.Duration, metricDeconstructor string,
-	metricDeconstructorOptions string, name string, serverAcceptDeadline time.Duration) (stats.ClosableKeeper, error) {
+// NewListener creates a new listener for carbon datapoints
+func NewListener(ctx context.Context, sink dpsink.Sink, conf listenerConfig, listenAddr string,
+	metricDeconstructor string, metricDeconstructorOptions string) (*Listener, error) {
 	psocket, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return nil, err
@@ -151,14 +170,12 @@ func startListeningCarbonOnPort(listenAddr string, Streamer datapoint.Streamer,
 	if err != nil {
 		return nil, err
 	}
-	receiver := carbonListener{
-		totalPoints:          new(uint64),
-		psocket:              psocket,
-		Streamer:             Streamer,
-		connectionTimeout:    timeout,
-		metricDeconstructor:  deconstructor,
-		name:                 name,
-		serverAcceptDeadline: serverAcceptDeadline,
+	receiver := Listener{
+		sink:                sink,
+		psocket:             psocket,
+		conf:                conf,
+		metricDeconstructor: deconstructor,
+		ctx:                 ctx,
 	}
 	go receiver.startListening()
 	return &receiver, nil

@@ -1,4 +1,4 @@
-package dimensions
+package dpdimsort
 
 import "sort"
 

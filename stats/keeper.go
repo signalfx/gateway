@@ -5,85 +5,86 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"golang.org/x/net/context"
 )
 
 // A Keeper contains datapoints that describe its state and can be reported upstream
 type Keeper interface {
-	Stats() []datapoint.Datapoint
+	Stats() []*datapoint.Datapoint
 }
 
-// A ClosableKeeper can report datapoints and close itself.  Usually, services open ports and
-// will eventually need to be closed.  Honestly, this type may belong in another package (?)
-type ClosableKeeper interface {
-	Keeper
-	Close()
-}
-
-// DimensionKeeper works like a stat keeper but requires input dimensions to any stats
-// it creates
-type DimensionKeeper interface {
-	Stats(dimensions map[string]string) []datapoint.Datapoint
-}
-
-// KeeperWrap pretends to be a Keeper by wrapping DimensionKeeper with dimensions
-type KeeperWrap struct {
-	Base       []DimensionKeeper
-	Dimensions map[string]string
-}
-
-// Stats returns any stats from this wrappers stat keepers
-func (k *KeeperWrap) Stats() []datapoint.Datapoint {
-	r := []datapoint.Datapoint{}
-	for _, s := range k.Base {
-		r = append(r, s.Stats(k.Dimensions)...)
-	}
-	return r
-}
+type combinedStats []Keeper
 
 // CombineStats from multiple keepers in the order given as parameters.
-func CombineStats(keepers []Keeper) []datapoint.Datapoint {
-	ret := []datapoint.Datapoint{}
-	for _, r := range keepers {
+func (c combinedStats) Stats() []*datapoint.Datapoint {
+	ret := []*datapoint.Datapoint{}
+	for _, r := range c {
 		ret = append(ret, r.Stats()...)
 	}
 	return ret
 }
 
-// StatKeepingStreamer both keeps stats and can stream datapoints
-type StatKeepingStreamer interface {
-	datapoint.Streamer
-	Keeper
-	Name() string
+// Combine multiple keepers into a single keeper
+func Combine(keepers ...Keeper) Keeper {
+	return combinedStats(keepers)
 }
 
-// DrainingThread attaches to the metricproxy to periodically send proxy statistics to
-// listeners
-type DrainingThread interface {
-	SendStats()
-	Stats() []datapoint.Datapoint
-	Start()
+// A DimensionKeeper contains datapoints that describe its state and can be reported upstream
+type DimensionKeeper interface {
+	Stats(dimensions map[string]string) []*datapoint.Datapoint
 }
 
-type statDrainingThreadImpl struct {
-	delay       time.Duration
-	sendTo      []datapoint.Streamer
-	listenFrom  []Keeper
-	stopChannel <-chan bool
+type dimKeeper struct {
+	k    DimensionKeeper
+	dims map[string]string
 }
 
-// NewDrainingThread returns a new DrainingThread.  The user must explicitly call
-// "go item.Start()" on the returned item.
-func NewDrainingThread(delay time.Duration, sendTo []datapoint.Streamer, listenFrom []Keeper, stopChannel <-chan bool) DrainingThread {
-	return &statDrainingThreadImpl{
-		delay:       delay,
-		sendTo:      sendTo,
-		listenFrom:  listenFrom,
-		stopChannel: stopChannel,
+// ToKeeper creates a keeper that pulls stats from k with dims
+func ToKeeper(k DimensionKeeper, dims map[string]string) Keeper {
+	return &dimKeeper{
+		k:    k,
+		dims: dims,
 	}
 }
 
-func (thread *statDrainingThreadImpl) Stats() []datapoint.Datapoint {
-	points := []datapoint.Datapoint{}
+// ToKeeperMany creates a single keeper that pulls stats from each of keeps with dims
+func ToKeeperMany(dims map[string]string, keeps ...DimensionKeeper) Keeper {
+	ret := make([]Keeper, 0, len(keeps))
+	for _, k := range keeps {
+		ret = append(ret, ToKeeper(k, dims))
+	}
+	return Combine(ret...)
+}
+
+func (d *dimKeeper) Stats() []*datapoint.Datapoint {
+	return d.k.Stats(d.dims)
+}
+
+// StatDrainingThread will sleep delay between draining stats from each keeper and sending the full
+// stats to each sendTo sink
+type StatDrainingThread struct {
+	delay      time.Duration
+	sendTo     []dpsink.Sink
+	listenFrom []Keeper
+	ctx        context.Context
+}
+
+// NewDrainingThread returns a new DrainingThread to collect stats and send them to sinks
+func NewDrainingThread(delay time.Duration, sendTo []dpsink.Sink, listenFrom []Keeper, ctx context.Context) *StatDrainingThread {
+	ret := &StatDrainingThread{
+		delay:      delay,
+		sendTo:     sendTo,
+		listenFrom: listenFrom,
+		ctx:        ctx,
+	}
+	go ret.start()
+	return ret
+}
+
+// Stats returns all the stast this draining thread will report
+func (thread *StatDrainingThread) Stats() []*datapoint.Datapoint {
+	points := []*datapoint.Datapoint{}
 	for _, listenFrom := range thread.listenFrom {
 		log.WithField("listenFrom", listenFrom).Debug("Loading stats")
 		stats := listenFrom.Stats()
@@ -93,25 +94,19 @@ func (thread *statDrainingThreadImpl) Stats() []datapoint.Datapoint {
 	return points
 }
 
-func (thread *statDrainingThreadImpl) SendStats() {
-	points := thread.Stats()
-	for _, sendTo := range thread.sendTo {
-		for _, dp := range points {
-			sendTo.Channel() <- dp
-		}
-	}
-}
-
-func (thread *statDrainingThreadImpl) Start() {
+func (thread *StatDrainingThread) start() {
 	log.WithField("listenFrom", thread.listenFrom).Info("Draining stats")
 	for {
 		select {
-		case _ = <-thread.stopChannel:
+		case <-thread.ctx.Done():
 			log.Debug("Request to stop stat thread")
 			return
-		case _ = <-time.After(thread.delay):
-			log.Debug("Stat thread waking up")
+		case <-time.After(thread.delay):
+			points := thread.Stats()
+			for _, sendTo := range thread.sendTo {
+				// Note: Errors ignored
+				sendTo.AddDatapoints(thread.ctx, points)
+			}
 		}
-		thread.SendStats()
 	}
 }

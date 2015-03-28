@@ -45,7 +45,7 @@ func (parser *commaKeysLoaderDeconstructor) Parse(originalMetric string) (string
 
 func commaKeysLoader(options string) (MetricDeconstructor, error) {
 	if options != "" && options != "coloninkey" {
-		return nil, fmt.Errorf("Unknown commaKeysLoaderDeconstructor parameter %s", options)
+		return nil, fmt.Errorf("unknown commaKeysLoaderDeconstructor parameter %s", options)
 	}
 	return &commaKeysLoaderDeconstructor{
 		colonInKey: options == "coloninkey",

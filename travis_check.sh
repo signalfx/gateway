@@ -51,7 +51,7 @@ gocyclo -over 10 . | grep -v skiptestcoverage > /tmp/a
 #
 # ---- go lint does static variable name and doc checks
 #
-find . -type f -name \*.go | grep -av ".git" | xargs -n1 -P8 golint > /tmp/a || exit 1
+find . -type f -name \*.go | grep -av ".git" | xargs -n1 -P8 golint -min_confidence=.3 > /tmp/a || exit 1
 [[ ! -s /tmp/a ]] || cat /tmp/a
 [[ ! -s /tmp/a ]] || exit 1
 
@@ -74,5 +74,5 @@ go test -cover -covermode atomic -race -parallel=8 -timeout 3s -cpu 4  ./... | g
 #
 # ---- Run benchmarks only
 #
-go test -run=none -bench=. ./... || exit 1
+go test -run=none -bench=. -benchtime 10ms ./... || exit 1
 echo "OK!"

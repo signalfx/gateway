@@ -6,34 +6,33 @@ import (
 	"strings"
 	"time"
 
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfx/metricproxy/datapoint"
 	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
 )
 
-// Native signals an object can be directly converted to a carbon datapoint send
-type Native interface {
-	ToCarbonLine() string
+type carbonMetadata int
+
+const (
+	carbonNative carbonMetadata = iota
+)
+
+// NativeCarbonLine inspects the datapoints metadata to see if it has information about the carbon
+// source it came from
+func NativeCarbonLine(dp *datapoint.Datapoint) (string, bool) {
+	s, exists := dp.Meta[carbonNative]
+	if exists {
+		return s.(string), true
+	}
+	return "", false
 }
 
-// NativeDatapoint is a datapoint that is carbon ready
-type NativeDatapoint interface {
-	datapoint.Datapoint
-	Native
-}
-
-type carbonDatapointImpl struct {
-	datapoint.Datapoint
-	originalLine string
-}
-
-func (carbonDatapoint *carbonDatapointImpl) ToCarbonLine() string {
-	return carbonDatapoint.originalLine
-}
-
-// NewCarbonDatapoint creates a new datapoint from a line in carbon
-func NewCarbonDatapoint(line string, metricDeconstructor metricdeconstructor.MetricDeconstructor) (NativeDatapoint, error) {
+// NewCarbonDatapoint creates a new datapoint from a line in carbon and injects into the datapoint
+// metadata about the original line.
+func NewCarbonDatapoint(line string, metricDeconstructor metricdeconstructor.MetricDeconstructor) (*datapoint.Datapoint, error) {
 	parts := strings.SplitN(line, " ", 3)
+	meta := map[interface{}]interface{}{
+		carbonNative: line,
+	}
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("invalid carbon input line: %s", line)
 	}
@@ -47,25 +46,19 @@ func NewCarbonDatapoint(line string, metricDeconstructor metricdeconstructor.Met
 		return nil, fmt.Errorf("invalid carbon metric time on input line %s: %s", line, err)
 	}
 
-	metricValueInt, err := strconv.ParseInt(parts[1], 10, 64)
-	if err == nil {
-		return &carbonDatapointImpl{
-			datapoint.NewAbsoluteTime(
-				metricName, dimensions, datapoint.NewIntValue(metricValueInt),
-				com_signalfuse_metrics_protobuf.MetricType_GAUGE,
-				time.Unix(0, metricTime*int64(time.Second))),
-			line,
-		}, nil
-	}
-	metricValueFloat, err := strconv.ParseFloat(parts[1], 64)
+	v, err := func() (datapoint.Value, error) {
+		metricValueInt, err := strconv.ParseInt(parts[1], 10, 64)
+		if err == nil {
+			return datapoint.NewIntValue(metricValueInt), nil
+		}
+		metricValueFloat, err := strconv.ParseFloat(parts[1], 64)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse carbon metric value on line %s: %s", line, err)
+		}
+		return datapoint.NewFloatValue(metricValueFloat), nil
+	}()
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse carbon metric value on line %s: %s", line, err)
+		return nil, err
 	}
-	return &carbonDatapointImpl{
-		datapoint.NewAbsoluteTime(
-			metricName, dimensions, datapoint.NewFloatValue(metricValueFloat),
-			com_signalfuse_metrics_protobuf.MetricType_GAUGE,
-			time.Unix(0, metricTime*int64(time.Second))),
-		line,
-	}, nil
+	return datapoint.NewWithMeta(metricName, dimensions, meta, v, datapoint.Gauge, time.Unix(0, metricTime*int64(time.Second))), nil
 }

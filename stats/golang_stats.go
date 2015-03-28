@@ -4,7 +4,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfx/metricproxy/datapoint"
 )
 
@@ -19,24 +18,24 @@ func NewGolangKeeper() Keeper {
 	}
 }
 
-func point(name string, v int64) datapoint.Datapoint {
+func point(name string, v int64) *datapoint.Datapoint {
 	return datapoint.NewOnHostDatapointDimensions(
 		name,
 		datapoint.NewIntValue(v),
-		com_signalfuse_metrics_protobuf.MetricType_GAUGE,
+		datapoint.Gauge,
 		map[string]string{"stattype": "golang_sys"})
 }
 
-func pointc(name string, v int64) datapoint.Datapoint {
+func pointc(name string, v int64) *datapoint.Datapoint {
 	return datapoint.NewOnHostDatapointDimensions(
 		name,
 		datapoint.NewIntValue(v),
-		com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+		datapoint.Counter,
 		map[string]string{"stattype": "golang_sys"})
 }
 
-func (statKeeper *golangKeeper) Stats() []datapoint.Datapoint {
-	ret := []datapoint.Datapoint{}
+func (statKeeper *golangKeeper) Stats() []*datapoint.Datapoint {
+	ret := []*datapoint.Datapoint{}
 	ret = append(
 		ret,
 		point("GOMAXPROCS", int64(runtime.GOMAXPROCS(0))))

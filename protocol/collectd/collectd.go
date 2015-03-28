@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfx/metricproxy/datapoint"
 )
 
@@ -25,32 +24,32 @@ type JSONWriteFormat struct {
 	Values         []*float64 `json:"values"`
 }
 
-func metricTypeFromDsType(dstype *string) com_signalfuse_metrics_protobuf.MetricType {
+func metricTypeFromDsType(dstype *string) datapoint.MetricType {
 	if dstype == nil {
-		return com_signalfuse_metrics_protobuf.MetricType_GAUGE
+		return datapoint.Gauge
 	}
 
-	m := map[string]com_signalfuse_metrics_protobuf.MetricType{
-		"gauge":    com_signalfuse_metrics_protobuf.MetricType_GAUGE,
-		"derive":   com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
-		"counter":  com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
-		"absolute": com_signalfuse_metrics_protobuf.MetricType_COUNTER,
+	m := map[string]datapoint.MetricType{
+		"gauge":    datapoint.Gauge,
+		"derive":   datapoint.Counter,
+		"counter":  datapoint.Counter,
+		"absolute": datapoint.Count,
 	}
 	v, ok := m[*dstype]
 	if ok {
 		return v
 	}
-	return com_signalfuse_metrics_protobuf.MetricType_GAUGE
+	return datapoint.Gauge
 }
 
 func isNilOrEmpty(str *string) bool {
 	return str == nil || *str == ""
 }
 
-// NewCollectdDatapoint creates a new datapoint from collectd's write_http endpoint JSON format
+// NewDatapoint creates a new datapoint from collectd's write_http endpoint JSON format
 // defaultDimensions are added to the datapoint created, but will be overridden by any dimension
 // values in the JSON
-func NewCollectdDatapoint(point *JSONWriteFormat, index uint, defaultDimensions map[string]string) datapoint.Datapoint {
+func NewDatapoint(point *JSONWriteFormat, index uint, defaultDimensions map[string]string) *datapoint.Datapoint {
 	dstype, val, dsname := point.Dstypes[index], point.Values[index], point.Dsnames[index]
 	// if you add another  dimension that we read from the json update this number
 	const MaxCollectDDims = 6
@@ -76,7 +75,7 @@ func NewCollectdDatapoint(point *JSONWriteFormat, index uint, defaultDimensions 
 	addIfNotNullOrEmpty(dimensions, "dsname", !usedInMetricName, dsname)
 
 	timestamp := time.Unix(0, int64(float64(time.Second)**point.Time))
-	return datapoint.NewAbsoluteTime(metricName, dimensions, datapoint.NewFloatValue(*val), metricType, timestamp)
+	return datapoint.New(metricName, dimensions, datapoint.NewFloatValue(*val), metricType, timestamp)
 }
 
 func addIfNotNullOrEmpty(dimensions map[string]string, key string, cond bool, val *string) {

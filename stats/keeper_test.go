@@ -2,56 +2,49 @@ package stats
 
 import (
 	"testing"
+
 	"time"
 
 	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/metricproxy/datapoint/dptest"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
 )
 
 type statKeeper struct {
 }
 
-func (m *statKeeper) Stats() []datapoint.Datapoint {
-	return []datapoint.Datapoint{nil}
+func (m *statKeeper) Stats() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{nil}
 }
 
-type dimensionKeeper struct {
+type dimKeeperTest struct {
 }
 
-func (m *dimensionKeeper) Stats(_ map[string]string) []datapoint.Datapoint {
-	return []datapoint.Datapoint{nil}
+func (m *dimKeeperTest) Stats(dims map[string]string) []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{nil}
 }
 
-type datapointStreamer struct {
-	mychan chan bool
-	myDp   chan datapoint.Datapoint
+func TestStatDrainingThread(t *testing.T) {
+	testSink := dptest.NewBasicSink()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	drainer := NewDrainingThread(time.Millisecond, []dpsink.Sink{testSink}, []Keeper{&statKeeper{}}, ctx)
+	assert.Equal(t, 1, len(drainer.Stats()))
+	time.Sleep(time.Millisecond * 10)
 }
 
-func (api *datapointStreamer) Channel() chan<- datapoint.Datapoint {
-	api.mychan <- true
-	return api.myDp
-}
-func (api *datapointStreamer) Name() string {
-	return ""
-}
-
-func TestDrainStatsThread(t *testing.T) {
-	c := make(chan bool, 3)
-	myDp := make(chan datapoint.Datapoint, 3)
-	keepers := []Keeper{&statKeeper{}}
-	apis := []datapoint.Streamer{&datapointStreamer{mychan: c, myDp: myDp}}
-	// We signal draining thread to die when we get a point
-	NewDrainingThread(time.Nanosecond*1, apis, keepers, c).Start()
+func TestCombined(t *testing.T) {
+	k1 := &statKeeper{}
+	k2 := &statKeeper{}
+	c := Combine(k1, k2)
+	assert.Equal(t, 2, len(c.Stats()))
 }
 
-func TestCombineStats(t *testing.T) {
-	assert.Equal(t, 2, len(CombineStats([]Keeper{&statKeeper{}, &statKeeper{}})))
-}
-
-func TestKeeperWrap(t *testing.T) {
-	w := &KeeperWrap{
-		Base:       []DimensionKeeper{&dimensionKeeper{}},
-		Dimensions: nil,
-	}
-	assert.Equal(t, 1, len(w.Stats()))
+func TestToKeeperMany(t *testing.T) {
+	k1 := &dimKeeperTest{}
+	k2 := &dimKeeperTest{}
+	c := ToKeeperMany(map[string]string{}, k1, k2)
+	assert.Equal(t, 2, len(c.Stats()))
 }

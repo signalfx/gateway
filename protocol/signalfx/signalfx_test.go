@@ -21,13 +21,13 @@ func TestNewProtobufDataPoint(t *testing.T) {
 		}},
 	}
 	dp := NewProtobufDataPointWithType(protoDatapoint, com_signalfuse_metrics_protobuf.MetricType_COUNTER)
-	assert.Equal(t, "asource", dp.Dimensions()["sf_source"], "Line should be invalid")
-	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_COUNTER, dp.MetricType(), "Line should be invalid")
+	assert.Equal(t, "asource", dp.Dimensions["sf_source"], "Line should be invalid")
+	assert.Equal(t, datapoint.Count, dp.MetricType, "Line should be invalid")
 
 	v := com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER
 	protoDatapoint.MetricType = &v
 	dp = NewProtobufDataPointWithType(protoDatapoint, com_signalfuse_metrics_protobuf.MetricType_COUNTER)
-	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER, dp.MetricType(), "Line should be invalid")
+	assert.Equal(t, datapoint.Counter, dp.MetricType, "Line should be invalid")
 
 	item := &BodySendFormatV2{
 		Metric: "ametric",
@@ -51,4 +51,22 @@ func TestNewProtobufDataPoint(t *testing.T) {
 	item.Value = struct{}{}
 	_, err := ValueToValue(item.Value)
 	assert.Error(t, err)
+}
+
+func TestConver(t *testing.T) {
+	assert.Panics(t, func() {
+		toMT(datapoint.MetricType(1001))
+	})
+	assert.Panics(t, func() {
+		fromMT(com_signalfuse_metrics_protobuf.MetricType(1001))
+	})
+}
+
+func TestNewDatumValue(t *testing.T) {
+	s1 := "abc"
+	f1 := 1.2
+	i1 := int64(3)
+	assert.Equal(t, s1, NewDatumValue(&com_signalfuse_metrics_protobuf.Datum{StrValue: &s1}).(datapoint.StringValue).String())
+	assert.Equal(t, i1, NewDatumValue(&com_signalfuse_metrics_protobuf.Datum{IntValue: &i1}).(datapoint.IntValue).Int())
+	assert.Equal(t, f1, NewDatumValue(&com_signalfuse_metrics_protobuf.Datum{DoubleValue: &f1}).(datapoint.FloatValue).Float())
 }

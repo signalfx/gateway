@@ -3,8 +3,6 @@ package datapoint
 import (
 	"testing"
 
-	"github.com/cep21/gohelpers/workarounds"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,14 +25,15 @@ func TestStrWire(t *testing.T) {
 	assert.Equal(t, iv.String(), "val")
 }
 
-func TestDatumValue(t *testing.T) {
-	iv := NewDatumValue(&com_signalfuse_metrics_protobuf.Datum{DoubleValue: workarounds.GolangDoesnotAllowPointerToFloat64Literal(3.0)})
-	assert.Equal(t, iv.String(), "3")
-	assert.Equal(t, iv.(FloatValue).Float(), 3.0)
-
-	iv = NewDatumValue(&com_signalfuse_metrics_protobuf.Datum{IntValue: workarounds.GolangDoesnotAllowPointerToIntLiteral(3)})
-	assert.Equal(t, iv.(IntValue).Int(), 3)
-
-	iv = NewDatumValue(&com_signalfuse_metrics_protobuf.Datum{StrValue: workarounds.GolangDoesnotAllowPointerToStringLiteral("hello")})
-	assert.Equal(t, iv.String(), "hello")
-}
+//
+//func TestDatumValue(t *testing.T) {
+//	iv := NewDatumValue(&com_signalfuse_metrics_protobuf.Datum{DoubleValue: workarounds.GolangDoesnotAllowPointerToFloat64Literal(3.0)})
+//	assert.Equal(t, iv.String(), "3")
+//	assert.Equal(t, iv.(FloatValue).Float(), 3.0)
+//
+//	iv = NewDatumValue(&com_signalfuse_metrics_protobuf.Datum{IntValue: workarounds.GolangDoesnotAllowPointerToIntLiteral(3)})
+//	assert.Equal(t, iv.(IntValue).Int(), 3)
+//
+//	iv = NewDatumValue(&com_signalfuse_metrics_protobuf.Datum{StrValue: workarounds.GolangDoesnotAllowPointerToStringLiteral("hello")})
+//	assert.Equal(t, iv.String(), "hello")
+//}

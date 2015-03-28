@@ -21,7 +21,7 @@ var knownLoaders = map[string]loader{
 func Load(name string, options string) (MetricDeconstructor, error) {
 	loader, exists := knownLoaders[name]
 	if !exists {
-		return nil, fmt.Errorf("Unable to load metric deconstructor by the name of %s", name)
+		return nil, fmt.Errorf("unable to load metric deconstructor by the name of %s", name)
 	}
 	return loader(options)
 }

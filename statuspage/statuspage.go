@@ -50,7 +50,7 @@ func (proxy *proxyStatusPageImpl) StatusPage() http.HandlerFunc {
 		w.Write(([]byte)("\nArgs:\n"))
 		w.Write(([]byte)(strings.Join(os.Args, "\n")))
 		w.Write(([]byte)("\nStats:\n"))
-		stats := []datapoint.Datapoint{}
+		stats := []*datapoint.Datapoint{}
 		for _, keeper := range proxy.statKeepers {
 			stats = append(stats, keeper.Stats()...)
 		}

@@ -12,33 +12,37 @@ import (
 	"sync/atomic"
 	"time"
 
+	"errors"
+
 	"code.google.com/p/goprotobuf/proto"
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/codegangsta/negroni"
 	"github.com/gorilla/mux"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/collectd"
 	"github.com/signalfx/metricproxy/reqcounter"
 	"github.com/signalfx/metricproxy/stats"
+	"github.com/signalfx/metricproxy/web"
+	"golang.org/x/net/context"
 )
 
-type listenerServer struct {
+// ListenerServer controls listening on a socket for SignalFx connections
+type ListenerServer struct {
+	stats.Keeper
 	name     string
 	listener net.Listener
-
-	statKeepers []stats.Keeper
 }
 
-func (streamer *listenerServer) Stats() []datapoint.Datapoint {
-	return stats.CombineStats(streamer.statKeepers)
-}
+var _ protocol.Listener = &ListenerServer{}
 
-func (streamer *listenerServer) Close() {
-	streamer.listener.Close()
+// Close the exposed socket listening for new connections
+func (streamer *ListenerServer) Close() error {
+	return streamer.listener.Close()
 }
 
 // MericTypeGetter is an old metric interface that returns the type of a metric name
@@ -49,7 +53,7 @@ type MericTypeGetter interface {
 // ErrorReader are datapoint streamers that read from a HTTP request and return errors if
 // the stream is invalid
 type ErrorReader interface {
-	Read(req *http.Request) error
+	Read(ctx context.Context, req *http.Request) error
 }
 
 // ErrorTrackerHandler behaves like a http handler, but tracks error returns from a ErrorReader
@@ -59,20 +63,21 @@ type ErrorTrackerHandler struct {
 }
 
 // Stats returns the number of calls to AddDatapoint
-func (e *ErrorTrackerHandler) Stats(dimensions map[string]string) []datapoint.Datapoint {
-	ret := []datapoint.Datapoint{}
-	ret = append(
-		ret,
+func (e *ErrorTrackerHandler) Stats(dimensions map[string]string) []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{
 		datapoint.NewOnHostDatapointDimensions(
 			"total_errors",
 			datapoint.NewIntValue(e.TotalErrors),
-			com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
-			dimensions))
-	return ret
+			datapoint.Counter,
+			dimensions),
+	}
 }
 
-func (e *ErrorTrackerHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if err := e.reader.Read(req); err != nil {
+// ServeHTTPC will serve the wrapped ErrorReader and return the error (if any) to rw if ErrorReader
+// fails
+func (e *ErrorTrackerHandler) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, req *http.Request) {
+	if err := e.reader.Read(ctx, req); err != nil {
+		log.WithField("err", err).Debug("Bad request")
 		atomic.AddInt64(&e.TotalErrors, 1)
 		rw.WriteHeader(http.StatusBadRequest)
 		rw.Write([]byte(err.Error()))
@@ -82,15 +87,15 @@ func (e *ErrorTrackerHandler) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 }
 
 type protobufDecoderV1 struct {
-	typeGetter       MericTypeGetter
-	datapointTracker datapoint.Tracker
+	sink       dpsink.Sink
+	typeGetter MericTypeGetter
 }
 
-var errInvalidProtobuf = fmt.Errorf("Invalid protocol buffer sent")
-var errProtobufTooLarge = fmt.Errorf("Protobuf structure too large")
-var errInvalidProtobufVarint = fmt.Errorf("Invalid protobuf varint")
+var errInvalidProtobuf = errors.New("invalid protocol buffer sent")
+var errProtobufTooLarge = errors.New("protobuf structure too large")
+var errInvalidProtobufVarint = errors.New("invalid protobuf varint")
 
-func (decoder *protobufDecoderV1) Read(req *http.Request) error {
+func (decoder *protobufDecoderV1) Read(ctx context.Context, req *http.Request) error {
 	body := req.Body
 	bufferedBody := bufio.NewReaderSize(body, 32768)
 	for {
@@ -139,16 +144,16 @@ func (decoder *protobufDecoderV1) Read(req *http.Request) error {
 		mt := decoder.typeGetter.GetMetricTypeFromMap(msg.GetMetric())
 		dp := NewProtobufDataPointWithType(&msg, mt)
 		log.WithField("dp", dp).Debug("Adding a point")
-		decoder.datapointTracker.AddDatapoint(dp)
+		decoder.sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp})
 	}
 }
 
 type jsonDecoderV1 struct {
-	typeGetter       MericTypeGetter
-	datapointTracker datapoint.Tracker
+	typeGetter MericTypeGetter
+	sink       dpsink.Sink
 }
 
-func (decoder *jsonDecoderV1) Read(req *http.Request) error {
+func (decoder *jsonDecoderV1) Read(ctx context.Context, req *http.Request) error {
 	dec := json.NewDecoder(req.Body)
 	for {
 		var d JSONDatapointV1
@@ -162,26 +167,21 @@ func (decoder *jsonDecoderV1) Read(req *http.Request) error {
 				log.WithField("dp", d).Debug("Invalid Datapoint")
 				continue
 			}
-			mt := decoder.typeGetter.GetMetricTypeFromMap(d.Metric)
-			dp := datapoint.NewRelativeTime(d.Metric, map[string]string{"sf_source": d.Source}, datapoint.NewFloatValue(d.Value), mt, 0)
-			decoder.datapointTracker.AddDatapoint(dp)
+			mt := fromMT(decoder.typeGetter.GetMetricTypeFromMap(d.Metric))
+			dp := datapoint.New(d.Metric, map[string]string{"sf_source": d.Source}, datapoint.NewFloatValue(d.Value), mt, time.Now())
+			decoder.sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp})
 		}
 	}
 	return nil
 }
 
 type protobufDecoderV2 struct {
-	datapointTracker datapoint.Tracker
+	sink dpsink.Sink
 }
 
-var errInvalidContentLength = fmt.Errorf("Invalid Content Length")
+var errInvalidContentLength = errors.New("invalid Content Length")
 
-func (decoder *protobufDecoderV2) Read(req *http.Request) error {
-	return DecodeProtobufV2(req, &decoder.datapointTracker)
-}
-
-// DecodeProtobufV2 will take a request of signalfx's V2 protocol buffers and forward them to datapointTracker
-func DecodeProtobufV2(req *http.Request, datapointTracker datapoint.Adder) error {
+func (decoder *protobufDecoderV2) Read(ctx context.Context, req *http.Request) error {
 	if req.ContentLength == -1 {
 		return errInvalidContentLength
 	}
@@ -196,31 +196,29 @@ func DecodeProtobufV2(req *http.Request, datapointTracker datapoint.Adder) error
 	var msg com_signalfuse_metrics_protobuf.DataPointUploadMessage
 	err = proto.Unmarshal(buf, &msg)
 	if err != nil {
+		log.Debug("Unable to unmarshal")
 		return err
 	}
+	dps := make([]*datapoint.Datapoint, 0, len(msg.GetDatapoints()))
 	for _, protoDb := range msg.GetDatapoints() {
-		dp := NewProtobufDataPointWithType(protoDb, com_signalfuse_metrics_protobuf.MetricType_GAUGE)
-		datapointTracker.AddDatapoint(dp)
+		dps = append(dps, NewProtobufDataPointWithType(protoDb, com_signalfuse_metrics_protobuf.MetricType_GAUGE))
 	}
-	return nil
+	log.Debug("Ready to forward")
+	return decoder.sink.AddDatapoints(ctx, dps)
 }
 
 type jsonDecoderV2 struct {
-	datapointTracker datapoint.Tracker
+	sink dpsink.Sink
 }
 
-func (decoder *jsonDecoderV2) Read(req *http.Request) error {
-	return DecodeJSONV2(req, &decoder.datapointTracker)
-}
-
-// DecodeJSONV2 accepts datapoints in signalfx's v2 JSON format and forwards them to datapointTracker
-func DecodeJSONV2(req *http.Request, datapointTracker datapoint.Adder) error {
+func (decoder *jsonDecoderV2) Read(ctx context.Context, req *http.Request) error {
 	dec := json.NewDecoder(req.Body)
 	var d JSONDatapointV2
 	if err := dec.Decode(&d); err != nil {
 		return err
 	}
 	log.WithField("jsonpoint_v2", d).Debug("Got a new point")
+	dps := make([]*datapoint.Datapoint, 0, 5)
 	for metricType, datapoints := range d {
 		mt, ok := com_signalfuse_metrics_protobuf.MetricType_value[strings.ToUpper(metricType)]
 		if !ok {
@@ -232,12 +230,12 @@ func DecodeJSONV2(req *http.Request, datapointTracker datapoint.Adder) error {
 			if err != nil {
 				log.WithField("err", err).Warn("Unable to get value for datapoint")
 			} else {
-				dp := datapoint.NewRelativeTime(jsonDatapoint.Metric, jsonDatapoint.Dimensions, v, com_signalfuse_metrics_protobuf.MetricType(mt), jsonDatapoint.Timestamp)
-				datapointTracker.AddDatapoint(dp)
+				dp := datapoint.New(jsonDatapoint.Metric, jsonDatapoint.Dimensions, v, fromMT(com_signalfuse_metrics_protobuf.MetricType(mt)), fromTs(jsonDatapoint.Timestamp))
+				dps = append(dps, dp)
 			}
 		}
 	}
-	return nil
+	return decoder.sink.AddDatapoints(ctx, dps)
 }
 
 var defaultConfig = &config.ListenFrom{
@@ -248,17 +246,11 @@ var defaultConfig = &config.ListenFrom{
 }
 
 // ListenerLoader loads a listener for signalfx protocol from config
-func ListenerLoader(Streamer datapoint.Streamer, listenFrom *config.ListenFrom) (stats.ClosableKeeper, error) {
+func ListenerLoader(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (*ListenerServer, error) {
 	structdefaults.FillDefaultFrom(listenFrom, defaultConfig)
 
-	engine, err := collectd.LoadEngine(*listenFrom.JSONEngine)
-	if err != nil {
-		return nil, err
-	}
-
 	log.WithField("listenFrom", listenFrom).Info("Creating signalfx listener using final config")
-	return StartServingHTTPOnPort(*listenFrom.ListenAddr, Streamer,
-		*listenFrom.TimeoutDuration, *listenFrom.Name, engine)
+	return StartServingHTTPOnPort(ctx, sink, *listenFrom.ListenAddr, *listenFrom.TimeoutDuration, *listenFrom.Name)
 }
 
 type jsonMarshalStub func(v interface{}) ([]byte, error)
@@ -320,8 +312,8 @@ func (handler *metricHandler) GetMetricTypeFromMap(metricName string) com_signal
 type decoderFunc func() func(*http.Request) error
 
 // StartServingHTTPOnPort servers http requests for Signalfx datapoints
-func StartServingHTTPOnPort(listenAddr string, Streamer datapoint.Streamer,
-	clientTimeout time.Duration, name string, decodingEngine collectd.JSONEngine) (stats.ClosableKeeper, error) {
+func StartServingHTTPOnPort(ctx context.Context, sink dpsink.Sink, listenAddr string,
+	clientTimeout time.Duration, name string) (*ListenerServer, error) {
 	r := mux.NewRouter()
 
 	server := http.Server{
@@ -335,7 +327,7 @@ func StartServingHTTPOnPort(listenAddr string, Streamer datapoint.Streamer,
 	if err != nil {
 		return nil, err
 	}
-	listenServer := listenerServer{
+	listenServer := ListenerServer{
 		name:     name,
 		listener: listener,
 	}
@@ -346,140 +338,89 @@ func StartServingHTTPOnPort(listenAddr string, Streamer datapoint.Streamer,
 	r.Handle("/v1/metric", &metricHandler)
 	r.Handle("/metric", &metricHandler)
 
-	listenServer.statKeepers = append(listenServer.statKeepers, setupNotFoundHandler(r, name))
-	listenServer.statKeepers = append(listenServer.statKeepers, setupProtobufV1(Streamer, r, name, &metricHandler))
-	listenServer.statKeepers = append(listenServer.statKeepers, setupJSONV1(Streamer, r, name, &metricHandler))
-	listenServer.statKeepers = append(listenServer.statKeepers, setupProtobufV2(Streamer, r, name))
-	listenServer.statKeepers = append(listenServer.statKeepers, setupJSONV2(Streamer, r, name))
-	listenServer.statKeepers = append(listenServer.statKeepers, setupCollectd(decodingEngine, Streamer, r, name))
+	listenServer.Keeper = stats.Combine(
+		setupNotFoundHandler(r, ctx, name),
+		setupProtobufV1(r, ctx, name, sink, &metricHandler),
+		setupJSONV1(r, ctx, name, sink, &metricHandler),
+		setupProtobufV2(r, ctx, name, sink),
+		setupJSONV2(r, ctx, name, sink),
+		setupCollectd(r, ctx, name, sink))
 
 	go server.Serve(listener)
 	return &listenServer, err
 }
 
-func setupNotFoundHandler(r *mux.Router, name string) stats.Keeper {
+func setupNotFoundHandler(r *mux.Router, ctx context.Context, name string) stats.Keeper {
 	metricTracking := reqcounter.RequestCounter{}
-	r.NotFoundHandler = negroni.New(&metricTracking, negroni.Wrap(http.NotFoundHandler()))
-	return &stats.KeeperWrap{
-		Base:       []stats.DimensionKeeper{&metricTracking},
-		Dimensions: map[string]string{"listener": name, "type": "unknown"},
-	}
+	r.NotFoundHandler = web.NewHandler(ctx, web.FromHTTP(http.NotFoundHandler())).Add(web.NextHTTP(metricTracking.ServeHTTP))
+	return stats.ToKeeperMany(map[string]string{"listener": name, "type": "http404"}, &metricTracking)
 }
 
-func setupProtobufV1(Streamer datapoint.Streamer, r *mux.Router, name string, typeGetter MericTypeGetter) stats.Keeper {
-	decoder := protobufDecoderV1{
-		datapointTracker: datapoint.Tracker{
-			Streamer: Streamer,
-		},
-		typeGetter: typeGetter,
-	}
-
+func setupChain(ctx context.Context, sink dpsink.Sink, name string, chainType string, getReader func(dpsink.Sink) ErrorReader) (*web.Handler, stats.Keeper) {
+	counter := &dpsink.Counter{}
+	finalSink := dpsink.FromChain(sink, counter.SinkMiddleware)
+	errReader := getReader(finalSink)
 	errorTracker := ErrorTrackerHandler{
-		reader: &decoder,
+		reader: errReader,
 	}
-
 	metricTracking := reqcounter.RequestCounter{}
+	handler := web.NewHandler(ctx, &errorTracker).Add(web.NextHTTP(metricTracking.ServeHTTP))
+	st := stats.ToKeeperMany(map[string]string{"listener": name, "type": chainType}, &metricTracking, &errorTracker, counter)
+	return handler, st
+}
 
-	n := negroni.New(&metricTracking, negroni.Wrap(&errorTracker))
-	r.Path("/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(n)
-	r.Path("/v1/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(n)
-	return &stats.KeeperWrap{
-		Base:       []stats.DimensionKeeper{&metricTracking, &errorTracker, &decoder.datapointTracker},
-		Dimensions: map[string]string{"listener": name, "type": "protobuf_v1"},
-	}
+func setupProtobufV1(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, typeGetter MericTypeGetter) stats.Keeper {
+	handler, st := setupChain(ctx, sink, name, "protobuf_v1", func(s dpsink.Sink) ErrorReader {
+		return &protobufDecoderV1{sink: s, typeGetter: typeGetter}
+	})
+
+	r.Path("/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
+	r.Path("/v1/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
+	return st
 }
 
 func invalidContentType(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Invalid content type:"+r.Header.Get("Content-Type"), http.StatusBadRequest)
 }
 
-func setupJSONV1(Streamer datapoint.Streamer, r *mux.Router, name string, typeGetter MericTypeGetter) stats.Keeper {
-	decoder := jsonDecoderV1{
-		datapointTracker: datapoint.Tracker{
-			Streamer: Streamer,
-		},
-		typeGetter: typeGetter,
-	}
+func setupJSONV1(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, typeGetter MericTypeGetter) stats.Keeper {
+	handler, st := setupChain(ctx, sink, name, "json_v1", func(s dpsink.Sink) ErrorReader {
+		return &jsonDecoderV1{sink: s, typeGetter: typeGetter}
+	})
 
-	errorTracker := ErrorTrackerHandler{
-		reader: &decoder,
-	}
-
-	metricTracking := reqcounter.RequestCounter{}
-
-	n := negroni.New(&metricTracking, negroni.Wrap(&errorTracker))
-	r.Path("/datapoint").Methods("POST").Headers("Content-Type", "application/json").Handler(n)
-	r.Path("/v1/datapoint").Methods("POST").Headers("Content-Type", "application/json").Handler(n)
+	r.Path("/datapoint").Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
+	r.Path("/v1/datapoint").Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
 	r.Path("/datapoint").Methods("POST").Headers("Content-Type", "").HandlerFunc(invalidContentType)
 	r.Path("/v1/datapoint").Methods("POST").Headers("Content-Type", "").HandlerFunc(invalidContentType)
-	r.Path("/datapoint").Methods("POST").Handler(n)
-	r.Path("/v1/datapoint").Methods("POST").Handler(n)
-	return &stats.KeeperWrap{
-		Base:       []stats.DimensionKeeper{&metricTracking, &errorTracker, &decoder.datapointTracker},
-		Dimensions: map[string]string{"listener": name, "type": "json_v1"},
-	}
+	r.Path("/datapoint").Methods("POST").Handler(handler)
+	r.Path("/v1/datapoint").Methods("POST").Handler(handler)
+	return st
 }
 
-func setupProtobufV2(Streamer datapoint.Streamer, r *mux.Router, name string) stats.Keeper {
-	protobufDecoderV2 := protobufDecoderV2{
-		datapointTracker: datapoint.Tracker{
-			Streamer: Streamer,
-		},
-	}
+func setupProtobufV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink) stats.Keeper {
+	handler, st := setupChain(ctx, sink, name, "protobuf_v2", func(s dpsink.Sink) ErrorReader {
+		return &protobufDecoderV2{sink: s}
+	})
+	log.Debug("Setting up proto v2")
+	r.Path("/v2/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
 
-	protobufDecoderV2ErrorTracker := ErrorTrackerHandler{
-		reader: &protobufDecoderV2,
-	}
-
-	metricTracking := reqcounter.RequestCounter{}
-
-	n := negroni.New(&metricTracking, negroni.Wrap(&protobufDecoderV2ErrorTracker))
-	r.Path("/v2/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(n)
-
-	return &stats.KeeperWrap{
-		Base:       []stats.DimensionKeeper{&metricTracking, &protobufDecoderV2ErrorTracker, &protobufDecoderV2.datapointTracker},
-		Dimensions: map[string]string{"listener": name, "type": "protobuf_v2"},
-	}
+	return st
 }
 
-func setupJSONV2(Streamer datapoint.Streamer, r *mux.Router, name string) stats.Keeper {
-	jsonDecoderV2 := jsonDecoderV2{
-		datapointTracker: datapoint.Tracker{
-			Streamer: Streamer,
-		},
-	}
+func setupJSONV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink) stats.Keeper {
+	handler, st := setupChain(ctx, sink, name, "json_v2", func(s dpsink.Sink) ErrorReader {
+		return &jsonDecoderV2{sink: s}
+	})
 
-	jsonDecoderV2ErrorTracker := ErrorTrackerHandler{
-		reader: &jsonDecoderV2,
-	}
-
-	metricTracking := reqcounter.RequestCounter{}
-
-	n := negroni.New(&metricTracking, negroni.Wrap(&jsonDecoderV2ErrorTracker))
-	r.Path("/v2/datapoint").Methods("POST").Headers("Content-Type", "application/json").Handler(n)
+	r.Path("/v2/datapoint").Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
 	r.Path("/v2/datapoint").Methods("POST").Headers("Content-Type", "").HandlerFunc(invalidContentType)
-	r.Path("/v2/datapoint").Methods("POST").Handler(n)
-	return &stats.KeeperWrap{
-		Base:       []stats.DimensionKeeper{&metricTracking, &jsonDecoderV2ErrorTracker, &jsonDecoderV2.datapointTracker},
-		Dimensions: map[string]string{"listener": name, "type": "json_v2"},
-	}
+	r.Path("/v2/datapoint").Methods("POST").Handler(handler)
+	return st
 }
 
-func setupCollectd(decodingEngine collectd.JSONEngine, Streamer datapoint.Streamer, r *mux.Router, name string) stats.Keeper {
-	collectdHandler := collectd.JSONDecoder{
-		DecodingEngine: decodingEngine,
-		DatapointTracker: datapoint.Tracker{
-			Streamer: Streamer,
-		},
-	}
-
-	metricTracking := reqcounter.RequestCounter{}
-
-	n := negroni.New(&metricTracking, negroni.Wrap(&collectdHandler))
-	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "application/json").Handler(n)
+func setupCollectd(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink) stats.Keeper {
+	h, st := collectd.SetupHandler(ctx, name, sink)
+	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "application/json").Handler(h)
 	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "").HandlerFunc(invalidContentType)
-	return &stats.KeeperWrap{
-		Base:       []stats.DimensionKeeper{&metricTracking, &collectdHandler},
-		Dimensions: map[string]string{"listener": name, "type": "collectd"},
-	}
+	return st
 }

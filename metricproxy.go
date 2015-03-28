@@ -16,7 +16,8 @@ import (
 	"github.com/Sirupsen/logrus"
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/carbon"
 	"github.com/signalfx/metricproxy/protocol/collectd"
 	"github.com/signalfx/metricproxy/protocol/csv"
@@ -24,28 +25,37 @@ import (
 	"github.com/signalfx/metricproxy/protocol/signalfx"
 	"github.com/signalfx/metricproxy/stats"
 	"github.com/signalfx/metricproxy/statuspage"
+	"golang.org/x/net/context"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 )
 
 // ForwardingLoader is the function definition of a function that can load a config
 // for a proxy and return the streamer
-type ForwardingLoader func(*config.ForwardTo) (stats.StatKeepingStreamer, error)
+type ForwardingLoader func(context.Context, *config.ForwardTo) (protocol.Forwarder, error)
 
 // AllForwarderLoaders is a map of config names to loaders for that config
 var allForwarderLoaders = map[string]ForwardingLoader{
 	"signalfx-json": signalfx.ForwarderLoader,
 	"carbon":        carbon.ForwarderLoader,
-	"csv":           csv.ForwarderLoader,
+	"csv": func(ctx context.Context, conf *config.ForwardTo) (protocol.Forwarder, error) {
+		return csv.ForwarderLoader(conf)
+	},
 }
 
 // A ListenerLoader loads a DatapointListener from a configuration definition
-type ListenerLoader func(datapoint.Streamer, *config.ListenFrom) (stats.ClosableKeeper, error)
+type ListenerLoader func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (protocol.Listener, error)
 
 // AllListenerLoaders is a map of all loaders from config, for each listener we support
 var allListenerLoaders = map[string]ListenerLoader{
-	"signalfx": signalfx.ListenerLoader,
-	"carbon":   carbon.ListenerLoader,
-	"collectd": collectd.ListenerLoader,
+	"signalfx": func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (protocol.Listener, error) {
+		return signalfx.ListenerLoader(ctx, sink, listenFrom)
+	},
+	"carbon": func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (protocol.Listener, error) {
+		return carbon.ListenerLoader(ctx, sink, listenFrom)
+	},
+	"collectd": func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (protocol.Listener, error) {
+		return collectd.ListenerLoader(ctx, sink, listenFrom)
+	},
 }
 
 func writePidFile(pidFileName string) error {
@@ -67,9 +77,10 @@ type proxyCommandLineConfigurationT struct {
 	stopChannel                   chan bool
 	closeWhenWaitingToStopChannel chan struct{}
 	logJSON                       bool
-	allForwarders                 []stats.StatKeepingStreamer
-	allListeners                  []stats.ClosableKeeper
-	statDrainThread               stats.DrainingThread
+	ctx                           context.Context
+	allForwarders                 []protocol.Forwarder
+	allListeners                  []protocol.Listener
+	statDrainThread               *stats.StatDrainingThread
 }
 
 var proxyCommandLineConfigurationDefault proxyCommandLineConfigurationT
@@ -144,18 +155,18 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus
 	})
 }
 
-func setupForwarders(loadedConfig *config.ProxyConfig) ([]stats.StatKeepingStreamer, error) {
-	allForwarders := make([]stats.StatKeepingStreamer, 0, len(loadedConfig.ForwardTo))
+func setupForwarders(ctx context.Context, loadedConfig *config.ProxyConfig) ([]protocol.Forwarder, error) {
+	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	allKeepers := []stats.Keeper{stats.NewGolangKeeper()}
 	for _, forwardConfig := range loadedConfig.ForwardTo {
 		loader, ok := allForwarderLoaders[forwardConfig.Type]
 		if !ok {
 			log.WithField("type", forwardConfig.Type).Error("Unknown loader type")
-			return nil, fmt.Errorf("Unknown loader type %s", forwardConfig.Type)
+			return nil, fmt.Errorf("unknown loader type %s", forwardConfig.Type)
 		}
-		forwarder, err := loader(forwardConfig)
+		forwarder, err := loader(ctx, forwardConfig)
 		if err != nil {
-			log.WithField("err", err).Error("Unable to load config")
+			log.WithField("err", err).Error("unable to load config")
 			return nil, err
 		}
 		allForwarders = append(allForwarders, forwarder)
@@ -164,15 +175,15 @@ func setupForwarders(loadedConfig *config.ProxyConfig) ([]stats.StatKeepingStrea
 	return allForwarders, nil
 }
 
-func setupListeners(loadedConfig *config.ProxyConfig, multiplexer stats.StatKeepingStreamer) ([]stats.ClosableKeeper, error) {
-	allListeners := make([]stats.ClosableKeeper, 0, len(loadedConfig.ListenFrom))
+func setupListeners(ctx context.Context, loadedConfig *config.ProxyConfig, multiplexer dpsink.Sink) ([]protocol.Listener, error) {
+	allListeners := make([]protocol.Listener, 0, len(loadedConfig.ListenFrom))
 	for _, listenConfig := range loadedConfig.ListenFrom {
 		loader, ok := allListenerLoaders[listenConfig.Type]
 		if !ok {
 			log.WithField("type", listenConfig.Type).Error("Unknown loader type")
-			return nil, fmt.Errorf("Unknown loader type %s", listenConfig.Type)
+			return nil, fmt.Errorf("unknown loader type %s", listenConfig.Type)
 		}
-		listener, err := loader(multiplexer, listenConfig)
+		listener, err := loader(ctx, multiplexer, listenConfig)
 		if err != nil {
 			log.WithField("err", err).Error("Unable to load config")
 			return nil, err
@@ -199,28 +210,20 @@ func setupDebugServer(allKeepers []stats.Keeper, loadedConfig *config.ProxyConfi
 	}
 }
 
-func recast(input []stats.StatKeepingStreamer) []datapoint.NamedStreamer {
-	var ret []datapoint.NamedStreamer
-	for _, i := range input {
-		ret = append(ret, i)
+func recastToSinks(in []protocol.Forwarder) []dpsink.Sink {
+	r := make([]dpsink.Sink, len(in))
+	for i, n := range in {
+		r[i] = n
 	}
-	return ret
+	return r
 }
 
-func recast2(input []stats.StatKeepingStreamer) []datapoint.Streamer {
-	var ret []datapoint.Streamer
-	for _, i := range input {
-		ret = append(ret, i)
+func recastListenToKeeper(in []protocol.Listener) []stats.Keeper {
+	r := make([]stats.Keeper, len(in))
+	for i, n := range in {
+		r[i] = n
 	}
-	return ret
-}
-
-func recastSK(input []stats.ClosableKeeper) []stats.Keeper {
-	var ret []stats.Keeper
-	for _, i := range input {
-		ret = append(ret, i)
-	}
-	return ret
+	return r
 }
 
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() error {
@@ -249,29 +252,27 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() erro
 		runtime.GOMAXPROCS(numProcs)
 	}
 
-	proxyCommandLineConfiguration.allForwarders, err = setupForwarders(loadedConfig)
+	proxyCommandLineConfiguration.allForwarders, err = setupForwarders(proxyCommandLineConfiguration.ctx, loadedConfig)
 	if err != nil {
 		return err
 	}
 	allKeepers := []stats.Keeper{stats.NewGolangKeeper()}
-	multiplexer := demultiplexer.New(recast(proxyCommandLineConfiguration.allForwarders))
-	allKeepers = append(allKeepers, multiplexer)
+	multiplexer := demultiplexer.New(recastToSinks(proxyCommandLineConfiguration.allForwarders))
 
-	proxyCommandLineConfiguration.allListeners, err = setupListeners(loadedConfig, multiplexer)
+	proxyCommandLineConfiguration.allListeners, err = setupListeners(proxyCommandLineConfiguration.ctx, loadedConfig, multiplexer)
 	if err != nil {
 		return err
 	}
 	// I wish I could do this, but golang doesn't allow append() of super/sub types
 	// allKeepers = append(allKeepers, proxyCommandLineConfiguration.allListeners...)
-	allKeepers = append(allKeepers, recastSK(proxyCommandLineConfiguration.allListeners)...)
+	allKeepers = append(allKeepers, recastListenToKeeper(proxyCommandLineConfiguration.allListeners)...)
 
 	for _, forwarder := range proxyCommandLineConfiguration.allForwarders {
 		allKeepers = append(allKeepers, forwarder)
 	}
 
 	if loadedConfig.StatsDelayDuration != nil && *loadedConfig.StatsDelayDuration != 0 {
-		proxyCommandLineConfiguration.statDrainThread = stats.NewDrainingThread(*loadedConfig.StatsDelayDuration, recast2(proxyCommandLineConfiguration.allForwarders), allKeepers, proxyCommandLineConfiguration.stopChannel)
-		go proxyCommandLineConfiguration.statDrainThread.Start()
+		proxyCommandLineConfiguration.statDrainThread = stats.NewDrainingThread(*loadedConfig.StatsDelayDuration, recastToSinks(proxyCommandLineConfiguration.allForwarders), allKeepers, proxyCommandLineConfiguration.ctx)
 	} else {
 		log.Info("Skipping stat keeping")
 	}

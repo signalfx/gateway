@@ -15,78 +15,45 @@ import (
 
 	"strings"
 
-	"github.com/codegangsta/negroni"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
+	"encoding/json"
+
 	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/reqcounter"
 	"github.com/signalfx/metricproxy/stats"
+	"github.com/signalfx/metricproxy/web"
+	"golang.org/x/net/context"
 )
 
-type listenerServer struct {
-	name        string
-	listener    net.Listener
-	server      http.Server
-	statKeepers []stats.Keeper
+// ListenerServer will listen for collectd datapoint connections
+type ListenerServer struct {
+	stats.Keeper
+	name     string
+	listener net.Listener
+	server   http.Server
 }
 
-func (streamer *listenerServer) Stats() []datapoint.Datapoint {
-	return stats.CombineStats(streamer.statKeepers)
-}
+var _ protocol.Listener = &ListenerServer{}
 
-func (streamer *listenerServer) Close() {
-	streamer.listener.Close()
+// Close the socket currently open for collectd JSON connections
+func (streamer *ListenerServer) Close() error {
+	return streamer.listener.Close()
 }
 
 // JSONDecoder can decode collectd's native JSON datapoint format
 type JSONDecoder struct {
-	TotalErrors      int64
-	TotalBlankDims   int64
-	DecodingEngine   JSONEngine
-	DatapointTracker datapoint.Tracker
+	SendTo dpsink.Sink
+
+	TotalErrors    int64
+	TotalBlankDims int64
 }
 
 const sfxDimQueryParamPrefix string = "sfxdim_"
 
-// getDefaultDims parses any query params from req that start with sfxDimQueryParamPrefix
-// and treats them as if they were dimensions on all of the datapoints in the request
-func getDefaultDims(req *http.Request, totalDroppedDims *int64) map[string]string {
-	params := req.URL.Query()
-	defaultDims := make(map[string]string)
-	for key := range params {
-		if strings.HasPrefix(key, sfxDimQueryParamPrefix) {
-			value := params.Get(key)
-			if len(value) == 0 {
-				atomic.AddInt64(totalDroppedDims, 1)
-				continue
-			}
-			key = key[len(sfxDimQueryParamPrefix):]
-			defaultDims[key] = value
-		}
-	}
-	return defaultDims
-}
-
-// DecodeJSON of a collectd HTTP request using collectd's native JSON http protocol
-func DecodeJSON(req *http.Request, decodingEngine JSONEngine, datapointTracker datapoint.Adder, totalDroppedDims *int64) error {
-	defaultDims := getDefaultDims(req, totalDroppedDims)
-	d, err := decodingEngine.DecodeJSONWriteBody(req.Body)
-	if err != nil {
-		return err
-	}
-	for _, f := range d {
-		if f.TypeS != nil && f.Time != nil {
-			for i := range f.Dsnames {
-				if i < len(f.Dstypes) && i < len(f.Values) {
-					datapointTracker.AddDatapoint(NewCollectdDatapoint(f, uint(i), defaultDims))
-				}
-			}
-		}
-	}
-	return nil
-}
-
-func (decoder *JSONDecoder) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	err := DecodeJSON(req, decoder.DecodingEngine, &decoder.DatapointTracker, &decoder.TotalBlankDims)
+// ServeHTTPC decodes datapoints for the connection and sends them to the decoder's sink
+func (decoder *JSONDecoder) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, req *http.Request) {
+	err := decoder.resolve(ctx, req)
 	if err != nil {
 		atomic.AddInt64(&decoder.TotalErrors, 1)
 		rw.WriteHeader(http.StatusBadRequest)
@@ -96,16 +63,49 @@ func (decoder *JSONDecoder) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 	rw.Write([]byte(`"OK"`))
 }
 
+func (decoder *JSONDecoder) resolve(ctx context.Context, req *http.Request) error {
+	defaultDims := decoder.defaultDims(req)
+	var d JSONWriteBody
+	err := json.NewDecoder(req.Body).Decode(&d)
+	if err != nil {
+		return err
+	}
+	dps := make([]*datapoint.Datapoint, 0, len(d)*2)
+	for _, f := range d {
+		if f.TypeS != nil && f.Time != nil {
+			for i := range f.Dsnames {
+				if i < len(f.Dstypes) && i < len(f.Values) {
+					dps = append(dps, NewDatapoint(f, uint(i), defaultDims))
+				}
+			}
+		}
+	}
+	return decoder.SendTo.AddDatapoints(ctx, dps)
+}
+
+func (decoder *JSONDecoder) defaultDims(req *http.Request) map[string]string {
+	params := req.URL.Query()
+	defaultDims := make(map[string]string)
+	for key := range params {
+		if strings.HasPrefix(key, sfxDimQueryParamPrefix) {
+			value := params.Get(key)
+			if len(value) == 0 {
+				atomic.AddInt64(&decoder.TotalBlankDims, 1)
+				continue
+			}
+			key = key[len(sfxDimQueryParamPrefix):]
+			defaultDims[key] = value
+		}
+	}
+	return defaultDims
+}
+
 // Stats about this decoder, including how many datapoints it decoded
-func (decoder *JSONDecoder) Stats(dimensions map[string]string) []datapoint.Datapoint {
-	ret := []datapoint.Datapoint{}
-	ret = append(ret, decoder.DatapointTracker.Stats(dimensions)...)
-	ret = append(ret, datapoint.NewOnHostDatapointDimensions(
-		"total_blank_dims",
-		datapoint.NewIntValue(decoder.TotalBlankDims),
-		com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
-		dimensions))
-	return ret
+func (decoder *JSONDecoder) Stats(dimensions map[string]string) []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{
+		datapoint.New("total_blank_dims", dimensions, datapoint.NewIntValue(decoder.TotalBlankDims), datapoint.Counter, time.Now()),
+		datapoint.New("invalid_collectd_json", dimensions, datapoint.NewIntValue(decoder.TotalErrors), datapoint.Counter, time.Now()),
+	}
 }
 
 var defaultCollectdConfig = &config.ListenFrom{
@@ -117,35 +117,27 @@ var defaultCollectdConfig = &config.ListenFrom{
 }
 
 // ListenerLoader loads a listener for collectd write_http protocol
-func ListenerLoader(Streamer datapoint.Streamer, listenFrom *config.ListenFrom) (stats.ClosableKeeper, error) {
+func ListenerLoader(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (*ListenerServer, error) {
 	structdefaults.FillDefaultFrom(listenFrom, defaultCollectdConfig)
-	log.WithField("listenFrom", listenFrom).Info("Creating signalfx listener using final config")
-	engine, err := LoadEngine(*listenFrom.JSONEngine)
-	if err != nil {
-		return nil, err
-	}
-	return StartListeningCollectDHTTPOnPort(Streamer, *listenFrom.ListenAddr, *listenFrom.ListenPath, *listenFrom.TimeoutDuration, engine, *listenFrom.Name)
+	log.WithField("listenFrom", listenFrom).Info("Creating listener using final config")
+	return StartListeningCollectDHTTPOnPort(ctx, sink, *listenFrom.ListenAddr, *listenFrom.ListenPath, *listenFrom.TimeoutDuration, *listenFrom.Name)
 }
 
 // StartListeningCollectDHTTPOnPort servers http collectd requests
-func StartListeningCollectDHTTPOnPort(Streamer datapoint.Streamer,
-	listenAddr string, listenPath string, clientTimeout time.Duration, decodingEngine JSONEngine, name string) (stats.ClosableKeeper, error) {
+func StartListeningCollectDHTTPOnPort(ctx context.Context, sink dpsink.Sink,
+	listenAddr string, listenPath string, clientTimeout time.Duration, name string) (*ListenerServer, error) {
 
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return nil, err
 	}
+	h, st := SetupHandler(ctx, name, sink)
 
 	r := mux.NewRouter()
+	r.Path(listenPath).Headers("Content-type", "application/json").Handler(h)
 
-	collectdDecoder := JSONDecoder{
-		DecodingEngine: decodingEngine,
-		DatapointTracker: datapoint.Tracker{
-			Streamer: Streamer,
-		},
-	}
-
-	listenServer := listenerServer{
+	listenServer := ListenerServer{
+		Keeper:   st,
 		name:     name,
 		listener: listener,
 		server: http.Server{
@@ -156,16 +148,19 @@ func StartListeningCollectDHTTPOnPort(Streamer datapoint.Streamer,
 		},
 	}
 
-	middleware := reqcounter.RequestCounter{}
-
-	listenServer.statKeepers = append(listenServer.statKeepers, &stats.KeeperWrap{
-		Base:       []stats.DimensionKeeper{&middleware, &collectdDecoder},
-		Dimensions: map[string]string{"listener": name},
-	})
-
-	n := negroni.New(&middleware, negroni.Wrap(&collectdDecoder))
-	r.Path(listenPath).Headers("Content-type", "application/json").Handler(n)
-
 	go listenServer.server.Serve(listener)
-	return &listenServer, err
+	return &listenServer, nil
+}
+
+// SetupHandler is shared between signalfx and here to setup listening for collectd connections.
+// Will do shared basic setup like configuring request counters
+func SetupHandler(ctx context.Context, name string, sink dpsink.Sink) (*web.Handler, stats.Keeper) {
+	metricTracking := reqcounter.RequestCounter{}
+	counter := dpsink.Counter{}
+	collectdDecoder := JSONDecoder{
+		SendTo: dpsink.FromChain(sink, counter.SinkMiddleware),
+	}
+	h := web.NewHandler(ctx, &collectdDecoder).Add(web.NextHTTP(metricTracking.ServeHTTP))
+	st := stats.ToKeeperMany(map[string]string{"listener": name, "type": "collectd"}, &metricTracking, &counter, &collectdDecoder)
+	return h, st
 }

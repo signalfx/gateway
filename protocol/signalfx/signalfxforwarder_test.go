@@ -14,13 +14,13 @@ import (
 	"code.google.com/p/goprotobuf/proto"
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/datapoint"
 	"github.com/signalfx/metricproxy/nettest"
-	"github.com/signalfx/metricproxy/stats"
 
+	"github.com/signalfx/metricproxy/datapoint/dptest"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
 )
 
 func init() {
@@ -47,10 +47,10 @@ func TestForwarderLoaderDefaults(t *testing.T) {
 		FormatVersion:    workarounds.GolangDoesnotAllowPointerToUintLiteral(2),
 		DefaultAuthToken: workarounds.GolangDoesnotAllowPointerToStringLiteral("AUTH_TOKEN"),
 	}
-	forwarder, err := ForwarderLoader(&forwardTo)
-	sfForwarder, _ := forwarder.(*signalfxJSONConnector)
+	ctx := context.Background()
+	forwarder, err := ForwarderLoader(ctx, &forwardTo)
 	assert.Nil(t, err)
-	assert.Equal(t, "https://ingest.signalfx.com/v2/datapoint", sfForwarder.url, "URL should change for version 2")
+	defer forwarder.Close()
 }
 
 func TestMapToDimensions(t *testing.T) {
@@ -78,16 +78,17 @@ func TestFilterSignalfxString(t *testing.T) {
 	assert.Equal(t, "_hello_bob1__", filterSignalfxKey(".hello:bob1_&"), "Filter not working")
 }
 
-func setupServerForwarder(t *testing.T) (*datapoint.BufferedForwarder, stats.ClosableKeeper, *signalfxJSONConnector) {
+func setupServerForwarder(t *testing.T) (*dptest.BasicSink, *ListenerServer, *Forwarder) {
 	// TODO: Break this out into smaller tests
 	listenFromSignalfx := config.ListenFrom{}
 	listenFromSignalfx.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
 
-	finalDatapointDestination := datapoint.NewBufferedForwarder(100, 1, "", 1)
-	l, err := ListenerLoader(finalDatapointDestination, &listenFromSignalfx)
+	finalDatapointDestination := dptest.NewBasicSink()
+	ctx := context.Background()
+	l, err := ListenerLoader(ctx, finalDatapointDestination, &listenFromSignalfx)
 	assert.Equal(t, nil, err, "Expect no error")
 
-	port := nettest.TCPPort(l.(*listenerServer).listener)
+	port := nettest.TCPPort(l.listener)
 
 	forwardTo := config.ForwardTo{
 		URL:              workarounds.GolangDoesnotAllowPointerToStringLiteral(fmt.Sprintf("http://127.0.0.1:%d/v2/datapoint", port)),
@@ -97,11 +98,9 @@ func setupServerForwarder(t *testing.T) (*datapoint.BufferedForwarder, stats.Clo
 		SourceDimensions: workarounds.GolangDoesnotAllowPointerToStringLiteral("username,ignored,hostname"),
 	}
 
-	forwarder, err := ForwarderLoader(&forwardTo)
-	assert.Equal(t, nil, err, "Expect no error")
-	assert.Equal(t, "signalfx-forwarder", forwarder.(*signalfxJSONConnector).Name(), "Expect no error")
-	assert.Equal(t, 7, len(forwarder.Stats()))
-	return finalDatapointDestination, l, forwarder.(*signalfxJSONConnector)
+	_, forwarder, err := ForwarderLoader1(ctx, &forwardTo)
+	assert.NoError(t, err, "Expect no error")
+	return finalDatapointDestination, l, forwarder
 }
 
 func TestDefaultSource(t *testing.T) {
@@ -109,13 +108,13 @@ func TestDefaultSource(t *testing.T) {
 	defer l.Close()
 
 	timeToSend := time.Now().Round(time.Second)
-	dpSent := datapoint.NewAbsoluteTime("metric", map[string]string{}, datapoint.NewIntValue(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
-	forwarder.Channel() <- dpSent
-	dpRecieved := <-finalDatapointDestination.DatapointsChannel
-	i := dpRecieved.Value().(datapoint.IntValue).Int()
+	dpSent := datapoint.New("metric", map[string]string{}, datapoint.NewIntValue(2), datapoint.Gauge, timeToSend)
+	go forwarder.AddDatapoints(context.Background(), []*datapoint.Datapoint{dpSent})
+	dpRecieved := finalDatapointDestination.Next()
+	i := dpRecieved.Value.(datapoint.IntValue).Int()
 	assert.Equal(t, int64(2), i, "Expect 2 back")
-	assert.Equal(t, "proxy-source", dpRecieved.Dimensions()["sf_source"], "Expect ahost back")
-	assert.Equal(t, timeToSend, dpRecieved.Timestamp())
+	assert.Equal(t, "proxy-source", dpRecieved.Dimensions["sf_source"], "Expect ahost back")
+	assert.Equal(t, timeToSend, dpRecieved.Timestamp)
 }
 
 func TestSetSource(t *testing.T) {
@@ -123,13 +122,13 @@ func TestSetSource(t *testing.T) {
 	defer l.Close()
 
 	timeToSend := time.Now().Round(time.Second)
-	dpSent := datapoint.NewAbsoluteTime("metric", map[string]string{"cpusize": "big", "hostname": "ahost"}, datapoint.NewIntValue(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
-	forwarder.Channel() <- dpSent
-	dpRecieved := <-finalDatapointDestination.DatapointsChannel
-	i := dpRecieved.Value().(datapoint.IntValue).Int()
+	dpSent := datapoint.New("metric", map[string]string{"cpusize": "big", "hostname": "ahost"}, datapoint.NewIntValue(2), datapoint.Gauge, timeToSend)
+	go forwarder.AddDatapoints(context.Background(), []*datapoint.Datapoint{dpSent})
+	dpRecieved := finalDatapointDestination.Next()
+	i := dpRecieved.Value.(datapoint.IntValue).Int()
 	assert.Equal(t, int64(2), i, "Expect 2 back")
-	assert.Equal(t, "ahost", dpRecieved.Dimensions()["sf_source"], "Expect ahost back")
-	assert.Equal(t, timeToSend, dpRecieved.Timestamp())
+	assert.Equal(t, "ahost", dpRecieved.Dimensions["sf_source"], "Expect ahost back")
+	assert.Equal(t, timeToSend, dpRecieved.Timestamp)
 }
 
 func TestForwarderLoaderOldVersion(t *testing.T) {
@@ -137,7 +136,8 @@ func TestForwarderLoaderOldVersion(t *testing.T) {
 		FormatVersion:    workarounds.GolangDoesnotAllowPointerToUintLiteral(1),
 		DefaultAuthToken: workarounds.GolangDoesnotAllowPointerToStringLiteral("AUTH_TOKEN"),
 	}
-	_, err := ForwarderLoader(&forwardTo)
+	ctx := context.Background()
+	_, err := ForwarderLoader(ctx, &forwardTo)
 	assert.NoError(t, err)
 }
 
@@ -147,12 +147,12 @@ func TestNoSource(t *testing.T) {
 
 	forwarder.defaultSource = ""
 	timeToSend := time.Now().Round(time.Second)
-	dpSent := datapoint.NewAbsoluteTime("metric", map[string]string{}, datapoint.NewIntValue(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, timeToSend)
-	forwarder.Channel() <- dpSent
-	dpRecieved := <-finalDatapointDestination.DatapointsChannel
-	i := dpRecieved.Value().(datapoint.IntValue).Int()
+	dpSent := datapoint.New("metric", map[string]string{}, datapoint.NewIntValue(2), datapoint.Gauge, timeToSend)
+	go forwarder.AddDatapoints(context.Background(), []*datapoint.Datapoint{dpSent})
+	dpRecieved := finalDatapointDestination.Next()
+	i := dpRecieved.Value.(datapoint.IntValue).Int()
 	assert.Equal(t, 2, i, "Expect 2 back")
-	val, exists := dpRecieved.Dimensions()["sf_source"]
+	val, exists := dpRecieved.Dimensions["sf_source"]
 	assert.False(t, exists, val)
 }
 
@@ -163,24 +163,14 @@ func TestDatumForPoint(t *testing.T) {
 	assert.Equal(t, "hi", datumForPoint(datapoint.NewStringValue("hi")).GetStrValue())
 }
 
-func TestCoreDatapointToProtobuf(t *testing.T) {
-	c := signalfxJSONConnector{
-		dimensionSources: []string{},
-	}
-	point := datapoint.NewRelativeTime("metric", map[string]string{}, datapoint.NewIntValue(2), com_signalfuse_metrics_protobuf.MetricType_GAUGE, 0)
-
-	dp := c.coreDatapointToProtobuf(point)
-	assert.Equal(t, 0, dp.GetTimestamp())
-}
-
 func TestConnectorProcessProtoError(t *testing.T) {
-	f := signalfxJSONConnector{
+	f := Forwarder{
 		protoMarshal: func(pb proto.Message) ([]byte, error) {
-			return nil, fmt.Errorf("Marshal error")
+			return nil, fmt.Errorf("marshal error")
 		},
 	}
-	err := f.process([]datapoint.Datapoint{})
-	assert.Equal(t, "Marshal error", err.Error())
+	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{})
+	assert.Equal(t, "marshal error", err.Error())
 }
 
 type roundTripTest func(r *http.Request) (*http.Response, error)
@@ -190,27 +180,29 @@ func (r roundTripTest) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func TestClientReqError(t *testing.T) {
-	f := signalfxJSONConnector{
+	f := Forwarder{
+		protoMarshal: proto.Marshal,
 		client: &http.Client{
 			Transport: roundTripTest(func(r *http.Request) (*http.Response, error) {
 				debug.PrintStack()
-				return nil, fmt.Errorf("Unable to execute http request")
+				return nil, fmt.Errorf("unable to execute http request")
 			}),
 		},
 	}
-	err := f.process([]datapoint.Datapoint{})
-	assert.Contains(t, err.Error(), "Unable to execute http request")
+	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{})
+	assert.Contains(t, err.Error(), "unable to execute http request")
 }
 
 type readError struct {
 }
 
 func (r *readError) Read([]byte) (int, error) {
-	return 0, fmt.Errorf("Read error!")
+	return 0, fmt.Errorf("read error")
 }
 
 func TestResponseBodyError(t *testing.T) {
-	f := signalfxJSONConnector{
+	f := Forwarder{
+		protoMarshal: proto.Marshal,
 		client: &http.Client{
 			Transport: roundTripTest(func(r *http.Request) (*http.Response, error) {
 				r2 := http.Response{
@@ -220,12 +212,13 @@ func TestResponseBodyError(t *testing.T) {
 			}),
 		},
 	}
-	err := f.process([]datapoint.Datapoint{})
-	assert.Equal(t, "Read error!", err.Error())
+	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{})
+	assert.Equal(t, "read error", err.Error())
 }
 
 func TestResponseBadStatus(t *testing.T) {
-	f := signalfxJSONConnector{
+	f := Forwarder{
+		protoMarshal: proto.Marshal,
 		client: &http.Client{
 			Transport: roundTripTest(func(r *http.Request) (*http.Response, error) {
 				r2 := http.Response{
@@ -236,12 +229,13 @@ func TestResponseBadStatus(t *testing.T) {
 			}),
 		},
 	}
-	err := f.process([]datapoint.Datapoint{})
+	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{})
 	assert.Contains(t, err.Error(), "invalid status code")
 }
 
 func TestResponseBadJSON(t *testing.T) {
-	f := signalfxJSONConnector{
+	f := Forwarder{
+		protoMarshal: proto.Marshal,
 		client: &http.Client{
 			Transport: roundTripTest(func(r *http.Request) (*http.Response, error) {
 				r2 := http.Response{
@@ -252,12 +246,13 @@ func TestResponseBadJSON(t *testing.T) {
 			}),
 		},
 	}
-	err := f.process([]datapoint.Datapoint{})
+	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{})
 	assert.IsType(t, &json.SyntaxError{}, err)
 }
 
 func TestResponseBadBody(t *testing.T) {
-	f := signalfxJSONConnector{
+	f := Forwarder{
+		protoMarshal: proto.Marshal,
 		client: &http.Client{
 			Transport: roundTripTest(func(r *http.Request) (*http.Response, error) {
 				r2 := http.Response{
@@ -268,6 +263,6 @@ func TestResponseBadBody(t *testing.T) {
 			}),
 		},
 	}
-	err := f.process([]datapoint.Datapoint{})
-	assert.Contains(t, err.Error(), "Body decode error")
+	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{})
+	assert.Contains(t, err.Error(), "body decode error")
 }

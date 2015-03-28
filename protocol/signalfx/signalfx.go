@@ -3,6 +3,8 @@ package signalfx
 import (
 	"fmt"
 
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 	"github.com/signalfx/metricproxy/datapoint"
@@ -13,6 +15,17 @@ type JSONDatapointV1 struct {
 	Source string  `json:"source"`
 	Metric string  `json:"metric"`
 	Value  float64 `json:"value"`
+}
+
+// NewDatumValue creates new datapoint value referenced from a value of the datum protobuf
+func NewDatumValue(val *com_signalfuse_metrics_protobuf.Datum) datapoint.Value {
+	if val.DoubleValue != nil {
+		return datapoint.NewFloatValue(val.GetDoubleValue())
+	}
+	if val.IntValue != nil {
+		return datapoint.NewIntValue(val.GetIntValue())
+	}
+	return datapoint.NewStringValue(val.GetStrValue())
 }
 
 // ValueToSend are values are sent from the proxy to a reciever for the datapoint
@@ -37,7 +50,7 @@ func ValueToValue(v ValueToSend) (datapoint.Value, error) {
 	if ok {
 		return datapoint.NewStringValue(s), nil
 	}
-	return nil, fmt.Errorf("Unable to convert value: %s", v)
+	return nil, fmt.Errorf("unable to convert value: %s", v)
 }
 
 // JSONDatapointV2 is the V2 json datapoint sending format
@@ -68,8 +81,46 @@ type MetricCreationResponse struct {
 	Message string `json:"message,omitempty"`
 }
 
+var toMTMap = map[datapoint.MetricType]com_signalfuse_metrics_protobuf.MetricType{
+	datapoint.Counter:   com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
+	datapoint.Count:     com_signalfuse_metrics_protobuf.MetricType_COUNTER,
+	datapoint.Enum:      com_signalfuse_metrics_protobuf.MetricType_GAUGE,
+	datapoint.Gauge:     com_signalfuse_metrics_protobuf.MetricType_GAUGE,
+	datapoint.Rate:      com_signalfuse_metrics_protobuf.MetricType_GAUGE,
+	datapoint.Timestamp: com_signalfuse_metrics_protobuf.MetricType_GAUGE,
+}
+
+func toMT(mt datapoint.MetricType) com_signalfuse_metrics_protobuf.MetricType {
+	ret, exists := toMTMap[mt]
+	if exists {
+		return ret
+	}
+	panic(fmt.Sprintf("Unknown metric type: %d\n", mt))
+}
+
+var fromMTMap = map[com_signalfuse_metrics_protobuf.MetricType]datapoint.MetricType{
+	com_signalfuse_metrics_protobuf.MetricType_CUMULATIVE_COUNTER: datapoint.Counter,
+	com_signalfuse_metrics_protobuf.MetricType_GAUGE:              datapoint.Gauge,
+	com_signalfuse_metrics_protobuf.MetricType_COUNTER:            datapoint.Count,
+}
+
+func fromMT(mt com_signalfuse_metrics_protobuf.MetricType) datapoint.MetricType {
+	ret, exists := fromMTMap[mt]
+	if exists {
+		return ret
+	}
+	panic(fmt.Sprintf("Unknown metric type: %s\n", mt))
+}
+
+func fromTs(ts int64) time.Time {
+	if ts > 0 {
+		return time.Unix(0, ts*time.Millisecond.Nanoseconds())
+	}
+	return time.Now().Add(-time.Duration(time.Millisecond.Nanoseconds() * ts))
+}
+
 // NewProtobufDataPointWithType creates a new datapoint from SignalFx's protobuf definition (backwards compatable with old API)
-func NewProtobufDataPointWithType(dp *com_signalfuse_metrics_protobuf.DataPoint, mType com_signalfuse_metrics_protobuf.MetricType) datapoint.Datapoint {
+func NewProtobufDataPointWithType(dp *com_signalfuse_metrics_protobuf.DataPoint, mType com_signalfuse_metrics_protobuf.MetricType) *datapoint.Datapoint {
 	var mt com_signalfuse_metrics_protobuf.MetricType
 	log.WithField("dp", dp).Debug("NewProtobufDataPointWithType")
 
@@ -89,7 +140,5 @@ func NewProtobufDataPointWithType(dp *com_signalfuse_metrics_protobuf.DataPoint,
 		dims[dpdim.GetKey()] = dpdim.GetValue()
 	}
 
-	return datapoint.NewRelativeTime(dp.GetMetric(),
-		dims, datapoint.NewDatumValue(dp.GetValue()), mt,
-		dp.GetTimestamp())
+	return datapoint.New(dp.GetMetric(), dims, NewDatumValue(dp.GetValue()), fromMT(mt), fromTs(dp.GetTimestamp()))
 }

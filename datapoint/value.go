@@ -3,8 +3,6 @@ package datapoint
 import (
 	"fmt"
 	"strconv"
-
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
 )
 
 // A Value is the value being sent between servers.  It is usually a floating point
@@ -12,17 +10,6 @@ import (
 // human readable interface
 type Value interface {
 	fmt.Stringer
-}
-
-// NewDatumValue creates new datapoint value referenced from a value of the datum protobuf
-func NewDatumValue(val *com_signalfuse_metrics_protobuf.Datum) Value {
-	if val.DoubleValue != nil {
-		return NewFloatValue(val.GetDoubleValue())
-	}
-	if val.IntValue != nil {
-		return NewIntValue(val.GetIntValue())
-	}
-	return NewStringValue(val.GetStrValue())
 }
 
 type floatWire float64

@@ -1,10 +1,10 @@
 package collectd
 
 import (
-	"bytes"
-	"net/http"
 	"testing"
 
+	"bytes"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 
@@ -13,6 +13,7 @@ import (
 	"github.com/signalfx/metricproxy/datapoint"
 	"github.com/signalfx/metricproxy/datapoint/dptest"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
 )
 
 const testCollectdBody = `[
@@ -82,30 +83,19 @@ func TestInvalidListen(t *testing.T) {
 	listenFrom := &config.ListenFrom{
 		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:999999"),
 	}
-	sendTo := &dptest.BasicStreamer{}
-	_, err := ListenerLoader(sendTo, listenFrom)
-	assert.Error(t, err)
-}
-
-func TestCollectdListenerInvalidJSONEngine(t *testing.T) {
-	sendTo := &dptest.BasicStreamer{
-		Chan: make(chan datapoint.Datapoint),
-	}
-	listenFrom := &config.ListenFrom{
-		JSONEngine: workarounds.GolangDoesnotAllowPointerToStringLiteral("unknown"),
-	}
-	_, err := ListenerLoader(sendTo, listenFrom)
+	sendTo := dptest.NewBasicSink()
+	ctx := context.Background()
+	_, err := ListenerLoader(ctx, sendTo, listenFrom)
 	assert.Error(t, err)
 }
 
 func TestCollectDListener(t *testing.T) {
 	jsonBody := testCollectdBody
 
-	sendTo := &dptest.BasicStreamer{
-		Chan: make(chan datapoint.Datapoint),
-	}
+	sendTo := dptest.NewBasicSink()
+	ctx := context.Background()
 	listenFrom := &config.ListenFrom{}
-	collectdListener, err := ListenerLoader(sendTo, listenFrom)
+	collectdListener, err := ListenerLoader(ctx, sendTo, listenFrom)
 	defer collectdListener.Close()
 	assert.Nil(t, err)
 	assert.NotNil(t, collectdListener)
@@ -114,26 +104,18 @@ func TestCollectDListener(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	go func() {
-		dp := <-sendTo.Chan
-		assert.Equal(t, "load.shortterm", dp.Metric(), "Metric not named correctly")
-
-		dp = <-sendTo.Chan
-		assert.Equal(t, "load.midterm", dp.Metric(), "Metric not named correctly")
-
-		dp = <-sendTo.Chan
-		assert.Equal(t, "load.longterm", dp.Metric(), "Metric not named correctly")
-
-		dp = <-sendTo.Chan
-		assert.Equal(t, "memory.used", dp.Metric(), "Metric not named correctly")
-
-		dp = <-sendTo.Chan
-		assert.Equal(t, "df_complex.free", dp.Metric(), "Metric not named correctly")
+		dps := <-sendTo.PointsChan
+		assert.Equal(t, "load.shortterm", dps[0].Metric, "Metric not named correctly")
+		assert.Equal(t, "load.midterm", dps[1].Metric, "Metric not named correctly")
+		assert.Equal(t, "load.longterm", dps[2].Metric, "Metric not named correctly")
+		assert.Equal(t, "memory.used", dps[3].Metric, "Metric not named correctly")
+		assert.Equal(t, "df_complex.free", dps[4].Metric, "Metric not named correctly")
 	}()
 	resp, err := client.Do(req)
 	assert.Nil(t, err)
 	assert.Equal(t, resp.StatusCode, http.StatusOK, "Request should work")
 
-	assert.Equal(t, 5, len(collectdListener.Stats()), "Request should work")
+	assert.Equal(t, 11, len(collectdListener.Stats()), "Request should work")
 
 	req, _ = http.NewRequest("POST", "http://127.0.0.1:8081/post-collectd", bytes.NewBuffer([]byte(`invalidjson`)))
 	req.Header.Set("Content-Type", "application/json")
@@ -152,14 +134,10 @@ func TestCollectDListener(t *testing.T) {
 func TestCollectDListenerWithQueryParams(t *testing.T) {
 	jsonBody := testCollectdBody
 
-	sendTo := &dptest.BasicStreamer{
-		Chan: make(chan datapoint.Datapoint),
-	}
-	collectdDecoder := JSONDecoder{
-		DecodingEngine: &NativeMarshallJSONDecoder{},
-		DatapointTracker: datapoint.Tracker{
-			Streamer: sendTo,
-		},
+	sendTo := dptest.NewBasicSink()
+	ctx := context.Background()
+	c := JSONDecoder{
+		SendTo: sendTo,
 	}
 
 	req, _ := http.NewRequest("POST", "http://127.0.0.1:8081/post-collectd?sfxdim_foo=bar&sfxdim_zam=narf&sfxdim_empty=&pleaseignore=true", bytes.NewBuffer([]byte(jsonBody)))
@@ -169,28 +147,24 @@ func TestCollectDListenerWithQueryParams(t *testing.T) {
 	memoryExpectedDims := map[string]string{"host": "i-b13d1e5f", "plugin": "memory", "dsname": "value", "foo": "bar", "zam": "narf"}
 	dfComplexExpectedDims := map[string]string{"plugin": "df", "plugin_instance": "dev", "dsname": "value", "foo": "bar", "zam": "narf", "host": "i-b13d1e5f"}
 	go func() {
-		dp := <-sendTo.Chan
-		assert.Equal(t, "load.shortterm", dp.Metric(), "Metric not named correctly")
-		assert.Equal(t, loadExpectedDims, dp.Dimensions(), "Dimensions not set correctly")
+		dps := <-sendTo.PointsChan
+		assert.Equal(t, "load.shortterm", dps[0].Metric, "Metric not named correctly")
+		assert.Equal(t, loadExpectedDims, dps[0].Dimensions, "Dimensions not set correctly")
 
-		dp = <-sendTo.Chan
-		assert.Equal(t, "load.midterm", dp.Metric(), "Metric not named correctly")
-		assert.Equal(t, loadExpectedDims, dp.Dimensions(), "Dimensions not set correctly")
+		assert.Equal(t, "load.midterm", dps[1].Metric, "Metric not named correctly")
+		assert.Equal(t, loadExpectedDims, dps[1].Dimensions, "Dimensions not set correctly")
 
-		dp = <-sendTo.Chan
-		assert.Equal(t, "load.longterm", dp.Metric(), "Metric not named correctly")
-		assert.Equal(t, loadExpectedDims, dp.Dimensions(), "Dimensions not set correctly")
+		assert.Equal(t, "load.longterm", dps[2].Metric, "Metric not named correctly")
+		assert.Equal(t, loadExpectedDims, dps[2].Dimensions, "Dimensions not set correctly")
 
-		dp = <-sendTo.Chan
-		assert.Equal(t, "memory.used", dp.Metric(), "Metric not named correctly")
-		assert.Equal(t, memoryExpectedDims, dp.Dimensions(), "Dimensions not set correctly")
+		assert.Equal(t, "memory.used", dps[3].Metric, "Metric not named correctly")
+		assert.Equal(t, memoryExpectedDims, dps[3].Dimensions, "Dimensions not set correctly")
 
-		dp = <-sendTo.Chan
-		assert.Equal(t, "df_complex.free", dp.Metric(), "Metric not named correctly")
-		assert.Equal(t, dfComplexExpectedDims, dp.Dimensions(), "Dimensions not set correctly")
+		assert.Equal(t, "df_complex.free", dps[4].Metric, "Metric not named correctly")
+		assert.Equal(t, dfComplexExpectedDims, dps[4].Dimensions, "Dimensions not set correctly")
 	}()
 	resp := httptest.NewRecorder()
-	collectdDecoder.ServeHTTP(resp, req)
+	c.ServeHTTPC(ctx, resp, req)
 	assert.Equal(t, resp.Code, http.StatusOK, "Request should work")
 
 	//assert.Equal(t, 4, len(collectdListener.Stats()), "Request should work")
@@ -199,38 +173,38 @@ func TestCollectDListenerWithQueryParams(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	resp = httptest.NewRecorder()
-	collectdDecoder.ServeHTTP(resp, req)
+	c.ServeHTTPC(ctx, resp, req)
 
-	assert.Equal(t, collectdDecoder.TotalBlankDims, 1)
+	assert.Equal(t, c.TotalBlankDims, 1)
 
 	assert.Equal(t, http.StatusBadRequest, resp.Code, "Request should work")
 
 }
+
 func BenchmarkCollectdListener(b *testing.B) {
 	bytes := int64(0)
 
-	jsonEngine, _ := LoadEngine("")
+	sendTo := dptest.NewBasicSink()
+	sendTo.PointsChan = make(chan []*datapoint.Datapoint, 2)
+	ctx := context.Background()
+	c := JSONDecoder{
+		SendTo: sendTo,
+	}
 
+	b.ReportAllocs()
+	b.StopTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		sendTo := &dptest.BasicStreamer{
-			Chan: make(chan datapoint.Datapoint, 6),
-		}
-
-		decoder := JSONDecoder{
-			DecodingEngine: jsonEngine,
-			DatapointTracker: datapoint.Tracker{
-				Streamer: sendTo,
-			},
-		}
 		writter := httptest.NewRecorder()
 		body := strings.NewReader(testCollectdBody)
-		req, err := http.NewRequest("GET", "http://example.com/collectd", body)
+		req, _ := http.NewRequest("GET", "http://example.com/collectd", body)
 		req.Header.Add("Content-type", "application/json")
-		decoder.ServeHTTP(writter, req)
+		b.StartTimer()
+		c.ServeHTTPC(ctx, writter, req)
+		b.StopTimer()
 		bytes += int64(len(testCollectdBody))
-		//		listener.handleCollectd(writter, req)
-		assert.NoError(b, err)
-		assert.Equal(b, 5, len(sendTo.Chan))
+		item := <-sendTo.PointsChan
+		assert.Equal(b, 5, len(item))
 	}
 	b.SetBytes(bytes)
 }
