@@ -102,7 +102,7 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogrusOu
 		logDir = *loadedConfig.LogDir
 	}
 	if logDir == "-" {
-		fmt.Printf("Sending logging to stdout")
+		fmt.Println("Sending logging to stdout")
 		return os.Stdout
 	}
 	logMaxSize := proxyCommandLineConfiguration.logMaxSize

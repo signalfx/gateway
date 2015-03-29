@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"time"
 )
 
 func TestRequestCounter(t *testing.T) {
@@ -13,6 +14,7 @@ func TestRequestCounter(t *testing.T) {
 		assert.Equal(t, 1, m.ActiveConnections)
 		assert.Equal(t, 1, m.TotalConnections)
 		assert.Equal(t, 0, m.TotalProcessingTimeNs)
+		time.Sleep(time.Nanosecond)
 	}
 	m.ServeHTTP(nil, nil, f)
 

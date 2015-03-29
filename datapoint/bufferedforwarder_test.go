@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/stretchr/testify/assert"
+	"time"
 )
 
 func TestForwarderBasicBufferedForwarder(t *testing.T) {
@@ -55,8 +56,9 @@ func TestEmptyBlockingDrain(t *testing.T) {
 	seenPointsChan := make(chan int, 2)
 	f.Start(func(dp []Datapoint) error {
 		assert.Equal(t, 1, f.callsInFlight)
-		fmt.Printf("Saw %d points", len(dp))
+		fmt.Printf("Saw %d points\n", len(dp))
 		seenPointsChan <- len(dp)
+		time.Sleep(time.Millisecond)
 		return nil
 	})
 	seenPoints := <-seenPointsChan

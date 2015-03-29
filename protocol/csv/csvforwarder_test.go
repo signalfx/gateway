@@ -29,9 +29,13 @@ func TestCsvCoverFileWrite(t *testing.T) {
 }
 
 func TestForwarderLoader(t *testing.T) {
-	defer func() { os.Remove("datapoints.csv") }()
+	defer os.Remove("datapoints.csv")
+	f, err := ioutil.TempFile("", "TestForwarderLoader")
+	assert.NoError(t, err)
+	f.Close()
+	defer os.Remove(f.Name())
 	forwardTo := config.ForwardTo{
-		Filename: workarounds.GolangDoesnotAllowPointerToStringLiteral("/tmp/tempfile.csv"),
+		Filename: workarounds.GolangDoesnotAllowPointerToStringLiteral(f.Name()),
 	}
 	cl, err := ForwarderLoader(&forwardTo)
 	assert.Equal(t, nil, err, "Expect no error")
