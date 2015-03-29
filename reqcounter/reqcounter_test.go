@@ -4,8 +4,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRequestCounter(t *testing.T) {

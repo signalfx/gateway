@@ -6,8 +6,9 @@ import (
 
 	"fmt"
 
-	"github.com/stretchr/testify/assert"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestForwarderBasicBufferedForwarder(t *testing.T) {
