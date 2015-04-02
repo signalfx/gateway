@@ -18,6 +18,8 @@ import (
 	"github.com/signalfx/metricproxy/datapoint"
 	"github.com/signalfx/metricproxy/nettest"
 
+	"net/http/httptest"
+
 	"github.com/signalfx/metricproxy/datapoint/dptest"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
@@ -265,4 +267,22 @@ func TestResponseBadBody(t *testing.T) {
 	}
 	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{})
 	assert.Contains(t, err.Error(), "body decode error")
+}
+
+func TestBasicSend(t *testing.T) {
+	testServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		assert.Equal(t, "abcd", req.Header.Get("User-Agent"))
+		assert.Equal(t, "abcdefg", req.Header.Get(TokenHeaderName))
+		rw.Write([]byte(`"OK"`))
+	}))
+	defer testServer.Close()
+
+	f := NewSignalfxJSONForwarer("", time.Second, "", 10, "", "")
+	f.UserAgent("abcd")
+	f.AuthToken("abcdefg")
+	f.Endpoint(testServer.URL)
+	ctx := context.Background()
+
+	dp := dptest.DP()
+	assert.NoError(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dp}))
 }

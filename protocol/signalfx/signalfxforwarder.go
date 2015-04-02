@@ -14,6 +14,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
+	"sync"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
@@ -30,14 +32,14 @@ import (
 
 // Forwarder controls forwarding datapoints to SignalFx
 type Forwarder struct {
-	url               string
-	connectionTimeout time.Duration
-	defaultAuthToken  string
-	tr                *http.Transport
-	client            *http.Client
-	userAgent         string
-	defaultSource     string
-	dimensionSources  []string
+	propertyLock     sync.Mutex
+	url              string
+	defaultAuthToken string
+	tr               *http.Transport
+	client           *http.Client
+	userAgent        string
+	defaultSource    string
+	dimensionSources []string
 
 	protoMarshal func(pb proto.Message) ([]byte, error)
 }
@@ -71,9 +73,9 @@ func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo) (protoco
 	}
 	structdefaults.FillDefaultFrom(forwardTo, defaultConfigV2)
 	log.WithField("forwardTo", forwardTo).Info("Creating signalfx forwarder using final config")
-	fwd := NewSignalfxJSONForwarer(*forwardTo.URL, *forwardTo.TimeoutDuration, *forwardTo.BufferSize,
-		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads, *forwardTo.Name,
-		*forwardTo.MaxDrainSize, *forwardTo.DefaultSource, *forwardTo.SourceDimensions)
+	fwd := NewSignalfxJSONForwarer(*forwardTo.URL, *forwardTo.TimeoutDuration,
+		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads,
+		*forwardTo.DefaultSource, *forwardTo.SourceDimensions)
 
 	counter := &dpsink.Counter{}
 	dims := map[string]string{
@@ -88,9 +90,9 @@ func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo) (protoco
 }
 
 // NewSignalfxJSONForwarer creates a new JSON forwarder
-func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint32,
-	defaultAuthToken string, drainingThreads uint32, name string,
-	maxDrainSize uint32, defaultSource string, sourceDimensions string) *Forwarder {
+func NewSignalfxJSONForwarer(url string, timeout time.Duration,
+	defaultAuthToken string, drainingThreads uint32,
+	defaultSource string, sourceDimensions string) *Forwarder {
 	tr := &http.Transport{
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 		MaxIdleConnsPerHost:   int(drainingThreads) * 2,
@@ -107,9 +109,8 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint3
 		client: &http.Client{
 			Transport: tr,
 		},
-		connectionTimeout: timeout,
-		protoMarshal:      proto.Marshal,
-		defaultSource:     defaultSource,
+		protoMarshal:  proto.Marshal,
+		defaultSource: defaultSource,
 		// sf_source is always a dimension that can be a source
 		dimensionSources: append([]string{"sf_source"}, strings.Split(sourceDimensions, ",")...),
 	}
@@ -201,8 +202,34 @@ func runeFilterMap(r rune) rune {
 	return '_'
 }
 
+// Endpoint sets where metrics are sent
+func (connector *Forwarder) Endpoint(endpoint string) {
+	connector.propertyLock.Lock()
+	defer connector.propertyLock.Unlock()
+	connector.url = endpoint
+}
+
+// UserAgent sets the User-Agent header on the request
+func (connector *Forwarder) UserAgent(ua string) {
+	connector.propertyLock.Lock()
+	defer connector.propertyLock.Unlock()
+	connector.userAgent = ua
+}
+
+// AuthToken identifies who is sending the request
+func (connector *Forwarder) AuthToken(authToken string) {
+	connector.propertyLock.Lock()
+	defer connector.propertyLock.Unlock()
+	connector.defaultAuthToken = authToken
+}
+
+// TokenHeaderName is the header key for the auth token in the HTTP request
+const TokenHeaderName = "X-SF-TOKEN"
+
 // AddDatapoints forwards datapoints to SignalFx
 func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*datapoint.Datapoint) error {
+	connector.propertyLock.Lock()
+	defer connector.propertyLock.Unlock()
 	jsonBytes, bodyType, err := connector.encodePostBodyProtobufV2(datapoints)
 
 	if err != nil {
@@ -211,7 +238,7 @@ func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*dat
 	}
 	req, _ := http.NewRequest("POST", connector.url, bytes.NewBuffer(jsonBytes))
 	req.Header.Set("Content-Type", bodyType)
-	req.Header.Set("X-SF-TOKEN", connector.defaultAuthToken)
+	req.Header.Set(TokenHeaderName, connector.defaultAuthToken)
 	req.Header.Set("User-Agent", connector.userAgent)
 
 	req.Header.Set("Connection", "Keep-Alive")
