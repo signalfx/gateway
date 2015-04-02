@@ -99,6 +99,7 @@ func init() {
 	flag.BoolVar(&proxyCommandLineConfigurationDefault.logJSON, "logjson", false, "deprecated: Use config file instead...  Log in JSON format (usable with logstash)")
 
 	proxyCommandLineConfigurationDefault.stopChannel = make(chan bool)
+	proxyCommandLineConfigurationDefault.ctx = context.Background()
 	proxyCommandLineConfigurationDefault.closeWhenWaitingToStopChannel = make(chan struct{})
 }
 
