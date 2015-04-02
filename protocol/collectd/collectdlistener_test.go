@@ -183,6 +183,25 @@ func TestCollectDListenerWithQueryParams(t *testing.T) {
 
 func BenchmarkCollectdListener(b *testing.B) {
 	bytes := int64(0)
+	smallCollectdBody := `[
+    {
+        "dsnames": [
+            "shortterm"
+        ],
+        "dstypes": [
+            "gauge"
+        ],
+        "host": "i-b13d1e5f",
+        "interval": 10.0,
+        "plugin": "load",
+        "plugin_instance": "",
+        "time": 1415062577.4960001,
+        "type": "load",
+        "type_instance": "",
+        "values": [
+            0.76000000000000001
+        ]
+    }]`
 
 	sendTo := dptest.NewBasicSink()
 	sendTo.PointsChan = make(chan []*datapoint.Datapoint, 2)
@@ -196,7 +215,7 @@ func BenchmarkCollectdListener(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		writter := httptest.NewRecorder()
-		body := strings.NewReader(testCollectdBody)
+		body := strings.NewReader(smallCollectdBody)
 		req, _ := http.NewRequest("GET", "http://example.com/collectd", body)
 		req.Header.Add("Content-type", "application/json")
 		b.StartTimer()
@@ -204,7 +223,7 @@ func BenchmarkCollectdListener(b *testing.B) {
 		b.StopTimer()
 		bytes += int64(len(testCollectdBody))
 		item := <-sendTo.PointsChan
-		assert.Equal(b, 5, len(item))
+		assert.Equal(b, 1, len(item))
 	}
 	b.SetBytes(bytes)
 }
