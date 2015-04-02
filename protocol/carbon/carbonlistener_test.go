@@ -52,6 +52,8 @@ func TestCarbonHandleConnection(t *testing.T) {
 	conn, err := net.Dial("tcp", listeningDialAddress)
 	assert.NoError(t, err)
 	conn.Close()
+	// Drain for the next read
+	conn.Read(make([]byte, 100))
 	assert.Error(t, listener.handleConnection(conn))
 
 }

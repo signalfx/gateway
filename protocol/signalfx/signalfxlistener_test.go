@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"code.google.com/p/goprotobuf/proto"
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
+	"github.com/golang/protobuf/proto"
+	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/metricproxy/config"
 
 	"github.com/signalfx/metricproxy/datapoint"
@@ -120,7 +120,7 @@ func TestSignalfxJSONV1Decoder(t *testing.T) {
 	assert.Error(t, e)
 }
 
-func oldBodyDp(dp *com_signalfuse_metrics_protobuf.DataPoint) io.Reader {
+func oldBodyDp(dp *com_signalfx_metrics_protobuf.DataPoint) io.Reader {
 	dpInBytes, _ := proto.Marshal(dp)
 	varintBytes := proto.EncodeVarint(uint64(len(dpInBytes)))
 	body := bytes.NewBuffer(append(varintBytes, dpInBytes...))
@@ -130,10 +130,10 @@ func oldBodyDp(dp *com_signalfuse_metrics_protobuf.DataPoint) io.Reader {
 func TestSignalfxProtobufV1Handler(t *testing.T) {
 	listener, channel, baseURI := localSetup(t)
 	defer listener.Close()
-	protoDatapoint := &com_signalfuse_metrics_protobuf.DataPoint{
+	protoDatapoint := &com_signalfx_metrics_protobuf.DataPoint{
 		Source: workarounds.GolangDoesnotAllowPointerToStringLiteral("asource"),
 		Metric: workarounds.GolangDoesnotAllowPointerToStringLiteral("ametric4"),
-		Value:  &com_signalfuse_metrics_protobuf.Datum{IntValue: workarounds.GolangDoesnotAllowPointerToIntLiteral(2)},
+		Value:  &com_signalfx_metrics_protobuf.Datum{IntValue: workarounds.GolangDoesnotAllowPointerToIntLiteral(2)},
 	}
 	// Test int body
 	body := oldBodyDp(protoDatapoint)
@@ -144,7 +144,7 @@ func TestSignalfxProtobufV1Decoder(t *testing.T) {
 	defer log.SetLevel(log.GetLevel())
 	log.SetLevel(log.DebugLevel)
 	typeGetter := metricHandler{
-		metricCreationsMap: make(map[string]com_signalfuse_metrics_protobuf.MetricType),
+		metricCreationsMap: make(map[string]com_signalfx_metrics_protobuf.MetricType),
 	}
 	sendTo := dptest.NewBasicSink()
 	ctx := context.Background()
@@ -253,13 +253,13 @@ func TestSignalfxProtoV2Handler(t *testing.T) {
 	listener, channel, baseURI := localSetup(t)
 	defer listener.Close()
 
-	protoDatapoint := &com_signalfuse_metrics_protobuf.DataPoint{
+	protoDatapoint := &com_signalfx_metrics_protobuf.DataPoint{
 		Source: workarounds.GolangDoesnotAllowPointerToStringLiteral("asource"),
 		Metric: workarounds.GolangDoesnotAllowPointerToStringLiteral("ametric4"),
-		Value:  &com_signalfuse_metrics_protobuf.Datum{IntValue: workarounds.GolangDoesnotAllowPointerToIntLiteral(2)},
+		Value:  &com_signalfx_metrics_protobuf.Datum{IntValue: workarounds.GolangDoesnotAllowPointerToIntLiteral(2)},
 	}
-	uploadMsg := &com_signalfuse_metrics_protobuf.DataPointUploadMessage{
-		Datapoints: []*com_signalfuse_metrics_protobuf.DataPoint{protoDatapoint},
+	uploadMsg := &com_signalfx_metrics_protobuf.DataPointUploadMessage{
+		Datapoints: []*com_signalfx_metrics_protobuf.DataPoint{protoDatapoint},
 	}
 	dpInBytes, _ := proto.Marshal(uploadMsg)
 	body := bytes.NewBuffer(dpInBytes)
@@ -268,11 +268,11 @@ func TestSignalfxProtoV2Handler(t *testing.T) {
 
 func TestMetricHandler(t *testing.T) {
 	handler := metricHandler{
-		metricCreationsMap: make(map[string]com_signalfuse_metrics_protobuf.MetricType),
+		metricCreationsMap: make(map[string]com_signalfx_metrics_protobuf.MetricType),
 	}
-	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_GAUGE, handler.GetMetricTypeFromMap("test"))
-	handler.metricCreationsMap["test"] = com_signalfuse_metrics_protobuf.MetricType_COUNTER
-	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_COUNTER, handler.GetMetricTypeFromMap("test"))
+	assert.Equal(t, com_signalfx_metrics_protobuf.MetricType_GAUGE, handler.GetMetricTypeFromMap("test"))
+	handler.metricCreationsMap["test"] = com_signalfx_metrics_protobuf.MetricType_COUNTER
+	assert.Equal(t, com_signalfx_metrics_protobuf.MetricType_COUNTER, handler.GetMetricTypeFromMap("test"))
 
 	// Testing OK write
 	rw := httptest.NewRecorder()
@@ -312,7 +312,7 @@ func TestMetricHandler(t *testing.T) {
 	handler.ServeHTTP(rw, req)
 	assert.Equal(t, rw.Code, http.StatusOK)
 
-	assert.Equal(t, com_signalfuse_metrics_protobuf.MetricType_COUNTER, handler.GetMetricTypeFromMap("ametric"))
+	assert.Equal(t, com_signalfx_metrics_protobuf.MetricType_COUNTER, handler.GetMetricTypeFromMap("ametric"))
 
 	rw = httptest.NewRecorder()
 	handler.jsonMarshal = func(v interface{}) ([]byte, error) {

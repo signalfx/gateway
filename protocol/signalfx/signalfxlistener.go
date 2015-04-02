@@ -14,12 +14,12 @@ import (
 
 	"errors"
 
-	"code.google.com/p/goprotobuf/proto"
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
+	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
+	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/datapoint"
 	"github.com/signalfx/metricproxy/datapoint/dpsink"
@@ -47,7 +47,7 @@ func (streamer *ListenerServer) Close() error {
 
 // MericTypeGetter is an old metric interface that returns the type of a metric name
 type MericTypeGetter interface {
-	GetMetricTypeFromMap(metricName string) com_signalfuse_metrics_protobuf.MetricType
+	GetMetricTypeFromMap(metricName string) com_signalfx_metrics_protobuf.MetricType
 }
 
 // ErrorReader are datapoint streamers that read from a HTTP request and return errors if
@@ -133,7 +133,7 @@ func (decoder *protobufDecoderV1) Read(ctx context.Context, req *http.Request) e
 		if err != nil {
 			return fmt.Errorf("unable to fully read protobuf message: %s", err)
 		}
-		var msg com_signalfuse_metrics_protobuf.DataPoint
+		var msg com_signalfx_metrics_protobuf.DataPoint
 		err = proto.Unmarshal(buf, &msg)
 		if err != nil {
 			return err
@@ -193,7 +193,7 @@ func (decoder *protobufDecoderV2) Read(ctx context.Context, req *http.Request) e
 		log.WithField("err", err).WithField("len", readLen).WithField("content-len", req.ContentLength).Warn("Unable to fully read from buffer")
 		return err
 	}
-	var msg com_signalfuse_metrics_protobuf.DataPointUploadMessage
+	var msg com_signalfx_metrics_protobuf.DataPointUploadMessage
 	err = proto.Unmarshal(buf, &msg)
 	if err != nil {
 		log.Debug("Unable to unmarshal")
@@ -201,7 +201,7 @@ func (decoder *protobufDecoderV2) Read(ctx context.Context, req *http.Request) e
 	}
 	dps := make([]*datapoint.Datapoint, 0, len(msg.GetDatapoints()))
 	for _, protoDb := range msg.GetDatapoints() {
-		dps = append(dps, NewProtobufDataPointWithType(protoDb, com_signalfuse_metrics_protobuf.MetricType_GAUGE))
+		dps = append(dps, NewProtobufDataPointWithType(protoDb, com_signalfx_metrics_protobuf.MetricType_GAUGE))
 	}
 	log.Debug("Ready to forward")
 	return decoder.sink.AddDatapoints(ctx, dps)
@@ -220,7 +220,7 @@ func (decoder *jsonDecoderV2) Read(ctx context.Context, req *http.Request) error
 	log.WithField("jsonpoint_v2", d).Debug("Got a new point")
 	dps := make([]*datapoint.Datapoint, 0, 5)
 	for metricType, datapoints := range d {
-		mt, ok := com_signalfuse_metrics_protobuf.MetricType_value[strings.ToUpper(metricType)]
+		mt, ok := com_signalfx_metrics_protobuf.MetricType_value[strings.ToUpper(metricType)]
 		if !ok {
 			log.WithField("metricType", metricType).Warn("Unknown metric type")
 			continue
@@ -230,7 +230,7 @@ func (decoder *jsonDecoderV2) Read(ctx context.Context, req *http.Request) error
 			if err != nil {
 				log.WithField("err", err).Warn("Unable to get value for datapoint")
 			} else {
-				dp := datapoint.New(jsonDatapoint.Metric, jsonDatapoint.Dimensions, v, fromMT(com_signalfuse_metrics_protobuf.MetricType(mt)), fromTs(jsonDatapoint.Timestamp))
+				dp := datapoint.New(jsonDatapoint.Metric, jsonDatapoint.Dimensions, v, fromMT(com_signalfx_metrics_protobuf.MetricType(mt)), fromTs(jsonDatapoint.Timestamp))
 				dps = append(dps, dp)
 			}
 		}
@@ -257,7 +257,7 @@ type jsonMarshalStub func(v interface{}) ([]byte, error)
 
 type metricHandler struct {
 	metricCreationsMapMutex sync.Mutex
-	metricCreationsMap      map[string]com_signalfuse_metrics_protobuf.MetricType
+	metricCreationsMap      map[string]com_signalfx_metrics_protobuf.MetricType
 	jsonMarshal             jsonMarshalStub
 }
 
@@ -275,13 +275,13 @@ func (handler *metricHandler) ServeHTTP(writter http.ResponseWriter, req *http.R
 	defer handler.metricCreationsMapMutex.Unlock()
 	ret := []MetricCreationResponse{}
 	for _, m := range d {
-		metricType, ok := com_signalfuse_metrics_protobuf.MetricType_value[m.MetricType]
+		metricType, ok := com_signalfx_metrics_protobuf.MetricType_value[m.MetricType]
 		if !ok {
 			writter.WriteHeader(http.StatusBadRequest)
 			writter.Write([]byte(`{msg:"Invalid metric type"}`))
 			return
 		}
-		handler.metricCreationsMap[m.MetricName] = com_signalfuse_metrics_protobuf.MetricType(metricType)
+		handler.metricCreationsMap[m.MetricName] = com_signalfx_metrics_protobuf.MetricType(metricType)
 		ret = append(ret, MetricCreationResponse{Code: 409})
 	}
 	unmarshal := handler.jsonMarshal
@@ -299,12 +299,12 @@ func (handler *metricHandler) ServeHTTP(writter http.ResponseWriter, req *http.R
 	writter.Write([]byte(toWrite))
 }
 
-func (handler *metricHandler) GetMetricTypeFromMap(metricName string) com_signalfuse_metrics_protobuf.MetricType {
+func (handler *metricHandler) GetMetricTypeFromMap(metricName string) com_signalfx_metrics_protobuf.MetricType {
 	handler.metricCreationsMapMutex.Lock()
 	defer handler.metricCreationsMapMutex.Unlock()
 	mt, ok := handler.metricCreationsMap[metricName]
 	if !ok {
-		return com_signalfuse_metrics_protobuf.MetricType_GAUGE
+		return com_signalfx_metrics_protobuf.MetricType_GAUGE
 	}
 	return mt
 }
@@ -333,7 +333,7 @@ func StartServingHTTPOnPort(ctx context.Context, sink dpsink.Sink, listenAddr st
 	}
 
 	metricHandler := metricHandler{
-		metricCreationsMap: make(map[string]com_signalfuse_metrics_protobuf.MetricType),
+		metricCreationsMap: make(map[string]com_signalfx_metrics_protobuf.MetricType),
 	}
 	r.Handle("/v1/metric", &metricHandler)
 	r.Handle("/metric", &metricHandler)

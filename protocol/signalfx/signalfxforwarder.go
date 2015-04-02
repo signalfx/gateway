@@ -14,11 +14,11 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
-	"code.google.com/p/goprotobuf/proto"
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/signalfuse/com_signalfuse_metrics_protobuf"
+	"github.com/golang/protobuf/proto"
+	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/datapoint"
 	"github.com/signalfx/metricproxy/datapoint/dpbuffered"
@@ -117,11 +117,11 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration, bufferSize uint3
 }
 
 func (connector *Forwarder) encodePostBodyProtobufV2(datapoints []*datapoint.Datapoint) ([]byte, string, error) {
-	dps := make([]*com_signalfuse_metrics_protobuf.DataPoint, 0, len(datapoints))
+	dps := make([]*com_signalfx_metrics_protobuf.DataPoint, 0, len(datapoints))
 	for _, dp := range datapoints {
 		dps = append(dps, connector.coreDatapointToProtobuf(dp))
 	}
-	msg := &com_signalfuse_metrics_protobuf.DataPointUploadMessage{
+	msg := &com_signalfx_metrics_protobuf.DataPointUploadMessage{
 		Datapoints: dps,
 	}
 	protobytes, err := connector.protoMarshal(msg)
@@ -130,17 +130,17 @@ func (connector *Forwarder) encodePostBodyProtobufV2(datapoints []*datapoint.Dat
 	return protobytes, "application/x-protobuf", err
 }
 
-func datumForPoint(pv datapoint.Value) *com_signalfuse_metrics_protobuf.Datum {
+func datumForPoint(pv datapoint.Value) *com_signalfx_metrics_protobuf.Datum {
 	switch t := pv.(type) {
 	case datapoint.IntValue:
 		x := t.Int()
-		return &com_signalfuse_metrics_protobuf.Datum{IntValue: &x}
+		return &com_signalfx_metrics_protobuf.Datum{IntValue: &x}
 	case datapoint.FloatValue:
 		x := t.Float()
-		return &com_signalfuse_metrics_protobuf.Datum{DoubleValue: &x}
+		return &com_signalfx_metrics_protobuf.Datum{DoubleValue: &x}
 	default:
 		x := t.String()
-		return &com_signalfuse_metrics_protobuf.Datum{StrValue: &x}
+		return &com_signalfx_metrics_protobuf.Datum{StrValue: &x}
 	}
 }
 
@@ -154,12 +154,12 @@ func (connector *Forwarder) figureOutReasonableSource(point *datapoint.Datapoint
 	return connector.defaultSource
 }
 
-func (connector *Forwarder) coreDatapointToProtobuf(point *datapoint.Datapoint) *com_signalfuse_metrics_protobuf.DataPoint {
+func (connector *Forwarder) coreDatapointToProtobuf(point *datapoint.Datapoint) *com_signalfx_metrics_protobuf.DataPoint {
 	thisPointSource := connector.figureOutReasonableSource(point)
 	m := point.Metric
 	ts := point.Timestamp.UnixNano() / time.Millisecond.Nanoseconds()
 	mt := toMT(point.MetricType)
-	v := &com_signalfuse_metrics_protobuf.DataPoint{
+	v := &com_signalfx_metrics_protobuf.DataPoint{
 		Metric:     &m,
 		Timestamp:  &ts,
 		Value:      datumForPoint(point.Value),
@@ -172,8 +172,8 @@ func (connector *Forwarder) coreDatapointToProtobuf(point *datapoint.Datapoint) 
 	return v
 }
 
-func mapToDimensions(dimensions map[string]string) []*com_signalfuse_metrics_protobuf.Dimension {
-	ret := make([]*com_signalfuse_metrics_protobuf.Dimension, 0, len(dimensions))
+func mapToDimensions(dimensions map[string]string) []*com_signalfx_metrics_protobuf.Dimension {
+	ret := make([]*com_signalfx_metrics_protobuf.Dimension, 0, len(dimensions))
 	for k, v := range dimensions {
 		if k == "" || v == "" {
 			continue
@@ -182,7 +182,7 @@ func mapToDimensions(dimensions map[string]string) []*com_signalfuse_metrics_pro
 		// of k and v because their content changes as the range iterates
 		copyOfK := filterSignalfxKey(string([]byte(k)))
 		copyOfV := (string([]byte(v)))
-		ret = append(ret, (&com_signalfuse_metrics_protobuf.Dimension{
+		ret = append(ret, (&com_signalfx_metrics_protobuf.Dimension{
 			Key:   &copyOfK,
 			Value: &copyOfV,
 		}))

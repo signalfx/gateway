@@ -11,9 +11,9 @@ import (
 	"runtime/debug"
 	"time"
 
-	"code.google.com/p/goprotobuf/proto"
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/workarounds"
+	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/datapoint"
 	"github.com/signalfx/metricproxy/nettest"
