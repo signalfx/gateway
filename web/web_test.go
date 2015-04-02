@@ -8,9 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"sync/atomic"
+
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
-	"sync/atomic"
 )
 
 type IncrHandler struct {
