@@ -23,7 +23,12 @@ rm -rf /opt/sfproxy
 rm -f /etc/init.d/metricproxy
 mkdir -p /opt/sfproxy
 cd /opt/sfproxy
-env GOPATH="$(pwd)" go get -u github.com/signalfx/metricproxy
+env GOPATH="$(pwd)" go get github.com/tools/godep
+env GOPATH="$(pwd)" go get github.com/signalfx/metricproxy
+
+cd /opt/sfproxy/github.com/signalfx/metricproxy
+env GOPATH="/opt/sfproxy" godep go install
+
 ln -s /opt/sfproxy/src/github.com/signalfx/metricproxy/metricproxy /etc/init.d/metricproxy
 if [ ! -f /opt/sfproxy/bin/metricproxy ]; then
     echo "Unable to install proxy"

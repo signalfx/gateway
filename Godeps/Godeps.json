@@ -1,0 +1,63 @@
+{
+	"ImportPath": "github.com/signalfx/metricproxy",
+	"GoVersion": "go1.4.2",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.6.6-2-g2cea0f0",
+			"Rev": "2cea0f0d141f56fae06df5b813ec4119d1c8ccbd"
+		},
+		{
+			"ImportPath": "github.com/cep21/gohelpers/stringhelper",
+			"Rev": "d3ee852b1e356176307fba740a0343703db39d46"
+		},
+		{
+			"ImportPath": "github.com/cep21/gohelpers/structdefaults",
+			"Rev": "d3ee852b1e356176307fba740a0343703db39d46"
+		},
+		{
+			"ImportPath": "github.com/cep21/gohelpers/workarounds",
+			"Rev": "d3ee852b1e356176307fba740a0343703db39d46"
+		},
+		{
+			"ImportPath": "github.com/cep21/xdgbasedir",
+			"Rev": "4afd84c6661f1f571276dd1dc2944ffd21745b6a"
+		},
+		{
+			"ImportPath": "github.com/golang/glog",
+			"Rev": "44145f04b68cf362d9c4df2182967c2275eaefed"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/proto",
+			"Rev": "655cdfa588ea190e901bc5590e65d5621688847c"
+		},
+		{
+			"ImportPath": "github.com/gorilla/context",
+			"Rev": "215affda49addc4c8ef7e2534915df2c8c35c6cd"
+		},
+		{
+			"ImportPath": "github.com/gorilla/mux",
+			"Rev": "8096f47503459bcc74d1f4c487b7e6e42e5746b5"
+		},
+		{
+			"ImportPath": "github.com/signalfx/com_signalfx_metrics_protobuf",
+			"Rev": "3f07c0108fbfbcf93508e4ab61a080953136fdf9"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/assert",
+			"Rev": "d6577e08ec30538639ac0ea38b562b6f250e9055"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "7dbad50ab5b31073856416cdcfeb2796d682f844"
+		},
+		{
+			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",
+			"Comment": "v1.0-12-gd28785c",
+			"Rev": "d28785c2f27cd682d872df46ccd8232843629f54"
+		}
+	]
+}
