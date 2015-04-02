@@ -78,7 +78,7 @@ func (forwarder *BufferedForwarder) Stats(dimensions map[string]string) []*datap
 		datapoint.Gauge,
 		dimensions))
 	ret = append(ret, datapoint.NewOnHostDatapointDimensions(
-		"datapoint_chan_size",
+		"datapoint_backup_size",
 		datapoint.NewIntValue(atomic.LoadInt64(&forwarder.stats.totalDatapointsBuffered)),
 		datapoint.Gauge,
 		dimensions))
