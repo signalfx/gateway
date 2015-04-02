@@ -10,23 +10,24 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
+	"sync/atomic"
 )
 
 type IncrHandler struct {
-	before int
-	after  int
+	before int64
+	after  int64
 }
 
 func (i *IncrHandler) ServeHTTPCN(ctx context.Context, rw http.ResponseWriter, r *http.Request, next ContextHandler) {
-	i.before++
+	atomic.AddInt64(&i.before, 1)
 	next.ServeHTTPC(ctx, rw, r)
-	i.after++
+	atomic.AddInt64(&i.after, 1)
 }
 
 func (i *IncrHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.Handler) {
-	i.before++
+	atomic.AddInt64(&i.before, 1)
 	next.ServeHTTP(rw, r)
-	i.after++
+	atomic.AddInt64(&i.after, 1)
 }
 
 func (i *IncrHandler) makeHTTP(next http.Handler) http.Handler {
