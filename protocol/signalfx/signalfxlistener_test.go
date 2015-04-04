@@ -206,7 +206,7 @@ func TestSignalfxProtobufV1Decoder(t *testing.T) {
 }
 
 func TestSignalfxJSONV2Decoder(t *testing.T) {
-	decoder := jsonDecoderV2{}
+	decoder := JsonDecoderV2{}
 	req := &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBuffer([]byte("INVALID_JSON"))),
 	}
@@ -226,7 +226,7 @@ func TestSignalfxJsonV2Handler(t *testing.T) {
 }
 
 func TestSignalfxProtoV2Decoder(t *testing.T) {
-	decoder := protobufDecoderV2{}
+	decoder := ProtobufDecoderV2{}
 	req := &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBufferString("")),
 	}

@@ -53,7 +53,7 @@ const sfxDimQueryParamPrefix string = "sfxdim_"
 
 // ServeHTTPC decodes datapoints for the connection and sends them to the decoder's sink
 func (decoder *JSONDecoder) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, req *http.Request) {
-	err := decoder.resolve(ctx, req)
+	err := decoder.Read(ctx, req)
 	if err != nil {
 		atomic.AddInt64(&decoder.TotalErrors, 1)
 		rw.WriteHeader(http.StatusBadRequest)
@@ -63,7 +63,7 @@ func (decoder *JSONDecoder) ServeHTTPC(ctx context.Context, rw http.ResponseWrit
 	rw.Write([]byte(`"OK"`))
 }
 
-func (decoder *JSONDecoder) resolve(ctx context.Context, req *http.Request) error {
+func (decoder *JSONDecoder) Read(ctx context.Context, req *http.Request) error {
 	defaultDims := decoder.defaultDims(req)
 	var d JSONWriteBody
 	err := json.NewDecoder(req.Body).Decode(&d)

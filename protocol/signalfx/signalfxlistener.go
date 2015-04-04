@@ -71,8 +71,8 @@ func (e *ErrorTrackerHandler) Stats(dimensions map[string]string) []*datapoint.D
 			datapoint.Counter,
 			dimensions),
 	}
-}
 
+}
 // ServeHTTPC will serve the wrapped ErrorReader and return the error (if any) to rw if ErrorReader
 // fails
 func (e *ErrorTrackerHandler) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, req *http.Request) {
@@ -175,13 +175,13 @@ func (decoder *jsonDecoderV1) Read(ctx context.Context, req *http.Request) error
 	return nil
 }
 
-type protobufDecoderV2 struct {
-	sink dpsink.Sink
+type ProtobufDecoderV2 struct {
+	Sink dpsink.Sink
 }
 
-var errInvalidContentLength = errors.New("invalid Content Length")
+var errInvalidContentLength = errors.New("invalid Content-Length")
 
-func (decoder *protobufDecoderV2) Read(ctx context.Context, req *http.Request) error {
+func (decoder *ProtobufDecoderV2) Read(ctx context.Context, req *http.Request) error {
 	if req.ContentLength == -1 {
 		return errInvalidContentLength
 	}
@@ -204,14 +204,14 @@ func (decoder *protobufDecoderV2) Read(ctx context.Context, req *http.Request) e
 		dps = append(dps, NewProtobufDataPointWithType(protoDb, com_signalfx_metrics_protobuf.MetricType_GAUGE))
 	}
 	log.Debug("Ready to forward")
-	return decoder.sink.AddDatapoints(ctx, dps)
+	return decoder.Sink.AddDatapoints(ctx, dps)
 }
 
-type jsonDecoderV2 struct {
-	sink dpsink.Sink
+type JsonDecoderV2 struct {
+	Sink dpsink.Sink
 }
 
-func (decoder *jsonDecoderV2) Read(ctx context.Context, req *http.Request) error {
+func (decoder *JsonDecoderV2) Read(ctx context.Context, req *http.Request) error {
 	dec := json.NewDecoder(req.Body)
 	var d JSONDatapointV2
 	if err := dec.Decode(&d); err != nil {
@@ -235,7 +235,7 @@ func (decoder *jsonDecoderV2) Read(ctx context.Context, req *http.Request) error
 			}
 		}
 	}
-	return decoder.sink.AddDatapoints(ctx, dps)
+	return decoder.Sink.AddDatapoints(ctx, dps)
 }
 
 var defaultConfig = &config.ListenFrom{
@@ -399,28 +399,41 @@ func setupJSONV1(r *mux.Router, ctx context.Context, name string, sink dpsink.Si
 
 func setupProtobufV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink) stats.Keeper {
 	handler, st := setupChain(ctx, sink, name, "protobuf_v2", func(s dpsink.Sink) ErrorReader {
-		return &protobufDecoderV2{sink: s}
+		return &ProtobufDecoderV2{Sink: s}
 	})
-	log.Debug("Setting up proto v2")
-	r.Path("/v2/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
+	SetupProtobufV2Paths(r, handler)
+
 
 	return st
+}
+
+func SetupProtobufV2Paths(r *mux.Router, handler http.Handler) {
+	log.Debug("Setting up proto v2")
+	r.Path("/v2/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
 }
 
 func setupJSONV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink) stats.Keeper {
 	handler, st := setupChain(ctx, sink, name, "json_v2", func(s dpsink.Sink) ErrorReader {
-		return &jsonDecoderV2{sink: s}
+		return &JsonDecoderV2{Sink: s}
 	})
+	SetupJSONV2Paths(r, handler)
+	return st
+}
 
+func SetupJSONV2Paths(r *mux.Router, handler http.Handler) {
 	r.Path("/v2/datapoint").Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
 	r.Path("/v2/datapoint").Methods("POST").Headers("Content-Type", "").HandlerFunc(invalidContentType)
 	r.Path("/v2/datapoint").Methods("POST").Handler(handler)
-	return st
 }
 
 func setupCollectd(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink) stats.Keeper {
 	h, st := collectd.SetupHandler(ctx, name, sink)
-	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "application/json").Handler(h)
-	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "").HandlerFunc(invalidContentType)
+	SetupCollectdPaths(r, h)
 	return st
+}
+
+
+func SetupCollectdPaths(r *mux.Router, handler http.Handler) {
+	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
+	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "").HandlerFunc(invalidContentType)
 }
