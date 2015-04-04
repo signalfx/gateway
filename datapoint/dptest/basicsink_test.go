@@ -47,3 +47,14 @@ func TestNext(t *testing.T) {
 		b.Next()
 	})
 }
+
+func TestResize(t *testing.T) {
+	b := NewBasicSink()
+	assert.Equal(t, 0, cap(b.PointsChan))
+	b.Resize(1)
+	assert.Equal(t, 1, cap(b.PointsChan))
+	b.PointsChan <- []*datapoint.Datapoint{}
+	assert.Panics(t, func() {
+		b.Resize(0)
+	})
+}

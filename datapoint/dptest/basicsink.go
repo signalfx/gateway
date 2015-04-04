@@ -28,11 +28,10 @@ func (f *BasicSink) Next() *datapoint.Datapoint {
 // AddDatapoints buffers the point on an internal chan or returns errors if RetErr is set
 func (f *BasicSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
 	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.RetErr != nil {
-		defer f.mu.Unlock()
 		return f.RetErr
 	}
-	f.mu.Unlock()
 	select {
 	case f.PointsChan <- points:
 		return nil
@@ -46,6 +45,16 @@ func (f *BasicSink) RetError(err error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.RetErr = err
+}
+
+// Resize the internal chan of points sent here
+func (f *BasicSink) Resize(size int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.PointsChan) != 0 {
+		panic("can only resize when empty")
+	}
+	f.PointsChan = make(chan []*datapoint.Datapoint, size)
 }
 
 // NewBasicSink creates a BasicSink with an unbuffered chan.  Note, calls to AddDatapoints will then

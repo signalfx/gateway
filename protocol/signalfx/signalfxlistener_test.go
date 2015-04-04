@@ -206,7 +206,7 @@ func TestSignalfxProtobufV1Decoder(t *testing.T) {
 }
 
 func TestSignalfxJSONV2Decoder(t *testing.T) {
-	decoder := JsonDecoderV2{}
+	decoder := JSONDecoderV2{}
 	req := &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBuffer([]byte("INVALID_JSON"))),
 	}

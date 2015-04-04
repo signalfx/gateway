@@ -73,6 +73,7 @@ func (e *ErrorTrackerHandler) Stats(dimensions map[string]string) []*datapoint.D
 	}
 
 }
+
 // ServeHTTPC will serve the wrapped ErrorReader and return the error (if any) to rw if ErrorReader
 // fails
 func (e *ErrorTrackerHandler) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, req *http.Request) {
@@ -175,6 +176,7 @@ func (decoder *jsonDecoderV1) Read(ctx context.Context, req *http.Request) error
 	return nil
 }
 
+// ProtobufDecoderV2 decodes protocol buffers in signalfx's v2 format and sends them to Sink
 type ProtobufDecoderV2 struct {
 	Sink dpsink.Sink
 }
@@ -207,11 +209,12 @@ func (decoder *ProtobufDecoderV2) Read(ctx context.Context, req *http.Request) e
 	return decoder.Sink.AddDatapoints(ctx, dps)
 }
 
-type JsonDecoderV2 struct {
+// JSONDecoderV2 decodes v2 json data for signalfx and sends it to Sink
+type JSONDecoderV2 struct {
 	Sink dpsink.Sink
 }
 
-func (decoder *JsonDecoderV2) Read(ctx context.Context, req *http.Request) error {
+func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error {
 	dec := json.NewDecoder(req.Body)
 	var d JSONDatapointV2
 	if err := dec.Decode(&d); err != nil {
@@ -403,10 +406,11 @@ func setupProtobufV2(r *mux.Router, ctx context.Context, name string, sink dpsin
 	})
 	SetupProtobufV2Paths(r, handler)
 
-
 	return st
 }
 
+// SetupProtobufV2Paths tells the router which paths the given handler (which should handle v2 protobufs)
+// should see
 func SetupProtobufV2Paths(r *mux.Router, handler http.Handler) {
 	log.Debug("Setting up proto v2")
 	r.Path("/v2/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
@@ -414,12 +418,14 @@ func SetupProtobufV2Paths(r *mux.Router, handler http.Handler) {
 
 func setupJSONV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink) stats.Keeper {
 	handler, st := setupChain(ctx, sink, name, "json_v2", func(s dpsink.Sink) ErrorReader {
-		return &JsonDecoderV2{Sink: s}
+		return &JSONDecoderV2{Sink: s}
 	})
 	SetupJSONV2Paths(r, handler)
 	return st
 }
 
+// SetupJSONV2Paths tells the router which paths the given handler (which should handle v2 JSON)
+// should see
 func SetupJSONV2Paths(r *mux.Router, handler http.Handler) {
 	r.Path("/v2/datapoint").Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
 	r.Path("/v2/datapoint").Methods("POST").Headers("Content-Type", "").HandlerFunc(invalidContentType)
@@ -432,7 +438,8 @@ func setupCollectd(r *mux.Router, ctx context.Context, name string, sink dpsink.
 	return st
 }
 
-
+// SetupCollectdPaths tells the router which paths the given handler (which should handle collectd json)
+// should see
 func SetupCollectdPaths(r *mux.Router, handler http.Handler) {
 	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
 	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "").HandlerFunc(invalidContentType)
