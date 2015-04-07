@@ -19,11 +19,6 @@ type Counter struct {
 	CallsInFlight      int64
 }
 
-type counterSink struct {
-	parent    *Counter
-	forwardTo Sink
-}
-
 // Stats related to this c, including errors processing datapoints
 func (c *Counter) Stats(dimensions map[string]string) []*datapoint.Datapoint {
 	ret := make([]*datapoint.Datapoint, 0, 6)
@@ -81,16 +76,4 @@ func (c *Counter) AddDatapoints(ctx context.Context, points []*datapoint.Datapoi
 		log.WithField("err", err).Warn("Unable to process datapoints")
 	}
 	return err
-}
-
-// SinkMiddleware creates a sink that forwards points to the parameter sink
-func (c *Counter) SinkMiddleware(sendTo Sink) Sink {
-	return &counterSink{
-		parent:    c,
-		forwardTo: sendTo,
-	}
-}
-
-func (c *counterSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
-	return c.parent.AddDatapoints(ctx, points, c.forwardTo)
 }

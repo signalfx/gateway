@@ -18,8 +18,8 @@ func TestCounterSink(t *testing.T) {
 	}
 	ctx := context.Background()
 	bs := dptest.NewBasicSink()
-	count := Counter{}
-	middleSink := count.SinkMiddleware(bs)
+	count := &Counter{}
+	middleSink := NextWrap(count)(bs)
 	go func() {
 		// Allow time for us to get in the middle of a call
 		time.Sleep(time.Millisecond)

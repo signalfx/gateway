@@ -205,7 +205,6 @@ func (decoder *ProtobufDecoderV2) Read(ctx context.Context, req *http.Request) e
 	for _, protoDb := range msg.GetDatapoints() {
 		dps = append(dps, NewProtobufDataPointWithType(protoDb, com_signalfx_metrics_protobuf.MetricType_GAUGE))
 	}
-	log.Debug("Ready to forward")
 	return decoder.Sink.AddDatapoints(ctx, dps)
 }
 
@@ -220,8 +219,7 @@ func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error
 	if err := dec.Decode(&d); err != nil {
 		return err
 	}
-	log.WithField("jsonpoint_v2", d).Debug("Got a new point")
-	dps := make([]*datapoint.Datapoint, 0, 5)
+	dps := make([]*datapoint.Datapoint, 0, len(d))
 	for metricType, datapoints := range d {
 		mt, ok := com_signalfx_metrics_protobuf.MetricType_value[strings.ToUpper(metricType)]
 		if !ok {
@@ -361,7 +359,7 @@ func setupNotFoundHandler(r *mux.Router, ctx context.Context, name string) stats
 
 func setupChain(ctx context.Context, sink dpsink.Sink, name string, chainType string, getReader func(dpsink.Sink) ErrorReader) (*web.Handler, stats.Keeper) {
 	counter := &dpsink.Counter{}
-	finalSink := dpsink.FromChain(sink, counter.SinkMiddleware)
+	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
 	errReader := getReader(finalSink)
 	errorTracker := ErrorTrackerHandler{
 		reader: errReader,

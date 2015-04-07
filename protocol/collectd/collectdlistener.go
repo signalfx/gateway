@@ -156,11 +156,11 @@ func StartListeningCollectDHTTPOnPort(ctx context.Context, sink dpsink.Sink,
 // Will do shared basic setup like configuring request counters
 func SetupHandler(ctx context.Context, name string, sink dpsink.Sink) (*web.Handler, stats.Keeper) {
 	metricTracking := reqcounter.RequestCounter{}
-	counter := dpsink.Counter{}
+	counter := &dpsink.Counter{}
 	collectdDecoder := JSONDecoder{
-		SendTo: dpsink.FromChain(sink, counter.SinkMiddleware),
+		SendTo: dpsink.FromChain(sink, dpsink.NextWrap(counter)),
 	}
 	h := web.NewHandler(ctx, &collectdDecoder).Add(web.NextHTTP(metricTracking.ServeHTTP))
-	st := stats.ToKeeperMany(map[string]string{"listener": name, "type": "collectd"}, &metricTracking, &counter, &collectdDecoder)
+	st := stats.ToKeeperMany(map[string]string{"listener": name, "type": "collectd"}, &metricTracking, counter, &collectdDecoder)
 	return h, st
 }

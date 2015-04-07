@@ -55,7 +55,7 @@ func TestNoHost(t *testing.T) {
 func TestInvalidPort(t *testing.T) {
 
 	ft := config.ForwardTo{
-		Host: workarounds.GolangDoesnotAllowPointerToStringLiteral("invalid.port.address.should.not.bind"),
+		Host: workarounds.GolangDoesnotAllowPointerToStringLiteral("zzfbdsaj_)__@#$%.zzzzzzzzzzz"),
 		Port: workarounds.GolangDoesnotAllowPointerToUint16Literal(1),
 	}
 	_, err := ForwarderLoader(context.Background(), &ft)

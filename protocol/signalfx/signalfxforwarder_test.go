@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"runtime/debug"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -19,6 +18,8 @@ import (
 	"github.com/signalfx/metricproxy/nettest"
 
 	"net/http/httptest"
+
+	"errors"
 
 	"github.com/signalfx/metricproxy/datapoint/dptest"
 	"github.com/stretchr/testify/assert"
@@ -166,13 +167,14 @@ func TestDatumForPoint(t *testing.T) {
 }
 
 func TestConnectorProcessProtoError(t *testing.T) {
+	expectedErr := errors.New("marshal error")
 	f := Forwarder{
 		protoMarshal: func(pb proto.Message) ([]byte, error) {
-			return nil, fmt.Errorf("marshal error")
+			return nil, expectedErr
 		},
 	}
-	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{})
-	assert.Equal(t, "marshal error", err.Error())
+	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
+	assert.Equal(t, expectedErr, err.(*forwardError).originalError)
 }
 
 type roundTripTest func(r *http.Request) (*http.Response, error)
@@ -186,12 +188,11 @@ func TestClientReqError(t *testing.T) {
 		protoMarshal: proto.Marshal,
 		client: &http.Client{
 			Transport: roundTripTest(func(r *http.Request) (*http.Response, error) {
-				debug.PrintStack()
 				return nil, fmt.Errorf("unable to execute http request")
 			}),
 		},
 	}
-	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{})
+	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
 	assert.Contains(t, err.Error(), "unable to execute http request")
 }
 
@@ -214,8 +215,8 @@ func TestResponseBodyError(t *testing.T) {
 			}),
 		},
 	}
-	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{})
-	assert.Equal(t, "read error", err.Error())
+	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
+	assert.Equal(t, "read error", err.(*forwardError).originalError.Error())
 }
 
 func TestResponseBadStatus(t *testing.T) {
@@ -231,8 +232,15 @@ func TestResponseBadStatus(t *testing.T) {
 			}),
 		},
 	}
-	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{})
-	assert.Contains(t, err.Error(), "invalid status code")
+	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
+	assert.Contains(t, err.(*forwardError).originalError.Error(), "invalid status code")
+}
+
+func TestAllInvalid(t *testing.T) {
+	dp := dptest.DP()
+	dp.Metric = ""
+	f := Forwarder{}
+	assert.NoError(t, f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dp}))
 }
 
 func TestResponseBadJSON(t *testing.T) {
@@ -248,8 +256,8 @@ func TestResponseBadJSON(t *testing.T) {
 			}),
 		},
 	}
-	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{})
-	assert.IsType(t, &json.SyntaxError{}, err)
+	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
+	assert.IsType(t, &json.SyntaxError{}, err.(*forwardError).originalError)
 }
 
 func TestResponseBadBody(t *testing.T) {
@@ -265,7 +273,7 @@ func TestResponseBadBody(t *testing.T) {
 			}),
 		},
 	}
-	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{})
+	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
 	assert.Contains(t, err.Error(), "body decode error")
 }
 

@@ -11,7 +11,6 @@ import (
 
 	"errors"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/metricproxy/config"
@@ -133,7 +132,7 @@ func ForwarderLoader(ctx context.Context, forwardTo *config.ForwardTo) (protocol
 	}
 	buffer := dpbuffered.NewBufferedForwarder(ctx, *(&dpbuffered.Config{}).FromConfig(forwardTo), fwd)
 	return &protocol.CompositeForwarder{
-		Sink:   dpsink.FromChain(buffer, counter.SinkMiddleware),
+		Sink:   dpsink.FromChain(buffer, dpsink.NextWrap(counter)),
 		Keeper: stats.ToKeeperMany(dims, counter, buffer),
 		Closer: protocol.CompositeCloser(protocol.OkCloser(buffer.Close), fwd),
 	}, nil
@@ -187,7 +186,6 @@ func (carbonConnection *Forwarder) AddDatapoints(ctx context.Context, points []*
 				dp.Timestamp.UnixNano()/time.Second.Nanoseconds())
 		}
 	}
-	log.WithField("buf", buf).Debug("Will write to graphite")
 	_, err = buf.WriteTo(openConnection)
 	if err != nil {
 		return

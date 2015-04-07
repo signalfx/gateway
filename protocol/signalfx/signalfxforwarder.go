@@ -16,6 +16,8 @@ import (
 
 	"sync"
 
+	"errors"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
@@ -32,14 +34,15 @@ import (
 
 // Forwarder controls forwarding datapoints to SignalFx
 type Forwarder struct {
-	propertyLock     sync.Mutex
-	url              string
-	defaultAuthToken string
-	tr               *http.Transport
-	client           *http.Client
-	userAgent        string
-	defaultSource    string
-	dimensionSources []string
+	propertyLock          sync.Mutex
+	url                   string
+	defaultAuthToken      string
+	tr                    *http.Transport
+	client                *http.Client
+	userAgent             string
+	defaultSource         string
+	dimensionSources      []string
+	emptyMetricNameFilter dpsink.EmptyMetricFilter
 
 	protoMarshal func(pb proto.Message) ([]byte, error)
 }
@@ -83,7 +86,7 @@ func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo) (protoco
 	}
 	buffer := dpbuffered.NewBufferedForwarder(ctx, *(&dpbuffered.Config{}).FromConfig(forwardTo), fwd)
 	return &protocol.CompositeForwarder{
-		Sink:   dpsink.FromChain(buffer, counter.SinkMiddleware),
+		Sink:   dpsink.FromChain(buffer, dpsink.NextWrap(counter)),
 		Keeper: stats.ToKeeperMany(dims, counter, buffer),
 		Closer: protocol.CompositeCloser(protocol.OkCloser(buffer.Close)),
 	}, fwd, nil
@@ -226,15 +229,32 @@ func (connector *Forwarder) AuthToken(authToken string) {
 // TokenHeaderName is the header key for the auth token in the HTTP request
 const TokenHeaderName = "X-SF-TOKEN"
 
+type forwardError struct {
+	originalError error
+	message       string
+}
+
+func (f *forwardError) Error() string {
+	return fmt.Sprintf("%s: %s", f.message, f.originalError.Error())
+}
+
+var _ error = &forwardError{}
+
 // AddDatapoints forwards datapoints to SignalFx
 func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*datapoint.Datapoint) error {
 	connector.propertyLock.Lock()
 	defer connector.propertyLock.Unlock()
+	datapoints = connector.emptyMetricNameFilter.FilterDatapoints(datapoints)
+	if len(datapoints) == 0 {
+		return nil
+	}
 	jsonBytes, bodyType, err := connector.encodePostBodyProtobufV2(datapoints)
 
 	if err != nil {
-		log.WithField("err", err).Warn("Unable to marshal object")
-		return err
+		return &forwardError{
+			originalError: err,
+			message:       "Unable to marshal object",
+		}
 	}
 	req, _ := http.NewRequest("POST", connector.url, bytes.NewBuffer(jsonBytes))
 	req.Header.Set("Content-Type", bodyType)
@@ -247,29 +267,39 @@ func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*dat
 	resp, err := connector.client.Do(req)
 
 	if err != nil {
-		log.WithField("err", err).Warn("Unable to POST request")
-		return err
+		return &forwardError{
+			originalError: err,
+			message:       "Unable to POST request",
+		}
 	}
 
 	defer resp.Body.Close()
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.WithField("err", err).Warn("Unable to verify response body")
-		return err
+		return &forwardError{
+			originalError: err,
+			message:       "Unable to verify response body",
+		}
 	}
 	if resp.StatusCode != 200 {
-		log.WithFields(log.Fields{"url": connector.url, "respBody": string(respBody)}).Warn("Metric upload failed")
-		return fmt.Errorf("invalid status code: %d", resp.StatusCode)
+		return &forwardError{
+			originalError: fmt.Errorf("invalid status code: %d", resp.StatusCode),
+			message:       string(respBody),
+		}
 	}
 	var body string
 	err = json.Unmarshal(respBody, &body)
 	if err != nil {
-		log.WithFields(log.Fields{"body": string(respBody), "err": err}).Warn("Unable to unmarshal")
-		return err
+		return &forwardError{
+			originalError: err,
+			message:       string(respBody),
+		}
 	}
 	if body != "OK" {
-		log.WithField("body", body).Warn("Response not OK")
-		return fmt.Errorf("body decode error: %s", body)
+		return &forwardError{
+			originalError: errors.New("body decode error"),
+			message:       body,
+		}
 	}
 	return nil
 }
