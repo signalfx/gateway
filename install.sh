@@ -26,7 +26,7 @@ cd /opt/sfproxy
 env GOPATH="$(pwd)" go get github.com/tools/godep
 env GOPATH="$(pwd)" go get github.com/signalfx/metricproxy
 
-cd /opt/sfproxy/github.com/signalfx/metricproxy
+cd /opt/sfproxy/src/github.com/signalfx/metricproxy
 env GOPATH="/opt/sfproxy" godep go install
 
 ln -s /opt/sfproxy/src/github.com/signalfx/metricproxy/metricproxy /etc/init.d/metricproxy
