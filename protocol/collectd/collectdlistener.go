@@ -74,7 +74,7 @@ func (decoder *JSONDecoder) Read(ctx context.Context, req *http.Request) error {
 	for _, f := range d {
 		if f.TypeS != nil && f.Time != nil {
 			for i := range f.Dsnames {
-				if i < len(f.Dstypes) && i < len(f.Values) {
+				if i < len(f.Dstypes) && i < len(f.Values) && f.Values[i] != nil {
 					dps = append(dps, NewDatapoint(f, uint(i), defaultDims))
 				}
 			}
