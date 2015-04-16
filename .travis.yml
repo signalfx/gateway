@@ -17,6 +17,7 @@ install:
   - go get code.google.com/p/go.tools/cmd/vet || go get golang.org/x/tools/cmd/vet
   - go get github.com/stretchr/testify/mock
   - go get code.google.com/p/go.tools/cmd/cover || go get golang.org/x/tools/cmd/cover
+  - go get github.com/tools/godep
   - gem install mdl
   - go get -d -v ./... && go build -v ./...
 
