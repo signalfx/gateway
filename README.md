@@ -306,9 +306,9 @@ points to signalfx.
 ### Status Page and profiling
 
 This config only loads a status page.  You can see status information at
-http://localhost:6009/status, a health check page (useful for load balances) at
-http://localhost:6009/health, and pprof information at
-http://localhost:6009/debug/pprof/.  You can learn more about pprof for golang
+`http://localhost:6009/status`, a health check page (useful for load balances) at
+`http://localhost:6009/health`, and pprof information at
+`http://localhost:6009/debug/pprof/`.  You can learn more about pprof for golang
 on [the pprof help page](http://golang.org/pkg/net/http/pprof/).
 
 ```
