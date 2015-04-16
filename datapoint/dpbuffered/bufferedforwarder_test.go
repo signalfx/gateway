@@ -37,7 +37,7 @@ func TestBufferedForwarderBasic(t *testing.T) {
 	}
 	// Wait for more points
 	seen := <-sendTo.PointsChan
-	assert.True(t, len(seen) > 2, "Points should buffer")
+	assert.True(t, len(seen) > 2, fmt.Sprintf("Points should buffer: %d", len(seen)))
 	assert.Equal(t, 2, len(bf.Stats(map[string]string{})), "Checking returned stats size")
 }
 
