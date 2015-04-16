@@ -5,7 +5,6 @@ import (
 
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/metricproxy/datapoint"
 )
@@ -122,7 +121,6 @@ func fromTs(ts int64) time.Time {
 // NewProtobufDataPointWithType creates a new datapoint from SignalFx's protobuf definition (backwards compatable with old API)
 func NewProtobufDataPointWithType(dp *com_signalfx_metrics_protobuf.DataPoint, mType com_signalfx_metrics_protobuf.MetricType) *datapoint.Datapoint {
 	var mt com_signalfx_metrics_protobuf.MetricType
-	log.WithField("dp", dp).Debug("NewProtobufDataPointWithType")
 
 	if dp.MetricType != nil {
 		mt = dp.GetMetricType()
@@ -130,7 +128,7 @@ func NewProtobufDataPointWithType(dp *com_signalfx_metrics_protobuf.DataPoint, m
 		mt = mType
 	}
 
-	dims := map[string]string{}
+	dims := make(map[string]string, len(dp.GetDimensions())+1)
 	if dp.GetSource() != "" {
 		dims["sf_source"] = dp.GetSource()
 	}

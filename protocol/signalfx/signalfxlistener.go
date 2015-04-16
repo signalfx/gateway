@@ -112,10 +112,7 @@ func (decoder *protobufDecoderV1) Read(ctx context.Context, req *http.Request) e
 			log.WithField("err", err).Info("peek error")
 			return err
 		}
-		log.Debug("Decoding varint")
 		num, bytesRead := proto.DecodeVarint(buf)
-		log.WithField("num", num).WithField("bytesRead", bytesRead).Debug("Decode results")
-		log.WithFields(log.Fields{"num": num, "bytesRead": bytesRead}).Debug("Decoding result")
 		if bytesRead == 0 {
 			// Invalid varint?
 			return errInvalidProtobufVarint
@@ -144,7 +141,6 @@ func (decoder *protobufDecoderV1) Read(ctx context.Context, req *http.Request) e
 		}
 		mt := decoder.typeGetter.GetMetricTypeFromMap(msg.GetMetric())
 		dp := NewProtobufDataPointWithType(&msg, mt)
-		log.WithField("dp", dp).Debug("Adding a point")
 		decoder.sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp})
 	}
 }
