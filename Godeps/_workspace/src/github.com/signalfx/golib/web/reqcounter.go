@@ -1,12 +1,11 @@
-package reqcounter
+package web
 
 import (
 	"net/http"
 	"sync/atomic"
 	"time"
 
-	"github.com/signalfx/metricproxy/datapoint"
-	"github.com/signalfx/metricproxy/web"
+	"github.com/signalfx/golib/datapoint"
 )
 
 // RequestCounter is a negroni handler that tracks connection stats
@@ -16,8 +15,8 @@ type RequestCounter struct {
 	TotalProcessingTimeNs int64
 }
 
-var _ web.HTTPConstructor = (&RequestCounter{}).Wrap
-var _ web.NextHTTP = (&RequestCounter{}).ServeHTTP
+var _ HTTPConstructor = (&RequestCounter{}).Wrap
+var _ NextHTTP = (&RequestCounter{}).ServeHTTP
 
 // Wrap returns a handler that forwards calls to next and counts the calls forwarded
 func (m *RequestCounter) Wrap(next http.Handler) http.Handler {
@@ -47,18 +46,20 @@ func (m *RequestCounter) Stats(dimensions map[string]string) []*datapoint.Datapo
 	for k, v := range stats {
 		ret = append(
 			ret,
-			datapoint.NewOnHostDatapointDimensions(
+			datapoint.New(
 				k,
+				dimensions,
 				datapoint.NewIntValue(v),
 				datapoint.Counter,
-				dimensions))
+				time.Now()))
 	}
 	ret = append(
 		ret,
-		datapoint.NewOnHostDatapointDimensions(
+		datapoint.New(
 			"active_connections",
+			dimensions,
 			datapoint.NewIntValue(atomic.LoadInt64(&m.ActiveConnections)),
 			datapoint.Gauge,
-			dimensions))
+			time.Now()))
 	return ret
 }

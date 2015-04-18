@@ -47,6 +47,18 @@
 			"Rev": "3f07c0108fbfbcf93508e4ab61a080953136fdf9"
 		},
 		{
+			"ImportPath": "github.com/signalfx/golib/datapoint",
+			"Rev": "b96a5f9d4fbd64d5cfb612b1022464c28ac6343b"
+		},
+		{
+			"ImportPath": "github.com/signalfx/golib/nettest",
+			"Rev": "b96a5f9d4fbd64d5cfb612b1022464c28ac6343b"
+		},
+		{
+			"ImportPath": "github.com/signalfx/golib/web",
+			"Rev": "b96a5f9d4fbd64d5cfb612b1022464c28ac6343b"
+		},
+		{
 			"ImportPath": "github.com/stretchr/testify/assert",
 			"Rev": "d6577e08ec30538639ac0ea38b562b6f250e9055"
 		},

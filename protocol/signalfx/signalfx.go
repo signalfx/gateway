@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
-	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/golib/datapoint"
 )
 
 // JSONDatapointV1 is the JSON API format for /v1/datapoint

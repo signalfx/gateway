@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
 )
 

@@ -1,4 +1,4 @@
-package reqcounter
+package web
 
 import (
 	"net/http"

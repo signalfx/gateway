@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/golib/datapoint"
 	"golang.org/x/net/context"
 )
 

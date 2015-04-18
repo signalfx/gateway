@@ -11,9 +11,10 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
+	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/datapoint"
-	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/metricproxy/dp/dplocal"
+	"github.com/signalfx/metricproxy/dp/dpsink"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
 	"golang.org/x/net/context"
@@ -63,7 +64,7 @@ func (listener *Listener) Stats() []*datapoint.Datapoint {
 		}
 		ret = append(
 			ret,
-			datapoint.NewOnHostDatapointDimensions(
+			dplocal.NewOnHostDatapointDimensions(
 				k,
 				datapoint.NewIntValue(v),
 				t,

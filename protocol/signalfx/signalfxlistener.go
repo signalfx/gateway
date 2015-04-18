@@ -20,14 +20,14 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
+	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/datapoint"
-	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/metricproxy/dp/dplocal"
+	"github.com/signalfx/metricproxy/dp/dpsink"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/collectd"
-	"github.com/signalfx/metricproxy/reqcounter"
 	"github.com/signalfx/metricproxy/stats"
-	"github.com/signalfx/metricproxy/web"
 	"golang.org/x/net/context"
 )
 
@@ -65,7 +65,7 @@ type ErrorTrackerHandler struct {
 // Stats returns the number of calls to AddDatapoint
 func (e *ErrorTrackerHandler) Stats(dimensions map[string]string) []*datapoint.Datapoint {
 	return []*datapoint.Datapoint{
-		datapoint.NewOnHostDatapointDimensions(
+		dplocal.NewOnHostDatapointDimensions(
 			"total_errors",
 			datapoint.NewIntValue(e.TotalErrors),
 			datapoint.Counter,
@@ -348,7 +348,7 @@ func StartServingHTTPOnPort(ctx context.Context, sink dpsink.Sink, listenAddr st
 }
 
 func setupNotFoundHandler(r *mux.Router, ctx context.Context, name string) stats.Keeper {
-	metricTracking := reqcounter.RequestCounter{}
+	metricTracking := web.RequestCounter{}
 	r.NotFoundHandler = web.NewHandler(ctx, web.FromHTTP(http.NotFoundHandler())).Add(web.NextHTTP(metricTracking.ServeHTTP))
 	return stats.ToKeeperMany(map[string]string{"listener": name, "type": "http404"}, &metricTracking)
 }
@@ -360,7 +360,7 @@ func setupChain(ctx context.Context, sink dpsink.Sink, name string, chainType st
 	errorTracker := ErrorTrackerHandler{
 		reader: errReader,
 	}
-	metricTracking := reqcounter.RequestCounter{}
+	metricTracking := web.RequestCounter{}
 	handler := web.NewHandler(ctx, &errorTracker).Add(web.NextHTTP(metricTracking.ServeHTTP))
 	st := stats.ToKeeperMany(map[string]string{"listener": name, "type": chainType}, &metricTracking, &errorTracker, counter)
 	return handler, st

@@ -17,12 +17,11 @@ import (
 
 	"encoding/json"
 
-	"github.com/signalfx/metricproxy/datapoint"
-	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/web"
+	"github.com/signalfx/metricproxy/dp/dpsink"
 	"github.com/signalfx/metricproxy/protocol"
-	"github.com/signalfx/metricproxy/reqcounter"
 	"github.com/signalfx/metricproxy/stats"
-	"github.com/signalfx/metricproxy/web"
 	"golang.org/x/net/context"
 )
 
@@ -155,7 +154,7 @@ func StartListeningCollectDHTTPOnPort(ctx context.Context, sink dpsink.Sink,
 // SetupHandler is shared between signalfx and here to setup listening for collectd connections.
 // Will do shared basic setup like configuring request counters
 func SetupHandler(ctx context.Context, name string, sink dpsink.Sink) (*web.Handler, stats.Keeper) {
-	metricTracking := reqcounter.RequestCounter{}
+	metricTracking := web.RequestCounter{}
 	counter := &dpsink.Counter{}
 	collectdDecoder := JSONDecoder{
 		SendTo: dpsink.FromChain(sink, dpsink.NextWrap(counter)),

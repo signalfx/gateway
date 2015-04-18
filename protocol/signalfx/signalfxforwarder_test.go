@@ -13,15 +13,15 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/golang/protobuf/proto"
+	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/datapoint"
-	"github.com/signalfx/metricproxy/nettest"
 
 	"net/http/httptest"
 
 	"errors"
 
-	"github.com/signalfx/metricproxy/datapoint/dptest"
+	"github.com/signalfx/metricproxy/dp/dptest"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )

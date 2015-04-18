@@ -7,9 +7,9 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
+	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/datapoint"
-	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/metricproxy/dp/dpsink"
 	"github.com/signalfx/metricproxy/protocol"
 	"golang.org/x/net/context"
 )

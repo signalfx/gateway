@@ -5,9 +5,10 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/datapoint"
-	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/metricproxy/dp/dplocal"
+	"github.com/signalfx/metricproxy/dp/dpsink"
 	"golang.org/x/net/context"
 )
 
@@ -72,12 +73,12 @@ func (forwarder *BufferedForwarder) AddDatapoints(ctx context.Context, points []
 // Stats related to this forwarder, including errors processing datapoints
 func (forwarder *BufferedForwarder) Stats(dimensions map[string]string) []*datapoint.Datapoint {
 	ret := make([]*datapoint.Datapoint, 0, 2)
-	ret = append(ret, datapoint.NewOnHostDatapointDimensions(
+	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
 		"datapoint_chan_backup_size",
 		datapoint.NewIntValue(int64(len(forwarder.dpChan))),
 		datapoint.Gauge,
 		dimensions))
-	ret = append(ret, datapoint.NewOnHostDatapointDimensions(
+	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
 		"datapoint_backup_size",
 		datapoint.NewIntValue(atomic.LoadInt64(&forwarder.stats.totalDatapointsBuffered)),
 		datapoint.Gauge,

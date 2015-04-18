@@ -16,7 +16,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/metricproxy/dp/dpsink"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/carbon"
 	"github.com/signalfx/metricproxy/protocol/collectd"

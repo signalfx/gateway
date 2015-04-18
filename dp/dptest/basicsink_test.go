@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/golib/datapoint"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )

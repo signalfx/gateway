@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/golib/datapoint"
 )
 
 // JSONWriteBody is the full POST body of collectd's write_http format

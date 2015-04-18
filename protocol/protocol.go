@@ -3,7 +3,7 @@ package protocol
 import (
 	"io"
 
-	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/metricproxy/dp/dpsink"
 	"github.com/signalfx/metricproxy/stats"
 )
 

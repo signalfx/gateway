@@ -4,7 +4,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/metricproxy/dp/dplocal"
 )
 
 type golangKeeper struct {
@@ -19,7 +20,7 @@ func NewGolangKeeper() Keeper {
 }
 
 func point(name string, v int64) *datapoint.Datapoint {
-	return datapoint.NewOnHostDatapointDimensions(
+	return dplocal.NewOnHostDatapointDimensions(
 		name,
 		datapoint.NewIntValue(v),
 		datapoint.Gauge,
@@ -27,7 +28,7 @@ func point(name string, v int64) *datapoint.Datapoint {
 }
 
 func pointc(name string, v int64) *datapoint.Datapoint {
-	return datapoint.NewOnHostDatapointDimensions(
+	return dplocal.NewOnHostDatapointDimensions(
 		name,
 		datapoint.NewIntValue(v),
 		datapoint.Counter,

@@ -5,7 +5,8 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/metricproxy/dp/dplocal"
 	"golang.org/x/net/context"
 )
 
@@ -23,37 +24,37 @@ type Counter struct {
 func (c *Counter) Stats(dimensions map[string]string) []*datapoint.Datapoint {
 	ret := make([]*datapoint.Datapoint, 0, 6)
 
-	ret = append(ret, datapoint.NewOnHostDatapointDimensions(
+	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
 		"total_process_errors",
 		datapoint.NewIntValue(atomic.LoadInt64(&c.TotalProcessErrors)),
 		datapoint.Counter,
 		dimensions))
 
-	ret = append(ret, datapoint.NewOnHostDatapointDimensions(
+	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
 		"total_datapoints",
 		datapoint.NewIntValue(atomic.LoadInt64(&c.TotalDatapoints)),
 		datapoint.Counter,
 		dimensions))
 
-	ret = append(ret, datapoint.NewOnHostDatapointDimensions(
+	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
 		"total_process_calls",
 		datapoint.NewIntValue(atomic.LoadInt64(&c.TotalProcessCalls)),
 		datapoint.Counter,
 		dimensions))
 
-	ret = append(ret, datapoint.NewOnHostDatapointDimensions(
+	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
 		"dropped_points",
 		datapoint.NewIntValue(atomic.LoadInt64(&c.ProcessErrorPoints)),
 		datapoint.Counter,
 		dimensions))
 
-	ret = append(ret, datapoint.NewOnHostDatapointDimensions(
+	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
 		"process_time_ns",
 		datapoint.NewIntValue(atomic.LoadInt64(&c.TotalProcessTimeNs)),
 		datapoint.Counter,
 		dimensions))
 
-	ret = append(ret, datapoint.NewOnHostDatapointDimensions(
+	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
 		"calls_in_flight",
 		datapoint.NewIntValue(atomic.LoadInt64(&c.CallsInFlight)),
 		datapoint.Gauge,

@@ -4,8 +4,8 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/signalfx/metricproxy/datapoint"
-	"github.com/signalfx/metricproxy/datapoint/dpsink"
+	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/metricproxy/dp/dpsink"
 	"golang.org/x/net/context"
 )
 

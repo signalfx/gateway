@@ -14,8 +14,8 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/datapoint"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )

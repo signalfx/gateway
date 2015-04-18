@@ -8,9 +8,9 @@ import (
 	"errors"
 
 	"github.com/cep21/gohelpers/workarounds"
+	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/datapoint"
-	"github.com/signalfx/metricproxy/datapoint/dptest"
+	"github.com/signalfx/metricproxy/dp/dptest"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )

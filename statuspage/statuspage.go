@@ -9,8 +9,8 @@ import (
 
 	"runtime"
 
+	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/datapoint"
 	"github.com/signalfx/metricproxy/stats"
 )
 

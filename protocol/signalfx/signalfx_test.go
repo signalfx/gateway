@@ -6,7 +6,7 @@ import (
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 
-	"github.com/signalfx/metricproxy/datapoint"
+	"github.com/signalfx/golib/datapoint"
 	"github.com/stretchr/testify/assert"
 )
 
