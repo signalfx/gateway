@@ -1,0 +1,18 @@
+{
+  "ignoreDir": ["Godeps"],
+  "checks": [
+    {
+      "macro": "goimport"
+    }, {
+      "macro": "gofmt"
+    }, {
+      "macro": "vet"
+    }, {
+      "macro": "golint"
+    }, {
+      "macro": "gocyclo"
+    }, {
+      "macro": "go-cover"
+    }
+  ]
+}

@@ -24,4 +24,4 @@ set -e
 # Want example config file to be valid json
 python -m json.tool < exampleSfdbproxy.conf > /dev/null
 
-./goverify.sh
+goverify -v
