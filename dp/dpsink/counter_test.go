@@ -23,16 +23,16 @@ func TestCounterSink(t *testing.T) {
 	go func() {
 		// Allow time for us to get in the middle of a call
 		time.Sleep(time.Millisecond)
-		assert.Equal(t, 1, count.CallsInFlight, "After a sleep, should be in flight")
+		assert.Equal(t, int64(1), count.CallsInFlight, "After a sleep, should be in flight")
 		datas := <-bs.PointsChan
 		assert.Equal(t, 2, len(datas), "Original datas should be sent")
 	}()
 	middleSink.AddDatapoints(ctx, dps)
-	assert.Equal(t, 0, count.CallsInFlight, "Call is finished")
-	assert.Equal(t, 0, count.TotalProcessErrors, "No errors so far (see above)")
+	assert.Equal(t, int64(0), count.CallsInFlight, "Call is finished")
+	assert.Equal(t, int64(0), count.TotalProcessErrors, "No errors so far (see above)")
 	assert.Equal(t, 6, len(count.Stats(map[string]string{})), "Just checking stats len()")
 
 	bs.RetError(errors.New("nope"))
 	middleSink.AddDatapoints(ctx, dps)
-	assert.Equal(t, 1, count.TotalProcessErrors, "Error should be sent through")
+	assert.Equal(t, int64(1), count.TotalProcessErrors, "Error should be sent through")
 }

@@ -120,6 +120,6 @@ func TestConfigLoad(t *testing.T) {
 
 	c1.FromConfig(&c2)
 
-	assert.Equal(t, 2, c1.BufferSize)
-	assert.Equal(t, 1, c1.MaxDrainSize)
+	assert.Equal(t, int64(2), c1.BufferSize)
+	assert.Equal(t, int64(1), c1.MaxDrainSize)
 }

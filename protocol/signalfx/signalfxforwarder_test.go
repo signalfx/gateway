@@ -154,13 +154,13 @@ func TestNoSource(t *testing.T) {
 	go forwarder.AddDatapoints(context.Background(), []*datapoint.Datapoint{dpSent})
 	dpRecieved := finalDatapointDestination.Next()
 	i := dpRecieved.Value.(datapoint.IntValue).Int()
-	assert.Equal(t, 2, i, "Expect 2 back")
+	assert.Equal(t, int64(2), i, "Expect 2 back")
 	val, exists := dpRecieved.Dimensions["sf_source"]
 	assert.False(t, exists, val)
 }
 
 func TestDatumForPoint(t *testing.T) {
-	assert.Equal(t, 3, datumForPoint(datapoint.NewIntValue(3)).GetIntValue())
+	assert.Equal(t, int64(3), datumForPoint(datapoint.NewIntValue(3)).GetIntValue())
 	assert.Equal(t, 0.0, datumForPoint(datapoint.NewIntValue(3)).GetDoubleValue())
 	assert.Equal(t, .1, datumForPoint(datapoint.NewFloatValue(.1)).GetDoubleValue())
 	assert.Equal(t, "hi", datumForPoint(datapoint.NewStringValue("hi")).GetStrValue())

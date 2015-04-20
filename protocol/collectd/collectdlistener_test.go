@@ -175,7 +175,7 @@ func TestCollectDListenerWithQueryParams(t *testing.T) {
 	resp = httptest.NewRecorder()
 	c.ServeHTTPC(ctx, resp, req)
 
-	assert.Equal(t, c.TotalBlankDims, 1)
+	assert.Equal(t, c.TotalBlankDims, int64(1))
 
 	assert.Equal(t, http.StatusBadRequest, resp.Code, "Request should work")
 

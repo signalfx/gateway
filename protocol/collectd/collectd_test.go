@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/cep21/gohelpers/workarounds"
-	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/stretchr/testify/assert"
 )
@@ -128,10 +127,10 @@ const testDecodeCollectdBody = `[
 ]`
 
 func TestMetricTypeFromDsType(t *testing.T) {
-	assert.Equal(t, com_signalfx_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("gauge")), "Types don't match expectation")
-	assert.Equal(t, com_signalfx_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(nil), "Types don't match expectation")
-	assert.Equal(t, com_signalfx_metrics_protobuf.MetricType_GAUGE, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("unknown")), "Types don't match expectation")
-	assert.Equal(t, com_signalfx_metrics_protobuf.MetricType_CUMULATIVE_COUNTER, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("derive")), "Types don't match expectation")
+	assert.Equal(t, datapoint.Gauge, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("gauge")), "Types don't match expectation")
+	assert.Equal(t, datapoint.Gauge, metricTypeFromDsType(nil), "Types don't match expectation")
+	assert.Equal(t, datapoint.Gauge, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("unknown")), "Types don't match expectation")
+	assert.Equal(t, datapoint.Counter, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("derive")), "Types don't match expectation")
 }
 
 func TestCollectdJsonDecoding(t *testing.T) {

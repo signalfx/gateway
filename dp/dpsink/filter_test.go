@@ -23,7 +23,7 @@ func TestEmptyMetricFilter(t *testing.T) {
 	assert.NoError(t, filt.AddDatapoints(ctx, []*datapoint.Datapoint{p1, p2}, end))
 	out := <-end.PointsChan
 	assert.Equal(t, 1, len(out))
-	assert.Equal(t, 1, filt.EmptyMetricFiltered)
+	assert.Equal(t, int64(1), filt.EmptyMetricFiltered)
 
 	assert.NoError(t, filt.AddDatapoints(ctx, []*datapoint.Datapoint{p1}, end))
 	runtime.Gosched()

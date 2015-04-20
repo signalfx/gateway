@@ -96,7 +96,7 @@ func verifyRequest(t *testing.T, baseURI string, contentType string, path string
 	log.Debug("Waiting for signal")
 	_ = <-doneSignal
 	assert.Equal(t, metricName, dpOut.Metric)
-	assert.Equal(t, metricValue, dpOut.Value)
+	assert.EqualValues(t, metricValue, dpOut.Value)
 }
 
 func TestSignalfxJsonV1Handler(t *testing.T) {
@@ -365,13 +365,13 @@ func TestErrorTrackerHandler(t *testing.T) {
 	ctx := context.Background()
 	rw := httptest.NewRecorder()
 	e.ServeHTTPC(ctx, rw, nil)
-	assert.Equal(t, 0, e.TotalErrors)
+	assert.Equal(t, int64(0), e.TotalErrors)
 	assert.Equal(t, `"OK"`, rw.Body.String())
 	e.reader = errTest("hi")
 	rw = httptest.NewRecorder()
 	e.ServeHTTPC(ctx, rw, nil)
 	assert.Equal(t, `hi`, rw.Body.String())
-	assert.Equal(t, 1, e.TotalErrors)
+	assert.Equal(t, int64(1), e.TotalErrors)
 }
 
 func BenchmarkAtomicInc(b *testing.B) {
