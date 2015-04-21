@@ -243,7 +243,10 @@ var _ error = &forwardError{}
 // AddDatapoints forwards datapoints to SignalFx
 func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*datapoint.Datapoint) error {
 	connector.propertyLock.Lock()
-	defer connector.propertyLock.Unlock()
+	endpoint := connector.url
+	userAgent := connector.userAgent
+	defautlAuthToken := connector.defaultAuthToken
+	connector.propertyLock.Unlock()
 	datapoints = connector.emptyMetricNameFilter.FilterDatapoints(datapoints)
 	if len(datapoints) == 0 {
 		return nil
@@ -256,10 +259,10 @@ func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*dat
 			message:       "Unable to marshal object",
 		}
 	}
-	req, _ := http.NewRequest("POST", connector.url, bytes.NewBuffer(jsonBytes))
+	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBytes))
 	req.Header.Set("Content-Type", bodyType)
-	req.Header.Set(TokenHeaderName, connector.defaultAuthToken)
-	req.Header.Set("User-Agent", connector.userAgent)
+	req.Header.Set(TokenHeaderName, defautlAuthToken)
+	req.Header.Set("User-Agent", userAgent)
 
 	req.Header.Set("Connection", "Keep-Alive")
 
