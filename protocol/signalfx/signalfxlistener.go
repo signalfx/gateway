@@ -50,6 +50,13 @@ type MericTypeGetter interface {
 	GetMetricTypeFromMap(metricName string) com_signalfx_metrics_protobuf.MetricType
 }
 
+// ConstTypeGetter always returns the wrapped metric type as a MericTypeGetter
+type ConstTypeGetter com_signalfx_metrics_protobuf.MetricType
+
+func (c ConstTypeGetter) GetMetricTypeFromMap(metricName string) com_signalfx_metrics_protobuf.MetricType {
+	return com_signalfx_metrics_protobuf.MetricType(c)
+}
+
 // ErrorReader are datapoint streamers that read from a HTTP request and return errors if
 // the stream is invalid
 type ErrorReader interface {
