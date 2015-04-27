@@ -111,7 +111,7 @@ func TestSignalfxJsonV1Handler(t *testing.T) {
 }
 
 func TestSignalfxJSONV1Decoder(t *testing.T) {
-	decoder := jsonDecoderV1{}
+	decoder := JSONDecoderV1{}
 	req := &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBuffer([]byte("INVALID_JSON"))),
 	}
@@ -149,9 +149,9 @@ func TestSignalfxProtobufV1Decoder(t *testing.T) {
 	sendTo := dptest.NewBasicSink()
 	ctx := context.Background()
 
-	decoder := protobufDecoderV1{
-		typeGetter: &typeGetter,
-		sink:       sendTo,
+	decoder := ProtobufDecoderV1{
+		TypeGetter: &typeGetter,
+		Sink:       sendTo,
 	}
 	req := &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBuffer([]byte("INVALID_PROTOBUF"))),

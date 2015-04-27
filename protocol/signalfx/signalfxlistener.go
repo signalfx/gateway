@@ -87,16 +87,17 @@ func (e *ErrorTrackerHandler) ServeHTTPC(ctx context.Context, rw http.ResponseWr
 	rw.Write([]byte(`"OK"`))
 }
 
-type protobufDecoderV1 struct {
-	sink       dpsink.Sink
-	typeGetter MericTypeGetter
+// ProtobufDecoderV1 creates datapoints out of the V1 protobuf definition
+type ProtobufDecoderV1 struct {
+	Sink       dpsink.Sink
+	TypeGetter MericTypeGetter
 }
 
 var errInvalidProtobuf = errors.New("invalid protocol buffer sent")
 var errProtobufTooLarge = errors.New("protobuf structure too large")
 var errInvalidProtobufVarint = errors.New("invalid protobuf varint")
 
-func (decoder *protobufDecoderV1) Read(ctx context.Context, req *http.Request) error {
+func (decoder *ProtobufDecoderV1) Read(ctx context.Context, req *http.Request) error {
 	body := req.Body
 	bufferedBody := bufio.NewReaderSize(body, 32768)
 	for {
@@ -139,18 +140,19 @@ func (decoder *protobufDecoderV1) Read(ctx context.Context, req *http.Request) e
 		if msg.Metric == nil || msg.Value == nil {
 			return errInvalidProtobuf
 		}
-		mt := decoder.typeGetter.GetMetricTypeFromMap(msg.GetMetric())
+		mt := decoder.TypeGetter.GetMetricTypeFromMap(msg.GetMetric())
 		dp := NewProtobufDataPointWithType(&msg, mt)
-		decoder.sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp})
+		decoder.Sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp})
 	}
 }
 
-type jsonDecoderV1 struct {
-	typeGetter MericTypeGetter
-	sink       dpsink.Sink
+// JSONDecoderV1 creates datapoints out of the v1 JSON definition
+type JSONDecoderV1 struct {
+	TypeGetter MericTypeGetter
+	Sink       dpsink.Sink
 }
 
-func (decoder *jsonDecoderV1) Read(ctx context.Context, req *http.Request) error {
+func (decoder *JSONDecoderV1) Read(ctx context.Context, req *http.Request) error {
 	dec := json.NewDecoder(req.Body)
 	for {
 		var d JSONDatapointV1
@@ -164,9 +166,9 @@ func (decoder *jsonDecoderV1) Read(ctx context.Context, req *http.Request) error
 				log.WithField("dp", d).Debug("Invalid Datapoint")
 				continue
 			}
-			mt := fromMT(decoder.typeGetter.GetMetricTypeFromMap(d.Metric))
+			mt := fromMT(decoder.TypeGetter.GetMetricTypeFromMap(d.Metric))
 			dp := datapoint.New(d.Metric, map[string]string{"sf_source": d.Source}, datapoint.NewFloatValue(d.Value), mt, time.Now())
-			decoder.sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp})
+			decoder.Sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp})
 		}
 	}
 	return nil
@@ -366,32 +368,42 @@ func setupChain(ctx context.Context, sink dpsink.Sink, name string, chainType st
 	return handler, st
 }
 
-func setupProtobufV1(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, typeGetter MericTypeGetter) stats.Keeper {
-	handler, st := setupChain(ctx, sink, name, "protobuf_v1", func(s dpsink.Sink) ErrorReader {
-		return &protobufDecoderV1{sink: s, typeGetter: typeGetter}
-	})
-
-	r.Path("/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
-	r.Path("/v1/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
-	return st
-}
-
 func invalidContentType(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Invalid content type:"+r.Header.Get("Content-Type"), http.StatusBadRequest)
 }
 
-func setupJSONV1(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, typeGetter MericTypeGetter) stats.Keeper {
-	handler, st := setupChain(ctx, sink, name, "json_v1", func(s dpsink.Sink) ErrorReader {
-		return &jsonDecoderV1{sink: s, typeGetter: typeGetter}
+func setupProtobufV1(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, typeGetter MericTypeGetter) stats.Keeper {
+	handler, st := setupChain(ctx, sink, name, "protobuf_v1", func(s dpsink.Sink) ErrorReader {
+		return &ProtobufDecoderV1{Sink: s, TypeGetter: typeGetter}
 	})
 
+	SetupProtobufV1Paths(r, handler)
+	return st
+}
+
+// SetupProtobufV1Paths routes to R paths that should handle V1 Protobuf datapoints
+func SetupProtobufV1Paths(r *mux.Router, handler http.Handler) {
+	r.Path("/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
+	r.Path("/v1/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
+}
+
+func setupJSONV1(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, typeGetter MericTypeGetter) stats.Keeper {
+	handler, st := setupChain(ctx, sink, name, "json_v1", func(s dpsink.Sink) ErrorReader {
+		return &JSONDecoderV1{Sink: s, TypeGetter: typeGetter}
+	})
+
+	SetupJSONV1Paths(r, handler)
+	return st
+}
+
+// SetupJSONV1Paths routes to R paths that should handle V1 JSON datapoints
+func SetupJSONV1Paths(r *mux.Router, handler http.Handler) {
 	r.Path("/datapoint").Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
 	r.Path("/v1/datapoint").Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
 	r.Path("/datapoint").Methods("POST").Headers("Content-Type", "").HandlerFunc(invalidContentType)
 	r.Path("/v1/datapoint").Methods("POST").Headers("Content-Type", "").HandlerFunc(invalidContentType)
 	r.Path("/datapoint").Methods("POST").Handler(handler)
 	r.Path("/v1/datapoint").Methods("POST").Handler(handler)
-	return st
 }
 
 func setupProtobufV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink) stats.Keeper {
@@ -406,7 +418,6 @@ func setupProtobufV2(r *mux.Router, ctx context.Context, name string, sink dpsin
 // SetupProtobufV2Paths tells the router which paths the given handler (which should handle v2 protobufs)
 // should see
 func SetupProtobufV2Paths(r *mux.Router, handler http.Handler) {
-	log.Debug("Setting up proto v2")
 	r.Path("/v2/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
 }
 
