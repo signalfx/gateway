@@ -53,6 +53,7 @@ type MericTypeGetter interface {
 // ConstTypeGetter always returns the wrapped metric type as a MericTypeGetter
 type ConstTypeGetter com_signalfx_metrics_protobuf.MetricType
 
+// GetMetricTypeFromMap returns the wrapped metric type object
 func (c ConstTypeGetter) GetMetricTypeFromMap(metricName string) com_signalfx_metrics_protobuf.MetricType {
 	return com_signalfx_metrics_protobuf.MetricType(c)
 }

@@ -99,6 +99,10 @@ func verifyRequest(t *testing.T, baseURI string, contentType string, path string
 	assert.EqualValues(t, metricValue, dpOut.Value)
 }
 
+func TestConstTypeGetter(t *testing.T) {
+	assert.Equal(t, com_signalfx_metrics_protobuf.MetricType_GAUGE, ConstTypeGetter(com_signalfx_metrics_protobuf.MetricType_GAUGE).GetMetricTypeFromMap(""))
+}
+
 func TestSignalfxJsonV1Handler(t *testing.T) {
 	listener, channel, baseURI := localSetup(t)
 	defer listener.Close()
