@@ -15,7 +15,7 @@ configfile="/etc/sfdbconfig.conf"
 logdir="/var/log/sfproxy"
 binary="/opt/sfproxy/bin/metricproxy"
 
-name=$(basename "$0")
+name=$(basename $(readlink -f "$0"))
 pid_file="/var/run/$name.pid"
 stdout_log="/var/log/$name.stdout.log"
 stderr_log="/var/log/$name.stderr.log"
