@@ -17,8 +17,8 @@ import (
 	"github.com/signalfx/metricproxy/dp/dpsink"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
-	"golang.org/x/net/context"
 	"github.com/signalfx/metricproxy/stats"
+	"golang.org/x/net/context"
 )
 
 type listenerConfig struct {
@@ -72,7 +72,7 @@ func (listener *Listener) Stats() []*datapoint.Datapoint {
 				t,
 				map[string]string{"listener": listener.conf.name}))
 	}
-	return append(ret, listener.st.Stats())
+	return append(ret, listener.st.Stats()...)
 }
 
 // Close the exposed carbon port
@@ -183,7 +183,7 @@ func NewListener(ctx context.Context, sink dpsink.Sink, conf listenerConfig, lis
 		conf:                conf,
 		metricDeconstructor: deconstructor,
 		ctx:                 ctx,
-		st: stats.ToKeeperMany(map[string]string{"location": "listener", "name": conf.name, "type": "carbon"}, counter),
+		st:                  stats.ToKeeperMany(map[string]string{"location": "listener", "name": conf.name, "type": "carbon"}, counter),
 	}
 
 	go receiver.startListening()

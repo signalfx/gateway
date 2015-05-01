@@ -82,9 +82,9 @@ func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo) (protoco
 
 	counter := &dpsink.Counter{}
 	dims := map[string]string{
-		"name": *forwardTo.Name,
+		"name":     *forwardTo.Name,
 		"location": "forwarder",
-		"type": "signalfx",
+		"type":     "signalfx",
 	}
 	buffer := dpbuffered.NewBufferedForwarder(ctx, *(&dpbuffered.Config{}).FromConfig(forwardTo), fwd)
 	return &protocol.CompositeForwarder{
