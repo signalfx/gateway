@@ -43,8 +43,8 @@ func TestHandler(t *testing.T) {
 	expectBefore := 2
 	destination := HandlerFunc(func(ctx context.Context, rw http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "value", ctx.Value("key"))
-		assert.Equal(t, expectAfter, i.after)
-		assert.Equal(t, expectBefore, i.before)
+		assert.EqualValues(t, expectAfter, i.after)
+		assert.EqualValues(t, expectBefore, i.before)
 	})
 	ctx := context.Background()
 	h := NewHandler(ctx, destination)
@@ -57,12 +57,12 @@ func TestHandler(t *testing.T) {
 	rw := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/", nil)
 	h.ServeHTTP(rw, req)
-	assert.Equal(t, 2, i.after)
+	assert.EqualValues(t, 2, i.after)
 
 	expectAfter = 2
 	expectBefore = 4
 	h.ServeHTTPC(ctx, rw, req)
-	assert.Equal(t, 4, i.after)
+	assert.EqualValues(t, 4, i.after)
 
 	bodyTest := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		rw.Write([]byte("test"))

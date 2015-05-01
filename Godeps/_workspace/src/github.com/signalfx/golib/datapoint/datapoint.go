@@ -14,12 +14,13 @@ type MetricType int
 const (
 	// Gauge is values at each point in time
 	Gauge MetricType = iota
-	// Count is a number that keeps increasing over time
+	// Count is a number per a given interval (such as a statsd flushInterval); not very useful
 	Count
 	// Enum is an added type: Values aren't important relative to each other but are just important as distinct
 	//             items in a set.  Usually used when Value is type "string"
 	Enum
-	// Counter is a number per a given interval
+	// Counter is a number that keeps increasing over time (but might wrap/reset at some points)
+	// (no statsd counterpart), i.e. a gauge with the added notion of "i usually want to derive this"
 	Counter
 	// Rate is a number per second
 	Rate
