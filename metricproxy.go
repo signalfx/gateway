@@ -258,7 +258,11 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() erro
 		return err
 	}
 	allKeepers := []stats.Keeper{stats.NewGolangKeeper()}
-	multiplexer := demultiplexer.New(recastToSinks(proxyCommandLineConfiguration.allForwarders))
+
+	multiplexerCounter := dpsink.Counter{}
+	multiplexer := dpsink.FromChain(demultiplexer.New(recastToSinks(proxyCommandLineConfiguration.allForwarders)), dpsink.NextWrap(multiplexerCounter))
+
+	allKeepers = append(allKeepers, stats.ToKeeper(&multiplexerCounter, map[string]string{"location": "middle", "name": "proxy", "type": "demultiplexer"}))
 
 	proxyCommandLineConfiguration.allListeners, err = setupListeners(proxyCommandLineConfiguration.ctx, loadedConfig, multiplexer)
 	if err != nil {

@@ -12,7 +12,6 @@ import (
 // Demultiplexer is a sink that forwards points it sees to multiple sinks
 type Demultiplexer struct {
 	sendTo []dpsink.Sink
-	name   string
 }
 
 var _ dpsink.Sink = &Demultiplexer{}
@@ -37,7 +36,6 @@ func (streamer *Demultiplexer) AddDatapoints(ctx context.Context, points []*data
 func New(sendTo []dpsink.Sink) *Demultiplexer {
 	ret := &Demultiplexer{
 		sendTo: make([]dpsink.Sink, len(sendTo)),
-		name:   "demultiplexer",
 	}
 	for i := range sendTo {
 		ret.sendTo[i] = dpsink.FromChain(sendTo[i], dpsink.NextWrap(&dpsink.RateLimitErrorLogging{

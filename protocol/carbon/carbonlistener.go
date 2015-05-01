@@ -18,6 +18,7 @@ import (
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
 	"golang.org/x/net/context"
+	"github.com/signalfx/metricproxy/stats"
 )
 
 type listenerConfig struct {
@@ -31,6 +32,8 @@ type Listener struct {
 	psocket             net.Listener
 	sink                dpsink.Sink
 	metricDeconstructor metricdeconstructor.MetricDeconstructor
+
+	st stats.Keeper
 
 	stats listenerStats
 	conf  listenerConfig
@@ -50,7 +53,6 @@ type listenerStats struct {
 func (listener *Listener) Stats() []*datapoint.Datapoint {
 	ret := []*datapoint.Datapoint{}
 	stats := map[string]int64{
-		"total_datapoints":   atomic.LoadInt64(&listener.stats.totalDatapoints),
 		"invalid_datapoints": atomic.LoadInt64(&listener.stats.invalidDatapoints),
 		"total_connections":  atomic.LoadInt64(&listener.stats.totalConnections),
 		"active_connections": atomic.LoadInt64(&listener.stats.activeConnections),
@@ -70,7 +72,7 @@ func (listener *Listener) Stats() []*datapoint.Datapoint {
 				t,
 				map[string]string{"listener": listener.conf.name}))
 	}
-	return ret
+	return append(ret, listener.st.Stats())
 }
 
 // Close the exposed carbon port
@@ -171,13 +173,19 @@ func NewListener(ctx context.Context, sink dpsink.Sink, conf listenerConfig, lis
 	if err != nil {
 		return nil, err
 	}
+
+	counter := &dpsink.Counter{}
+	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
+
 	receiver := Listener{
-		sink:                sink,
+		sink:                finalSink,
 		psocket:             psocket,
 		conf:                conf,
 		metricDeconstructor: deconstructor,
 		ctx:                 ctx,
+		st: stats.ToKeeperMany(map[string]string{"location": "listener", "name": conf.name, "type": "carbon"}, counter),
 	}
+
 	go receiver.startListening()
 	return &receiver, nil
 }
