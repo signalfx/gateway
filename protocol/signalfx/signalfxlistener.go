@@ -360,7 +360,7 @@ func StartServingHTTPOnPort(ctx context.Context, sink dpsink.Sink, listenAddr st
 func setupNotFoundHandler(r *mux.Router, ctx context.Context, name string) stats.Keeper {
 	metricTracking := web.RequestCounter{}
 	r.NotFoundHandler = web.NewHandler(ctx, web.FromHTTP(http.NotFoundHandler())).Add(web.NextHTTP(metricTracking.ServeHTTP))
-	return stats.ToKeeperMany(map[string]string{"listener": name, "type": "http404"}, &metricTracking)
+	return stats.ToKeeperMany(map[string]string{"location": "listener", "name": name, "type": "http404"}, &metricTracking)
 }
 
 func setupChain(ctx context.Context, sink dpsink.Sink, name string, chainType string, getReader func(dpsink.Sink) ErrorReader) (*web.Handler, stats.Keeper) {
@@ -372,7 +372,7 @@ func setupChain(ctx context.Context, sink dpsink.Sink, name string, chainType st
 	}
 	metricTracking := web.RequestCounter{}
 	handler := web.NewHandler(ctx, &errorTracker).Add(web.NextHTTP(metricTracking.ServeHTTP))
-	st := stats.ToKeeperMany(map[string]string{"loc": "listener", "name": name, "type": "sfx_" + chainType}, &metricTracking, &errorTracker, counter)
+	st := stats.ToKeeperMany(map[string]string{"location": "listener", "name": name, "type": "sfx_" + chainType}, &metricTracking, &errorTracker, counter)
 	return handler, st
 }
 
