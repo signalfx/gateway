@@ -29,3 +29,11 @@ func TestCompositeCloser(t *testing.T) {
 	t2 := &errCloser{}
 	assert.Equal(t, errClose, CompositeCloser(t2, OkCloser(t1.Close)).Close())
 }
+
+func TestDimMakers(t *testing.T) {
+	_, exists := ListenerDims("a", "b")["name"]
+	assert.True(t, exists)
+
+	_, exists = ForwarderDims("a", "b")["name"]
+	assert.True(t, exists)
+}

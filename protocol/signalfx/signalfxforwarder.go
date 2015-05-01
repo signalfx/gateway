@@ -81,11 +81,7 @@ func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo) (protoco
 		*forwardTo.DefaultSource, *forwardTo.SourceDimensions)
 
 	counter := &dpsink.Counter{}
-	dims := map[string]string{
-		"name":     *forwardTo.Name,
-		"location": "forwarder",
-		"type":     "signalfx",
-	}
+	dims := protocol.ForwarderDims(*forwardTo.Name, "sfx_protobuf_v2")
 	buffer := dpbuffered.NewBufferedForwarder(ctx, *(&dpbuffered.Config{}).FromConfig(forwardTo), fwd)
 	return &protocol.CompositeForwarder{
 		Sink:   dpsink.FromChain(buffer, dpsink.NextWrap(counter)),

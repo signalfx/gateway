@@ -183,7 +183,7 @@ func NewListener(ctx context.Context, sink dpsink.Sink, conf listenerConfig, lis
 		conf:                conf,
 		metricDeconstructor: deconstructor,
 		ctx:                 ctx,
-		st:                  stats.ToKeeperMany(map[string]string{"location": "listener", "name": conf.name, "type": "carbon"}, counter),
+		st:                  stats.ToKeeperMany(protocol.ListenerDims(conf.name, "carbon"), counter),
 	}
 
 	go receiver.startListening()

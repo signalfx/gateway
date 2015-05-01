@@ -160,6 +160,6 @@ func SetupHandler(ctx context.Context, name string, sink dpsink.Sink) (*web.Hand
 		SendTo: dpsink.FromChain(sink, dpsink.NextWrap(counter)),
 	}
 	h := web.NewHandler(ctx, &collectdDecoder).Add(web.NextHTTP(metricTracking.ServeHTTP))
-	st := stats.ToKeeperMany(map[string]string{"location": "listener", "name": name, "type": "collectd"}, &metricTracking, counter, &collectdDecoder)
+	st := stats.ToKeeperMany(protocol.ListenerDims(name, "collectd"), &metricTracking, counter, &collectdDecoder)
 	return h, st
 }

@@ -30,6 +30,24 @@ type Listener interface {
 	io.Closer
 }
 
+// ListenerDims are the common stat dimensions we expect on listener protocols
+func ListenerDims(name string, typ string) map[string]string {
+	return map[string]string{
+		"location": "listener",
+		"name":     name,
+		"type":     typ,
+	}
+}
+
+// ForwarderDims are the common stat dimensions we expect on forwarder protocols
+func ForwarderDims(name string, typ string) map[string]string {
+	return map[string]string{
+		"location": "forwarder",
+		"name":     name,
+		"type":     typ,
+	}
+}
+
 // CompositeListener is a helper struct that expects users to inject their own versions of each
 // type
 type CompositeListener struct {
