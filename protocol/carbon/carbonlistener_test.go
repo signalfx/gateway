@@ -58,7 +58,6 @@ func TestCarbonHandleConnection(t *testing.T) {
 	conn.Close()
 	assert.Error(t, listener.handleConnection(conn))
 
-	assert.Equal(t, int64(0), listener.stats.totalEOFCloses)
 	conn, err = net.Dial("tcp", listeningDialAddress)
 	assert.NoError(t, err)
 	waitChan := make(chan struct{})

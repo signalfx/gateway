@@ -144,7 +144,7 @@ func TestProxyEmptyConfig(t *testing.T) {
 
 	ioutil.WriteFile(filename, []byte(`{}`), os.FileMode(0666))
 	proxyCommandLineConfigurationDefault.configFileName = filename
-	proxyCommandLineConfigurationDefault.pprofaddr = "127.0.0.1:0"
+	proxyCommandLineConfigurationDefault.pprofaddr = "localhost:99999"
 	go func() {
 		proxyCommandLineConfigurationDefault.stopChannel <- true
 	}()
