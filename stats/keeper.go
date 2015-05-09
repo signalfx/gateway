@@ -94,13 +94,13 @@ func (thread *StatDrainingThread) Stats() []*datapoint.Datapoint {
 	return points
 }
 
-func (thread *StatDrainingThread) start() {
+func (thread *StatDrainingThread) start() error {
 	log.WithField("listenFrom", thread.listenFrom).Info("Draining stats")
 	for {
 		select {
 		case <-thread.ctx.Done():
 			log.Debug("Request to stop stat thread")
-			return
+			return thread.ctx.Err()
 		case <-time.After(thread.delay):
 			points := thread.Stats()
 			for _, sendTo := range thread.sendTo {

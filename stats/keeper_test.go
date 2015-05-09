@@ -26,13 +26,20 @@ func (m *dimKeeperTest) Stats(dims map[string]string) []*datapoint.Datapoint {
 	return []*datapoint.Datapoint{nil}
 }
 
-func TestStatDrainingThread(t *testing.T) {
+func TestStatDrainingThreadSend(t *testing.T) {
 	testSink := dptest.NewBasicSink()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx, _ := context.WithCancel(context.Background())
 	drainer := NewDrainingThread(time.Millisecond, []dpsink.Sink{testSink}, []Keeper{&statKeeper{}}, ctx)
 	assert.Equal(t, 1, len(drainer.Stats()))
-	time.Sleep(time.Millisecond * 10)
+	<-testSink.PointsChan
+}
+
+func TestStatDrainingThreadCancel(t *testing.T) {
+	testSink := dptest.NewBasicSink()
+	ctx, cancel := context.WithCancel(context.Background())
+	drainer := NewDrainingThread(time.Hour, []dpsink.Sink{testSink}, []Keeper{&statKeeper{}}, ctx)
+	cancel()
+	assert.Equal(t, ctx.Err(), drainer.start())
 }
 
 func TestCombined(t *testing.T) {
