@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"sync/atomic"
+
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/nettest"
@@ -52,10 +54,19 @@ func TestCarbonHandleConnection(t *testing.T) {
 	conn, err := net.Dial("tcp", listeningDialAddress)
 	assert.NoError(t, err)
 	conn.Close()
-	// Drain for the next read
-	conn.Read(make([]byte, 100))
 	assert.Error(t, listener.handleConnection(conn))
 
+	assert.Equal(t, int64(0), listener.stats.totalEOFCloses)
+	conn, err = net.Dial("tcp", listeningDialAddress)
+	assert.NoError(t, err)
+	waitChan := make(chan struct{})
+	go func() {
+		time.Sleep(time.Millisecond * 10)
+		assert.NoError(t, conn.Close())
+		close(waitChan)
+	}()
+	<-waitChan
+	assert.NotEqual(t, int64(0), listener.stats.totalEOFCloses)
 }
 
 func TestListenerLoader(t *testing.T) {
@@ -71,13 +82,11 @@ func TestListenerLoader(t *testing.T) {
 	defer listener.Close()
 	listeningDialAddress := fmt.Sprintf("127.0.0.1:%d", nettest.TCPPort(listener.psocket))
 	assert.Equal(t, 9, len(listener.Stats()), "Should have no stats")
-	assert.NotEqual(t, listener, err, "Should be ok to make")
-
-	// Wait for the connection to timeout
-	time.Sleep(3 * time.Millisecond)
+	assert.NoError(t, err, "Should be ok to make")
 
 	conn, err := net.Dial("tcp", listeningDialAddress)
-	assert.Equal(t, nil, err, "Should be ok to make")
+	assert.NoError(t, err, "Should be ok to make")
+	assert.Equal(t, int64(0), listener.stats.invalidDatapoints)
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "%s %d %d\n\nINVALIDLINE", "ametric", 2, 2)
 	_, err = buf.WriteTo(conn)
@@ -87,4 +96,9 @@ func TestListenerLoader(t *testing.T) {
 	assert.Equal(t, "ametric", dp.Metric, "Should be metric")
 	i := dp.Value.(datapoint.IntValue).Int()
 	assert.Equal(t, int64(2), i, "Should get 2")
+
+	for atomic.LoadInt64(&listener.stats.retriedListenErrors) == 0 {
+		time.Sleep(time.Millisecond)
+	}
+	assert.Equal(t, int64(1), atomic.LoadInt64(&listener.stats.invalidDatapoints))
 }

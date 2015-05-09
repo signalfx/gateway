@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"sync"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
@@ -37,16 +39,20 @@ type Listener struct {
 
 	stats listenerStats
 	conf  listenerConfig
+	wg    sync.WaitGroup
 	ctx   context.Context
 }
 
 var _ protocol.Listener = &Listener{}
 
 type listenerStats struct {
-	totalDatapoints   int64
-	invalidDatapoints int64
-	totalConnections  int64
-	activeConnections int64
+	totalDatapoints     int64
+	idleTimeouts        int64
+	retriedListenErrors int64
+	totalEOFCloses      int64
+	invalidDatapoints   int64
+	totalConnections    int64
+	activeConnections   int64
 }
 
 // Stats reports information about the total points seen by carbon
@@ -77,7 +83,9 @@ func (listener *Listener) Stats() []*datapoint.Datapoint {
 
 // Close the exposed carbon port
 func (listener *Listener) Close() error {
-	return listener.psocket.Close()
+	err := listener.psocket.Close()
+	listener.wg.Wait()
+	return err
 }
 
 type carbonListenConn interface {
@@ -96,6 +104,7 @@ func (listener *Listener) handleConnection(conn carbonListenConn) error {
 		conn.SetDeadline(time.Now().Add(listener.conf.connectionTimeout))
 		bytes, err := reader.ReadBytes((byte)('\n'))
 		if err != nil && err != io.EOF {
+			atomic.AddInt64(&listener.stats.idleTimeouts, 1)
 			log.WithField("err", err).Warn("Listening for carbon data returned an error (Note: We timeout idle connections)")
 			return err
 		}
@@ -112,12 +121,14 @@ func (listener *Listener) handleConnection(conn carbonListenConn) error {
 		}
 
 		if err == io.EOF {
+			atomic.AddInt64(&listener.stats.totalEOFCloses, 1)
 			return nil
 		}
 	}
 }
 
 func (listener *Listener) startListening() {
+	defer listener.wg.Done()
 	defer log.Info("Carbon listener closed")
 	for {
 		deadlineable, ok := listener.psocket.(*net.TCPListener)
@@ -126,13 +137,15 @@ func (listener *Listener) startListening() {
 		}
 		conn, err := listener.psocket.Accept()
 		if err != nil {
-			timeoutError, ok := err.(net.Error)
-			if ok && timeoutError.Timeout() {
-				log.Debug("Timeout waiting for connection.  Expected, will continue")
-				continue
+			if netErr, ok := err.(net.Error); ok {
+				if netErr.Timeout() || netErr.Temporary() {
+					atomic.AddInt64(&listener.stats.retriedListenErrors, 1)
+					log.Debug("Timeout (or temp) waiting for connection.  Expected, will continue")
+					continue
+				}
 			}
-			log.WithField("err", err).Debug("Unable to accept a socket connection")
-			continue
+			log.WithField("err", err).Info("Unable to accept a socket connection")
+			return
 		}
 		go listener.handleConnection(conn)
 	}
@@ -185,6 +198,7 @@ func NewListener(ctx context.Context, sink dpsink.Sink, conf listenerConfig, lis
 		ctx:                 ctx,
 		st:                  stats.ToKeeperMany(protocol.ListenerDims(conf.name, "carbon"), counter),
 	}
+	receiver.wg.Add(1)
 
 	go receiver.startListening()
 	return &receiver, nil
