@@ -26,5 +26,5 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### Security
 - Placeholder
 
-[unreleased]: https://github.com/olivierlacan/keep-a-changelog/compare/v0.4.0...HEAD
+[unreleased]: https://github.com/signalfx/metricproxy/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/signalfx/metricproxy/compare/...v0.4.0
