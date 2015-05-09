@@ -38,4 +38,4 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - Placeholder
 
 [unreleased]: https://github.com/signalfx/metricproxy/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/signalfx/metricproxy/compare/...v0.4.0
+[0.4.0]: https://github.com/signalfx/metricproxy/compare/v0.0.1...v0.4.0
