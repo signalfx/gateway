@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"sync/atomic"
-
+	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/nettest"
@@ -40,8 +40,10 @@ func TestCarbonInvalidCarbonDeconstructorListenerLoader(t *testing.T) {
 }
 
 func TestCarbonHandleConnection(t *testing.T) {
+	log.Info("START TestCarbonHandleConnection")
+	defer log.Info("END   TestCarbonHandleConnection")
 	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0"),
+		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("localhost:0"),
 	}
 
 	ctx := context.Background()
@@ -49,7 +51,7 @@ func TestCarbonHandleConnection(t *testing.T) {
 	listener, err := ListenerLoader(ctx, forwardTo, listenFrom)
 	defer listener.Close()
 
-	listeningDialAddress := fmt.Sprintf("127.0.0.1:%d", nettest.TCPPort(listener.psocket))
+	listeningDialAddress := fmt.Sprintf("localhost:%d", nettest.TCPPort(listener.psocket))
 
 	conn, err := net.Dial("tcp", listeningDialAddress)
 	assert.NoError(t, err)
@@ -66,7 +68,10 @@ func TestCarbonHandleConnection(t *testing.T) {
 		close(waitChan)
 	}()
 	<-waitChan
-	assert.NotEqual(t, int64(0), listener.stats.totalEOFCloses)
+
+	for atomic.LoadInt64(&listener.stats.totalEOFCloses) == 0 {
+		time.Sleep(time.Millisecond)
+	}
 }
 
 func TestListenerLoader(t *testing.T) {
