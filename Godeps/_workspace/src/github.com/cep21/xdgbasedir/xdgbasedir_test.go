@@ -26,23 +26,23 @@ func TestGetAll(t *testing.T) {
 	}
 	defer resetEnv()
 
-	data_home, err := DataHomeDirectory()
+	dataHome, err := DataHomeDirectory()
 	if err != nil {
 		t.Error("Unexpected error ", err)
 	}
-	expectEquals(t, "/home/Person/.local/share", data_home, "Unexpected data")
+	expectEquals(t, "/home/Person/.local/share", dataHome, "Unexpected data")
 
-	config_home, err := ConfigHomeDirectory()
+	configHome, err := ConfigHomeDirectory()
 	if err != nil {
 		t.Error("Unexpected error ", err)
 	}
-	expectEquals(t, "/home/Person/.config", config_home, "Unexpected config")
+	expectEquals(t, "/home/Person/.config", configHome, "Unexpected config")
 
-	cache_home, err := CacheDirectory()
+	cacheHome, err := CacheDirectory()
 	if err != nil {
 		t.Error("Unexpected error ", err)
 	}
-	expectEquals(t, "/home/Person/.cache", cache_home, "Unexpected cache")
+	expectEquals(t, "/home/Person/.cache", cacheHome, "Unexpected cache")
 }
 
 func TestDirectories(t *testing.T) {

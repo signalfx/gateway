@@ -7,8 +7,8 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/Sirupsen/logrus",
-			"Comment": "v0.7.3-2-g26709e2",
-			"Rev": "26709e2714106fb8ad40b773b711ebce25b78914"
+			"Comment": "v0.7.3",
+			"Rev": "55eb11d21d2a31a3cc93838241d04800f52e823d"
 		},
 		{
 			"ImportPath": "github.com/cep21/gohelpers/stringhelper",
@@ -24,7 +24,7 @@
 		},
 		{
 			"ImportPath": "github.com/cep21/xdgbasedir",
-			"Rev": "4afd84c6661f1f571276dd1dc2944ffd21745b6a"
+			"Rev": "b123604ccc445c5759d1bc3b425defff797c3d8c"
 		},
 		{
 			"ImportPath": "github.com/golang/glog",
@@ -40,7 +40,7 @@
 		},
 		{
 			"ImportPath": "github.com/gorilla/mux",
-			"Rev": "660d31f8602b95058fed6833debf113e85350868"
+			"Rev": "8096f47503459bcc74d1f4c487b7e6e42e5746b5"
 		},
 		{
 			"ImportPath": "github.com/signalfx/com_signalfx_metrics_protobuf",
@@ -48,15 +48,15 @@
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/datapoint",
-			"Rev": "8ff5c303cf6284011e97bc8447f2968d32f5b979"
+			"Rev": "7e234685a590b0af362917971d01034e2b704acb"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/nettest",
-			"Rev": "8ff5c303cf6284011e97bc8447f2968d32f5b979"
+			"Rev": "7e234685a590b0af362917971d01034e2b704acb"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/web",
-			"Rev": "8ff5c303cf6284011e97bc8447f2968d32f5b979"
+			"Rev": "7e234685a590b0af362917971d01034e2b704acb"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
@@ -64,7 +64,7 @@
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
-			"Rev": "d175081df37eff8cda13f478bc11a0a65b39958b"
+			"Rev": "169f42267807fe93f4a4b0150583e410aefafe4e"
 		},
 		{
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",
