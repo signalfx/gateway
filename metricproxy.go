@@ -29,6 +29,8 @@ import (
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 )
 
+const versionString = "0.4.1-SNAPSHOT"
+
 // ForwardingLoader is the function definition of a function that can load a config
 // for a proxy and return the streamer
 type ForwardingLoader func(context.Context, *config.ForwardTo) (protocol.Forwarder, error)
@@ -99,7 +101,7 @@ func init() {
 	flag.BoolVar(&proxyCommandLineConfigurationDefault.logJSON, "logjson", false, "deprecated: Use config file instead...  Log in JSON format (usable with logstash)")
 
 	proxyCommandLineConfigurationDefault.stopChannel = make(chan bool)
-	proxyCommandLineConfigurationDefault.ctx = context.Background()
+	proxyCommandLineConfigurationDefault.ctx = context.WithValue(context.Background(), "version", versionString)
 	proxyCommandLineConfigurationDefault.closeWhenWaitingToStopChannel = make(chan struct{})
 }
 

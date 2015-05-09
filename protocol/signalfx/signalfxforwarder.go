@@ -68,6 +68,10 @@ func ForwarderLoader(ctx context.Context, forwardTo *config.ForwardTo) (protocol
 
 // ForwarderLoader1 is a more strictly typed version of ForwarderLoader
 func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo) (protocol.Forwarder, *Forwarder, error) {
+	proxyVersion, ok := ctx.Value("version").(string)
+	if !ok || proxyVersion == "" {
+		proxyVersion = "UNKNOWN_VERSION"
+	}
 	if forwardTo.FormatVersion == nil {
 		forwardTo.FormatVersion = workarounds.GolangDoesnotAllowPointerToUintLiteral(3)
 	}
@@ -78,7 +82,7 @@ func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo) (protoco
 	log.WithField("forwardTo", forwardTo).Info("Creating signalfx forwarder using final config")
 	fwd := NewSignalfxJSONForwarer(*forwardTo.URL, *forwardTo.TimeoutDuration,
 		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads,
-		*forwardTo.DefaultSource, *forwardTo.SourceDimensions)
+		*forwardTo.DefaultSource, *forwardTo.SourceDimensions, proxyVersion)
 
 	counter := &dpsink.Counter{}
 	dims := protocol.ForwarderDims(*forwardTo.Name, "sfx_protobuf_v2")
@@ -93,7 +97,7 @@ func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo) (protoco
 // NewSignalfxJSONForwarer creates a new JSON forwarder
 func NewSignalfxJSONForwarer(url string, timeout time.Duration,
 	defaultAuthToken string, drainingThreads uint32,
-	defaultSource string, sourceDimensions string) *Forwarder {
+	defaultSource string, sourceDimensions string, proxyVersion string) *Forwarder {
 	tr := &http.Transport{
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 		MaxIdleConnsPerHost:   int(drainingThreads) * 2,
@@ -105,7 +109,7 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration,
 	ret := &Forwarder{
 		url:              url,
 		defaultAuthToken: defaultAuthToken,
-		userAgent:        fmt.Sprintf("SignalfxProxy/0.4 (gover %s)", runtime.Version()),
+		userAgent:        fmt.Sprintf("SignalfxProxy/%s (gover %s)", proxyVersion, runtime.Version()),
 		tr:               tr,
 		client: &http.Client{
 			Transport: tr,

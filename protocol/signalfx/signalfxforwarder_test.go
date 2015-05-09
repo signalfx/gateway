@@ -285,7 +285,7 @@ func TestBasicSend(t *testing.T) {
 	}))
 	defer testServer.Close()
 
-	f := NewSignalfxJSONForwarer("", time.Second, "", 10, "", "")
+	f := NewSignalfxJSONForwarer("", time.Second, "", 10, "", "", "")
 	f.UserAgent("abcd")
 	f.AuthToken("abcdefg")
 	f.Endpoint(testServer.URL)
