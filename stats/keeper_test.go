@@ -28,7 +28,8 @@ func (m *dimKeeperTest) Stats(dims map[string]string) []*datapoint.Datapoint {
 
 func TestStatDrainingThreadSend(t *testing.T) {
 	testSink := dptest.NewBasicSink()
-	ctx, _ := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	drainer := NewDrainingThread(time.Millisecond, []dpsink.Sink{testSink}, []Keeper{&statKeeper{}}, ctx)
 	assert.Equal(t, 1, len(drainer.Stats()))
 	<-testSink.PointsChan
