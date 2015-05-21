@@ -7,6 +7,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased][unreleased]
 
+
+## [0.5.0] - 2015-05-21
+
 ### Added
 
 - Added a changelog
@@ -40,3 +43,4 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 [unreleased]: https://github.com/signalfx/metricproxy/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/signalfx/metricproxy/compare/v0.0.1...v0.4.0
+[0.5.0]: https://github.com/signalfx/metricproxy/compare/v0.4.0...v0.5.0

@@ -29,7 +29,7 @@ import (
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 )
 
-const versionString = "0.4.1-SNAPSHOT"
+const versionString = "0.5.0"
 
 // ForwardingLoader is the function definition of a function that can load a config
 // for a proxy and return the streamer
