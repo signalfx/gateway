@@ -37,7 +37,7 @@ func NewCarbonDatapoint(line string, metricDeconstructor metricdeconstructor.Met
 		return nil, fmt.Errorf("invalid carbon input line: %s", line)
 	}
 	originalMetricName := parts[0]
-	metricName, dimensions, err := metricDeconstructor.Parse(originalMetricName)
+	metricName, mtype, dimensions, err := metricDeconstructor.Parse(originalMetricName)
 	if err != nil {
 		return nil, err
 	}
@@ -60,5 +60,5 @@ func NewCarbonDatapoint(line string, metricDeconstructor metricdeconstructor.Met
 	if err != nil {
 		return nil, err
 	}
-	return datapoint.NewWithMeta(metricName, dimensions, meta, v, datapoint.Gauge, time.Unix(0, metricTime*int64(time.Second))), nil
+	return datapoint.NewWithMeta(metricName, dimensions, meta, v, mtype, time.Unix(0, metricTime*int64(time.Second))), nil
 }

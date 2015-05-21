@@ -225,7 +225,10 @@ dot delimited name.
 
 This config will pull dimensions out of graphite metrics if they fit the commakeys
 format.  That format is "\_METRIC_NAME\_\[KEY:VALUE,KEY:VALUE]".  For example,
-"user.hit_rate\[host:server1,type:production]".
+"user.hit_rate\[host:server1,type:production]".  It also has the extra option
+of adding a metric type to the datapoints.  For example, if one of the
+dimensions is "sf_type" in this config and the dimension's value is "count",
+then the value is sent upstream as a datapoint.Count.
 
 ```
 {
@@ -234,7 +237,7 @@ format.  That format is "\_METRIC_NAME\_\[KEY:VALUE,KEY:VALUE]".  For example,
     {
       "Type": "carbon",
       "ListenAddr" : "0.0.0.0:2003",
-      "MetricDeconstructor": "commakeys"
+      "MetricDeconstructor": "commakeys,mtypedim:sf_type"
     },
   ],
 
