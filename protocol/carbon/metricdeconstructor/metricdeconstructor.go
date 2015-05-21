@@ -1,11 +1,15 @@
 package metricdeconstructor
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/signalfx/golib/datapoint"
+)
 
 // MetricDeconstructor is an object that can deconstruct a single metric name into what dimensions
 // it should represent.  Useful for compatability with non dimentioned stores, like graphite
 type MetricDeconstructor interface {
-	Parse(originalMetric string) (newMetric string, dimension map[string]string, err error)
+	Parse(originalMetric string) (newMetric string, mtype datapoint.MetricType, dimension map[string]string, err error)
 }
 
 type loader func(string) (MetricDeconstructor, error)

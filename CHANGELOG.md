@@ -10,6 +10,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 
 - Added a changelog
+- Carbon datapoint now support mtypedim options
 
 ## [0.4.0] - 2015-05-08
 

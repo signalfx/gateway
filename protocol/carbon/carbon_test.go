@@ -11,8 +11,8 @@ import (
 
 type errorDeconstructor struct{}
 
-func (parser *errorDeconstructor) Parse(originalMetric string) (string, map[string]string, error) {
-	return "", nil, errors.New("error parsing")
+func (parser *errorDeconstructor) Parse(originalMetric string) (string, datapoint.MetricType, map[string]string, error) {
+	return "", datapoint.Gauge, nil, errors.New("error parsing")
 }
 
 func TestNewCarbonDatapoint(t *testing.T) {
