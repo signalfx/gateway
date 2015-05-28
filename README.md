@@ -237,7 +237,8 @@ then the value is sent upstream as a datapoint.Count.
     {
       "Type": "carbon",
       "ListenAddr" : "0.0.0.0:2003",
-      "MetricDeconstructor": "commakeys,mtypedim:sf_type"
+      "MetricDeconstructor": "commakeys",
+      "MetricDeconstructorOptions": "mtypedim:sf_type"
     },
   ],
 
