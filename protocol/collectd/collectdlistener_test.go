@@ -76,7 +76,44 @@ const testCollectdBody = `[
         "values": [
             1962600000.0
         ]
+    },
+	{
+        "dsnames": [
+            "value"
+        ],
+        "dstypes": [
+            "gauge"
+        ],
+        "host": "mwp-signalbox",
+        "interval": 10.0,
+        "plugin": "tail",
+        "plugin_instance": "analytics[f=x]",
+        "time": 1434477504.484,
+        "type": "memory",
+        "type_instance": "old_gen_end[k1=v1,k2=v2]",
+        "values": [
+            26790
+        ]
+    },
+	{
+        "dsnames": [
+            "value"
+        ],
+        "dstypes": [
+            "gauge"
+        ],
+        "host": "mwp-signalbox",
+        "interval": 10.0,
+        "plugin": "tail",
+        "plugin_instance": "analytics[f=x]",
+        "time": 1434477504.484,
+        "type": "memory",
+        "type_instance": "total_heap_space[k1=v1,k2=v2]",
+        "values": [
+            1035520.0
+        ]
     }
+
 ]`
 
 func TestInvalidListen(t *testing.T) {
@@ -110,6 +147,8 @@ func TestCollectDListener(t *testing.T) {
 		assert.Equal(t, "load.longterm", dps[2].Metric, "Metric not named correctly")
 		assert.Equal(t, "memory.used", dps[3].Metric, "Metric not named correctly")
 		assert.Equal(t, "df_complex.free", dps[4].Metric, "Metric not named correctly")
+		assert.Equal(t, "memory.old_gen_end", dps[5].Metric, "Metric not named correctly")
+		assert.Equal(t, "memory.total_heap_space", dps[6].Metric, "Metric not named correctly")
 	}()
 	resp, err := client.Do(req)
 	assert.Nil(t, err)
@@ -146,6 +185,8 @@ func TestCollectDListenerWithQueryParams(t *testing.T) {
 	loadExpectedDims := map[string]string{"foo": "bar", "zam": "narf", "plugin": "load", "host": "i-b13d1e5f"}
 	memoryExpectedDims := map[string]string{"host": "i-b13d1e5f", "plugin": "memory", "dsname": "value", "foo": "bar", "zam": "narf"}
 	dfComplexExpectedDims := map[string]string{"plugin": "df", "plugin_instance": "dev", "dsname": "value", "foo": "bar", "zam": "narf", "host": "i-b13d1e5f"}
+	parsedInstanceExpectedDims := map[string]string{"foo": "bar", "zam": "narf", "host": "mwp-signalbox", "f": "x", "plugin_instance": "analytics", "k1": "v1", "k2": "v2", "dsname": "value", "plugin": "tail"}
+
 	go func() {
 		dps := <-sendTo.PointsChan
 		assert.Equal(t, "load.shortterm", dps[0].Metric, "Metric not named correctly")
@@ -162,6 +203,12 @@ func TestCollectDListenerWithQueryParams(t *testing.T) {
 
 		assert.Equal(t, "df_complex.free", dps[4].Metric, "Metric not named correctly")
 		assert.Equal(t, dfComplexExpectedDims, dps[4].Dimensions, "Dimensions not set correctly")
+
+		assert.Equal(t, "memory.old_gen_end", dps[5].Metric, "Metric not named correctly")
+		assert.Equal(t, parsedInstanceExpectedDims, dps[5].Dimensions, "Dimensions not set correctly")
+
+		assert.Equal(t, "memory.total_heap_space", dps[6].Metric, "Metric not named correctly")
+		assert.Equal(t, parsedInstanceExpectedDims, dps[6].Dimensions, "Dimensions not set correctly")
 	}()
 	resp := httptest.NewRecorder()
 	c.ServeHTTPC(ctx, resp, req)
