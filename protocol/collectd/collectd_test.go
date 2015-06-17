@@ -157,17 +157,17 @@ func TestCollectdJsonDecoding(t *testing.T) {
 
 func TestCollectdParseInstanceNameForDimensions(t *testing.T) {
 	var tests = []struct {
-        val string
-        dim map[string]string
+		val string
+		dim map[string]string
 	}{
-        {"name[k=v,f=x]", map[string]string{"k": "v", "f": "x", "instance": "name"}},
-        {"name[k=v,f=x]-rest", map[string]string{"k": "v", "f": "x", "instance": "name-rest"}},
-        {"name[k=v,f=x]-middle-[g=h]-more", map[string]string{"k": "v", "f": "x", "instance": "name-middle-[g=h]-more"}},
-        {"namek=v,f=x]-middle-[g=h]-more", map[string]string{"g": "h", "instance": "namek=v,f=x]-middle--more"}},
-        {"name[k=v,f=x-middle-[g=h]-more", map[string]string{"instance": "name[k=v,f=x-middle-[g=h]-more"}},
-        {"name", map[string]string{"instance": "name"}},
-        {"name[k=v", map[string]string{"instance": "name[k=v"}},
-    }
+		{"name[k=v,f=x]", map[string]string{"k": "v", "f": "x", "instance": "name"}},
+		{"name[k=v,f=x]-rest", map[string]string{"k": "v", "f": "x", "instance": "name-rest"}},
+		{"name[k=v,f=x]-middle-[g=h]-more", map[string]string{"k": "v", "f": "x", "instance": "name-middle-[g=h]-more"}},
+		{"namek=v,f=x]-middle-[g=h]-more", map[string]string{"g": "h", "instance": "namek=v,f=x]-middle--more"}},
+		{"name[k=v,f=x-middle-[g=h]-more", map[string]string{"instance": "name[k=v,f=x-middle-[g=h]-more"}},
+		{"name", map[string]string{"instance": "name"}},
+		{"name[k=v", map[string]string{"instance": "name[k=v"}},
+	}
 	for _, test := range tests {
 		inputDim := make(map[string]string)
 		parseInstanceNameForDimensions(inputDim, "instance", true, &test.val)
