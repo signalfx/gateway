@@ -7,10 +7,10 @@ go:
 
 install:
   - sudo apt-get update
-  - sudo apt-get install -y ghc6 ghc6-prof ghc6-doc cabal-install
-  - cabal update || cabal update || cabal update # damn you travis-ci.org
-  - cabal install shellcheck
-  - sudo ln ~/.cabal/bin/shellcheck /usr/bin/shellcheck
+  - sudo apt-get install -y ghc6 ghc6-prof ghc6-doc cabal-install shellcheck
+#  - cabal update || cabal update || cabal update # damn you travis-ci.org
+#  - cabal install shellcheck
+#  - sudo ln ~/.cabal/bin/shellcheck /usr/bin/shellcheck
   - go get github.com/stretchr/testify/mock
   - go get github.com/tools/godep
   - go get -u github.com/cep21/goverify
