@@ -1,20 +1,11 @@
 package collectd
 
 import (
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/signalfx/golib/datapoint"
 )
-
-var instancere *regexp.Regexp
-var dimre *regexp.Regexp
-
-func init() {
-	instancere, _ = regexp.Compile("(.*)\\[(.*)\\]")
-	dimre, _ = regexp.Compile("([0-9a-zA-Z_\\.]+)=([0-9a-zA-Z_\\.]+)")
-}
 
 // JSONWriteBody is the full POST body of collectd's write_http format
 type JSONWriteBody []*JSONWriteFormat
@@ -92,29 +83,42 @@ func addIfNotNullOrEmpty(dimensions map[string]string, key string, cond bool, va
 		dimensions[key] = *val
 	}
 }
-func getDimensionsFromName(val *string) (string, map[string]string) {
-	toAddDims := make(map[string]string)
-	answers := instancere.FindStringSubmatch(*val)
-	instanceName := *val
-	if len(answers) > 2 {
-		instanceName = answers[1]
-		dimensions := answers[2]
-		dims := dimre.FindAllStringSubmatchIndex(dimensions, -1)
-		for i := 0; i < len(dims); i++ {
-			delem := dims[i]
-			left := dimensions[delem[2]:delem[3]]
-			right := dimensions[delem[4]:delem[5]]
-			toAddDims[left] = right
+
+// try to pull out dimensions out of name in the format name[k=v,f=x]-morename would
+// return name-morename and extract dimensions (k,v) and (f,x)
+// if we encounter something we don't expect use original
+func getDimensionsFromName(val *string) (instanceName string, toAddDims map[string]string) {
+	toAddDims = make(map[string]string)
+	working := make(map[string]string)
+	instanceName = *val
+	index := strings.Index(*val, "[")
+	if index > -1 {
+		left := (*val)[:index]
+		rest := (*val)[index+1:]
+		index = strings.Index(rest, "]")
+		if index > -1 {
+			dimensions := rest[:index]
+			rest = rest[index+1:]
+			pieces := strings.Split(dimensions, ",")
+			for i := range pieces {
+				tokens := strings.Split(pieces[i], "=")
+				if len(tokens) != 2 {
+					return
+				}
+				working[tokens[0]] = tokens[1]
+			}
+			toAddDims = working
+			instanceName = left + rest
 		}
 	}
-	return instanceName, toAddDims
+	return
 }
 
 func parseInstanceNameForDimensions(dimensions map[string]string, key string, cond bool, val *string) {
 	instanceName, toAddDims := getDimensionsFromName(val)
 
 	for k, v := range toAddDims {
-		if _, ok := dimensions[k]; !ok {
+		if _, exists := dimensions[k]; !exists {
 			addIfNotNullOrEmpty(dimensions, k, true, &v)
 		}
 	}
