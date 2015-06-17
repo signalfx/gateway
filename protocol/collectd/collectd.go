@@ -63,10 +63,10 @@ func NewDatapoint(point *JSONWriteFormat, index uint, defaultDimensions map[stri
 	// Don't add empty dimensions
 	addIfNotNullOrEmpty(dimensions, "host", true, point.Host)
 	addIfNotNullOrEmpty(dimensions, "plugin", true, point.Plugin)
-	addIfNotNullOrEmpty(dimensions, "plugin_instance", true, point.PluginInstance)
+	parseInstanceNameForDimensions(dimensions, "plugin_instance", true, point.PluginInstance)
 
 	_, usedInMetricName := usedParts["type_instance"]
-	addIfNotNullOrEmpty(dimensions, "type_instance", !usedInMetricName, point.TypeInstance)
+	parseInstanceNameForDimensions(dimensions, "type_instance", !usedInMetricName, point.TypeInstance)
 
 	_, usedInMetricName = usedParts["type"]
 	addIfNotNullOrEmpty(dimensions, "type", !usedInMetricName, point.TypeS)
@@ -84,6 +84,47 @@ func addIfNotNullOrEmpty(dimensions map[string]string, key string, cond bool, va
 	}
 }
 
+// try to pull out dimensions out of name in the format name[k=v,f=x]-morename would
+// return name-morename and extract dimensions (k,v) and (f,x)
+// if we encounter something we don't expect use original
+func getDimensionsFromName(val *string) (instanceName string, toAddDims map[string]string) {
+	toAddDims = make(map[string]string)
+	working := make(map[string]string)
+	instanceName = *val
+	index := strings.Index(*val, "[")
+	if index > -1 {
+		left := (*val)[:index]
+		rest := (*val)[index+1:]
+		index = strings.Index(rest, "]")
+		if index > -1 {
+			dimensions := rest[:index]
+			rest = rest[index+1:]
+			pieces := strings.Split(dimensions, ",")
+			for i := range pieces {
+				tokens := strings.Split(pieces[i], "=")
+				if len(tokens) != 2 {
+					return
+				}
+				working[tokens[0]] = tokens[1]
+			}
+			toAddDims = working
+			instanceName = left + rest
+		}
+	}
+	return
+}
+
+func parseInstanceNameForDimensions(dimensions map[string]string, key string, cond bool, val *string) {
+	instanceName, toAddDims := getDimensionsFromName(val)
+
+	for k, v := range toAddDims {
+		if _, exists := dimensions[k]; !exists {
+			addIfNotNullOrEmpty(dimensions, k, true, &v)
+		}
+	}
+	addIfNotNullOrEmpty(dimensions, key, cond, &instanceName)
+}
+
 func getReasonableMetricName(point *JSONWriteFormat, index uint) (string, map[string]struct{}) {
 	parts := []string{}
 	usedParts := make(map[string]struct{})
@@ -92,7 +133,8 @@ func getReasonableMetricName(point *JSONWriteFormat, index uint) (string, map[st
 		usedParts["type"] = struct{}{}
 	}
 	if !isNilOrEmpty(point.TypeInstance) {
-		parts = append(parts, *point.TypeInstance)
+		instanceName, _ := getDimensionsFromName(point.TypeInstance)
+		parts = append(parts, instanceName)
 		usedParts["type_instance"] = struct{}{}
 	}
 	if !isNilOrEmpty(point.Dsnames[index]) && len(point.Dsnames) > 1 {

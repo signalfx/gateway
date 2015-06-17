@@ -5,7 +5,9 @@ Placeholder changes in the oldest release exist only to document which
 subsections are relevant.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased][unreleased]
+## [0.6.0] - 2015-06-17
+
+- Taught it how to parse dimensions from instance names of the format name[k=v]suffix
 
 
 ## [0.5.0] - 2015-05-21
