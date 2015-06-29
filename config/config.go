@@ -13,6 +13,7 @@ import (
 // ForwardTo configures where we forward datapoints to
 type ForwardTo struct {
 	URL               *string
+	EventURL          *string
 	Host              *string
 	Port              *uint16
 	Type              string

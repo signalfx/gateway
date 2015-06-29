@@ -4,8 +4,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/event"
 	"golang.org/x/net/context"
 )
 
@@ -38,9 +39,27 @@ func (e *RateLimitErrorLogging) AddDatapoints(ctx context.Context, points []*dat
 	return err
 }
 
+// AddEvents forwards points and will log any errors forwarding, but only one per LogThrottle
+// duration
+func (e *RateLimitErrorLogging) AddEvents(ctx context.Context, points []*event.Event, next Sink) error {
+	err := next.AddEvents(ctx, points)
+	if err != nil {
+		now := time.Now()
+		lastLogTimeNs := atomic.LoadInt64(&e.lastLogTimeNs)
+		sinceLastLogNs := now.UnixNano() - lastLogTimeNs
+		if sinceLastLogNs > e.LogThrottle.Nanoseconds() {
+			nowUnixNs := now.UnixNano()
+			if atomic.CompareAndSwapInt64(&e.lastLogTimeNs, lastLogTimeNs, nowUnixNs) {
+				e.Callback(err)
+			}
+		}
+	}
+	return err
+}
+
 // LogCallback returns a callback that logs an error to logger with msg at Warn
-func LogCallback(msg string, log *logrus.Logger) ErrCallback {
+func LogCallback(msg string, l *log.Logger) ErrCallback {
 	return func(err error) {
-		log.WithField("err", err.Error()).Warn(msg)
+		l.WithField("err", err.Error()).Warn(msg)
 	}
 }

@@ -4,6 +4,8 @@ import (
 	"net"
 	"testing"
 
+	"fmt"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,4 +15,11 @@ func TestListenerPort(t *testing.T) {
 	defer psocket.Close()
 	p := TCPPort(psocket)
 	assert.True(t, p > 0)
+}
+
+func TestFreeTCPPort(t *testing.T) {
+	p := FreeTCPPort()
+	n, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", p))
+	assert.NoError(t, err)
+	n.Close()
 }

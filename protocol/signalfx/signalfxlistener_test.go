@@ -334,7 +334,7 @@ func TestMetricHandler(t *testing.T) {
 func TestStatSize(t *testing.T) {
 	listener, _, _ := localSetup(t)
 	defer listener.Close()
-	assert.Equal(t, 54, len(listener.Stats()))
+	assert.Equal(t, 59, len(listener.Stats()))
 }
 
 func TestInvalidContentType(t *testing.T) {

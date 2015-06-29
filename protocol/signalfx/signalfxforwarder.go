@@ -24,6 +24,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/event"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/dp/dpbuffered"
 	"github.com/signalfx/metricproxy/dp/dpsink"
@@ -36,6 +37,7 @@ import (
 type Forwarder struct {
 	propertyLock          sync.Mutex
 	url                   string
+	eventURL              string
 	defaultAuthToken      string
 	tr                    *http.Transport
 	client                *http.Client
@@ -45,10 +47,12 @@ type Forwarder struct {
 	emptyMetricNameFilter dpsink.EmptyMetricFilter
 
 	protoMarshal func(pb proto.Message) ([]byte, error)
+	jsonMarshal  func(v interface{}) ([]byte, error)
 }
 
 var defaultConfigV2 = &config.ForwardTo{
 	URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("https://ingest.signalfx.com/v2/datapoint"),
+	EventURL:          workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfx.com/v1/event"),
 	DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
 	MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral(""), // Not used
 	TimeoutDuration:   workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 60),
@@ -83,7 +87,7 @@ func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo) (protoco
 	fwd := NewSignalfxJSONForwarer(*forwardTo.URL, *forwardTo.TimeoutDuration,
 		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads,
 		*forwardTo.DefaultSource, *forwardTo.SourceDimensions, proxyVersion)
-
+	fwd.eventURL = *forwardTo.EventURL
 	counter := &dpsink.Counter{}
 	dims := protocol.ForwarderDims(*forwardTo.Name, "sfx_protobuf_v2")
 	buffer := dpbuffered.NewBufferedForwarder(ctx, *(&dpbuffered.Config{}).FromConfig(forwardTo), fwd)
@@ -115,6 +119,7 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration,
 			Transport: tr,
 		},
 		protoMarshal:  proto.Marshal,
+		jsonMarshal:   json.Marshal,
 		defaultSource: defaultSource,
 		// sf_source is always a dimension that can be a source
 		dimensionSources: append([]string{"sf_source"}, strings.Split(sourceDimensions, ",")...),
@@ -134,6 +139,35 @@ func (connector *Forwarder) encodePostBodyProtobufV2(datapoints []*datapoint.Dat
 
 	// Now we can send datapoints
 	return protobytes, "application/x-protobuf", err
+}
+
+// JSONEvent is used to wrap event object so we can format it as expected
+type JSONEvent struct {
+	EventType  string                 `json:"eventType"`
+	Category   string                 `json:"category"`
+	Dimensions map[string]string      `json:"dimensions"`
+	Meta       map[string]interface{} `json:"properties"`
+	Timestamp  int64                  `json:"timestamp"`
+}
+
+func newJSONEvent(event *event.Event) *JSONEvent {
+	return &JSONEvent{EventType: event.EventType,
+		Category:   event.Category,
+		Dimensions: event.Dimensions,
+		Meta:       event.Meta,
+		Timestamp:  event.Timestamp.UnixNano() / time.Millisecond.Nanoseconds()}
+}
+
+func (connector *Forwarder) encodeEventPostBodyJSON(events []*event.Event) ([]byte, error) {
+	var buffer []byte
+	for i := range events {
+		protobytes, err := connector.jsonMarshal(newJSONEvent(events[i]))
+		if err != nil {
+			return buffer, err
+		}
+		buffer = append(buffer, protobytes...)
+	}
+	return buffer, nil
 }
 
 func datumForPoint(pv datapoint.Value) *com_signalfx_metrics_protobuf.Datum {
@@ -214,6 +248,13 @@ func (connector *Forwarder) Endpoint(endpoint string) {
 	connector.url = endpoint
 }
 
+// EventEndpoint sets where events are sent
+func (connector *Forwarder) EventEndpoint(endpoint string) {
+	connector.propertyLock.Lock()
+	defer connector.propertyLock.Unlock()
+	connector.eventURL = endpoint
+}
+
 // UserAgent sets the User-Agent header on the request
 func (connector *Forwarder) UserAgent(ua string) {
 	connector.propertyLock.Lock()
@@ -247,8 +288,9 @@ func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*dat
 	connector.propertyLock.Lock()
 	endpoint := connector.url
 	userAgent := connector.userAgent
-	defautlAuthToken := connector.defaultAuthToken
+	defaultAuthToken := connector.defaultAuthToken
 	connector.propertyLock.Unlock()
+
 	datapoints = connector.emptyMetricNameFilter.FilterDatapoints(datapoints)
 	if len(datapoints) == 0 {
 		return nil
@@ -261,9 +303,37 @@ func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*dat
 			message:       "Unable to marshal object",
 		}
 	}
+	return connector.sendBytes(endpoint, bodyType, defaultAuthToken, userAgent, jsonBytes)
+
+}
+
+// AddEvents forwards events to SignalFx
+func (connector *Forwarder) AddEvents(ctx context.Context, events []*event.Event) error {
+	connector.propertyLock.Lock()
+	endpoint := connector.eventURL
+	userAgent := connector.userAgent
+	defaultAuthToken := connector.defaultAuthToken
+	connector.propertyLock.Unlock()
+
+	// could filter here
+	if len(events) == 0 {
+		return nil
+	}
+	jsonBytes, err := connector.encodeEventPostBodyJSON(events)
+
+	if err != nil {
+		return &forwardError{
+			originalError: err,
+			message:       "Unable to marshal object",
+		}
+	}
+	return connector.sendBytes(endpoint, "application/json", defaultAuthToken, userAgent, jsonBytes)
+}
+
+func (connector *Forwarder) sendBytes(endpoint string, bodyType string, defaultAuthToken string, userAgent string, jsonBytes []byte) error {
 	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBytes))
 	req.Header.Set("Content-Type", bodyType)
-	req.Header.Set(TokenHeaderName, defautlAuthToken)
+	req.Header.Set(TokenHeaderName, defaultAuthToken)
 	req.Header.Set("User-Agent", userAgent)
 
 	req.Header.Set("Connection", "Keep-Alive")

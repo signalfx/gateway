@@ -85,7 +85,7 @@ func TestListenerLoader(t *testing.T) {
 	assert.Equal(t, nil, err, "Should be ok to make")
 	defer listener.Close()
 	listeningDialAddress := fmt.Sprintf("127.0.0.1:%d", nettest.TCPPort(listener.psocket))
-	assert.Equal(t, 9, len(listener.Stats()), "Should have no stats")
+	assert.Equal(t, numStats, len(listener.Stats()), "Should have no stats")
 	assert.NoError(t, err, "Should be ok to make")
 
 	conn, err := net.Dial("tcp", listeningDialAddress)

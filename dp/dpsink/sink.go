@@ -2,18 +2,21 @@ package dpsink
 
 import (
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/event"
 	"golang.org/x/net/context"
 )
 
-// A Sink is an object that can accept datapoints and do something with them, like forward them
+// A Sink is an object that can accept datapoints or events and do something with them, like forward them
 // to some endpoint
 type Sink interface {
 	AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error
+	AddEvents(ctx context.Context, events []*event.Event) error
 }
 
 // NextSink is a special case of a sink that forwards to another sink
 type NextSink interface {
 	AddDatapoints(ctx context.Context, points []*datapoint.Datapoint, next Sink) error
+	AddEvents(ctx context.Context, events []*event.Event, next Sink) error
 }
 
 // A MiddlewareConstructor is used by FromChain to chain together a bunch of sinks that forward
@@ -36,6 +39,10 @@ type nextWrapped struct {
 
 func (n *nextWrapped) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
 	return n.wrapping.AddDatapoints(ctx, points, n.forwardTo)
+}
+
+func (n *nextWrapped) AddEvents(ctx context.Context, events []*event.Event) error {
+	return n.wrapping.AddEvents(ctx, events, n.forwardTo)
 }
 
 // NextWrap wraps a NextSink to make it usable by MiddlewareConstructor

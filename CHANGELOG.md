@@ -5,6 +5,12 @@ Placeholder changes in the oldest release exist only to document which
 subsections are relevant.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.7.0] - 2015-07-13
+
+### Added
+
+- Support notifications sent from collectd write_http and send to api as events
+
 ## [0.6.0] - 2015-06-17
 
 ### Added

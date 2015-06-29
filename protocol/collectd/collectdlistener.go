@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/dp/dpsink"
 	"github.com/signalfx/metricproxy/protocol"
@@ -62,6 +63,23 @@ func (decoder *JSONDecoder) ServeHTTPC(ctx context.Context, rw http.ResponseWrit
 	rw.Write([]byte(`"OK"`))
 }
 
+func newDataPoints(f *JSONWriteFormat, defaultDims map[string]string) []*datapoint.Datapoint {
+	dps := make([]*datapoint.Datapoint, 0, len(f.Dsnames))
+	for i := range f.Dsnames {
+		if i < len(f.Dstypes) && i < len(f.Values) && f.Values[i] != nil {
+			dps = append(dps, NewDatapoint(f, uint(i), defaultDims))
+		}
+	}
+	return dps
+}
+
+func newEvent(f *JSONWriteFormat, defaultDims map[string]string) *event.Event {
+	if f.Time != nil && f.Severity != nil && f.Message != nil {
+		return NewEvent(f, defaultDims)
+	}
+	return nil
+}
+
 func (decoder *JSONDecoder) Read(ctx context.Context, req *http.Request) error {
 	defaultDims := decoder.defaultDims(req)
 	var d JSONWriteBody
@@ -69,17 +87,21 @@ func (decoder *JSONDecoder) Read(ctx context.Context, req *http.Request) error {
 	if err != nil {
 		return err
 	}
+	es := make([]*event.Event, 0, len(d)*2)
 	dps := make([]*datapoint.Datapoint, 0, len(d)*2)
 	for _, f := range d {
-		if f.TypeS != nil && f.Time != nil {
-			for i := range f.Dsnames {
-				if i < len(f.Dstypes) && i < len(f.Values) && f.Values[i] != nil {
-					dps = append(dps, NewDatapoint(f, uint(i), defaultDims))
-				}
-			}
+		if e := newEvent(f, defaultDims); e == nil {
+			dps = append(dps, newDataPoints(f, defaultDims)...)
+		} else {
+			es = append(es, e)
 		}
 	}
-	return decoder.SendTo.AddDatapoints(ctx, dps)
+	derr := decoder.SendTo.AddDatapoints(ctx, dps)
+	eerr := decoder.SendTo.AddEvents(ctx, es)
+	if derr != nil {
+		return derr
+	}
+	return eerr
 }
 
 func (decoder *JSONDecoder) defaultDims(req *http.Request) map[string]string {
