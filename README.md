@@ -227,7 +227,7 @@ This config will pull dimensions out of graphite metrics if they fit the commake
 format.  That format is "\_METRIC_NAME\_\[KEY:VALUE,KEY:VALUE]".  For example,
 "user.hit_rate\[host:server1,type:production]".  It also has the extra option
 of adding a metric type to the datapoints.  For example, if one of the
-dimensions is "sf_type" in this config and the dimension's value is "count",
+dimensions is "metrictype" in this config and the dimension's value is "count",
 then the value is sent upstream as a datapoint.Count.
 
 ```
@@ -238,7 +238,7 @@ then the value is sent upstream as a datapoint.Count.
       "Type": "carbon",
       "ListenAddr" : "0.0.0.0:2003",
       "MetricDeconstructor": "commakeys",
-      "MetricDeconstructorOptions": "mtypedim:sf_type"
+      "MetricDeconstructorOptions": "mtypedim:metrictype"
     },
   ],
 
