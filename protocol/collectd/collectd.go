@@ -84,38 +84,39 @@ func addIfNotNullOrEmpty(dimensions map[string]string, key string, cond bool, va
 	}
 }
 
-// try to pull out dimensions out of name in the format name[k=v,f=x]-morename would
+// getDimensionsFromName pulls out dimensions out of name in the format name[k=v,f=x]-morename would
 // return name-morename and extract dimensions (k,v) and (f,x)
-// if we encounter something we don't expect use original
-func getDimensionsFromName(val *string) (instanceName string, toAddDims map[string]string) {
-	toAddDims = make(map[string]string)
-	working := make(map[string]string)
-	instanceName = *val
-	index := strings.Index(*val, "[")
-	if index > -1 {
-		left := (*val)[:index]
-		rest := (*val)[index+1:]
-		index = strings.Index(rest, "]")
-		if index > -1 {
-			dimensions := rest[:index]
-			rest = rest[index+1:]
+// if we encounter something we don't expect use original.  This function considers dimensions in
+// the last, smallest [] in instanceName
+func getDimensionsFromName(instanceName string) (string, map[string]string) {
+	openBracketIndex := strings.LastIndex(instanceName, "[")
+	if openBracketIndex > -1 {
+		left := instanceName[:openBracketIndex]
+		rest := instanceName[openBracketIndex+1:]
+		closeBracketIndex := strings.Index(rest, "]")
+		if closeBracketIndex > -1 {
+			dimensions := rest[:closeBracketIndex]
+			rest = rest[closeBracketIndex+1:]
 			pieces := strings.Split(dimensions, ",")
+			extraDimensions := make(map[string]string, len(pieces))
 			for i := range pieces {
 				tokens := strings.Split(pieces[i], "=")
 				if len(tokens) != 2 {
-					return
+					return instanceName, map[string]string{}
 				}
-				working[tokens[0]] = tokens[1]
+				extraDimensions[tokens[0]] = tokens[1]
 			}
-			toAddDims = working
-			instanceName = left + rest
+			return left + rest, extraDimensions
 		}
 	}
-	return
+	return instanceName, map[string]string{}
 }
 
 func parseInstanceNameForDimensions(dimensions map[string]string, key string, cond bool, val *string) {
-	instanceName, toAddDims := getDimensionsFromName(val)
+	if val == nil {
+		return
+	}
+	instanceName, toAddDims := getDimensionsFromName(*val)
 
 	for k, v := range toAddDims {
 		if _, exists := dimensions[k]; !exists {
@@ -133,7 +134,7 @@ func getReasonableMetricName(point *JSONWriteFormat, index uint) (string, map[st
 		usedParts["type"] = struct{}{}
 	}
 	if !isNilOrEmpty(point.TypeInstance) {
-		instanceName, _ := getDimensionsFromName(point.TypeInstance)
+		instanceName, _ := getDimensionsFromName(*point.TypeInstance)
 		parts = append(parts, instanceName)
 		usedParts["type_instance"] = struct{}{}
 	}

@@ -162,9 +162,10 @@ func TestCollectdParseInstanceNameForDimensions(t *testing.T) {
 	}{
 		{"name[k=v,f=x]", map[string]string{"k": "v", "f": "x", "instance": "name"}},
 		{"name[k=v,f=x]-rest", map[string]string{"k": "v", "f": "x", "instance": "name-rest"}},
-		{"name[k=v,f=x]-middle-[g=h]-more", map[string]string{"k": "v", "f": "x", "instance": "name-middle-[g=h]-more"}},
+		{"name[k=v,f=x]-middle-[g=h]-more", map[string]string{"g": "h", "instance": "name[k=v,f=x]-middle--more"}},
 		{"namek=v,f=x]-middle-[g=h]-more", map[string]string{"g": "h", "instance": "namek=v,f=x]-middle--more"}},
-		{"name[k=v,f=x-middle-[g=h]-more", map[string]string{"instance": "name[k=v,f=x-middle-[g=h]-more"}},
+		{"name[k=v,f=x-middle-[g=h]-more", map[string]string{"g": "h", "instance": "name[k=v,f=x-middle--more"}},
+		{"name[k=v,f=x-middle-[g=h,]-more", map[string]string{"instance": "name[k=v,f=x-middle-[g=h,]-more"}},
 		{"name", map[string]string{"instance": "name"}},
 		{"name[k=v", map[string]string{"instance": "name[k=v"}},
 	}
@@ -174,4 +175,6 @@ func TestCollectdParseInstanceNameForDimensions(t *testing.T) {
 		assert.Equal(t, test.dim, inputDim, "Dimensions not equal")
 	}
 
+	// Nil should not panic
+	parseInstanceNameForDimensions(map[string]string{}, "", true, nil)
 }
