@@ -4,10 +4,13 @@ import (
 	"io/ioutil"
 	"os"
 
+	"sync"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/event"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/dp/dpsink"
 	"github.com/signalfx/metricproxy/protocol"
@@ -30,6 +33,7 @@ var _ protocol.Forwarder = &FilenameForwarder{}
 
 // FilenameForwarder prints datapoints to a file
 type FilenameForwarder struct {
+	writeLock   sync.Mutex
 	filename    string
 	writeString func(f *os.File, s string) (ret int, err error)
 }
@@ -43,6 +47,8 @@ func (connector *FilenameForwarder) Stats() []*datapoint.Datapoint {
 
 // AddDatapoints writes the points to a file
 func (connector *FilenameForwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
+	connector.writeLock.Lock()
+	defer connector.writeLock.Unlock()
 	file, err := os.OpenFile(connector.filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.FileMode(0666))
 	if err != nil {
 		return err
@@ -50,6 +56,24 @@ func (connector *FilenameForwarder) AddDatapoints(ctx context.Context, points []
 	defer file.Close()
 	for _, dp := range points {
 		_, err := connector.writeString(file, dp.String()+"\n")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// AddEvents writes the events to a file
+func (connector *FilenameForwarder) AddEvents(ctx context.Context, events []*event.Event) error {
+	connector.writeLock.Lock()
+	defer connector.writeLock.Unlock()
+	file, err := os.OpenFile(connector.filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.FileMode(0666))
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	for _, e := range events {
+		_, err := connector.writeString(file, e.String()+"\n")
 		if err != nil {
 			return err
 		}

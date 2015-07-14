@@ -12,3 +12,11 @@ type NetworkListener interface {
 func TCPPort(l NetworkListener) uint16 {
 	return (uint16)(l.Addr().(*net.TCPAddr).Port)
 }
+
+// FreeTCPPort returns a TCP port that is free on "localhost", or panics if it cannot find a port
+func FreeTCPPort() uint16 {
+	l, _ := net.Listen("tcp", "localhost:0")
+	ret := TCPPort(l)
+	l.Close()
+	return ret
+}

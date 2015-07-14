@@ -126,6 +126,22 @@ const testDecodeCollectdBody = `[
     }
 ]`
 
+const testDecodeCollectdEventBody = `[
+	{
+		"host": "mwp-signalbox",
+		"message": "my message",
+		"meta": {
+			"key": "value"
+		},
+		"plugin": "my_plugin",
+		"plugin_instance": "my_plugin_instance[f=x]",
+		"severity": "OKAY",
+		"time": 1435104306.0,
+		"type": "imanotify",
+		"type_instance": "notify_instance[k=v]"
+	}
+]`
+
 func TestMetricTypeFromDsType(t *testing.T) {
 	assert.Equal(t, datapoint.Gauge, metricTypeFromDsType(workarounds.GolangDoesnotAllowPointerToStringLiteral("gauge")), "Types don't match expectation")
 	assert.Equal(t, datapoint.Gauge, metricTypeFromDsType(nil), "Types don't match expectation")
@@ -155,6 +171,35 @@ func TestCollectdJsonDecoding(t *testing.T) {
 	assert.Equal(t, 3, len(dp.Dimensions))
 }
 
+func TestCollectdEventJsonDecoding(t *testing.T) {
+	postFormat := new([]*JSONWriteFormat)
+	assert.Nil(t, json.Unmarshal([]byte(testDecodeCollectdEventBody), &postFormat))
+	assert.Equal(t, 1, len(*postFormat))
+	emptyMap := map[string]string{}
+	e := NewEvent((*postFormat)[0], emptyMap)
+	assert.Equal(t, "imanotify.notify_instance", e.EventType, "event type not named correctly")
+	assert.Equal(t, 3, len(e.Meta), "size of meta not corect")
+	metaExists := func(name string, expected string) {
+		value, exists := e.Meta[name]
+		assert.True(t, exists, "should have "+name+" in meta")
+		assert.Equal(t, expected, value.(string), name+" should be value "+expected)
+	}
+	metaExists("severity", "OKAY")
+	metaExists("message", "my message")
+	metaExists("key", "value")
+	assert.Equal(t, 5, len(e.Dimensions), "size of dimensions not corect")
+	dimExists := func(name string, expected string) {
+		value, exists := e.Dimensions[name]
+		assert.True(t, exists, "should have "+name+" in meta")
+		assert.Equal(t, expected, value, name+" should be value "+expected)
+	}
+	dimExists("host", "mwp-signalbox")
+	dimExists("plugin", "my_plugin")
+	dimExists("f", "x")
+	dimExists("plugin_instance", "my_plugin_instance")
+	dimExists("k", "v")
+}
+
 func TestCollectdParseInstanceNameForDimensions(t *testing.T) {
 	var tests = []struct {
 		val string
@@ -167,11 +212,11 @@ func TestCollectdParseInstanceNameForDimensions(t *testing.T) {
 		{"name[k=v,f=x-middle-[g=h]-more", map[string]string{"instance": "name[k=v,f=x-middle-[g=h]-more"}},
 		{"name", map[string]string{"instance": "name"}},
 		{"name[k=v", map[string]string{"instance": "name[k=v"}},
+		{"user.hit_rate[host:server1,type:production]", map[string]string{"instance": "user.hit_rate[host:server1,type:production]"}},
 	}
 	for _, test := range tests {
 		inputDim := make(map[string]string)
 		parseInstanceNameForDimensions(inputDim, "instance", true, &test.val)
 		assert.Equal(t, test.dim, inputDim, "Dimensions not equal")
 	}
-
 }

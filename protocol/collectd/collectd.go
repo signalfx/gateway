@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/event"
 )
 
 // JSONWriteBody is the full POST body of collectd's write_http format
@@ -22,6 +23,10 @@ type JSONWriteFormat struct {
 	TypeS          *string    `json:"type"`
 	TypeInstance   *string    `json:"type_instance"`
 	Values         []*float64 `json:"values"`
+	// events
+	Message  *string                `json:"message"`
+	Meta     map[string]interface{} `json:"meta"`
+	Severity *string                `json:"severity"`
 }
 
 func metricTypeFromDsType(dstype *string) datapoint.MetricType {
@@ -64,7 +69,6 @@ func NewDatapoint(point *JSONWriteFormat, index uint, defaultDimensions map[stri
 	addIfNotNullOrEmpty(dimensions, "host", true, point.Host)
 	addIfNotNullOrEmpty(dimensions, "plugin", true, point.Plugin)
 	parseInstanceNameForDimensions(dimensions, "plugin_instance", true, point.PluginInstance)
-
 	_, usedInMetricName := usedParts["type_instance"]
 	parseInstanceNameForDimensions(dimensions, "type_instance", !usedInMetricName, point.TypeInstance)
 
@@ -137,9 +141,45 @@ func getReasonableMetricName(point *JSONWriteFormat, index uint) (string, map[st
 		parts = append(parts, instanceName)
 		usedParts["type_instance"] = struct{}{}
 	}
-	if !isNilOrEmpty(point.Dsnames[index]) && len(point.Dsnames) > 1 {
+	if point.Dsnames != nil && !isNilOrEmpty(point.Dsnames[index]) && len(point.Dsnames) > 1 {
 		parts = append(parts, *point.Dsnames[index])
 		usedParts["dsname"] = struct{}{}
 	}
 	return strings.Join(parts, "."), usedParts
+}
+
+// NewEvent creates a new event from collectd's write_http endpoint JSON format
+// defaultDimensions are added to the event created, but will be overridden by any dimension
+// values in the JSON
+func NewEvent(e *JSONWriteFormat, defaultDimensions map[string]string) *event.Event {
+	// if you add another  dimension that we read from the json update this number
+	const MaxCollectDDims = 6
+	dimensions := make(map[string]string, len(defaultDimensions)+MaxCollectDDims)
+	for k, v := range defaultDimensions {
+		dimensions[k] = v
+	}
+	// Don't add empty dimensions
+	addIfNotNullOrEmpty(dimensions, "host", true, e.Host)
+	addIfNotNullOrEmpty(dimensions, "plugin", true, e.Plugin)
+	eventType, usedParts := getReasonableMetricName(e, 0)
+	parseInstanceNameForDimensions(dimensions, "plugin_instance", true, e.PluginInstance)
+	_, usedInMetricName := usedParts["type_instance"]
+	parseInstanceNameForDimensions(dimensions, "type_instance", !usedInMetricName, e.TypeInstance)
+	_, usedInMetricName = usedParts["type"]
+	addIfNotNullOrEmpty(dimensions, "type", !usedInMetricName, e.TypeS)
+	meta := make(map[string]interface{}, len(e.Meta)+2)
+	for k, v := range e.Meta {
+		meta[k] = v
+	}
+	_, exists := e.Meta["severity"]
+	if !exists && e.Severity != nil {
+		meta["severity"] = *e.Severity
+	}
+	_, exists = e.Meta["message"]
+	if !exists && e.Message != nil {
+		meta["message"] = *e.Message
+	}
+
+	timestamp := time.Unix(0, int64(float64(time.Second)**e.Time))
+	return event.NewWithMeta(eventType, "COLLECTD", dimensions, meta, timestamp)
 }

@@ -4,12 +4,24 @@ import (
 	"testing"
 
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/event"
 	"golang.org/x/net/context"
 )
 
 type expect struct {
 	count     int
 	forwardTo Sink
+}
+
+func (e *expect) AddEvents(ctx context.Context, events []*event.Event) error {
+	if len(events) != e.count {
+		panic("NOPE")
+	}
+	if e.forwardTo != nil {
+		events = append(events, nil)
+		e.forwardTo.AddEvents(ctx, events)
+	}
+	return nil
 }
 
 func (e *expect) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
@@ -37,4 +49,5 @@ func TestFromChain(t *testing.T) {
 
 	chain := FromChain(&e2, e0.next, e1.next)
 	chain.AddDatapoints(nil, []*datapoint.Datapoint{})
+	chain.AddEvents(nil, []*event.Event{})
 }

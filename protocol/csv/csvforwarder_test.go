@@ -9,6 +9,7 @@ import (
 
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/event"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/dp/dptest"
 	"github.com/stretchr/testify/assert"
@@ -27,6 +28,7 @@ func TestFilenameForwarder(t *testing.T) {
 	defer f.Close()
 	assert.NoError(t, err)
 	assert.NoError(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dptest.DP()}))
+	assert.NoError(t, f.AddEvents(ctx, []*event.Event{dptest.E()}))
 	assert.Equal(t, 0, len(f.Stats()))
 }
 
@@ -44,6 +46,7 @@ func TestFilenameForwarderBadOpen(t *testing.T) {
 
 	f.filename = "/"
 	assert.Error(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{}))
+	assert.Error(t, f.AddEvents(ctx, []*event.Event{}))
 }
 
 func TestFilenameForwarderBadWrite(t *testing.T) {
@@ -58,4 +61,5 @@ func TestFilenameForwarderBadWrite(t *testing.T) {
 		return 0, errors.New("nope")
 	}
 	assert.Error(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dptest.DP()}))
+	assert.Error(t, f.AddEvents(ctx, []*event.Event{dptest.E()}))
 }

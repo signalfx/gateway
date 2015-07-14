@@ -8,6 +8,10 @@ import (
 	"net/http/httptest"
 	"strings"
 
+	"fmt"
+
+	"errors"
+
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/metricproxy/config"
@@ -112,7 +116,30 @@ const testCollectdBody = `[
         "values": [
             1035520.0
         ]
-    }
+    },
+	{
+		"host": "mwp-signalbox",
+		"message": "my message",
+		"meta": {
+			"key": "value"
+		},
+		"plugin": "my_plugin",
+		"plugin_instance": "my_plugin_instance[f=x]",
+		"severity": "OKAY",
+		"time": 1435104306.0,
+		"type": "imanotify",
+		"type_instance": "notify_instance[k=v]"
+	},
+	{
+	    "time": 1436546167.739,
+	    "severity": "UNKNOWN",
+	    "host": "mwp-signalbox",
+	    "plugin": "tail",
+	    "plugin_instance": "quantizer",
+	    "type": "counter",
+	    "type_instance": "exception[level=error]",
+	    "message": "the value was found"
+	}
 
 ]`
 
@@ -142,6 +169,7 @@ func TestCollectDListener(t *testing.T) {
 	client := &http.Client{}
 	go func() {
 		dps := <-sendTo.PointsChan
+		assert.Equal(t, len(dps), 7)
 		assert.Equal(t, "load.shortterm", dps[0].Metric, "Metric not named correctly")
 		assert.Equal(t, "load.midterm", dps[1].Metric, "Metric not named correctly")
 		assert.Equal(t, "load.longterm", dps[2].Metric, "Metric not named correctly")
@@ -149,12 +177,19 @@ func TestCollectDListener(t *testing.T) {
 		assert.Equal(t, "df_complex.free", dps[4].Metric, "Metric not named correctly")
 		assert.Equal(t, "memory.old_gen_end", dps[5].Metric, "Metric not named correctly")
 		assert.Equal(t, "memory.total_heap_space", dps[6].Metric, "Metric not named correctly")
+		events := <-sendTo.EventsChan
+		assert.Equal(t, len(events), 2)
+		assert.Equal(t, "imanotify.notify_instance", events[0].EventType, "Event not named correctly")
+		assert.Equal(t, "counter.exception", events[1].EventType, "Event not named correctly")
 	}()
 	resp, err := client.Do(req)
-	assert.Nil(t, err)
-	assert.Equal(t, resp.StatusCode, http.StatusOK, "Request should work")
+	if err != nil {
+		fmt.Println(err.Error())
+		assert.Fail(t, "Err should be nil")
+	}
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "Request should work")
 
-	assert.Equal(t, 11, len(collectdListener.Stats()), "Request should work")
+	assert.Equal(t, 12, len(collectdListener.Stats()), "Request should work")
 
 	req, _ = http.NewRequest("POST", "http://127.0.0.1:8081/post-collectd", bytes.NewBuffer([]byte(`invalidjson`)))
 	req.Header.Set("Content-Type", "application/json")
@@ -186,6 +221,7 @@ func TestCollectDListenerWithQueryParams(t *testing.T) {
 	memoryExpectedDims := map[string]string{"host": "i-b13d1e5f", "plugin": "memory", "dsname": "value", "foo": "bar", "zam": "narf"}
 	dfComplexExpectedDims := map[string]string{"plugin": "df", "plugin_instance": "dev", "dsname": "value", "foo": "bar", "zam": "narf", "host": "i-b13d1e5f"}
 	parsedInstanceExpectedDims := map[string]string{"foo": "bar", "zam": "narf", "host": "mwp-signalbox", "f": "x", "plugin_instance": "analytics", "k1": "v1", "k2": "v2", "dsname": "value", "plugin": "tail"}
+	eventExpectedDims := map[string]string{"foo": "bar", "host": "mwp-signalbox", "plugin": "my_plugin", "f": "x", "plugin_instance": "my_plugin_instance", "k": "v", "zam": "narf"}
 
 	go func() {
 		dps := <-sendTo.PointsChan
@@ -209,12 +245,14 @@ func TestCollectDListenerWithQueryParams(t *testing.T) {
 
 		assert.Equal(t, "memory.total_heap_space", dps[6].Metric, "Metric not named correctly")
 		assert.Equal(t, parsedInstanceExpectedDims, dps[6].Dimensions, "Dimensions not set correctly")
+
+		events := <-sendTo.EventsChan
+		assert.Equal(t, "imanotify.notify_instance", events[0].EventType, "Metric not named correctly")
+		assert.Equal(t, eventExpectedDims, events[0].Dimensions, "Dimensions not set correctly")
 	}()
 	resp := httptest.NewRecorder()
 	c.ServeHTTPC(ctx, resp, req)
 	assert.Equal(t, resp.Code, http.StatusOK, "Request should work")
-
-	//assert.Equal(t, 4, len(collectdListener.Stats()), "Request should work")
 
 	req, _ = http.NewRequest("POST", "http://127.0.0.1:8081/post-collectd", bytes.NewBuffer([]byte(`invalidjson`)))
 	req.Header.Set("Content-Type", "application/json")
@@ -273,4 +311,23 @@ func BenchmarkCollectdListener(b *testing.B) {
 		assert.Equal(b, 1, len(item))
 	}
 	b.SetBytes(bytes)
+}
+
+func TestFailureInRead(t *testing.T) {
+	jsonBody := testCollectdBody
+
+	sendTo := dptest.NewBasicSink()
+	sendTo.RetError(errors.New("error"))
+	ctx := context.Background()
+	listenFrom := &config.ListenFrom{}
+	collectdListener, err := ListenerLoader(ctx, sendTo, listenFrom)
+	defer collectdListener.Close()
+	assert.Nil(t, err)
+	assert.NotNil(t, collectdListener)
+
+	req, _ := http.NewRequest("POST", "http://127.0.0.1:8081/post-collectd", bytes.NewBuffer([]byte(jsonBody)))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "Request should work")
 }

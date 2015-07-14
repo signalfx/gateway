@@ -14,6 +14,7 @@ import (
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/metricproxy/config"
 
@@ -172,8 +173,13 @@ func TestConnectorProcessProtoError(t *testing.T) {
 		protoMarshal: func(pb proto.Message) ([]byte, error) {
 			return nil, expectedErr
 		},
+		jsonMarshal: func(interface{}) ([]byte, error) {
+			return nil, expectedErr
+		},
 	}
 	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
+	assert.Equal(t, expectedErr, err.(*forwardError).originalError)
+	err = f.AddEvents(context.Background(), []*event.Event{dptest.E()})
 	assert.Equal(t, expectedErr, err.(*forwardError).originalError)
 }
 
@@ -241,11 +247,13 @@ func TestAllInvalid(t *testing.T) {
 	dp.Metric = ""
 	f := Forwarder{}
 	assert.NoError(t, f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dp}))
+	assert.NoError(t, f.AddEvents(context.Background(), []*event.Event{}))
 }
 
 func TestResponseBadJSON(t *testing.T) {
 	f := Forwarder{
 		protoMarshal: proto.Marshal,
+		jsonMarshal:  json.Marshal,
 		client: &http.Client{
 			Transport: roundTripTest(func(r *http.Request) (*http.Response, error) {
 				r2 := http.Response{
@@ -258,11 +266,14 @@ func TestResponseBadJSON(t *testing.T) {
 	}
 	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
 	assert.IsType(t, &json.SyntaxError{}, err.(*forwardError).originalError)
+	err = f.AddEvents(context.Background(), []*event.Event{dptest.E()})
+	assert.IsType(t, &json.SyntaxError{}, err.(*forwardError).originalError)
 }
 
 func TestResponseBadBody(t *testing.T) {
 	f := Forwarder{
 		protoMarshal: proto.Marshal,
+		jsonMarshal:  json.Marshal,
 		client: &http.Client{
 			Transport: roundTripTest(func(r *http.Request) (*http.Response, error) {
 				r2 := http.Response{
@@ -274,6 +285,8 @@ func TestResponseBadBody(t *testing.T) {
 		},
 	}
 	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
+	assert.Contains(t, err.Error(), "body decode error")
+	err = f.AddEvents(context.Background(), []*event.Event{dptest.E()})
 	assert.Contains(t, err.Error(), "body decode error")
 }
 
@@ -289,8 +302,11 @@ func TestBasicSend(t *testing.T) {
 	f.UserAgent("abcd")
 	f.AuthToken("abcdefg")
 	f.Endpoint(testServer.URL)
+	f.EventEndpoint(testServer.URL)
 	ctx := context.Background()
 
 	dp := dptest.DP()
+	e := dptest.E()
 	assert.NoError(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dp}))
+	assert.NoError(t, f.AddEvents(ctx, []*event.Event{e}))
 }

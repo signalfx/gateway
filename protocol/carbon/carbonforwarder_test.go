@@ -9,6 +9,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/dp/dptest"
@@ -16,13 +17,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-var testConfig1 = `
-{
-  "Type":"carbon",
-  "Host": "127.0.0.1",
-  "Port": 2013
-}
-`
+const numStats = 10
 
 type mockConn struct {
 	net.Conn
@@ -79,7 +74,7 @@ func TestCreation(t *testing.T) {
 	l, err := ListenerLoader(ctx, forwardTo, &listenFrom)
 	defer l.Close()
 	assert.Equal(t, nil, err, "Expect no error")
-	assert.Equal(t, 9, len(l.Stats()), "Expect no stats")
+	assert.Equal(t, numStats, len(l.Stats()), "Expect no stats")
 	forwarder, err := NewForwarder("127.0.0.1", nettest.TCPPort(l.psocket), time.Second, []string{"zzfirst"}, 10)
 	defer forwarder.Close()
 	assert.Equal(t, nil, err, "Expect no error")
@@ -174,7 +169,7 @@ func TestCarbonWrite(t *testing.T) {
 	l, err := ListenerLoader(ctx, forwardTo, &listenFrom)
 	defer l.Close()
 	assert.Equal(t, nil, err, "Expect no error")
-	assert.Equal(t, 9, len(l.Stats()), "Expect no stats")
+	assert.Equal(t, numStats, len(l.Stats()), "Expect no stats")
 	forwarder, err := NewForwarder("127.0.0.1", nettest.TCPPort(l.psocket), time.Second, []string{"zzfirst"}, 10)
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, 1, len(forwarder.pool.conns))
@@ -209,7 +204,7 @@ func TestLoader(t *testing.T) {
 	assert.NoError(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dpSent}))
 	dpSeen := forwardTo.Next()
 	assert.Equal(t, dpSent.Metric, dpSeen.Metric)
-	assert.Equal(t, 8, len(f.Stats()))
+	assert.Equal(t, numStats+1, len(f.Stats()))
 }
 
 func TestNonNil(t *testing.T) {
@@ -217,4 +212,26 @@ func TestNonNil(t *testing.T) {
 	assert.Equal(t, e1, nonNil(e1, nil))
 	assert.Equal(t, e1, nonNil(nil, e1))
 	assert.Nil(t, nonNil(nil, nil))
+}
+
+func TestCarbonNoWriteEvents(t *testing.T) {
+	listenFrom := config.ListenFrom{}
+	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
+	forwardTo := dptest.NewBasicSink()
+	ctx := context.Background()
+	l, err := ListenerLoader(ctx, forwardTo, &listenFrom)
+	defer l.Close()
+	assert.Equal(t, nil, err, "Expect no error")
+	assert.Equal(t, numStats, len(l.Stats()), "Expect no stats")
+	forwarder, err := NewForwarder("127.0.0.1", nettest.TCPPort(l.psocket), time.Second, []string{"zzfirst"}, 10)
+	assert.Equal(t, nil, err, "Expect no error")
+	assert.Equal(t, 1, len(forwarder.pool.conns))
+	timeToSend := time.Now().Round(time.Second)
+	eSent := dptest.E()
+	eSent.Timestamp = timeToSend
+	eSent.Meta["blarg"] = "abcd 123 123"
+	log.Info("Sending a e")
+	forwarder.AddEvents(ctx, []*event.Event{eSent})
+	assert.Equal(t, 0, len(forwardTo.EventsChan))
+
 }
