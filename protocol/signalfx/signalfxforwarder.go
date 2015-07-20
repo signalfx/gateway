@@ -103,12 +103,14 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration,
 	defaultAuthToken string, drainingThreads uint32,
 	defaultSource string, sourceDimensions string, proxyVersion string) *Forwarder {
 	tr := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 		MaxIdleConnsPerHost:   int(drainingThreads) * 2,
 		ResponseHeaderTimeout: timeout,
 		Dial: func(network, addr string) (net.Conn, error) {
 			return net.DialTimeout(network, addr, timeout)
 		},
+		TLSHandshakeTimeout: timeout,
 	}
 	ret := &Forwarder{
 		url:              url,
