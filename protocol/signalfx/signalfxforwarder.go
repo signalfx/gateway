@@ -112,6 +112,17 @@ func NewSignalfxJSONForwarer(url string, timeout time.Duration,
 		},
 		TLSHandshakeTimeout: timeout,
 	}
+
+	req, _ := http.NewRequest("POST", url, nil)
+	if req != nil {
+		purl, err := tr.Proxy(req)
+		if purl != nil {
+			log.Info("Proxy URL being used: ", purl)
+		} else {
+			log.Info("Error configuring proxy: ", err)
+		}
+	}
+
 	ret := &Forwarder{
 		url:              url,
 		defaultAuthToken: defaultAuthToken,
