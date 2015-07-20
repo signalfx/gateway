@@ -233,7 +233,7 @@ func recastListenToKeeper(in []protocol.Listener) []stats.Keeper {
 
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() error {
 	log.WithField("configFile", proxyCommandLineConfiguration.configFileName).Info("Looking for config file")
-	log.WithField("env", strings.Join(os.Environ(), " -*- ")).Info("Current env")
+	log.WithField("env", strings.Join(os.Environ(), " -*- ")).Info("Current env at start")
 
 	loadedConfig, err := config.Load(proxyCommandLineConfiguration.configFileName)
 	if err != nil {
@@ -251,6 +251,7 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() erro
 	}
 
 	log.WithField("config", loadedConfig).Info("Config loaded")
+	log.WithField("env", strings.Join(os.Environ(), " -*- ")).Info("Current env after loading config")
 	if loadedConfig.NumProcs != nil {
 		runtime.GOMAXPROCS(*loadedConfig.NumProcs)
 	} else {
