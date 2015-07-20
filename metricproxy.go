@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"sync"
 
+	"strings"
+
 	"github.com/Sirupsen/logrus"
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/metricproxy/config"
@@ -231,6 +233,7 @@ func recastListenToKeeper(in []protocol.Listener) []stats.Keeper {
 
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() error {
 	log.WithField("configFile", proxyCommandLineConfiguration.configFileName).Info("Looking for config file")
+	log.WithField("env", strings.Join(os.Environ(), " -*- ")).Info("Current env")
 
 	loadedConfig, err := config.Load(proxyCommandLineConfiguration.configFileName)
 	if err != nil {
