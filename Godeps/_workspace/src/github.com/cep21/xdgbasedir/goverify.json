@@ -12,7 +12,11 @@
     }, {
       "macro": "gocyclo"
     }, {
-      "macro": "gocoverdir"
+      "macro": "go-cover",
+      "validate": {
+        "type": "cover",
+        "coverage": 50
+      }
     }
   ]
 }

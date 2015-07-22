@@ -1,19 +1,31 @@
 language: go
 
+sudo: false
+
 go:
   - 1.3
   - 1.4
   - tip
 
-install:
+before_install:
   - wget "http://ftp.debian.org/debian/pool/main/s/shellcheck/shellcheck_0.3.7-1_amd64.deb"
-  - sudo dpkg -i shellcheck_0.3.7-1_amd64.deb
-  - go get github.com/stretchr/testify/mock
+  - dpkg -x shellcheck_0.3.7-1_amd64.deb $HOME
+  - export PATH=$HOME/usr/bin:$PATH
   - go get github.com/tools/godep
-  - go get -u github.com/cep21/goverify
+  - go get github.com/cep21/goverify
+  - go get github.com/cep21/gocoverdir
+  - go get github.com/axw/gocov/gocov
+  - go get github.com/mattn/goveralls
   - gem install mdl
-  - go get -d -v ./... && go build -v ./...
+
+install:
+  - godep go install -v .
 
 script:
   - export PATH=$HOME/gopath/bin:$PATH
+  - export GOCOVERDIR_DIR="."
   - ./travis_check.sh
+  - goveralls -coverprofile=coverage.out -service=travis-ci
+
+after_script:
+  - cat coverage.out
