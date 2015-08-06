@@ -48,19 +48,19 @@
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/datapoint",
-			"Rev": "d9c9653f3763062b54d7ab944121b2e2ae6369a8"
+			"Rev": "d9c8a954585f3c1fb3d19c086788fdecd8c00f27"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/event",
-			"Rev": "d9c9653f3763062b54d7ab944121b2e2ae6369a8"
+			"Rev": "d9c8a954585f3c1fb3d19c086788fdecd8c00f27"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/nettest",
-			"Rev": "d9c9653f3763062b54d7ab944121b2e2ae6369a8"
+			"Rev": "d9c8a954585f3c1fb3d19c086788fdecd8c00f27"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/web",
-			"Rev": "d9c9653f3763062b54d7ab944121b2e2ae6369a8"
+			"Rev": "d9c8a954585f3c1fb3d19c086788fdecd8c00f27"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",

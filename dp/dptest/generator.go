@@ -28,9 +28,9 @@ func init() {
 	globalSource.Dims = map[string]string{"source": "randtest"}
 	globalSource.Dptype = datapoint.Gauge
 	globalSource.TimeSource = time.Now
-	globalEventSource.EventType = "random"
-	globalEventSource.Dims = map[string]string{"severity": "OKAY"}
-	globalEventSource.Meta = map[string]interface{}{"f": "x"}
+	globalEventSource.EventType = "imanotify.notify_type"
+	globalEventSource.Dims = map[string]string{"host": "mwp-signalbox", "plugin": "my_plugin", "f": "x", "plugin_instance": "my_plugin_instance", "k": "v"}
+	globalEventSource.Meta = map[string]interface{}{"key": "value", "severity": "OKAY", "message": "my_message"}
 	globalEventSource.TimeSource = time.Now
 }
 
@@ -63,7 +63,8 @@ var globalEventSource EventSource
 func (d *EventSource) Next() *event.Event {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	return event.NewWithMeta(d.EventType+":"+strconv.FormatInt(atomic.AddInt64(&d.CurrentIndex, 1), 10), "COLLECTD", d.Dims, d.Meta, d.TimeSource())
+
+	return event.NewWithMeta("imanotify.notify_instance", "COLLECTD", d.Dims, d.Meta, d.TimeSource())
 }
 
 // E generates and returns a unique event to use for testing purposes
