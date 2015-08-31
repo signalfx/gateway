@@ -84,7 +84,7 @@ func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo) (protoco
 	}
 	structdefaults.FillDefaultFrom(forwardTo, defaultConfigV2)
 	log.WithField("forwardTo", forwardTo).Info("Creating signalfx forwarder using final config")
-	fwd := NewSignalfxJSONForwarer(*forwardTo.URL, *forwardTo.TimeoutDuration,
+	fwd := NewSignalfxJSONForwarder(*forwardTo.URL, *forwardTo.TimeoutDuration,
 		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads,
 		*forwardTo.DefaultSource, *forwardTo.SourceDimensions, proxyVersion)
 	fwd.eventURL = *forwardTo.EventURL
@@ -98,8 +98,8 @@ func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo) (protoco
 	}, fwd, nil
 }
 
-// NewSignalfxJSONForwarer creates a new JSON forwarder
-func NewSignalfxJSONForwarer(url string, timeout time.Duration,
+// NewSignalfxJSONForwarder creates a new JSON forwarder
+func NewSignalfxJSONForwarder(url string, timeout time.Duration,
 	defaultAuthToken string, drainingThreads uint32,
 	defaultSource string, sourceDimensions string, proxyVersion string) *Forwarder {
 	tr := &http.Transport{
