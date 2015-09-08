@@ -81,7 +81,7 @@ const testCollectdBody = `[
             1962600000.0
         ]
     },
-	{
+    {
         "dsnames": [
             "value"
         ],
@@ -99,7 +99,7 @@ const testCollectdBody = `[
             26790
         ]
     },
-	{
+    {
         "dsnames": [
             "value"
         ],
@@ -117,29 +117,29 @@ const testCollectdBody = `[
             1035520.0
         ]
     },
-	{
-		"host": "mwp-signalbox",
-		"message": "my message",
-		"meta": {
-			"key": "value"
-		},
-		"plugin": "my_plugin",
-		"plugin_instance": "my_plugin_instance[f=x]",
-		"severity": "OKAY",
-		"time": 1435104306.0,
-		"type": "imanotify",
-		"type_instance": "notify_instance[k=v]"
-	},
-	{
-	    "time": 1436546167.739,
-	    "severity": "UNKNOWN",
-	    "host": "mwp-signalbox",
-	    "plugin": "tail",
-	    "plugin_instance": "quantizer",
-	    "type": "counter",
-	    "type_instance": "exception[level=error]",
-	    "message": "the value was found"
-	}
+    {
+        "host": "mwp-signalbox",
+        "message": "my message",
+        "meta": {
+            "key": "value"
+        },
+        "plugin": "my_plugin",
+        "plugin_instance": "my_plugin_instance[f=x]",
+        "severity": "OKAY",
+        "time": 1435104306.0,
+        "type": "imanotify",
+        "type_instance": "notify_instance[k=v]"
+    },
+    {
+        "time": 1436546167.739,
+        "severity": "UNKNOWN",
+        "host": "mwp-signalbox",
+        "plugin": "tail",
+        "plugin_instance": "quantizer",
+        "type": "counter",
+        "type_instance": "exception[level=error]",
+        "message": "the value was found"
+    }
 
 ]`
 
