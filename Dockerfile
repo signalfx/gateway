@@ -7,7 +7,7 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && apt-get update && apt-get -y install git mercurial gcc libc6-dev make
 
 # Borrow from docker-library/golang
-ENV GOLANG_VERSION 1.4.2
+ENV GOLANG_VERSION 1.5.1
 RUN curl -sSL https://golang.org/dl/go$GOLANG_VERSION.src.tar.gz | tar -v -C /usr/src -xz
 RUN cd /usr/src/go/src && ./make.bash --no-clean 2>&1
 ENV PATH /usr/src/go/bin:$PATH
