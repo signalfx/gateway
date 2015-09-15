@@ -14,6 +14,7 @@ import (
 
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/dp/dptest"
 	"github.com/stretchr/testify/assert"
@@ -319,13 +320,19 @@ func TestFailureInRead(t *testing.T) {
 	sendTo := dptest.NewBasicSink()
 	sendTo.RetError(errors.New("error"))
 	ctx := context.Background()
-	listenFrom := &config.ListenFrom{}
+	s := fmt.Sprintf("127.0.0.1:%d", nettest.FreeTCPPort())
+	listenFrom := &config.ListenFrom{
+		ListenAddr: &s,
+	}
 	collectdListener, err := ListenerLoader(ctx, sendTo, listenFrom)
 	defer collectdListener.Close()
+	if err != nil {
+		fmt.Printf("%s\n", err.Error())
+	}
 	assert.Nil(t, err)
 	assert.NotNil(t, collectdListener)
 
-	req, _ := http.NewRequest("POST", "http://127.0.0.1:8081/post-collectd", bytes.NewBuffer([]byte(jsonBody)))
+	req, _ := http.NewRequest("POST", fmt.Sprintf("http://%s/post-collectd", s), bytes.NewBuffer([]byte(jsonBody)))
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	resp, err := client.Do(req)
