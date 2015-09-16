@@ -89,7 +89,7 @@ const testCollectdBody = `[
         "dstypes": [
             "gauge"
         ],
-        "host": "mwp-signalbox",
+        "host": "mwp-signalbox[a=b]",
         "interval": 10.0,
         "plugin": "tail",
         "plugin_instance": "analytics[f=x]",
@@ -107,7 +107,7 @@ const testCollectdBody = `[
         "dstypes": [
             "gauge"
         ],
-        "host": "mwp-signalbox",
+        "host": "mwp-signalbox[a=b]",
         "interval": 10.0,
         "plugin": "tail",
         "plugin_instance": "analytics[f=x]",
@@ -221,35 +221,35 @@ func TestCollectDListenerWithQueryParams(t *testing.T) {
 	loadExpectedDims := map[string]string{"foo": "bar", "zam": "narf", "plugin": "load", "host": "i-b13d1e5f"}
 	memoryExpectedDims := map[string]string{"host": "i-b13d1e5f", "plugin": "memory", "dsname": "value", "foo": "bar", "zam": "narf"}
 	dfComplexExpectedDims := map[string]string{"plugin": "df", "plugin_instance": "dev", "dsname": "value", "foo": "bar", "zam": "narf", "host": "i-b13d1e5f"}
-	parsedInstanceExpectedDims := map[string]string{"foo": "bar", "zam": "narf", "host": "mwp-signalbox", "f": "x", "plugin_instance": "analytics", "k1": "v1", "k2": "v2", "dsname": "value", "plugin": "tail"}
+	parsedInstanceExpectedDims := map[string]string{"zam": "narf", "host": "mwp-signalbox", "plugin_instance": "analytics", "k1": "v1", "k2": "v2", "foo": "bar", "a": "b", "plugin": "tail", "f": "x", "dsname": "value"}
 	eventExpectedDims := map[string]string{"foo": "bar", "host": "mwp-signalbox", "plugin": "my_plugin", "f": "x", "plugin_instance": "my_plugin_instance", "k": "v", "zam": "narf"}
 
 	go func() {
 		dps := <-sendTo.PointsChan
-		assert.Equal(t, "load.shortterm", dps[0].Metric, "Metric not named correctly")
-		assert.Equal(t, loadExpectedDims, dps[0].Dimensions, "Dimensions not set correctly")
+		assert.Equal(t, "load.shortterm", dps[0].Metric, "Metric not named correctly0")
+		assert.Equal(t, loadExpectedDims, dps[0].Dimensions, "Dimensions not set correctly0")
 
-		assert.Equal(t, "load.midterm", dps[1].Metric, "Metric not named correctly")
-		assert.Equal(t, loadExpectedDims, dps[1].Dimensions, "Dimensions not set correctly")
+		assert.Equal(t, "load.midterm", dps[1].Metric, "Metric not named correctly1")
+		assert.Equal(t, loadExpectedDims, dps[1].Dimensions, "Dimensions not set correctly1")
 
-		assert.Equal(t, "load.longterm", dps[2].Metric, "Metric not named correctly")
-		assert.Equal(t, loadExpectedDims, dps[2].Dimensions, "Dimensions not set correctly")
+		assert.Equal(t, "load.longterm", dps[2].Metric, "Metric not named correctly2")
+		assert.Equal(t, loadExpectedDims, dps[2].Dimensions, "Dimensions not set correctly2")
 
-		assert.Equal(t, "memory.used", dps[3].Metric, "Metric not named correctly")
-		assert.Equal(t, memoryExpectedDims, dps[3].Dimensions, "Dimensions not set correctly")
+		assert.Equal(t, "memory.used", dps[3].Metric, "Metric not named correctly3")
+		assert.Equal(t, memoryExpectedDims, dps[3].Dimensions, "Dimensions not set correctly3")
 
-		assert.Equal(t, "df_complex.free", dps[4].Metric, "Metric not named correctly")
-		assert.Equal(t, dfComplexExpectedDims, dps[4].Dimensions, "Dimensions not set correctly")
+		assert.Equal(t, "df_complex.free", dps[4].Metric, "Metric not named correctly4")
+		assert.Equal(t, dfComplexExpectedDims, dps[4].Dimensions, "Dimensions not set correctly4")
 
-		assert.Equal(t, "memory.old_gen_end", dps[5].Metric, "Metric not named correctly")
-		assert.Equal(t, parsedInstanceExpectedDims, dps[5].Dimensions, "Dimensions not set correctly")
+		assert.Equal(t, "memory.old_gen_end", dps[5].Metric, "Metric not named correctly5")
+		assert.Equal(t, parsedInstanceExpectedDims, dps[5].Dimensions, "Dimensions not set correctly5")
 
-		assert.Equal(t, "memory.total_heap_space", dps[6].Metric, "Metric not named correctly")
-		assert.Equal(t, parsedInstanceExpectedDims, dps[6].Dimensions, "Dimensions not set correctly")
+		assert.Equal(t, "memory.total_heap_space", dps[6].Metric, "Metric not named correctly6")
+		assert.Equal(t, parsedInstanceExpectedDims, dps[6].Dimensions, "Dimensions not set correctly6")
 
 		events := <-sendTo.EventsChan
-		assert.Equal(t, "imanotify.notify_instance", events[0].EventType, "Metric not named correctly")
-		assert.Equal(t, eventExpectedDims, events[0].Dimensions, "Dimensions not set correctly")
+		assert.Equal(t, "imanotify.notify_instance", events[0].EventType, "Metric not named correctly event")
+		assert.Equal(t, eventExpectedDims, events[0].Dimensions, "Dimensions not set correctly event")
 	}()
 	resp := httptest.NewRecorder()
 	c.ServeHTTPC(ctx, resp, req)

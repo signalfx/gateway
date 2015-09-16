@@ -66,11 +66,11 @@ func NewDatapoint(point *JSONWriteFormat, index uint, defaultDimensions map[stri
 	metricType := metricTypeFromDsType(dstype)
 	metricName, usedParts := getReasonableMetricName(point, index)
 	// Don't add empty dimensions
-	addIfNotNullOrEmpty(dimensions, "host", true, point.Host)
+	parseNameForDimensions(dimensions, "host", true, point.Host)
 	addIfNotNullOrEmpty(dimensions, "plugin", true, point.Plugin)
-	parseInstanceNameForDimensions(dimensions, "plugin_instance", true, point.PluginInstance)
+	parseNameForDimensions(dimensions, "plugin_instance", true, point.PluginInstance)
 	_, usedInMetricName := usedParts["type_instance"]
-	parseInstanceNameForDimensions(dimensions, "type_instance", !usedInMetricName, point.TypeInstance)
+	parseNameForDimensions(dimensions, "type_instance", !usedInMetricName, point.TypeInstance)
 
 	_, usedInMetricName = usedParts["type"]
 	addIfNotNullOrEmpty(dimensions, "type", !usedInMetricName, point.TypeS)
@@ -118,7 +118,7 @@ func getDimensionsFromName(val *string) (instanceName string, toAddDims map[stri
 	return
 }
 
-func parseInstanceNameForDimensions(dimensions map[string]string, key string, cond bool, val *string) {
+func parseNameForDimensions(dimensions map[string]string, key string, cond bool, val *string) {
 	instanceName, toAddDims := getDimensionsFromName(val)
 
 	for k, v := range toAddDims {
@@ -159,12 +159,12 @@ func NewEvent(e *JSONWriteFormat, defaultDimensions map[string]string) *event.Ev
 		dimensions[k] = v
 	}
 	// Don't add empty dimensions
-	addIfNotNullOrEmpty(dimensions, "host", true, e.Host)
+	parseNameForDimensions(dimensions, "host", true, e.Host)
 	addIfNotNullOrEmpty(dimensions, "plugin", true, e.Plugin)
 	eventType, usedParts := getReasonableMetricName(e, 0)
-	parseInstanceNameForDimensions(dimensions, "plugin_instance", true, e.PluginInstance)
+	parseNameForDimensions(dimensions, "plugin_instance", true, e.PluginInstance)
 	_, usedInMetricName := usedParts["type_instance"]
-	parseInstanceNameForDimensions(dimensions, "type_instance", !usedInMetricName, e.TypeInstance)
+	parseNameForDimensions(dimensions, "type_instance", !usedInMetricName, e.TypeInstance)
 	_, usedInMetricName = usedParts["type"]
 	addIfNotNullOrEmpty(dimensions, "type", !usedInMetricName, e.TypeS)
 	meta := make(map[string]interface{}, len(e.Meta)+2)
