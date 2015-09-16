@@ -128,7 +128,7 @@ const testDecodeCollectdBody = `[
 
 const testDecodeCollectdEventBody = `[
 	{
-		"host": "mwp-signalbox",
+		"host": "mwp-signalbox[a=b]",
 		"message": "my message",
 		"meta": {
 			"key": "value"
@@ -187,7 +187,7 @@ func TestCollectdEventJsonDecoding(t *testing.T) {
 	metaExists("severity", "OKAY")
 	metaExists("message", "my message")
 	metaExists("key", "value")
-	assert.Equal(t, 5, len(e.Dimensions), "size of dimensions not corect")
+	assert.Equal(t, 6, len(e.Dimensions), "size of dimensions not corect")
 	dimExists := func(name string, expected string) {
 		value, exists := e.Dimensions[name]
 		assert.True(t, exists, "should have "+name+" in meta")
@@ -198,9 +198,10 @@ func TestCollectdEventJsonDecoding(t *testing.T) {
 	dimExists("f", "x")
 	dimExists("plugin_instance", "my_plugin_instance")
 	dimExists("k", "v")
+	dimExists("a", "b")
 }
 
-func TestCollectdParseInstanceNameForDimensions(t *testing.T) {
+func TestCollectdParseNameForDimensions(t *testing.T) {
 	var tests = []struct {
 		val string
 		dim map[string]string
@@ -216,7 +217,7 @@ func TestCollectdParseInstanceNameForDimensions(t *testing.T) {
 	}
 	for _, test := range tests {
 		inputDim := make(map[string]string)
-		parseInstanceNameForDimensions(inputDim, "instance", true, &test.val)
+		parseNameForDimensions(inputDim, "instance", true, &test.val)
 		assert.Equal(t, test.dim, inputDim, "Dimensions not equal")
 	}
 }
