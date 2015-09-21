@@ -201,6 +201,53 @@ func TestCollectdEventJsonDecoding(t *testing.T) {
 	dimExists("a", "b")
 }
 
+const testDecodeCollectdEventBodyDims = `[
+	{
+		"host": "mwp-signalbox[a=a,c=c]",
+		"message": "my message",
+		"meta": {
+			"key": "value"
+		},
+		"plugin": "my_plugin",
+		"plugin_instance": "my_plugin_instance[a=b,b=b]",
+		"severity": "OKAY",
+		"time": 1435104306.0,
+		"type": "imanotify",
+		"type_instance": "notify_instance[a=c,d=d]"
+	}
+]`
+
+func TestCollectdDimensonalizedPrecedence(t *testing.T) {
+	postFormat := new([]*JSONWriteFormat)
+	assert.Nil(t, json.Unmarshal([]byte(testDecodeCollectdEventBodyDims), &postFormat))
+	assert.Equal(t, 1, len(*postFormat))
+	emptyMap := map[string]string{}
+	e := NewEvent((*postFormat)[0], emptyMap)
+	assert.Equal(t, "imanotify.notify_instance", e.EventType, "event type not named correctly")
+	assert.Equal(t, 3, len(e.Meta), "size of meta not corect")
+	metaExists := func(name string, expected string) {
+		value, exists := e.Meta[name]
+		assert.True(t, exists, "should have "+name+" in meta")
+		assert.Equal(t, expected, value.(string), name+" should be value "+expected)
+	}
+	metaExists("severity", "OKAY")
+	metaExists("message", "my message")
+	metaExists("key", "value")
+	assert.Equal(t, 7, len(e.Dimensions), "size of dimensions not corect")
+	dimExists := func(name string, expected string) {
+		value, exists := e.Dimensions[name]
+		assert.True(t, exists, "should have "+name+" in meta")
+		assert.Equal(t, expected, value, name+" should be value "+expected)
+	}
+	dimExists("host", "mwp-signalbox")
+	dimExists("plugin", "my_plugin")
+	dimExists("plugin_instance", "my_plugin_instance")
+	dimExists("a", "c")
+	dimExists("b", "b")
+	dimExists("c", "c")
+	dimExists("d", "d")
+}
+
 func TestCollectdParseNameForDimensions(t *testing.T) {
 	var tests = []struct {
 		val string

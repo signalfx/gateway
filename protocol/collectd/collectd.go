@@ -54,6 +54,7 @@ func isNilOrEmpty(str *string) bool {
 // NewDatapoint creates a new datapoint from collectd's write_http endpoint JSON format
 // defaultDimensions are added to the datapoint created, but will be overridden by any dimension
 // values in the JSON
+// Dimensions are pulled out of type_instance, plugin_instance and host in that order of precedence
 func NewDatapoint(point *JSONWriteFormat, index uint, defaultDimensions map[string]string) *datapoint.Datapoint {
 	dstype, val, dsname := point.Dstypes[index], point.Values[index], point.Dsnames[index]
 	// if you add another  dimension that we read from the json update this number
@@ -65,12 +66,11 @@ func NewDatapoint(point *JSONWriteFormat, index uint, defaultDimensions map[stri
 
 	metricType := metricTypeFromDsType(dstype)
 	metricName, usedParts := getReasonableMetricName(point, index)
-	// Don't add empty dimensions
-	parseNameForDimensions(dimensions, "host", true, point.Host)
+
 	addIfNotNullOrEmpty(dimensions, "plugin", true, point.Plugin)
-	parseNameForDimensions(dimensions, "plugin_instance", true, point.PluginInstance)
+
 	_, usedInMetricName := usedParts["type_instance"]
-	parseNameForDimensions(dimensions, "type_instance", !usedInMetricName, point.TypeInstance)
+	parseDimensionsOut(dimensions, usedInMetricName, point.TypeInstance, point.PluginInstance, point.Host)
 
 	_, usedInMetricName = usedParts["type"]
 	addIfNotNullOrEmpty(dimensions, "type", !usedInMetricName, point.TypeS)
@@ -86,6 +86,12 @@ func addIfNotNullOrEmpty(dimensions map[string]string, key string, cond bool, va
 	if cond && val != nil && *val != "" {
 		dimensions[key] = *val
 	}
+}
+
+func parseDimensionsOut(dimensions map[string]string, usedInMetricName bool, typeInstance *string, pluginInstance *string, host *string) {
+	parseNameForDimensions(dimensions, "type_instance", !usedInMetricName, typeInstance)
+	parseNameForDimensions(dimensions, "plugin_instance", true, pluginInstance)
+	parseNameForDimensions(dimensions, "host", true, host)
 }
 
 // try to pull out dimensions out of name in the format name[k=v,f=x]-morename would
@@ -158,14 +164,12 @@ func NewEvent(e *JSONWriteFormat, defaultDimensions map[string]string) *event.Ev
 	for k, v := range defaultDimensions {
 		dimensions[k] = v
 	}
-	// Don't add empty dimensions
-	parseNameForDimensions(dimensions, "host", true, e.Host)
-	addIfNotNullOrEmpty(dimensions, "plugin", true, e.Plugin)
+
 	eventType, usedParts := getReasonableMetricName(e, 0)
-	parseNameForDimensions(dimensions, "plugin_instance", true, e.PluginInstance)
-	_, usedInMetricName := usedParts["type_instance"]
-	parseNameForDimensions(dimensions, "type_instance", !usedInMetricName, e.TypeInstance)
-	_, usedInMetricName = usedParts["type"]
+	addIfNotNullOrEmpty(dimensions, "plugin", true, e.Plugin)
+	parseDimensionsOut(dimensions, true, e.TypeInstance, e.PluginInstance, e.Host)
+
+	_, usedInMetricName := usedParts["type"]
 	addIfNotNullOrEmpty(dimensions, "type", !usedInMetricName, e.TypeS)
 	meta := make(map[string]interface{}, len(e.Meta)+2)
 	for k, v := range e.Meta {
