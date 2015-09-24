@@ -230,6 +230,8 @@ of adding a metric type to the datapoints.  For example, if one of the
 dimensions is "metrictype" in this config and the dimension's value is "count",
 then the value is sent upstream as a datapoint.Count.
 
+It also sets the timeout on idle connections to 1 minute, from the default of 30 seconds.
+
 ```
 {
   "StatsDelay": "1s",
@@ -237,6 +239,7 @@ then the value is sent upstream as a datapoint.Count.
     {
       "Type": "carbon",
       "ListenAddr" : "0.0.0.0:2003",
+      "TimeoutDuration": "1m",
       "MetricDeconstructor": "commakeys",
       "MetricDeconstructorOptions": "mtypedim:metrictype"
     },
@@ -265,7 +268,7 @@ call.
   "ListenFrom": [
     {
       "Type": "carbon",
-      "ListenAddr" : "0.0.0.0:2003",
+      "ListenAddr" : "0.0.0.0:2003"
     },
   ],
 
