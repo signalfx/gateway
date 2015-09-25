@@ -240,7 +240,7 @@ seconds.
     {
       "Type": "carbon",
       "ListenAddr" : "0.0.0.0:2003",
-      "TimeoutDuration": "1m",
+      "Timeout": "1m",
       "MetricDeconstructor": "commakeys",
       "MetricDeconstructorOptions": "mtypedim:metrictype"
     },
