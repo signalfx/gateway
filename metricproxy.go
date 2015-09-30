@@ -23,6 +23,7 @@ import (
 	"github.com/signalfx/metricproxy/protocol/carbon"
 	"github.com/signalfx/metricproxy/protocol/collectd"
 	"github.com/signalfx/metricproxy/protocol/csv"
+	"github.com/signalfx/metricproxy/protocol/ddagent"
 	"github.com/signalfx/metricproxy/protocol/demultiplexer"
 	"github.com/signalfx/metricproxy/protocol/signalfx"
 	"github.com/signalfx/metricproxy/stats"
@@ -53,6 +54,9 @@ type ListenerLoader func(ctx context.Context, sink dpsink.Sink, listenFrom *conf
 var allListenerLoaders = map[string]ListenerLoader{
 	"signalfx": func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (protocol.Listener, error) {
 		return signalfx.ListenerLoader(ctx, sink, listenFrom)
+	},
+	"ddagent": func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (protocol.Listener, error) {
+		return ddagent.ListenerLoader(ctx, sink, listenFrom)
 	},
 	"carbon": func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (protocol.Listener, error) {
 		return carbon.ListenerLoader(ctx, sink, listenFrom)

@@ -38,6 +38,7 @@ type ListenFrom struct {
 	ListenAddr                 *string
 	MetricDeconstructor        *string
 	MetricDeconstructorOptions *string
+	ReforwardHost              *string
 	Timeout                    *string
 	Name                       *string
 	ListenPath                 *string
