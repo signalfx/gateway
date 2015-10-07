@@ -171,12 +171,12 @@ func ListenerLoader(ctx context.Context, sink dpsink.Sink, listenFrom *config.Li
 	//  *listenFrom.Name
 	return NewListener(
 		ctx, sink, conf, *listenFrom.ListenAddr,
-		*listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions)
+		*listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions, listenFrom.MetricDeconstructorOptionsJSON)
 }
 
 // NewListener creates a new listener for carbon datapoints
 func NewListener(ctx context.Context, sink dpsink.Sink, conf listenerConfig, listenAddr string,
-	metricDeconstructor string, metricDeconstructorOptions string) (*Listener, error) {
+	metricDeconstructor string, metricDeconstructorOptions string, metricDeconstructorJSON map[string]interface{}) (*Listener, error) {
 	psocket, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return nil, err
@@ -184,7 +184,10 @@ func NewListener(ctx context.Context, sink dpsink.Sink, conf listenerConfig, lis
 
 	deconstructor, err := metricdeconstructor.Load(metricDeconstructor, metricDeconstructorOptions)
 	if err != nil {
-		return nil, err
+		deconstructor, err = metricdeconstructor.LoadJSON(metricDeconstructor, metricDeconstructorJSON)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	counter := &dpsink.Counter{}

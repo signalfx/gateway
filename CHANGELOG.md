@@ -5,6 +5,13 @@ Placeholder changes in the oldest release exist only to document which
 subsections are relevant.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [0.8.0] - 2015-10-12
+
+### Added
+
+- Support delimiter based metric deconstructor usable for dimensionalizing of
+  graphite metrics
+
 ## [0.7.0] - 2015-07-13
 
 ### Added
