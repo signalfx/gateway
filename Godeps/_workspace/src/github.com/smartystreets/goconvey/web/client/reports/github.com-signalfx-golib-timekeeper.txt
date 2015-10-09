@@ -1,7 +1,0 @@
-mode: set
-github.com/signalfx/golib/timekeeper/timekeeper.go:26.36,28.2 1 1
-github.com/signalfx/golib/timekeeper/timekeeper.go:31.48,33.2 1 1
-github.com/signalfx/golib/timekeeper/timekeeper.go:43.33,45.2 1 1
-github.com/signalfx/golib/timekeeper/timekeeper.go:48.42,50.2 1 1
-github.com/signalfx/golib/timekeeper/timekeeper.go:53.57,55.2 1 1
-github.com/signalfx/golib/timekeeper/timekeeper.go:58.49,62.2 1 1

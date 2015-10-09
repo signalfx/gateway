@@ -1,7 +1,0 @@
-mode: set
-github.com/signalfx/golib/eventcounter/eventcounter.go:19.62,26.2 1 1
-github.com/signalfx/golib/eventcounter/eventcounter.go:31.51,33.2 1 1
-github.com/signalfx/golib/eventcounter/eventcounter.go:37.65,40.62 3 1
-github.com/signalfx/golib/eventcounter/eventcounter.go:51.2,51.52 1 1
-github.com/signalfx/golib/eventcounter/eventcounter.go:40.62,44.77 1 1
-github.com/signalfx/golib/eventcounter/eventcounter.go:44.77,46.4 1 1
