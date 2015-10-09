@@ -1,0 +1,3 @@
+mode: set
+github.com/signalfx/golib/safeexec/safeexec.go:15.13,17.2 1 1
+github.com/signalfx/golib/safeexec/safeexec.go:21.81,31.2 8 1

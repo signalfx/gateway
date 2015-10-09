@@ -1,0 +1,243 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" >package timekeepertest
+
+import (
+        "container/heap"
+        "runtime"
+        "sync"
+        "time"
+
+        "github.com/signalfx/golib/timekeeper"
+)
+
+type chanTime struct {
+        ch          chan time.Time
+        triggerTime time.Time
+}
+
+type triggerHeap []*chanTime
+
+func (t triggerHeap) Len() int <span class="cov8" title="1">{
+        return len(t)
+}</span>
+
+func (t triggerHeap) Less(i, j int) bool <span class="cov8" title="1">{
+        return t[i].triggerTime.Before(t[j].triggerTime)
+}</span>
+
+func (t triggerHeap) Swap(i, j int) <span class="cov8" title="1">{
+        t[i], t[j] = t[j], t[i]
+}</span>
+
+func (t *triggerHeap) Push(x interface{}) <span class="cov8" title="1">{
+        *t = append(*t, x.(*chanTime))
+}</span>
+
+func (t *triggerHeap) Pop() interface{} <span class="cov8" title="1">{
+        old := *t
+        n := len(old)
+        x := old[n-1]
+        *t = old[0 : n-1]
+        return x
+}</span>
+
+// StubClock is a way to stub the progress of time
+type StubClock struct {
+        currentTime  time.Time
+        waitingChans triggerHeap
+
+        mu sync.Mutex
+}
+
+// NewStubClock creates a new stubbable clock
+func NewStubClock(now time.Time) *StubClock <span class="cov8" title="1">{
+        return &amp;StubClock{
+                currentTime:  now,
+                waitingChans: triggerHeap([]*chanTime{}),
+        }
+}</span>
+
+var _ timekeeper.TimeKeeper = &amp;StubClock{}
+
+// Now simulates time.Now and returns the current time of the stubbed clock
+func (s *StubClock) Now() time.Time <span class="cov8" title="1">{
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        return s.currentTime
+}</span>
+
+// Sleep pauses and returns when the clock has advanced dur duration
+func (s *StubClock) Sleep(dur time.Duration) <span class="cov8" title="1">{
+        &lt;-s.After(dur)
+}</span>
+
+// Incr the stored time by dur, causing waiting channels to send
+func (s *StubClock) Incr(dur time.Duration) <span class="cov8" title="1">{
+        s.mu.Lock()
+        s.currentTime = s.currentTime.Add(dur)
+        s.mu.Unlock()
+        s.triggerChans()
+        runtime.Gosched()
+}</span>
+
+// Set the time to t
+func (s *StubClock) Set(t time.Time) <span class="cov8" title="1">{
+        s.mu.Lock()
+        s.currentTime = t
+        s.mu.Unlock()
+        s.triggerChans()
+        runtime.Gosched()
+}</span>
+
+func (s *StubClock) triggerChans() <span class="cov8" title="1">{
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        for len(s.waitingChans) &gt; 0 </span><span class="cov8" title="1">{
+                firstItem := s.waitingChans[0]
+                if !firstItem.triggerTime.After(s.currentTime) </span><span class="cov8" title="1">{
+                        i := heap.Pop(&amp;s.waitingChans).(*chanTime)
+                        i.ch &lt;- i.triggerTime
+                        runtime.Gosched()
+                }</span><span class="cov8" title="1"> else {
+                        break</span>
+                }
+        }
+}
+
+// After stubs time.After
+func (s *StubClock) After(d time.Duration) &lt;-chan time.Time <span class="cov8" title="1">{
+        ch := make(chan time.Time, 1)
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        heap.Push(&amp;s.waitingChans, &amp;chanTime{
+                ch:          ch,
+                triggerTime: s.currentTime.Add(d),
+        })
+        return ch
+}</span>
+
+func (s *StubClock) removeChan(ch &lt;-chan time.Time) <span class="cov8" title="1">{
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        for i := 0; i &lt; len(s.waitingChans); i++ </span><span class="cov8" title="1">{
+                if s.waitingChans[i].ch == ch </span><span class="cov8" title="1">{
+                        heap.Remove(&amp;s.waitingChans, i)
+                        return
+                }</span>
+        }
+}
+
+// NewTimer stubs time.NewTimer
+func (s *StubClock) NewTimer(d time.Duration) timekeeper.Timer <span class="cov8" title="1">{
+        ch := s.After(d)
+        return &amp;simpleTimer{
+                ch:     ch,
+                parent: s,
+        }
+}</span>
+
+type simpleTimer struct {
+        ch      &lt;-chan time.Time
+        stopped bool
+        parent  *StubClock
+}
+
+func (s *simpleTimer) Chan() &lt;-chan time.Time <span class="cov8" title="1">{
+        return s.ch
+}</span>
+
+func (s *simpleTimer) Stop() bool <span class="cov8" title="1">{
+        if s.stopped </span><span class="cov8" title="1">{
+                return false
+        }</span>
+        <span class="cov8" title="1">s.stopped = true
+        s.parent.removeChan(s.ch)
+        return true</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible = document.getElementById('file0');
+		files.addEventListener('change', onChange, false);
+		function onChange() {
+			visible.style.display = 'none';
+			visible = document.getElementById(files.value);
+			visible.style.display = 'block';
+			window.scrollTo(0, 0);
+		}
+	})();
+	</script>
+</html>

@@ -145,13 +145,18 @@ func (decoder *ProtobufDecoderV1) Read(ctx context.Context, req *http.Request) e
 		if err != nil {
 			return err
 		}
-		if msg.Metric == nil || msg.Value == nil {
+		if datapointProtobufIsInvalidForV1(&msg) {
 			return errInvalidProtobuf
 		}
 		mt := decoder.TypeGetter.GetMetricTypeFromMap(msg.GetMetric())
-		dp := NewProtobufDataPointWithType(&msg, mt)
-		decoder.Sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp})
+		if dp, err := NewProtobufDataPointWithType(&msg, mt); err == nil {
+			decoder.Sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp})
+		}
 	}
+}
+
+func datapointProtobufIsInvalidForV1(msg *com_signalfx_metrics_protobuf.DataPoint) bool {
+	return msg.Metric == nil || msg.Value == nil
 }
 
 // JSONDecoderV1 creates datapoints out of the v1 JSON definition
@@ -209,7 +214,9 @@ func (decoder *ProtobufDecoderV2) Read(ctx context.Context, req *http.Request) e
 	}
 	dps := make([]*datapoint.Datapoint, 0, len(msg.GetDatapoints()))
 	for _, protoDb := range msg.GetDatapoints() {
-		dps = append(dps, NewProtobufDataPointWithType(protoDb, com_signalfx_metrics_protobuf.MetricType_GAUGE))
+		if dp, err := NewProtobufDataPointWithType(protoDb, com_signalfx_metrics_protobuf.MetricType_GAUGE); err == nil {
+			dps = append(dps, dp)
+		}
 	}
 	return decoder.Sink.AddDatapoints(ctx, dps)
 }

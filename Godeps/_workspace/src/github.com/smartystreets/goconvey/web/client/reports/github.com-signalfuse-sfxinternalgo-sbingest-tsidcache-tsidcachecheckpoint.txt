@@ -1,0 +1,8 @@
+mode: set
+github.com/signalfuse/sfxinternalgo/sbingest/tsidcache/tsidcachecheckpoint/checkpoint.go:33.46,36.2 2 1
+github.com/signalfuse/sfxinternalgo/sbingest/tsidcache/tsidcachecheckpoint/checkpoint.go:39.73,48.2 4 1
+github.com/signalfuse/sfxinternalgo/sbingest/tsidcache/tsidcachecheckpoint/checkpoint.go:50.62,53.6 3 1
+github.com/signalfuse/sfxinternalgo/sbingest/tsidcache/tsidcachecheckpoint/checkpoint.go:53.6,54.10 1 1
+github.com/signalfuse/sfxinternalgo/sbingest/tsidcache/tsidcachecheckpoint/checkpoint.go:55.3,56.10 1 1
+github.com/signalfuse/sfxinternalgo/sbingest/tsidcache/tsidcachecheckpoint/checkpoint.go:57.3,58.56 1 1
+github.com/signalfuse/sfxinternalgo/sbingest/tsidcache/tsidcachecheckpoint/checkpoint.go:64.42,68.2 3 1

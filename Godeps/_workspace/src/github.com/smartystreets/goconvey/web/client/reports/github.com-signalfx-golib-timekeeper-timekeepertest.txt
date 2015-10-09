@@ -1,0 +1,24 @@
+mode: set
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:19.32,21.2 1 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:23.42,25.2 1 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:27.37,29.2 1 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:31.43,33.2 1 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:35.41,41.2 5 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:52.45,57.2 1 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:62.37,66.2 3 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:69.46,71.2 1 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:74.45,80.2 5 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:83.38,89.2 5 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:91.36,94.30 3 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:94.30,96.50 2 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:96.50,100.4 3 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:100.4,101.9 1 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:107.61,116.2 5 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:118.53,121.43 3 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:121.43,122.33 1 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:122.33,125.4 2 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:130.64,136.2 2 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:144.47,146.2 1 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:148.35,149.15 1 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:152.2,154.13 3 1
+github.com/signalfx/golib/timekeeper/timekeepertest/timekeepertest.go:149.15,151.3 1 1

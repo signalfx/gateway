@@ -1,0 +1,27 @@
+mode: set
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:17.13,27.2 9 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:56.13,59.2 2 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:61.27,62.19 1 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:66.2,67.16 2 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:62.19,65.3 2 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:67.16,70.3 2 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:80.54,81.23 1 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:89.2,89.12 1 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:81.23,82.26 1 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:82.26,83.51 1 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:83.51,86.5 2 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:92.34,100.16 4 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:103.2,103.38 1 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:107.2,108.62 2 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:111.2,113.30 3 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:116.2,116.48 1 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:119.2,120.29 2 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:123.2,123.47 1 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:126.2,127.12 2 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:100.16,102.3 1 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:103.38,105.3 1 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:108.62,110.3 1 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:113.30,115.3 1 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:116.48,118.3 1 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:120.29,122.3 1 1
+github.com/signalfuse/sfxinternalgo/cmd/sbhealth/sbhealth.go:123.47,125.3 1 1

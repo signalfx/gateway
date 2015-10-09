@@ -1,0 +1,14 @@
+mode: set
+github.com/signalfx/golib/schedexec/schedexec.go:21.74,27.2 1 1
+github.com/signalfx/golib/schedexec/schedexec.go:30.74,32.2 1 1
+github.com/signalfx/golib/schedexec/schedexec.go:36.70,38.2 1 1
+github.com/signalfx/golib/schedexec/schedexec.go:43.109,46.20 3 1
+github.com/signalfx/golib/schedexec/schedexec.go:50.2,52.6 3 1
+github.com/signalfx/golib/schedexec/schedexec.go:46.20,48.3 1 1
+github.com/signalfx/golib/schedexec/schedexec.go:52.6,53.10 1 1
+github.com/signalfx/golib/schedexec/schedexec.go:54.3,55.42 1 1
+github.com/signalfx/golib/schedexec/schedexec.go:58.4,60.22 3 1
+github.com/signalfx/golib/schedexec/schedexec.go:63.3,65.14 2 1
+github.com/signalfx/golib/schedexec/schedexec.go:55.42,57.5 1 1
+github.com/signalfx/golib/schedexec/schedexec.go:60.22,62.5 1 1
+github.com/signalfx/golib/schedexec/schedexec.go:71.44,75.2 3 1

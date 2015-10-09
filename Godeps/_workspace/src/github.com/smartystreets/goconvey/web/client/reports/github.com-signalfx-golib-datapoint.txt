@@ -1,0 +1,12 @@
+mode: set
+github.com/signalfx/golib/datapoint/datapoint.go:51.38,53.2 1 1
+github.com/signalfx/golib/datapoint/datapoint.go:56.123,58.2 1 1
+github.com/signalfx/golib/datapoint/datapoint.go:61.165,70.2 1 1
+github.com/signalfx/golib/datapoint/value.go:23.42,25.2 1 1
+github.com/signalfx/golib/datapoint/value.go:27.42,29.2 1 1
+github.com/signalfx/golib/datapoint/value.go:32.44,34.2 1 1
+github.com/signalfx/golib/datapoint/value.go:44.36,46.2 1 1
+github.com/signalfx/golib/datapoint/value.go:48.40,50.2 1 1
+github.com/signalfx/golib/datapoint/value.go:53.38,55.2 1 1
+github.com/signalfx/golib/datapoint/value.go:65.40,67.2 1 1
+github.com/signalfx/golib/datapoint/value.go:70.45,72.2 1 1

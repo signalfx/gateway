@@ -5,6 +5,7 @@ import (
 
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
+	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/signalfx/golib/datapoint"
 	"github.com/stretchr/testify/assert"
@@ -20,13 +21,15 @@ func TestNewProtobufDataPoint(t *testing.T) {
 			Value: workarounds.GolangDoesnotAllowPointerToStringLiteral("value"),
 		}},
 	}
-	dp := NewProtobufDataPointWithType(protoDatapoint, com_signalfx_metrics_protobuf.MetricType_COUNTER)
+	dp, err := NewProtobufDataPointWithType(protoDatapoint, com_signalfx_metrics_protobuf.MetricType_COUNTER)
 	assert.Equal(t, "asource", dp.Dimensions["sf_source"], "Line should be invalid")
+	assert.NoError(t, err)
 	assert.Equal(t, datapoint.Count, dp.MetricType, "Line should be invalid")
 
 	v := com_signalfx_metrics_protobuf.MetricType_CUMULATIVE_COUNTER
 	protoDatapoint.MetricType = &v
-	dp = NewProtobufDataPointWithType(protoDatapoint, com_signalfx_metrics_protobuf.MetricType_COUNTER)
+	dp, err = NewProtobufDataPointWithType(protoDatapoint, com_signalfx_metrics_protobuf.MetricType_COUNTER)
+	assert.NoError(t, err)
 	assert.Equal(t, datapoint.Counter, dp.MetricType, "Line should be invalid")
 
 	item := &BodySendFormatV2{
@@ -49,8 +52,18 @@ func TestNewProtobufDataPoint(t *testing.T) {
 	assert.Equal(t, datapoint.NewStringValue("abc"), s, "Should get value abc back")
 
 	item.Value = struct{}{}
-	_, err := ValueToValue(item.Value)
+	_, err = ValueToValue(item.Value)
 	assert.Error(t, err)
+}
+
+func TestNewProtobufDataPointWithType(t *testing.T) {
+	Convey("A nil datapoint value", t, func() {
+		dp := com_signalfx_metrics_protobuf.DataPoint{}
+		Convey("should error when converted", func() {
+			_, err := NewProtobufDataPointWithType(&dp, com_signalfx_metrics_protobuf.MetricType_COUNTER)
+			So(err, ShouldEqual, errDatapointValueNotSet)
+		})
+	})
 }
 
 func TestConver(t *testing.T) {

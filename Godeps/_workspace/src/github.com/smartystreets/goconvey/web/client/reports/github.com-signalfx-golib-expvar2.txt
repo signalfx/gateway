@@ -1,0 +1,6 @@
+mode: set
+github.com/signalfx/golib/expvar2/handler.go:11.60,15.37 4 1
+github.com/signalfx/golib/expvar2/handler.go:22.2,22.25 1 1
+github.com/signalfx/golib/expvar2/handler.go:15.37,16.13 1 1
+github.com/signalfx/golib/expvar2/handler.go:19.3,20.45 2 1
+github.com/signalfx/golib/expvar2/handler.go:16.13,18.4 1 1

@@ -1,0 +1,4 @@
+mode: set
+github.com/signalfx/golib/sfxclient/sfxclienttest/sfxclienttest.go:17.47,18.2 0 1
+github.com/signalfx/golib/sfxclient/sfxclienttest/sfxclienttest.go:21.46,22.2 0 1
+github.com/signalfx/golib/sfxclient/sfxclienttest/sfxclienttest.go:25.44,29.2 1 1

@@ -5,6 +5,8 @@ import (
 
 	"time"
 
+	"errors"
+
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/golib/datapoint"
 )
@@ -118,10 +120,15 @@ func fromTs(ts int64) time.Time {
 	return time.Now().Add(-time.Duration(time.Millisecond.Nanoseconds() * ts))
 }
 
+var errDatapointValueNotSet = errors.New("datapoint value not set")
+
 // NewProtobufDataPointWithType creates a new datapoint from SignalFx's protobuf definition (backwards compatable with old API)
-func NewProtobufDataPointWithType(dp *com_signalfx_metrics_protobuf.DataPoint, mType com_signalfx_metrics_protobuf.MetricType) *datapoint.Datapoint {
+func NewProtobufDataPointWithType(dp *com_signalfx_metrics_protobuf.DataPoint, mType com_signalfx_metrics_protobuf.MetricType) (*datapoint.Datapoint, error) {
 	var mt com_signalfx_metrics_protobuf.MetricType
 
+	if dp.GetValue() == nil {
+		return nil, errDatapointValueNotSet
+	}
 	if dp.MetricType != nil {
 		mt = dp.GetMetricType()
 	} else {
@@ -138,5 +145,5 @@ func NewProtobufDataPointWithType(dp *com_signalfx_metrics_protobuf.DataPoint, m
 		dims[dpdim.GetKey()] = dpdim.GetValue()
 	}
 
-	return datapoint.New(dp.GetMetric(), dims, NewDatumValue(dp.GetValue()), fromMT(mt), fromTs(dp.GetTimestamp()))
+	return datapoint.New(dp.GetMetric(), dims, NewDatumValue(dp.GetValue()), fromMT(mt), fromTs(dp.GetTimestamp())), nil
 }

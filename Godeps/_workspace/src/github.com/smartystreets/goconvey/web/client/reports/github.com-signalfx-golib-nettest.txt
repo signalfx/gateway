@@ -1,0 +1,11 @@
+mode: set
+github.com/signalfx/golib/nettest/tcpport.go:12.40,14.2 1 1
+github.com/signalfx/golib/nettest/tcpport.go:17.27,22.2 4 1
+github.com/signalfx/golib/nettest/trackingdialer.go:15.40,17.24 2 1
+github.com/signalfx/golib/nettest/trackingdialer.go:25.2,25.15 1 1
+github.com/signalfx/golib/nettest/trackingdialer.go:17.24,20.17 3 1
+github.com/signalfx/golib/nettest/trackingdialer.go:23.3,23.24 1 1
+github.com/signalfx/golib/nettest/trackingdialer.go:20.17,22.4 1 1
+github.com/signalfx/golib/nettest/trackingdialer.go:29.104,33.16 4 1
+github.com/signalfx/golib/nettest/trackingdialer.go:36.2,37.18 2 1
+github.com/signalfx/golib/nettest/trackingdialer.go:33.16,35.3 1 1

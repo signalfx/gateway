@@ -1,0 +1,485 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/signalfx/golib/explorable/explorable.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" >package explorable
+
+import (
+        "fmt"
+        "html"
+        "net/http"
+        "reflect"
+        "runtime"
+        "strconv"
+        "strings"
+
+        "github.com/Sirupsen/logrus"
+)
+
+// Result is the crude explorable representation of an object returned by ExploreObject
+type Result struct {
+        Result   interface{}
+        Children []string
+        Desc     string
+}
+
+// Handler allows you to serve an exportable object for debugging over HTTP
+type Handler struct {
+        Val      interface{}
+        BasePath string
+}
+
+func (h *Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request) <span class="cov8" title="1">{
+        pathParts := strings.Split(strings.TrimPrefix(r.URL.Path, h.BasePath), "/")
+        nonEmptyParts := []string{}
+        for _, p := range pathParts </span><span class="cov8" title="1">{
+                if p != "" </span><span class="cov8" title="1">{
+                        nonEmptyParts = append(nonEmptyParts, p)
+                }</span>
+        }
+        <span class="cov8" title="1">logrus.WithField("parts", nonEmptyParts).WithField("url", r.URL).Info("Exploring object")
+        o := ExploreObject(reflect.ValueOf(h.Val), nonEmptyParts)
+
+        parent := ""
+        if len(nonEmptyParts) &gt; 0 </span><span class="cov8" title="1">{
+                parent = fmt.Sprintf(`
+                &lt;h1&gt;
+                        &lt;a href="%s"&gt;Parent&lt;/a&gt;
+                &lt;/h1&gt;
+                `, h.BasePath+strings.TrimPrefix("/"+strings.Join(nonEmptyParts[0:len(nonEmptyParts)-1], "/"), "/"))
+        }</span>
+
+        <span class="cov8" title="1">childTable := ""
+        if len(o.Children) &gt; 0 </span><span class="cov8" title="1">{
+                childTable += "&lt;table&gt;\n"
+                for _, c := range o.Children </span><span class="cov8" title="1">{
+                        link := h.BasePath + strings.TrimPrefix("/"+strings.Join(append(nonEmptyParts, c), "/"), "/")
+                        childTable += fmt.Sprintf(`
+&lt;tr&gt;
+        &lt;td&gt;&lt;a href="%s"&gt;%s&lt;/a&gt;&lt;/td&gt;
+&lt;/tr&gt;
+`, link, html.EscapeString(c))
+                }</span>
+                <span class="cov8" title="1">childTable += "&lt;/table&gt;\n"</span>
+        }
+        <span class="cov8" title="1">s :=
+                fmt.Sprintf(`
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+        &lt;head&gt;
+                &lt;title&gt;Explorable object&lt;/title&gt;
+        &lt;/head&gt;
+        &lt;body&gt;
+                &lt;h1&gt;
+                        %s
+                &lt;/h1&gt;
+                %s
+                %s
+        &lt;/body&gt;
+&lt;/html&gt;`, html.EscapeString(o.Desc), parent, childTable)
+
+        rw.Write([]byte(s))</span>
+}
+
+func getObj(obj interface{}) *Result <span class="cov8" title="1">{
+        return ExploreObject(reflect.ValueOf(obj), []string{})
+}</span>
+
+func checkConsts(t reflect.Value) *Result <span class="cov8" title="1">{
+        ret := &amp;Result{}
+        if !t.IsValid() </span><span class="cov8" title="1">{
+                ret.Desc = "&lt;INVALID&gt;"
+                return ret
+        }</span>
+        <span class="cov8" title="1">kind := t.Kind()
+        if kind &gt;= reflect.Int &amp;&amp; kind &lt;= reflect.Int64 </span><span class="cov8" title="1">{
+                ret.Desc = strconv.FormatInt(t.Int(), 10)
+                return ret
+        }</span>
+        <span class="cov8" title="1">if kind &gt;= reflect.Uint &amp;&amp; kind &lt;= reflect.Uint64 </span><span class="cov8" title="1">{
+                ret.Desc = strconv.FormatUint(t.Uint(), 10)
+                return ret
+        }</span>
+        <span class="cov8" title="1">if kind &gt;= reflect.Float32 &amp;&amp; kind &lt;= reflect.Float64 </span><span class="cov8" title="1">{
+                ret.Desc = strconv.FormatFloat(t.Float(), byte('f'), 10, 64)
+                return ret
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+func exploreArray(t reflect.Value, path []string) *Result <span class="cov8" title="1">{
+        ret := &amp;Result{}
+        if len(path) == 0 </span><span class="cov8" title="1">{
+                ret.Desc = fmt.Sprintf("array-len(%d of %d)", t.Len(), t.Cap())
+                ret.Children = make([]string, t.Len())
+                for i := 0; i &lt; t.Len(); i++ </span><span class="cov8" title="1">{
+                        ret.Children[i] = strconv.FormatInt(int64(i), 10)
+                }</span>
+                <span class="cov8" title="1">return ret</span>
+        }
+        <span class="cov8" title="1">index, err := strconv.ParseInt(path[0], 10, 64)
+        if err != nil </span><span class="cov8" title="1">{
+                ret.Desc = err.Error()
+                return ret
+        }</span>
+        // TODO: Catch panics here
+        <span class="cov8" title="1">return ExploreObject(t.Index(int(index)), path[1:])</span>
+}
+
+func exploreFunc(t reflect.Value, path []string) *Result <span class="cov8" title="1">{
+        ret := &amp;Result{}
+        if t.IsNil() </span><span class="cov8" title="1">{
+                ret.Desc = "&lt;NIL function&gt;"
+                return ret
+        }</span>
+        <span class="cov8" title="1">f := runtime.FuncForPC(t.Pointer())
+        if f == nil </span><span class="cov8" title="1">{
+                ret.Desc = "&lt;UNKNOWN FUNCTION&gt;"
+                return ret
+        }</span>
+        <span class="cov8" title="1">ret.Desc = f.Name()
+        return ret</span>
+}
+
+func exploreSlice(t reflect.Value, path []string) *Result <span class="cov8" title="1">{
+        ret := &amp;Result{}
+        if t.IsNil() </span><span class="cov8" title="1">{
+                ret.Desc = "&lt;NIL&gt;"
+                return ret
+        }</span>
+        <span class="cov8" title="1">if len(path) == 0 </span><span class="cov8" title="1">{
+                ret.Desc = fmt.Sprintf("slice-len(%d of %d)", t.Len(), t.Cap())
+                ret.Children = make([]string, t.Len())
+                for i := 0; i &lt; t.Len(); i++ </span><span class="cov8" title="1">{
+                        ret.Children[i] = strconv.FormatInt(int64(i), 10)
+                }</span>
+                <span class="cov8" title="1">return ret</span>
+        }
+        <span class="cov8" title="1">index, err := strconv.ParseInt(path[0], 10, 64)
+        if err != nil </span><span class="cov8" title="1">{
+                ret.Desc = err.Error()
+                return ret
+        }</span>
+        // TODO: Catch panics here
+        <span class="cov8" title="1">return ExploreObject(t.Index(int(index)), path[1:])</span>
+}
+
+func exploreMap(t reflect.Value, path []string) *Result <span class="cov8" title="1">{
+        ret := &amp;Result{}
+        if t.IsNil() </span><span class="cov8" title="1">{
+                ret.Desc = "&lt;NIL&gt;"
+                return ret
+        }</span>
+        <span class="cov8" title="1">if len(path) == 0 </span><span class="cov8" title="1">{
+                ret.Desc = fmt.Sprintf("map-len(%d)", t.Len())
+                keys := t.MapKeys()
+                ret.Children = make([]string, len(keys))
+                for i, k := range keys </span><span class="cov8" title="1">{
+                        // TODO: Better index?
+                        ret.Children[i] = keyMapString(k)
+                }</span>
+                <span class="cov8" title="1">return ret</span>
+        }
+        <span class="cov8" title="1">mkey := keyMapType(t.Type().Key().Kind(), path[0])
+        if !mkey.IsValid() </span><span class="cov8" title="1">{
+                ret.Desc = fmt.Sprintf("&lt;INVALID MAP KEY %s&gt;", path[0])
+                return ret
+        }</span>
+
+        <span class="cov8" title="1">v := t.MapIndex(mkey)
+        if !v.IsValid() </span><span class="cov8" title="1">{
+                ret.Desc = fmt.Sprintf("&lt;NOT FOUND MAP KEY %s&gt;", path[0])
+                return ret
+        }</span>
+        <span class="cov8" title="1">return ExploreObject(v, path[1:])</span>
+}
+
+func exploreStruct(t reflect.Value, path []string) *Result <span class="cov8" title="1">{
+        ret := &amp;Result{}
+        if len(path) == 0 </span><span class="cov8" title="1">{
+                ret.Desc = t.Type().Name()
+                ret.Children = make([]string, t.Type().NumField())
+                for i := 0; i &lt; t.Type().NumField(); i++ </span><span class="cov8" title="1">{
+                        ret.Children[i] = t.Type().Field(i).Name
+                }</span>
+                <span class="cov8" title="1">return ret</span>
+        }
+        <span class="cov8" title="1">val := t.FieldByName(path[0])
+        if !val.IsValid() </span><span class="cov8" title="1">{
+                ret.Desc = fmt.Sprintf("&lt;Invalid path %s&gt;", path[0])
+                return ret
+        }</span>
+        <span class="cov8" title="1">return ExploreObject(val, path[1:])</span>
+}
+
+func exploreChan(t reflect.Value, path []string) *Result <span class="cov8" title="1">{
+        ret := &amp;Result{}
+        if t.IsNil() </span><span class="cov8" title="1">{
+                ret.Desc = "&lt;NIL&gt;"
+                return ret
+        }</span>
+        <span class="cov8" title="1">ret.Desc = fmt.Sprintf("chan-len(%d of %d)", t.Len(), t.Cap())
+        return ret</span>
+}
+
+func explorePtr(t reflect.Value, path []string) *Result <span class="cov8" title="1">{
+        ret := &amp;Result{}
+        if t.IsNil() </span><span class="cov8" title="1">{
+                ret.Desc = "&lt;NIL&gt;"
+                return ret
+        }</span>
+        <span class="cov8" title="1">return ExploreObject(t.Elem(), path)</span>
+}
+
+func exploreInterface(t reflect.Value, path []string) *Result <span class="cov8" title="1">{
+        ret := &amp;Result{}
+        if t.IsNil() </span><span class="cov8" title="1">{
+                ret.Desc = "&lt;NIL&gt;"
+                return ret
+        }</span>
+        <span class="cov8" title="1">return ExploreObject(t.Elem(), path)</span>
+}
+
+// ExploreObject is a crude public way to explore an object's values via reflection
+func ExploreObject(t reflect.Value, path []string) *Result <span class="cov8" title="1">{
+        if ret := checkConsts(t); ret != nil </span><span class="cov8" title="1">{
+                return ret
+        }</span>
+        <span class="cov8" title="1">ret := &amp;Result{}
+        switch t.Kind() </span>{
+        <span class="cov8" title="1">case reflect.Bool:
+                ret.Desc = fmt.Sprintf("%t", t.Bool())
+                return ret</span>
+        <span class="cov8" title="1">case reflect.String:
+                ret.Desc = t.String()
+                return ret</span>
+        }
+        <span class="cov8" title="1">c := map[reflect.Kind](func(reflect.Value, []string) *Result){
+                reflect.Array:     exploreArray,
+                reflect.Func:      exploreFunc,
+                reflect.Slice:     exploreSlice,
+                reflect.Map:       exploreMap,
+                reflect.Struct:    exploreStruct,
+                reflect.Chan:      exploreChan,
+                reflect.Ptr:       explorePtr,
+                reflect.Interface: exploreInterface,
+        }
+        callback, exists := c[t.Kind()]
+        if exists </span><span class="cov8" title="1">{
+                return callback(t, path)
+        }</span>
+        <span class="cov8" title="1">ret.Desc = "&lt;Unsupported&gt;"
+        return ret</span>
+}
+
+func stringToIntType(path string) reflect.Value <span class="cov8" title="1">{
+        i, err := strconv.ParseInt(path, 10, 64)
+        if err != nil </span><span class="cov8" title="1">{
+                return reflect.Value{}
+        }</span>
+        <span class="cov8" title="1">return reflect.ValueOf(int(i))</span>
+}
+
+func stringToInt8Type(path string) reflect.Value <span class="cov8" title="1">{
+        i, err := strconv.ParseInt(path, 10, 8)
+        if err != nil </span><span class="cov8" title="1">{
+                return reflect.Value{}
+        }</span>
+        <span class="cov8" title="1">return reflect.ValueOf(int8(i))</span>
+}
+
+func stringToInt16Type(path string) reflect.Value <span class="cov8" title="1">{
+        i, err := strconv.ParseInt(path, 10, 16)
+        if err != nil </span><span class="cov8" title="1">{
+                return reflect.Value{}
+        }</span>
+        <span class="cov8" title="1">return reflect.ValueOf(int16(i))</span>
+}
+
+func stringToInt32Type(path string) reflect.Value <span class="cov8" title="1">{
+        i, err := strconv.ParseInt(path, 10, 32)
+        if err != nil </span><span class="cov8" title="1">{
+                return reflect.Value{}
+        }</span>
+        <span class="cov8" title="1">return reflect.ValueOf(int32(i))</span>
+}
+
+func stringToInt64Type(path string) reflect.Value <span class="cov8" title="1">{
+        i, err := strconv.ParseInt(path, 10, 64)
+        if err != nil </span><span class="cov8" title="1">{
+                return reflect.Value{}
+        }</span>
+        <span class="cov8" title="1">return reflect.ValueOf(i)</span>
+}
+
+func stringToUIntType(path string) reflect.Value <span class="cov8" title="1">{
+        i, err := strconv.ParseUint(path, 10, 64)
+        if err != nil </span><span class="cov8" title="1">{
+                return reflect.Value{}
+        }</span>
+        <span class="cov8" title="1">return reflect.ValueOf(uint(i))</span>
+}
+
+func stringToUInt8Type(path string) reflect.Value <span class="cov8" title="1">{
+        i, err := strconv.ParseUint(path, 10, 8)
+        if err != nil </span><span class="cov8" title="1">{
+                return reflect.Value{}
+        }</span>
+        <span class="cov8" title="1">return reflect.ValueOf(uint8(i))</span>
+}
+
+func stringToUInt16Type(path string) reflect.Value <span class="cov8" title="1">{
+        i, err := strconv.ParseUint(path, 10, 16)
+        if err != nil </span><span class="cov8" title="1">{
+                return reflect.Value{}
+        }</span>
+        <span class="cov8" title="1">return reflect.ValueOf(uint16(i))</span>
+}
+
+func stringToUInt32Type(path string) reflect.Value <span class="cov8" title="1">{
+        i, err := strconv.ParseUint(path, 10, 32)
+        if err != nil </span><span class="cov8" title="1">{
+                return reflect.Value{}
+        }</span>
+        <span class="cov8" title="1">return reflect.ValueOf(uint32(i))</span>
+}
+
+func stringToUInt64Type(path string) reflect.Value <span class="cov8" title="1">{
+        i, err := strconv.ParseUint(path, 10, 64)
+        if err != nil </span><span class="cov8" title="1">{
+                return reflect.Value{}
+        }</span>
+        <span class="cov8" title="1">return reflect.ValueOf(i)</span>
+}
+
+func stringToFloat32Type(path string) reflect.Value <span class="cov8" title="1">{
+        i, err := strconv.ParseFloat(path, 32)
+        if err != nil </span><span class="cov8" title="1">{
+                return reflect.Value{}
+        }</span>
+        <span class="cov8" title="1">return reflect.ValueOf(float32(i))</span>
+}
+
+func stringToFloat64Type(path string) reflect.Value <span class="cov8" title="1">{
+        i, err := strconv.ParseFloat(path, 64)
+        if err != nil </span><span class="cov8" title="1">{
+                return reflect.Value{}
+        }</span>
+        <span class="cov8" title="1">return reflect.ValueOf(i)</span>
+}
+
+func stringToStringType(path string) reflect.Value <span class="cov8" title="1">{
+        return reflect.ValueOf(path)
+}</span>
+
+func keyMapType(mapKeyKind reflect.Kind, path string) reflect.Value <span class="cov8" title="1">{
+        m := map[reflect.Kind](func(string) reflect.Value){
+                reflect.Int:     stringToIntType,
+                reflect.Int8:    stringToInt8Type,
+                reflect.Int16:   stringToInt16Type,
+                reflect.Int32:   stringToInt32Type,
+                reflect.Int64:   stringToInt64Type,
+                reflect.Uint:    stringToUIntType,
+                reflect.Uint8:   stringToUInt8Type,
+                reflect.Uint16:  stringToUInt16Type,
+                reflect.Uint32:  stringToUInt32Type,
+                reflect.Uint64:  stringToUInt64Type,
+                reflect.Float32: stringToFloat32Type,
+                reflect.Float64: stringToFloat64Type,
+                reflect.String:  stringToStringType,
+        }
+        f, e := m[mapKeyKind]
+        if e </span><span class="cov8" title="1">{
+                return f(path)
+        }</span>
+        <span class="cov8" title="1">return reflect.Value{}</span>
+}
+
+func keyMapString(t reflect.Value) string <span class="cov8" title="1">{
+        o := ExploreObject(t, []string{})
+        return o.Desc
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible = document.getElementById('file0');
+		files.addEventListener('change', onChange, false);
+		function onChange() {
+			visible.style.display = 'none';
+			visible = document.getElementById(files.value);
+			visible.style.display = 'block';
+			window.scrollTo(0, 0);
+		}
+	})();
+	</script>
+</html>

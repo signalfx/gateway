@@ -1,0 +1,4 @@
+mode: set
+github.com/signalfx/golib/event/event.go:24.33,26.2 1 1
+github.com/signalfx/golib/event/event.go:29.103,31.2 1 1
+github.com/signalfx/golib/event/event.go:34.140,42.2 1 1
