@@ -256,6 +256,197 @@ seconds.
 }
 ```
 
+### Graphite Dimensions using Delimiters
+
+You can use MetricRules to extract dimensions from the dot-separated names of
+graphite metrics.
+
+A metric will be matched to only one matching rule. When multiple rules are
+provided, they are evaluated for a match to a metric in the following order:
+
+1. The rule must contain the same number of terms as the name of the metric to
+  be matched.
+1. If there is more than one rule with the same number of terms as the metric
+  name, then matches will be evaluated in the order in which they are defined in
+  the config.
+1. If there are no rules that match the metric name, the FallbackDeconstructor
+  is applied. By default this is "identity": all metrics are emitted as gauges
+  with unmodified names.
+
+The simplest rule contains only a DimensionsMap with the same number of terms
+and separated by the same delimiter as the incoming metrics. In the following
+example, the configuration contains two rules: one that matches all metrics
+with four terms, and one that matches all metrics with six terms.
+
+If the following example config were used to process a graphite metric called
+`cassandra.cassandra23.production.thread_count`, it would output the following:
+
+```
+metricName = thread_count
+metricType = Gauge
+dimensions = {service=cassandra, instance=cassandra23, tier=production}
+```
+
+```
+{
+  "ListenFrom": [
+    {
+      "Type": "carbon",
+      "ListenAddr": "0.0.0.0:2003",
+      "MetricDeconstructor": "delimiter",
+      "MetricDeconstructorOptionsJSON": {
+        "MetricRules": [
+          {
+            "DimensionsMap": "service.instance.tier.%"
+          },
+          {
+            "DimensionsMap": "service.instance.tier.module.submodule.%"
+          }
+        ]
+      }
+    }
+  ],
+  "ForwardTo": [
+    {
+      "type": "signalfx-json",
+      "DefaultAuthToken": "ABCD",
+      "Name": "signalfxforwarder"
+    }
+  ]
+}
+```
+
+You can define more complex rules for determining the name, type and dimensions
+of metrics to be emitted. In this next more complex example, we first define
+Dimensions that will be added to every datapoint ('customer: Acme'). We then
+explicitly define the metrics that will be sent in as counters rather than
+gauges (anything that ends with 'counter.count' or starts with 'counter').
+
+Define a MetricPath separately from the DimensionsMap to match only certain
+metrics.
+
+In the example below, the MetricPath `kafka|cassandra.*.*.*.!database`
+matches metrics under the following conditions:
+
+1. If the first term of the metric name separated by '.' matches either
+  'kafka' or 'cassandra'
+1. And the metric contains exactly 10 terms
+1. And the fifth term des not match the string 'database'
+
+The MetricPath is followed by a DimensionsMap:
+`component.identifier.instance.-.type.tier.item.item.%.%`
+
+1. The first three terms in the metric will be mapped to dimensions as
+  indicated in the DimensionsMap: 'component', 'identifier', and 'instance',
+  respectively.
+1. The fourth term in the metric will be ignored, since it's specified in the
+  DimensionsMap as the default ignore character '-'.
+1. The fifth and sixth terms will be mapped to dimensions 'type' and 'tier',
+  respectively.
+1. The seventh and eighth terms will be concatenated together delimited by
+  the default separator character '.', because they are both mapped to the
+  dimension called 'item'.
+1. The ninth and tenth terms are '%', the default metric character, which
+  indicates that they should be used for the metric name.
+
+This config also contains MetricName, the value of which will be prefixed onto
+the name of every metric emitted.
+
+Finally, note that the MetricPath contains five terms, but the DimensionsMap
+contains ten. This means that the MetricPath implicitly contains five
+additional metric terms that are '*' (match anything).
+
+If this config were used to process a metric named
+`cassandra.bbac.23.foo.primary.prod.nodefactory.node.counter.count`, it would
+output the following:
+
+```
+metricName = tiered.counter.count
+metricType = counter
+dimensions = {customer=Acme, component=cassandra, identifier=bbac,
+              instance=23, type=primary, tier=prod, item=nodefactory.node,
+              business_unit=Coyote}
+```
+
+```
+{
+  "ListenFrom": [
+    {
+      "Type": "carbon",
+      "ListenAddr": "0.0.0.0:2003",
+      "MetricDeconstructor": "delimiter",
+      "MetricDeconstructorOptionsJSON": {
+        "Dimensions": {
+          "customer": "Acme"
+        },
+        "TypeRules": [
+          {
+            "MetricType": "count",
+            "EndsWith": "counter.count"
+          },
+          {
+            "MetricType": "cumulative_counter",
+            "StartsWith": "counter"
+          }
+        ],
+        "FallbackDeconstructor": "nil",
+        "MetricRules": [
+          {
+            "MetricPath": "kafka|cassandra.*.*.*.!database",
+            "DimensionsMap": "component.identifier.instance.-.type.tier.item.item.%.%",
+            "Dimensions": {
+              "business_unit": "Coyote"
+            },
+            "MetricName": "tiered"
+          }
+        ]
+      }
+    }
+  ],
+  "ForwardTo": [
+    {
+      "type": "signalfx-json",
+      "DefaultAuthToken": "ABCD",
+      "Name": "signalfxforwarder"
+    }
+  ]
+}
+```
+
+The following is a full list of overrideable options and their defaults:
+
+```
+// For the top level
+{
+  "Delimiter":".",
+  "Globbing":"*",
+  "OrDelimiter":"|",
+  "NotDelimiter":"!",
+  "IgnoreDimension":"-",
+  "MetricIdentifer":"%",
+  "DefaultMetricType":"Gauge",
+  "FallbackDeconstructor":"identity",
+  "FallbackDeconstructorConfig":"",
+  "TypeRules":[],
+  "MetricRules":[],
+  "Dimensions":{}
+}
+// A MetricRule
+{
+  "MetricType":"Gauge", // overrides the DefaultMetricType or TypeRules
+  "MetricPath":"",
+  "DimensionsMap":"",
+  "MetricName":"",
+  "Dimensions":{}
+}
+// A TypeRule. If StartsWith and EndsWith are both specified, they must both match.
+{
+  "MetricType":"Gauge",
+  "StartsWith":"",
+  "EndsWith":""
+}
+```
+
 ### SignalFx perf options
 
 This config listens for carbon data on port 2003 and forwards it to signalfx

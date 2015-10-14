@@ -23,3 +23,13 @@ func TestLoad(t *testing.T) {
 	assert.Nil(t, m)
 	assert.Error(t, err)
 }
+
+func TestLoadJSON(t *testing.T) {
+	m, err := LoadJSON("delimiter", make(map[string]interface{}))
+	assert.NotNil(t, m)
+	assert.NoError(t, err)
+
+	m, err = LoadJSON("NOTFOUND", make(map[string]interface{}))
+	assert.Nil(t, m)
+	assert.Error(t, err)
+}
