@@ -253,6 +253,7 @@ func TestCollectdParseNameForDimensions(t *testing.T) {
 		val string
 		dim map[string]string
 	}{
+		{"name[]", map[string]string{"instance": "name[]"}},
 		{"name[k=v,f=x]", map[string]string{"k": "v", "f": "x", "instance": "name"}},
 		{"name[k=v,f=x]-rest", map[string]string{"k": "v", "f": "x", "instance": "name-rest"}},
 		{"name[k=v,f=x]-middle-[g=h]-more", map[string]string{"k": "v", "f": "x", "instance": "name-middle-[g=h]-more"}},
