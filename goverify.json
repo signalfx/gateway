@@ -2,8 +2,6 @@
   "ignoreDir": ["Godeps"],
   "checks": [
     {
-      "macro": "goimport"
-    }, {
       "macro": "gofmt"
     }, {
       "macro": "vet"
