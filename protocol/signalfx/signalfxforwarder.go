@@ -345,7 +345,7 @@ func (connector *Forwarder) sendBytes(endpoint string, bodyType string, defaultA
 
 	if log.GetLevel() <= log.DebugLevel {
 		reqN := atomic.AddInt64(&atomicRequestNumber, 1)
-		log.WithField("req#", reqN).WithField("header", req.Header).WithField("req", req).WithField("body-len", len(jsonBytes)).Debug("Sending a request")
+		log.WithField("req#", reqN).WithField("header", req.Header).WithField("body-len", len(jsonBytes)).Debug("Sending a request")
 		defer func() {
 			log.WithField("req#", reqN).Debug("Done sending request")
 		}()
