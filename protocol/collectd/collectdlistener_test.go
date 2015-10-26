@@ -119,6 +119,24 @@ const testCollectdBody = `[
         ]
     },
     {
+        "dsnames": [
+            "value"
+        ],
+        "dstypes": [
+            "gauge"
+        ],
+        "host": "some-host",
+        "interval": 10.0,
+        "plugin": "dogstatsd",
+        "plugin_instance": "[env=dev,k1=v1]",
+        "time": 1434477504.484,
+        "type": "gauge",
+        "type_instance": "page.loadtime",
+        "values": [
+            12.0
+        ]
+    },
+    {
         "host": "mwp-signalbox",
         "message": "my message",
         "meta": {
@@ -170,7 +188,7 @@ func TestCollectDListener(t *testing.T) {
 	client := &http.Client{}
 	go func() {
 		dps := <-sendTo.PointsChan
-		assert.Equal(t, len(dps), 7)
+		assert.Equal(t, len(dps), 8)
 		assert.Equal(t, "load.shortterm", dps[0].Metric, "Metric not named correctly")
 		assert.Equal(t, "load.midterm", dps[1].Metric, "Metric not named correctly")
 		assert.Equal(t, "load.longterm", dps[2].Metric, "Metric not named correctly")
@@ -178,6 +196,9 @@ func TestCollectDListener(t *testing.T) {
 		assert.Equal(t, "df_complex.free", dps[4].Metric, "Metric not named correctly")
 		assert.Equal(t, "memory.old_gen_end", dps[5].Metric, "Metric not named correctly")
 		assert.Equal(t, "memory.total_heap_space", dps[6].Metric, "Metric not named correctly")
+
+		assert.Equal(t, "gauge.page.loadtime", dps[7].Metric, "Metric not named correctly")
+		assert.Equal(t, map[string]string{"dsname": "value", "plugin": "dogstatsd", "env": "dev", "k1": "v1", "host": "some-host"}, dps[7].Dimensions, "Dimensions not parsed correctly")
 		events := <-sendTo.EventsChan
 		assert.Equal(t, len(events), 2)
 		assert.Equal(t, "imanotify.notify_instance", events[0].EventType, "Event not named correctly")
