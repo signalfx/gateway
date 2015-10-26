@@ -29,7 +29,7 @@ env GOPATH="$(pwd)" go get github.com/signalfx/metricproxy
 cd /opt/sfproxy/src/github.com/signalfx/metricproxy
 env GOPATH="/opt/sfproxy" /opt/sfproxy/bin/godep go install
 
-ln -s /opt/sfproxy/src/github.com/signalfx/metricproxy/metricproxy /etc/init.d/metricproxy
+ln -s /opt/sfproxy/src/github.com/signalfx/metricproxy/metricproxy_initd /etc/init.d/metricproxy
 if [ ! -f /opt/sfproxy/bin/metricproxy ]; then
     echo "Unable to install proxy"
     exit 1
