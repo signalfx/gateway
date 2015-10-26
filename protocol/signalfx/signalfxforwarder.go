@@ -31,6 +31,7 @@ import (
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/stats"
 	"golang.org/x/net/context"
+	"sync/atomic"
 )
 
 // Forwarder controls forwarding datapoints to SignalFx
@@ -332,6 +333,8 @@ func (connector *Forwarder) AddEvents(ctx context.Context, events []*event.Event
 	return connector.sendBytes(endpoint, "application/json", defaultAuthToken, userAgent, jsonBytes)
 }
 
+var atomicRequestNumber = int64(0)
+
 func (connector *Forwarder) sendBytes(endpoint string, bodyType string, defaultAuthToken string, userAgent string, jsonBytes []byte) error {
 	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBytes))
 	req.Header.Set("Content-Type", bodyType)
@@ -339,6 +342,14 @@ func (connector *Forwarder) sendBytes(endpoint string, bodyType string, defaultA
 	req.Header.Set("User-Agent", userAgent)
 
 	req.Header.Set("Connection", "Keep-Alive")
+
+	if log.GetLevel() <= log.DebugLevel {
+		reqN := atomic.AddInt64(&atomicRequestNumber, 1)
+		log.WithField("req#", reqN).WithField("header", req.Header).WithField("req", req).WithField("body-len", len(jsonBytes)).Debug("Sending a request")
+		defer func() {
+			log.WithField("req#", reqN).Debug("Done sending request")
+		}()
+	}
 
 	// TODO: Set timeout from ctx
 	resp, err := connector.client.Do(req)

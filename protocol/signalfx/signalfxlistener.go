@@ -323,8 +323,6 @@ func (handler *metricHandler) GetMetricTypeFromMap(metricName string) com_signal
 	return mt
 }
 
-type decoderFunc func() func(*http.Request) error
-
 // StartServingHTTPOnPort servers http requests for Signalfx datapoints
 func StartServingHTTPOnPort(ctx context.Context, sink dpsink.Sink, listenAddr string,
 	clientTimeout time.Duration, name string) (*ListenerServer, error) {

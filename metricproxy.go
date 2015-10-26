@@ -149,6 +149,15 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogrusFo
 	return &log.TextFormatter{DisableColors: true}
 }
 
+func logLevelMustParse(level string) logrus.Level {
+	lvl, err := logrus.ParseLevel(level)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to parse level %s", level)
+		panic(err)
+	}
+	return lvl
+}
+
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus(loadedConfig *config.ProxyConfig) {
 	out := proxyCommandLineConfiguration.getLogrusOutput(loadedConfig)
 	formatter := proxyCommandLineConfiguration.getLogrusFormatter(loadedConfig)
@@ -157,6 +166,9 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus
 	logSetupSync.Do(func() {
 		log.SetOutput(out)
 		log.SetFormatter(formatter)
+		if loadedConfig.LogLevel != nil {
+			log.SetLevel(logLevelMustParse(*loadedConfig.LogLevel))
+		}
 	})
 }
 

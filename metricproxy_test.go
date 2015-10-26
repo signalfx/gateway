@@ -26,6 +26,7 @@ var config1 = `
     "NumProcs": 1,
     "LogDir": "sfproxytest.json",
     "LogMaxSize": 5,
+    "LogLevel": "info",
     "PidFilename": "metricproxy.pid",
     "LogMaxBackups": 5,
     "LogFormat": "stdout",
@@ -59,6 +60,12 @@ func TestProxyPidWrite(t *testing.T) {
 	defer os.Remove(filename)
 
 	assert.Nil(t, writePidFile(filename))
+}
+
+func TestInvalidLogLevel(t *testing.T) {
+	assert.Panics(t, func() {
+		logLevelMustParse("invalid_log_level")
+	})
 }
 
 func TestProxyPidWriteError(t *testing.T) {
