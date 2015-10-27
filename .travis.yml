@@ -14,6 +14,7 @@ before_install:
   - export PATH=$HOME/usr/bin:$PATH
   - go get github.com/tools/godep
   - go get github.com/cep21/goverify
+  - go get github.com/cep21/gobuild
   - go get github.com/cep21/gocoverdir
   - go get github.com/axw/gocov/gocov
   - go get github.com/mattn/goveralls
