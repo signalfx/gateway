@@ -290,8 +290,8 @@ messages.  Only use debug logging temporarily.
 
 ### CollectD listener dimensions
 
-The CollectD listener supports setting dimensions on all recieved metrics with the Dimensions
-attribute which expects a map of string => string.
+The CollectD listener supports setting dimensions on all recieved metrics with
+the Dimensions attribute which expects a map of string => string.
 
 ```
 {
