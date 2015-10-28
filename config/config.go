@@ -37,6 +37,7 @@ type ListenFrom struct {
 	Type                       string
 	ListenAddr                 *string
 	MetricDeconstructor        *string
+	Dimensions                 map[string]string
 	MetricDeconstructorOptions *string
 	Timeout                    *string
 	Name                       *string

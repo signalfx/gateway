@@ -177,7 +177,9 @@ func TestCollectDListener(t *testing.T) {
 
 	sendTo := dptest.NewBasicSink()
 	ctx := context.Background()
-	listenFrom := &config.ListenFrom{}
+	listenFrom := &config.ListenFrom{
+		Dimensions: map[string]string{"hello": "world"},
+	}
 	collectdListener, err := ListenerLoader(ctx, sendTo, listenFrom)
 	defer collectdListener.Close()
 	assert.Nil(t, err)
@@ -198,7 +200,7 @@ func TestCollectDListener(t *testing.T) {
 		assert.Equal(t, "memory.total_heap_space", dps[6].Metric, "Metric not named correctly")
 
 		assert.Equal(t, "gauge.page.loadtime", dps[7].Metric, "Metric not named correctly")
-		assert.Equal(t, map[string]string{"dsname": "value", "plugin": "dogstatsd", "env": "dev", "k1": "v1", "host": "some-host"}, dps[7].Dimensions, "Dimensions not parsed correctly")
+		assert.Equal(t, map[string]string{"hello": "world", "dsname": "value", "plugin": "dogstatsd", "env": "dev", "k1": "v1", "host": "some-host"}, dps[7].Dimensions, "Dimensions not parsed correctly")
 		events := <-sendTo.EventsChan
 		assert.Equal(t, len(events), 2)
 		assert.Equal(t, "imanotify.notify_instance", events[0].EventType, "Event not named correctly")

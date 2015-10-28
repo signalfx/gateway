@@ -261,11 +261,13 @@ seconds.
 This config listens for carbon data on port 2003 and forwards it to signalfx
 using an internal datapoint buffer size of 1,000,000 and sending with 50 threads
 simultaniously with each thread sending no more than 5,000 points in a single
-call.
+call.  It also turns on debug logging, which will spew a large number of log
+messages.  Only use debug logging temporarily.
 
 ```
 {
   "StatsDelay": "1s",
+  "LogLevel": "debug",
   "ListenFrom": [
     {
       "Type": "carbon",
@@ -281,6 +283,34 @@ call.
       "BufferSize": 1000000,
       "DrainingThreads": 50,
       "MaxDrainSize": 5000
+    }
+  ]
+}
+```
+
+### CollectD listener dimensions
+
+The CollectD listener supports setting dimensions on all recieved metrics with the Dimensions
+attribute which expects a map of string => string.
+
+```
+{
+  "StatsDelay": "1s",
+  "ListenFrom": [
+    {
+      "Type": "collectd",
+      "ListenAddr" : "0.0.0.0:8081",
+      "Dimensions" : {"hello": "world"}
+    },
+  ],
+
+  "ForwardTo": [
+    {
+      "type": "carbon",
+      "DefaultAuthToken": "ABCD",
+      "Host": "graphite.database.dc1.com",
+      "DimensionsOrder": ["source", "forwarder"],
+      "Name": "graphite-west"
     }
   ]
 }

@@ -43,7 +43,8 @@ func (streamer *ListenerServer) Close() error {
 
 // JSONDecoder can decode collectd's native JSON datapoint format
 type JSONDecoder struct {
-	SendTo dpsink.Sink
+	SendTo      dpsink.Sink
+	DefaultDims map[string]string
 
 	TotalErrors    int64
 	TotalBlankDims int64
@@ -106,7 +107,7 @@ func (decoder *JSONDecoder) Read(ctx context.Context, req *http.Request) error {
 
 func (decoder *JSONDecoder) defaultDims(req *http.Request) map[string]string {
 	params := req.URL.Query()
-	defaultDims := make(map[string]string)
+	defaultDims := make(map[string]string, len(decoder.DefaultDims))
 	for key := range params {
 		if strings.HasPrefix(key, sfxDimQueryParamPrefix) {
 			value := params.Get(key)
@@ -117,6 +118,9 @@ func (decoder *JSONDecoder) defaultDims(req *http.Request) map[string]string {
 			key = key[len(sfxDimQueryParamPrefix):]
 			defaultDims[key] = value
 		}
+	}
+	for k, v := range decoder.DefaultDims {
+		defaultDims[k] = v
 	}
 	return defaultDims
 }
@@ -141,18 +145,18 @@ var defaultCollectdConfig = &config.ListenFrom{
 func ListenerLoader(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (*ListenerServer, error) {
 	structdefaults.FillDefaultFrom(listenFrom, defaultCollectdConfig)
 	log.WithField("listenFrom", listenFrom).Info("Creating listener using final config")
-	return StartListeningCollectDHTTPOnPort(ctx, sink, *listenFrom.ListenAddr, *listenFrom.ListenPath, *listenFrom.TimeoutDuration, *listenFrom.Name)
+	return StartListeningCollectDHTTPOnPort(ctx, sink, *listenFrom.ListenAddr, *listenFrom.ListenPath, *listenFrom.TimeoutDuration, *listenFrom.Name, listenFrom.Dimensions)
 }
 
 // StartListeningCollectDHTTPOnPort servers http collectd requests
 func StartListeningCollectDHTTPOnPort(ctx context.Context, sink dpsink.Sink,
-	listenAddr string, listenPath string, clientTimeout time.Duration, name string) (*ListenerServer, error) {
+	listenAddr string, listenPath string, clientTimeout time.Duration, name string, defaultDims map[string]string) (*ListenerServer, error) {
 
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return nil, err
 	}
-	h, st := SetupHandler(ctx, name, sink)
+	h, st := SetupHandler(ctx, name, sink, defaultDims)
 
 	r := mux.NewRouter()
 	r.Path(listenPath).Headers("Content-type", "application/json").Handler(h)
@@ -175,11 +179,12 @@ func StartListeningCollectDHTTPOnPort(ctx context.Context, sink dpsink.Sink,
 
 // SetupHandler is shared between signalfx and here to setup listening for collectd connections.
 // Will do shared basic setup like configuring request counters
-func SetupHandler(ctx context.Context, name string, sink dpsink.Sink) (*web.Handler, stats.Keeper) {
+func SetupHandler(ctx context.Context, name string, sink dpsink.Sink, defaultDims map[string]string) (*web.Handler, stats.Keeper) {
 	metricTracking := web.RequestCounter{}
 	counter := &dpsink.Counter{}
 	collectdDecoder := JSONDecoder{
-		SendTo: dpsink.FromChain(sink, dpsink.NextWrap(counter)),
+		SendTo:      dpsink.FromChain(sink, dpsink.NextWrap(counter)),
+		DefaultDims: defaultDims,
 	}
 	h := web.NewHandler(ctx, &collectdDecoder).Add(web.NextHTTP(metricTracking.ServeHTTP))
 	st := stats.ToKeeperMany(protocol.ListenerDims(name, "collectd"), &metricTracking, counter, &collectdDecoder)
