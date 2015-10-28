@@ -451,7 +451,7 @@ func SetupJSONV2Paths(r *mux.Router, handler http.Handler) {
 }
 
 func setupCollectd(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink) stats.Keeper {
-	h, st := collectd.SetupHandler(ctx, name, sink)
+	h, st := collectd.SetupHandler(ctx, name, sink, nil)
 	SetupCollectdPaths(r, h)
 	return st
 }
