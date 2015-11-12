@@ -1,29 +1,10 @@
-machine:
-  environment:
-    GOLANG_VERSION: 1.5.1
-    GOROOT: "$HOME/go"
-    GOPATH: "$HOME/.go"
-    CACHED_LINT_TOOLS_DIR: "$HOME/lints"
-    PATH: "$GOROOT/bin:$GOPATH/bin:$HOME/circleutil/scripts:$CACHED_LINT_TOOLS_DIR:$PATH"
-    IMPORT_PATH: "github.com/signalfx/metricproxy"
-    SRC_PATH: "$GOPATH/src/$IMPORT_PATH"
-
-checkout:
-  post:
-    - git clone https://github.com/cep21/circleutil.git $HOME/circleutil
-
 dependencies:
   cache_directories:
     - ~/gover
     - ~/lints
   override:
-    - install_all_go_versions.sh
-    - install_lint_tools.sh github.com/tools/godep
-    - install_shellcheck.sh
-    - gem install mdl
-    - rm -rf "$HOME/.go_workspace" "$HOME/.gradle" "$HOME/.ivy2" "$HOME/.m2"
+    - ./circle.sh cache
 
 test:
   override:
-    - copy_local_code_to_gopath.sh
-    - cd $SRC_PATH && ./circle_check.sh
+    - ./circle.sh test
