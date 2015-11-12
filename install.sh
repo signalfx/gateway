@@ -19,6 +19,9 @@ else
   exit 1
 fi
 
+which go
+which git
+
 rm -rf /opt/sfproxy
 rm -f /etc/init.d/metricproxy
 mkdir -p /opt/sfproxy
