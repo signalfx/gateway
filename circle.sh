@@ -16,6 +16,11 @@ export DOCKER_STORAGE="$HOME/docker_images"
 
 SRC_PATH="$GOPATH/src/$IMPORT_PATH"
 
+function docker_tag() {
+  DOCKTAG=$(docker_release_tag "$CIRCLE_BRANCH")
+  echo "quay.io/signalfx/metricproxy:${DOCKTAG}$DOCKER_TAG_SUFFIX"
+}
+
 # Cache phase of circleci
 function do_cache() {
   [ ! -d "$HOME/circleutil" ] && git clone https://github.com/signalfx/circleutil.git "$HOME/circleutil"
@@ -30,16 +35,22 @@ function do_cache() {
   . "$HOME/circleutil/scripts/versioned_goget.sh" "github.com/cep21/gobuild:v1.0" "github.com/tools/godep:master"
   mkdir -p "$CACHED_LINT_TOOLS_DIR"
   CACHED_LINT_TOOLS_DIR=$CACHED_LINT_TOOLS_DIR "$HOME/circleutil/scripts/install_shellcheck.sh"
-  gobuild install
   gem install mdl
-  go version
-  go env
+  copy_local_to_path "$SRC_PATH"
+  (
+    cd "$SRC_PATH"
+    load_docker_images
+    GOPATH="$GOPATH:$(godep path)" CGO_ENABLED=0 go build -v -installsuffix .
+    docker build -t "$(docker_tag)" .
+    cache_docker_image "$(docker_tag)" metricproxy
+  )
 }
 
 # Test phase of circleci
 function do_test() {
   . "$HOME/circleutil/scripts/common.sh"
-  copy_local_to_path "$SRC_PATH"
+  go version
+  go env
   (
     cd "$SRC_PATH"
     shellcheck install.sh
@@ -55,6 +66,12 @@ function do_test() {
 # Deploy phase of circleci
 function do_deploy() {
   . "$HOME/circleutil/scripts/common.sh"
+  (
+    cd "$SRC_PATH"
+    if [ "$DOCKER_PUSH" == "1" ]; then
+      docker push "$(docker_tag)"
+    fi
+  )
 }
 
 function do_all() {

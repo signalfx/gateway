@@ -1,10 +1,27 @@
+machine:
+  environment:
+    DOCKER_HOST: tcp://localhost:2375
+    DOCKER_PUSH: 1
+  services:
+    - docker
+  pre:
+    - echo 'DOCKER_OPTS="${DOCKER_OPTS} -H tcp://127.0.0.1:2375 -H unix:///var/run/docker.sock"' | sudo tee -a /etc/default/docker
+
+
 dependencies:
   cache_directories:
     - ~/gover
     - ~/lints
+    - ~/docker_images
   override:
     - ./circle.sh cache
 
 test:
   override:
     - ./circle.sh test
+
+deployment:
+  quay:
+    commands:
+      - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS quay.io
+      - ./circle.sh deploy
