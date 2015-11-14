@@ -21,8 +21,12 @@ test:
     - ./circle.sh test
 
 deployment:
-  quay:
+  quaybranch:
     branch: [release, /feature.*/]
+    commands:
+      - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS quay.io
+      - ./circle.sh deploy
+  quaytag:
     tag: /v[0-9]+(\.[0-9]+)*/
     commands:
       - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS quay.io
