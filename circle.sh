@@ -34,7 +34,7 @@ function do_cache() {
   install_go_version "$HOME/gover" "$GOLANG_VERSION"
   versioned_goget "github.com/cep21/gobuild:v1.0" "github.com/tools/godep:master"
   mkdir -p "$CACHED_LINT_TOOLS_DIR"
-  CACHED_LINT_TOOLS_DIR=$CACHED_LINT_TOOLS_DIR install_shellcheck
+  install_shellcheck "$CACHED_LINT_TOOLS_DIR"
   gem install mdl
   copy_local_to_path "$SRC_PATH"
   (
@@ -67,7 +67,6 @@ function do_test() {
 function do_deploy() {
   . "$HOME/circleutil/scripts/common.sh"
   (
-    cd "$SRC_PATH"
     if [ "$DOCKER_PUSH" == "1" ]; then
       docker push "$(docker_url)"
     fi
