@@ -29,10 +29,10 @@ function do_cache() {
     git reset --hard $CIRCLEUTIL_TAG
   )
   . "$HOME/circleutil/scripts/common.sh"
-  . "$HOME/circleutil/scripts/install_all_go_versions.sh"
-  . "$HOME/circleutil/scripts/versioned_goget.sh" "github.com/cep21/gobuild:v1.0" "github.com/tools/godep:master"
+  install_all_go_versions
+  versioned_goget "github.com/cep21/gobuild:v1.0" "github.com/tools/godep:master"
   mkdir -p "$CACHED_LINT_TOOLS_DIR"
-  CACHED_LINT_TOOLS_DIR=$CACHED_LINT_TOOLS_DIR "$HOME/circleutil/scripts/install_shellcheck.sh"
+  CACHED_LINT_TOOLS_DIR=$CACHED_LINT_TOOLS_DIR install_shellcheck
   gem install mdl
   copy_local_to_path "$SRC_PATH"
   (
