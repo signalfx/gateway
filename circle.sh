@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ex
 
-CIRCLEUTIL_TAG="v1.24"
+CIRCLEUTIL_TAG="v1.27"
 
 export GOPATH_INTO="$HOME/installed_gotools"
 export GOLANG_VERSION="1.5.1"
@@ -29,7 +29,9 @@ function do_cache() {
     git reset --hard $CIRCLEUTIL_TAG
   )
   . "$HOME/circleutil/scripts/common.sh"
-  install_all_go_versions
+  mkdir -p "$HOME/gover"
+  install_all_go_versions "$HOME/gover"
+  install_go_version "$HOME/gover" "$GOLANG_VERSION"
   versioned_goget "github.com/cep21/gobuild:v1.0" "github.com/tools/godep:master"
   mkdir -p "$CACHED_LINT_TOOLS_DIR"
   CACHED_LINT_TOOLS_DIR=$CACHED_LINT_TOOLS_DIR install_shellcheck
@@ -39,7 +41,7 @@ function do_cache() {
     cd "$SRC_PATH"
     load_docker_images
     GOPATH="$GOPATH:$(godep path)" CGO_ENABLED=0 go build -v -installsuffix .
-    docker build -t "$(docker_url)"
+    docker build -t "$(docker_url)" .
     cache_docker_image "$(docker_url)" metricproxy
   )
 }
