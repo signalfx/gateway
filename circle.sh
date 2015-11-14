@@ -3,16 +3,15 @@ set -ex
 
 CIRCLEUTIL_TAG="v1.27"
 
-export GOPATH_INTO="$HOME/installed_gotools"
 export GOLANG_VERSION="1.5.1"
 export GOROOT="$HOME/go_circle"
 export GOPATH="$HOME/.go_circle"
-export CACHED_LINT_TOOLS_DIR="$HOME/lints"
-export PATH="$GOROOT/bin:$GOPATH/bin:$GOPATH_INTO:$CACHED_LINT_TOOLS_DIR:$PATH"
-export IMPORT_PATH="github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
-export CIRCLE_ARTIFACTS="${CIRCLE_ARTIFACTS-/tmp}"
+export GOPATH_INTO="$HOME/lints"
+export PATH="$GOROOT/bin:$GOPATH/bin:$GOPATH_INTO:$PATH"
 export DOCKER_STORAGE="$HOME/docker_images"
+export IMPORT_PATH="github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
 
+GO_COMPILER_PATH="$HOME/gover"
 SRC_PATH="$GOPATH/src/$IMPORT_PATH"
 
 function docker_url() {
@@ -29,12 +28,12 @@ function do_cache() {
     git reset --hard $CIRCLEUTIL_TAG
   )
   . "$HOME/circleutil/scripts/common.sh"
-  mkdir -p "$HOME/gover"
-  install_all_go_versions "$HOME/gover"
-  install_go_version "$HOME/gover" "$GOLANG_VERSION"
+  mkdir -p "$GO_COMPILER_PATH"
+  install_all_go_versions "$GO_COMPILER_PATH"
+  install_go_version "$GO_COMPILER_PATH" "$GOLANG_VERSION"
   versioned_goget "github.com/cep21/gobuild:v1.0" "github.com/tools/godep:master"
-  mkdir -p "$CACHED_LINT_TOOLS_DIR"
-  install_shellcheck "$CACHED_LINT_TOOLS_DIR"
+  mkdir -p "$GOPATH_INTO"
+  install_shellcheck "$GOPATH_INTO"
   gem install mdl
   copy_local_to_path "$SRC_PATH"
   (
@@ -97,4 +96,3 @@ case "$1" in
     exit 1
     ;;
 esac
-
