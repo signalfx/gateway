@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ex
 
-CIRCLEUTIL_TAG="v1.22"
+CIRCLEUTIL_TAG="v1.23"
 
 export GOPATH_INTO="$HOME/installed_gotools"
 export GOLANG_VERSION="1.5.1"
@@ -13,12 +13,10 @@ export IMPORT_PATH="github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME
 export CIRCLE_ARTIFACTS="${CIRCLE_ARTIFACTS-/tmp}"
 export DOCKER_STORAGE="$HOME/docker_images"
 
-
 SRC_PATH="$GOPATH/src/$IMPORT_PATH"
 
-function docker_tag() {
-  DOCKTAG=$(docker_release_tag "$CIRCLE_BRANCH")
-  echo "quay.io/signalfx/metricproxy:${DOCKTAG}$DOCKER_TAG_SUFFIX"
+function docker_url() {
+  echo -n "quay.io/signalfx/metricproxy:$(docker_tag)"
 }
 
 # Cache phase of circleci
@@ -41,8 +39,8 @@ function do_cache() {
     cd "$SRC_PATH"
     load_docker_images
     GOPATH="$GOPATH:$(godep path)" CGO_ENABLED=0 go build -v -installsuffix .
-    docker build -t "$(docker_tag)" .
-    cache_docker_image "$(docker_tag)" metricproxy
+    docker build -t "$(docker_url)"
+    cache_docker_image "$(docker_url)" metricproxy
   )
 }
 
@@ -69,7 +67,7 @@ function do_deploy() {
   (
     cd "$SRC_PATH"
     if [ "$DOCKER_PUSH" == "1" ]; then
-      docker push "$(docker_tag)"
+      docker push "$(docker_url)"
     fi
   )
 }
