@@ -563,23 +563,42 @@ on [the pprof help page](http://golang.org/pkg/net/http/pprof/).
 ### When should I use the proxy?
 
 The SignalFx metric proxy is designed to be used in the following scenarios:
-* You are using another metrics monitoring system (e.g. Graphite) in production and want to evaluate SignalFx in a non-disruptive way
-* You have decided to use SignalFx, but you have a mechanism for collecting metrics (typically an agent or other client-side code) that does not yet have a native SignalFx backend or handler
-* You limit the number of egress points from your network due to security or other concerns, and you want to consolidate metrics-related traffic as it leaves your network.
+* You are using another metrics monitoring system (e.g. Graphite) in production
+and want to evaluate SignalFx in a non-disruptive way
+* You have decided to use SignalFx, but you have a mechanism for collecting 
+metrics (typically an agent or other client-side code) that does not yet have
+a native SignalFx backend or handler
+* You limit the number of egress points from your network due to security or
+other concerns, and you want to consolidate metrics-related traffic as it leaves
+your network.
 
 ### How do SignalFx customers typically use the proxy?
 
-For customers using another metrics monitoring system, they insert the proxy in between their data collectors and that system. For example, instead of writing to Graphite’s carbon-cache directly, their collectd, StatsD and other agents or client libraries send their metrics to the proxy, which then forwards them on to both Graphite and SignalFx. The proxy is configured in this case with a Graphite listener, and both a Graphite and SignalFx forwarder.
+For customers using another metrics monitoring system, they insert the proxy
+in between their data collectors and that system. For example, instead of writing
+to Graphite’s carbon-cache directly, their collectd, StatsD and other agents or
+client libraries send their metrics to the proxy, which then forwards them on to
+both Graphite and SignalFx. The proxy is configured in this case with a Graphite
+listener, and both a Graphite and SignalFx forwarder.
 
-Some customers have metrics collection methods that do not have a native SignalFx backend or handler, but find that their method has a Graphite backend. In that situation, customers configure their preferred collector(s) to use the Graphite backend, then send the Graphite-formatted traffic to the SignalFx proxy, which is configured with a Graphite listener and a SignalFx forwarder.
+Some customers have metrics collection methods that do not have a native SignalFx
+backend or handler, but find that their method has a Graphite backend. In that
+situation, customers configure their preferred collector(s) to use the Graphite
+backend, then send the Graphite-formatted traffic to the SignalFx proxy, which is
+configured with a Graphite listener and a SignalFx forwarder.
 
 ### How much traffic can the proxy handle?
 
-We have benchmarked the proxy against a mid-sized, compute-optimized instance on Amazon Web Services, the c3.2xlarge. As the only service on such an instance, it comfortably processes in excess of 6 million datapoints per minute.
+We have benchmarked the proxy against a mid-sized, compute-optimized instance on
+Amazon Web Services, the c3.2xlarge. As the only service on such an instance, it
+comfortably processes in excess of 6 million datapoints per minute.
 
 ### How do I monitor the proxy?
 
-The proxy emits a number of metrics to SignalFx that you can monitor for its health and performance. For the cumulative counters, we recommend that you use the default (rate/sec) rollup. A partial list of the more commonly watched metrics follows.
+The proxy emits a number of metrics to SignalFx that you can monitor for its
+health and performance. For the cumulative counters, we recommend that you use
+the default (rate/sec) rollup. A partial list of the more commonly watched metrics
+follows.
 
 |Metric|Description|
 |------|-----------|
@@ -595,16 +614,26 @@ The proxy emits a number of metrics to SignalFx that you can monitor for its hea
 
 The most common areas to look into are as follows: 
 
-**1. Is the proxy hardware or instance sized properly?** Depending on the volume of traffic that you are sending, you may need a larger box. (See above for the benchmarking we’ve done.)
+**1. Is the proxy hardware or instance sized properly?** Depending on the volume
+of traffic that you are sending, you may need a larger box. (See above for the
+benchmarking we’ve done.)
 
-**2. Are the buffers full?** Look in the proxy logs for messages that indicate the buffer is full for one or more forwarders in the proxy:
+**2. Are the buffers full?** Look in the proxy logs for messages that indicate the
+buffer is full for one or more forwarders in the proxy:
 
 `level=warning msg="Unable to process datapoints" err="unable to send more datapoints.  Buffer full”`
 
-To address this, adjust the buffer size in the proxy’s performance options, as documented [above](#perf).
+To address this, adjust the buffer size in the proxy’s performance options, as
+documented [above](#perf).
 
-**3. Is your outbound network experiencing issues?** Network latency can obviously affect datapoint submission; it can also cause the proxy to get backed up. One way to debug this is to look at the datapoints_backup_size metric, as documented above. If this metric has shot up suddenly, there’s a good chance that datapoints are not exiting the proxy at a fast enough rate.
+**3. Is your outbound network experiencing issues?** Network latency can obviously
+affect datapoint submission; it can also cause the proxy to get backed up. One way
+to debug this is to look at the datapoints_backup_size metric, as documented above.
+If this metric has shot up suddenly, there’s a good chance that datapoints are not
+exiting the proxy at a fast enough rate.
 
 ### What is your high availability strategy for the proxy?
 
-The proxy is stateless, and can be put behind a load balancer for HA purposes. Using a load balancer is also a good way to submit a volume of metrics that exceeds what a single proxy server can process.
+The proxy is stateless, and can be put behind a load balancer for HA purposes.
+Using a load balancer is also a good way to submit a volume of metrics that exceeds
+what a single proxy server can process.
