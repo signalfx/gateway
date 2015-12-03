@@ -1,9 +1,6 @@
 {
 	"ImportPath": "github.com/signalfx/metricproxy",
 	"GoVersion": "go1.5.1",
-	"Packages": [
-		"./..."
-	],
 	"Deps": [
 		{
 			"ImportPath": "github.com/Sirupsen/logrus",
@@ -39,10 +36,6 @@
 			"Rev": "47e8f450ef38c857cdd922ec08862ca9d65a1c6d"
 		},
 		{
-			"ImportPath": "github.com/jtolds/gls",
-			"Rev": "9a4a02dbe491bef4bab3c24fd9f3087d6c4c6690"
-		},
-		{
 			"ImportPath": "github.com/signalfx/com_signalfx_metrics_protobuf",
 			"Rev": "4ee27186f23ce032939bb7363a04c653c333139c"
 		},
@@ -55,26 +48,12 @@
 			"Rev": "9f10d93a91220d2a68751a64b4c0fe4d6b219839"
 		},
 		{
-			"ImportPath": "github.com/signalfx/golib/nettest",
-			"Rev": "9f10d93a91220d2a68751a64b4c0fe4d6b219839"
-		},
-		{
 			"ImportPath": "github.com/signalfx/golib/timekeeper",
 			"Rev": "9f10d93a91220d2a68751a64b4c0fe4d6b219839"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/web",
 			"Rev": "9f10d93a91220d2a68751a64b4c0fe4d6b219839"
-		},
-		{
-			"ImportPath": "github.com/smartystreets/assertions",
-			"Comment": "1.5.0-397-gac6b6f6",
-			"Rev": "ac6b6f68ca3d6ac00a360d0fad0c844859ad131b"
-		},
-		{
-			"ImportPath": "github.com/smartystreets/goconvey/convey",
-			"Comment": "1.5.0-432-g6a613df",
-			"Rev": "6a613dfb77d9fd2df760901a46339b33694d9bd1"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
