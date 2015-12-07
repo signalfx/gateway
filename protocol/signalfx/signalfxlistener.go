@@ -98,7 +98,7 @@ func (e *ErrorTrackerHandler) ServeHTTPC(ctx context.Context, rw http.ResponseWr
 
 // ProtobufDecoderV1 creates datapoints out of the V1 protobuf definition
 type ProtobufDecoderV1 struct {
-	Sink       dpsink.Sink
+	Sink       dpsink.DSink
 	TypeGetter MericTypeGetter
 }
 
@@ -163,7 +163,7 @@ func datapointProtobufIsInvalidForV1(msg *com_signalfx_metrics_protobuf.DataPoin
 // JSONDecoderV1 creates datapoints out of the v1 JSON definition
 type JSONDecoderV1 struct {
 	TypeGetter MericTypeGetter
-	Sink       dpsink.Sink
+	Sink       dpsink.DSink
 }
 
 func (decoder *JSONDecoderV1) Read(ctx context.Context, req *http.Request) error {
@@ -224,7 +224,7 @@ func (decoder *ProtobufDecoderV2) Read(ctx context.Context, req *http.Request) e
 
 // ProtobufEventDecoderV2 decodes protocol buffers in signalfx's v2 format and sends them to Sink
 type ProtobufEventDecoderV2 struct {
-	Sink dpsink.Sink
+	Sink dpsink.ESink
 }
 
 func (decoder *ProtobufEventDecoderV2) Read(ctx context.Context, req *http.Request) error {
@@ -287,7 +287,7 @@ func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error
 
 // JSONEventDecoderV2 decodes v2 json data for signalfx events and sends it to Sink
 type JSONEventDecoderV2 struct {
-	Sink dpsink.Sink
+	Sink dpsink.ESink
 }
 
 func (decoder *JSONEventDecoderV2) Read(ctx context.Context, req *http.Request) error {
