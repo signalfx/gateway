@@ -96,7 +96,7 @@ func setupServerForwarder(t *testing.T) (*dptest.BasicSink, *ListenerServer, *Fo
 
 	forwardTo := config.ForwardTo{
 		URL:              workarounds.GolangDoesnotAllowPointerToStringLiteral(fmt.Sprintf("http://127.0.0.1:%d/v2/datapoint", port)),
-		TimeoutDuration:  workarounds.GolangDoesnotAllowPointerToDurationLiteral(time.Second * 1),
+		TimeoutDuration:  workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 1),
 		DefaultAuthToken: workarounds.GolangDoesnotAllowPointerToStringLiteral("AUTH_TOKEN"),
 		DefaultSource:    workarounds.GolangDoesnotAllowPointerToStringLiteral("proxy-source"),
 		SourceDimensions: workarounds.GolangDoesnotAllowPointerToStringLiteral("username,ignored,hostname"),
