@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ex
 
-CIRCLEUTIL_TAG="v1.27"
+CIRCLEUTIL_TAG="v1.35"
 
 export GOLANG_VERSION="1.5.1"
 export GOROOT="$HOME/go_circle"
@@ -31,7 +31,7 @@ function do_cache() {
   mkdir -p "$GO_COMPILER_PATH"
   install_all_go_versions "$GO_COMPILER_PATH"
   install_go_version "$GO_COMPILER_PATH" "$GOLANG_VERSION"
-  versioned_goget "github.com/cep21/gobuild:v1.0" "github.com/tools/godep:master"
+  versioned_goget "github.com/cep21/gobuild:v1.3" "github.com/tools/godep:master"
   mkdir -p "$GOPATH_INTO"
   install_shellcheck "$GOPATH_INTO"
   gem install mdl
