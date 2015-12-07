@@ -12,15 +12,15 @@
 		},
 		{
 			"ImportPath": "github.com/cep21/gohelpers/stringhelper",
-			"Rev": "dc600e06e5851ba613dba1949f9ae1b7641cb80c"
+			"Rev": "ac9f0e053f1594a6565e3c6778ce2ef56900ec98"
 		},
 		{
 			"ImportPath": "github.com/cep21/gohelpers/structdefaults",
-			"Rev": "dc600e06e5851ba613dba1949f9ae1b7641cb80c"
+			"Rev": "ac9f0e053f1594a6565e3c6778ce2ef56900ec98"
 		},
 		{
 			"ImportPath": "github.com/cep21/gohelpers/workarounds",
-			"Rev": "dc600e06e5851ba613dba1949f9ae1b7641cb80c"
+			"Rev": "ac9f0e053f1594a6565e3c6778ce2ef56900ec98"
 		},
 		{
 			"ImportPath": "github.com/cep21/xdgbasedir",
@@ -28,7 +28,7 @@
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
-			"Rev": "73aaaa9eb61d74fbf7e256ca586a3a565b308eea"
+			"Rev": "68415e7123da32b07eab49c96d2c4d6158360e9b"
 		},
 		{
 			"ImportPath": "github.com/gorilla/context",
@@ -44,7 +44,7 @@
 		},
 		{
 			"ImportPath": "github.com/signalfx/com_signalfx_metrics_protobuf",
-			"Rev": "3f07c0108fbfbcf93508e4ab61a080953136fdf9"
+			"Rev": "4ee27186f23ce032939bb7363a04c653c333139c"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/datapoint",
