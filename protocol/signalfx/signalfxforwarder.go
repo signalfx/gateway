@@ -222,7 +222,7 @@ func mapToProperties(properties map[string]interface{}) []*com_signalfx_metrics_
 		if k == "" || v == nil {
 			continue
 		}
-		copyOfK := filterSignalfxKey(string([]byte(k)))
+		copyOfK := filterSignalfxKey(k)
 
 		pv := com_signalfx_metrics_protobuf.PropertyValue{}
 		if ival, ok := v.(int64); ok {
@@ -234,6 +234,8 @@ func mapToProperties(properties map[string]interface{}) []*com_signalfx_metrics_
 		} else if sval, ok := v.(string); ok {
 			pv.StrValue = &sval
 		}
+		// else ignore, i was unable to come up with a way to send in something
+		// that wasn't one of these from an external source
 
 		ret = append(ret, (&com_signalfx_metrics_protobuf.Property{
 			Key:   &copyOfK,
@@ -248,10 +250,9 @@ func mapToDimensions(dimensions map[string]string) []*com_signalfx_metrics_proto
 		if k == "" || v == "" {
 			continue
 		}
-		// If someone knows a better way to do this, let me know.  I can't just take the &
-		// of k and v because their content changes as the range iterates
-		copyOfK := filterSignalfxKey(string([]byte(k)))
-		copyOfV := (string([]byte(v)))
+		copyOfK := filterSignalfxKey(k)
+		copyOfV := v
+
 		ret = append(ret, (&com_signalfx_metrics_protobuf.Dimension{
 			Key:   &copyOfK,
 			Value: &copyOfV,

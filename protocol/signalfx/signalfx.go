@@ -172,6 +172,7 @@ func NewProtobufEvent(e *com_signalfx_metrics_protobuf.Event) (*event.Event, err
 		} else if pval.IntValue != nil {
 			props[pkey] = pval.GetIntValue()
 		}
+		// protobuf format only has these 4 values so no else would be reachable
 	}
 
 	return event.NewWithMeta(e.GetEventType(), e.GetCategory().String(), dims, props, fromTs(e.GetTimestamp())), nil
