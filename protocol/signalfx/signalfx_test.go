@@ -66,6 +66,26 @@ func TestNewProtobufDataPointWithType(t *testing.T) {
 	})
 }
 
+func TestNewProtobufEvent(t *testing.T) {
+	Convey("given a protobuf event with a nil property value", t, func() {
+		protoEvent := &com_signalfx_metrics_protobuf.Event{
+			EventType:  workarounds.GolangDoesnotAllowPointerToStringLiteral("mwp.test2"),
+			Dimensions: []*com_signalfx_metrics_protobuf.Dimension{},
+			Properties: []*com_signalfx_metrics_protobuf.Property{
+				{
+					Key:   workarounds.GolangDoesnotAllowPointerToStringLiteral("version"),
+					Value: &com_signalfx_metrics_protobuf.PropertyValue{},
+				},
+			},
+		}
+		Convey("should error when converted", func() {
+			_, err := NewProtobufEvent(protoEvent)
+			So(err, ShouldEqual, errPropertyValueNotSet)
+		})
+
+	})
+}
+
 func TestConver(t *testing.T) {
 	assert.Panics(t, func() {
 		toMT(datapoint.MetricType(1001))

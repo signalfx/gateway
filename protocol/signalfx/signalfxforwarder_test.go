@@ -23,6 +23,7 @@ import (
 	"errors"
 
 	"github.com/signalfx/metricproxy/dp/dptest"
+	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
@@ -55,6 +56,19 @@ func TestForwarderLoaderDefaults(t *testing.T) {
 	forwarder, err := ForwarderLoader(ctx, &forwardTo)
 	assert.Nil(t, err)
 	defer forwarder.Close()
+}
+
+func TestMapToProperties(t *testing.T) {
+	Convey("given a map of properties", t, func() {
+		p := map[string]interface{}{
+			"dim1": int(8),
+			"dim2": int64(3),
+		}
+		Convey("invalid properties are ignored", func() {
+			res := mapToProperties(p)
+			So(len(res), ShouldEqual, 1)
+		})
+	})
 }
 
 func TestMapToDimensions(t *testing.T) {
@@ -291,22 +305,32 @@ func TestResponseBadBody(t *testing.T) {
 }
 
 func TestBasicSend(t *testing.T) {
-	testServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		assert.Equal(t, "abcd", req.Header.Get("User-Agent"))
-		assert.Equal(t, "abcdefg", req.Header.Get(TokenHeaderName))
-		rw.Write([]byte(`"OK"`))
-	}))
-	defer testServer.Close()
+	Convey("given an test server and forwarder", t, func() {
+		testServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, "abcd", req.Header.Get("User-Agent"))
+			assert.Equal(t, "abcdefg", req.Header.Get(TokenHeaderName))
+			rw.Write([]byte(`"OK"`))
+		}))
+		defer testServer.Close()
 
-	f := NewSignalfxJSONForwarder("", time.Second, "", 10, "", "", "")
-	f.UserAgent("abcd")
-	f.AuthToken("abcdefg")
-	f.Endpoint(testServer.URL)
-	f.EventEndpoint(testServer.URL)
-	ctx := context.Background()
+		f := NewSignalfxJSONForwarder("", time.Second, "", 10, "", "", "")
+		f.UserAgent("abcd")
+		f.AuthToken("abcdefg")
+		f.Endpoint(testServer.URL)
+		f.EventEndpoint(testServer.URL)
+		ctx := context.Background()
 
-	dp := dptest.DP()
-	e := dptest.E()
-	assert.NoError(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dp}))
-	assert.NoError(t, f.AddEvents(ctx, []*event.Event{e}))
+		Convey("a valid datapoint", func() {
+			dp := dptest.DP()
+			Convey("should not error", func() {
+				So(f.AddDatapoints(ctx, []*datapoint.Datapoint{dp}), ShouldBeNil)
+			})
+		})
+		Convey("a valid event", func() {
+			e := dptest.E()
+			Convey("should not error", func() {
+				So(f.AddEvents(ctx, []*event.Event{e}), ShouldBeNil)
+			})
+		})
+	})
 }

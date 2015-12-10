@@ -152,7 +152,7 @@ func (connector *Forwarder) encodeEventPostBodyProtobufV2(events []*event.Event)
 	}
 	protobytes, err := connector.protoMarshal(msg)
 
-	// Now we can send datapoints
+	// Now we can send events
 	return protobytes, "application/x-protobuf", err
 }
 
@@ -233,9 +233,10 @@ func mapToProperties(properties map[string]interface{}) []*com_signalfx_metrics_
 			pv.DoubleValue = &dval
 		} else if sval, ok := v.(string); ok {
 			pv.StrValue = &sval
+		} else {
+			// ignore, shouldn't be possible to get here from external source
+			continue
 		}
-		// else ignore, i was unable to come up with a way to send in something
-		// that wasn't one of these from an external source
 
 		ret = append(ret, (&com_signalfx_metrics_protobuf.Property{
 			Key:   &copyOfK,

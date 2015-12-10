@@ -149,6 +149,8 @@ func NewProtobufDataPointWithType(dp *com_signalfx_metrics_protobuf.DataPoint, m
 	return datapoint.New(dp.GetMetric(), dims, NewDatumValue(dp.GetValue()), fromMT(mt), fromTs(dp.GetTimestamp())), nil
 }
 
+var errPropertyValueNotSet = errors.New("property value not set")
+
 // NewProtobufEvent creates a new event from SignalFx's protobuf definition
 func NewProtobufEvent(e *com_signalfx_metrics_protobuf.Event) (*event.Event, error) {
 	dims := make(map[string]string, len(e.GetDimensions())+1)
@@ -171,8 +173,9 @@ func NewProtobufEvent(e *com_signalfx_metrics_protobuf.Event) (*event.Event, err
 			props[pkey] = pval.GetDoubleValue()
 		} else if pval.IntValue != nil {
 			props[pkey] = pval.GetIntValue()
+		} else {
+			return nil, errPropertyValueNotSet
 		}
-		// protobuf format only has these 4 values so no else would be reachable
 	}
 
 	return event.NewWithMeta(e.GetEventType(), e.GetCategory().String(), dims, props, fromTs(e.GetTimestamp())), nil
