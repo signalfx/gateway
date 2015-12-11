@@ -18,13 +18,16 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/metricproxy/config"
+	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/metricproxy/dp/dptest"
 
+	"github.com/signalfx/golib/event"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
+	"runtime"
 )
 
 func TestInvalidForwarderLoader(t *testing.T) {
@@ -334,7 +337,7 @@ func TestMetricHandler(t *testing.T) {
 func TestStatSize(t *testing.T) {
 	listener, _, _ := localSetup(t)
 	defer listener.Close()
-	assert.Equal(t, 59, len(listener.Stats()))
+	assert.Equal(t, 81, len(listener.Stats()))
 }
 
 func TestInvalidContentType(t *testing.T) {
@@ -347,6 +350,7 @@ func TestInvalidContentType(t *testing.T) {
 	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/v1/datapoint", body)
 	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/datapoint", body)
 	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/v2/datapoint", body)
+	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/v2/event", body)
 	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/v1/collectd", body)
 	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/metric", body)
 	verifyFailure(t, "POST", baseURI, "INVALID_TYPE", "/v1/metric", body)
@@ -376,6 +380,158 @@ func TestErrorTrackerHandler(t *testing.T) {
 	e.ServeHTTPC(ctx, rw, nil)
 	assert.Equal(t, `hi`, rw.Body.String())
 	assert.Equal(t, int64(1), e.TotalErrors)
+}
+
+func TestSignalfxJsonV2EventHandler(t *testing.T) {
+	listener, channel, baseURI := localSetup(t)
+	defer listener.Close()
+	// default for category and timestamp
+	Convey("given a json body without a timestamp or category", t, func() {
+		body := bytes.NewBuffer([]byte(`[{"eventType": "mwp.test2", "dimensions": {"instance": "mwpinstance4", "host": "myhost-4", "service": "myservice4"}, "properties": {"version": "2015-11-23-4"}}]`))
+		Convey("verify the timestamp is filled in and the category becomes USER_DEFINED", func() {
+			verifyEventRequest(baseURI, "application/json", "/v2/event", body, channel, "mwp.test2", "USER_DEFINED", map[string]string{"instance": "mwpinstance4", "host": "myhost-4", "service": "myservice4"}, map[string]interface{}{"version": "2015-11-23-4"}, nil)
+		})
+	})
+	Convey("given a json body with a timestamp and category ALERT", t, func() {
+		body := bytes.NewBuffer([]byte(`[{"category":"ALERT", "eventType": "mwp.test2", "dimensions": {"instance": "mwpinstance4", "host": "myhost-4", "service": "myservice4"}, "properties": {"version": "2015-11-23-4"}, "timestamp":12345}]`))
+		Convey("verify the timestamp is acurate the category is ALERT", func() {
+			verifyEventRequest(baseURI, "application/json", "/v2/event", body, channel, "mwp.test2", "ALERT", map[string]string{"instance": "mwpinstance4", "host": "myhost-4", "service": "myservice4"}, map[string]interface{}{"version": "2015-11-23-4"}, nil)
+		})
+	})
+	Convey("Given json decoder show invalid json errors", t, func() {
+		decoder := JSONEventDecoderV2{}
+		req := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewBuffer([]byte("INVALID_JSON"))),
+		}
+		req.ContentLength = -1
+		ctx := context.Background()
+		e := decoder.Read(ctx, req)
+		_ = e.(*json.SyntaxError)
+	})
+
+	Convey("given a protobuf body without or category", t, func() {
+		protoEvent := &com_signalfx_metrics_protobuf.Event{
+			EventType: workarounds.GolangDoesnotAllowPointerToStringLiteral("mwp.test2"),
+			Dimensions: []*com_signalfx_metrics_protobuf.Dimension{
+				{
+					Key:   workarounds.GolangDoesnotAllowPointerToStringLiteral("instance"),
+					Value: workarounds.GolangDoesnotAllowPointerToStringLiteral("mwpinstance4"),
+				},
+				{
+					Key:   workarounds.GolangDoesnotAllowPointerToStringLiteral("host"),
+					Value: workarounds.GolangDoesnotAllowPointerToStringLiteral("myhost-4"),
+				},
+				{
+					Key:   workarounds.GolangDoesnotAllowPointerToStringLiteral("service"),
+					Value: workarounds.GolangDoesnotAllowPointerToStringLiteral("myservice4"),
+				},
+			},
+			Properties: []*com_signalfx_metrics_protobuf.Property{
+				{
+					Key: workarounds.GolangDoesnotAllowPointerToStringLiteral("version"),
+					Value: &com_signalfx_metrics_protobuf.PropertyValue{
+						StrValue: workarounds.GolangDoesnotAllowPointerToStringLiteral("2015-11-23-4"),
+					},
+				},
+				{
+					Key: workarounds.GolangDoesnotAllowPointerToStringLiteral("int"),
+					Value: &com_signalfx_metrics_protobuf.PropertyValue{
+						IntValue: workarounds.GolangDoesnotAllowPointerToIntLiteral(4),
+					},
+				},
+				{
+					Key: workarounds.GolangDoesnotAllowPointerToStringLiteral("bool"),
+					Value: &com_signalfx_metrics_protobuf.PropertyValue{
+						BoolValue: workarounds.GolangDoesnotAllowPointerToBooleanLiteral(true),
+					},
+				},
+				{
+					Key: workarounds.GolangDoesnotAllowPointerToStringLiteral("double"),
+					Value: &com_signalfx_metrics_protobuf.PropertyValue{
+						DoubleValue: workarounds.GolangDoesnotAllowPointerToFloat64Literal(1.1),
+					},
+				},
+			},
+		}
+		uploadMsg := &com_signalfx_metrics_protobuf.EventUploadMessage{
+			Events: []*com_signalfx_metrics_protobuf.Event{protoEvent},
+		}
+		dpInBytes, _ := proto.Marshal(uploadMsg)
+		body := bytes.NewBuffer(dpInBytes)
+		Convey("verify the timestamp is acurate the category is USER_DEFINED", func() {
+			verifyEventRequest(baseURI, "application/x-protobuf", "/v2/event", body, channel, "mwp.test2", "USER_DEFINED", map[string]string{"instance": "mwpinstance4", "host": "myhost-4", "service": "myservice4"}, map[string]interface{}{"version": "2015-11-23-4", "int": int64(4), "bool": true, "double": 1.1}, nil)
+		})
+	})
+
+	Convey("given a protobuf event decoder", t, func() {
+		decoder := ProtobufEventDecoderV2{}
+		ctx := context.Background()
+		Convey("show an empty request errors", func() {
+			req := &http.Request{
+				Body: ioutil.NopCloser(bytes.NewBufferString("")),
+			}
+			req.ContentLength = -1
+			So(decoder.Read(ctx, req), ShouldEqual, errInvalidContentLength)
+		})
+		Convey("show an error reading errors", func() {
+			req := &http.Request{
+				Body: ioutil.NopCloser(&errorReader{}),
+			}
+			req.ContentLength = 1
+			e := decoder.Read(ctx, req)
+			So(e.Error(), ShouldEqual, "could not read")
+		})
+		Convey("show invalid json errors", func() {
+			req := &http.Request{
+				Body: ioutil.NopCloser(bytes.NewBufferString("INVALID_JSON")),
+			}
+			req.ContentLength = int64(len("INVALID_JSON"))
+			e := decoder.Read(ctx, req)
+			So(e.Error(), ShouldEqual, "proto: can't skip unknown wire type 7 for com_signalfx_metrics_protobuf.EventUploadMessage")
+		})
+	})
+}
+
+func verifyEventRequest(baseURI string, contentType string, path string, body io.Reader, channel *dptest.BasicSink, eventType string, category string, dimensions map[string]string, properties map[string]interface{}, reqErr error) {
+	Convey("given a new request with path "+path, func() {
+		req, err := http.NewRequest("POST", baseURI+path, body)
+		if reqErr != nil {
+			Convey("we should get the error provided"+reqErr.Error(), func() {
+				So(err, ShouldNotBeNil)
+				So(reqErr, ShouldEqual, err)
+			})
+		} else {
+			Convey("we should be able to successfully parse the payload", func() {
+				So(err, ShouldBeNil)
+				doneSignal := make(chan struct{})
+				var eOut *event.Event
+				go func() {
+					eOut = channel.NextEvent()
+					doneSignal <- struct{}{}
+				}()
+				client := &http.Client{}
+				if contentType != "" {
+					req.Header.Add("Content-Type", contentType)
+				}
+				resp, err := client.Do(req)
+				So(err, ShouldBeNil)
+				So(resp.StatusCode, ShouldEqual, http.StatusOK)
+				Convey("and the generated event should be what we expect", func() {
+					runtime.Gosched()
+					_ = <-doneSignal
+					So(eventType, ShouldEqual, eOut.EventType)
+					So(category, ShouldEqual, eOut.Category)
+					if dimensions != nil {
+						So(dimensions, ShouldResemble, eOut.Dimensions)
+					}
+					if properties != nil {
+						So(properties, ShouldResemble, eOut.Meta)
+					}
+					So(eOut.Timestamp.Nanosecond(), ShouldBeGreaterThan, 0)
+				})
+			})
+		}
+	})
 }
 
 func BenchmarkAtomicInc(b *testing.B) {

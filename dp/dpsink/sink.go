@@ -6,11 +6,23 @@ import (
 	"golang.org/x/net/context"
 )
 
+// A DSink is an object that can accept datapoints and do something with them, like forward them
+// to some endpoint
+type DSink interface {
+	AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error
+}
+
+// A ESink is an object that can accept events and do something with them, like forward them
+// to some endpoint
+type ESink interface {
+	AddEvents(ctx context.Context, events []*event.Event) error
+}
+
 // A Sink is an object that can accept datapoints or events and do something with them, like forward them
 // to some endpoint
 type Sink interface {
-	AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error
-	AddEvents(ctx context.Context, events []*event.Event) error
+	DSink
+	ESink
 }
 
 // NextSink is a special case of a sink that forwards to another sink

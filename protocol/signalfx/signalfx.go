@@ -9,6 +9,7 @@ import (
 
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/event"
 )
 
 // JSONDatapointV1 is the JSON API format for /v1/datapoint
@@ -146,4 +147,48 @@ func NewProtobufDataPointWithType(dp *com_signalfx_metrics_protobuf.DataPoint, m
 	}
 
 	return datapoint.New(dp.GetMetric(), dims, NewDatumValue(dp.GetValue()), fromMT(mt), fromTs(dp.GetTimestamp())), nil
+}
+
+var errPropertyValueNotSet = errors.New("property value not set")
+
+// NewProtobufEvent creates a new event from SignalFx's protobuf definition
+func NewProtobufEvent(e *com_signalfx_metrics_protobuf.Event) (*event.Event, error) {
+	dims := make(map[string]string, len(e.GetDimensions())+1)
+	edims := e.GetDimensions()
+	for _, dpdim := range edims {
+		dims[dpdim.GetKey()] = dpdim.GetValue()
+	}
+
+	// sure wish protobuf has something eqiv of interface{} instead of only union structs...
+	// <sigh>
+	props := make(map[string]interface{}, len(e.GetDimensions())+1)
+	for _, dpdim := range e.GetProperties() {
+		pval := dpdim.GetValue()
+		pkey := dpdim.GetKey()
+		if pval.StrValue != nil {
+			props[pkey] = pval.GetStrValue()
+		} else if pval.BoolValue != nil {
+			props[pkey] = pval.GetBoolValue()
+		} else if pval.DoubleValue != nil {
+			props[pkey] = pval.GetDoubleValue()
+		} else if pval.IntValue != nil {
+			props[pkey] = pval.GetIntValue()
+		} else {
+			return nil, errPropertyValueNotSet
+		}
+	}
+
+	return event.NewWithMeta(e.GetEventType(), e.GetCategory().String(), dims, props, fromTs(e.GetTimestamp())), nil
+}
+
+// JSONEventV2 is the V2 json event sending format
+type JSONEventV2 []*EventSendFormatV2
+
+// EventSendFormatV2 is the JSON format signalfx datapoints are expected to be in
+type EventSendFormatV2 struct {
+	EventType  string                 `json:"eventType"`
+	Category   *string                `json:"category"`
+	Dimensions map[string]string      `json:"dimensions"`
+	Properties map[string]interface{} `json:"properties"`
+	Timestamp  *int64                 `json:"timestamp"`
 }

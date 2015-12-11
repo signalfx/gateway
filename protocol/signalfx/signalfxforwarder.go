@@ -52,7 +52,7 @@ type Forwarder struct {
 
 var defaultConfigV2 = &config.ForwardTo{
 	URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("https://ingest.signalfx.com/v2/datapoint"),
-	EventURL:          workarounds.GolangDoesnotAllowPointerToStringLiteral("https://api.signalfx.com/v1/event"),
+	EventURL:          workarounds.GolangDoesnotAllowPointerToStringLiteral("https://ingest.signalfx.com/v2/event"),
 	DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
 	MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral(""), // Not used
 	TimeoutDuration:   workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 60),
@@ -142,33 +142,18 @@ func (connector *Forwarder) encodePostBodyProtobufV2(datapoints []*datapoint.Dat
 	return protobytes, "application/x-protobuf", err
 }
 
-// JSONEvent is used to wrap event object so we can format it as expected
-type JSONEvent struct {
-	EventType  string                 `json:"eventType"`
-	Category   string                 `json:"category"`
-	Dimensions map[string]string      `json:"dimensions"`
-	Meta       map[string]interface{} `json:"properties"`
-	Timestamp  int64                  `json:"timestamp"`
-}
-
-func newJSONEvent(event *event.Event) *JSONEvent {
-	return &JSONEvent{EventType: event.EventType,
-		Category:   event.Category,
-		Dimensions: event.Dimensions,
-		Meta:       event.Meta,
-		Timestamp:  event.Timestamp.UnixNano() / time.Millisecond.Nanoseconds()}
-}
-
-func (connector *Forwarder) encodeEventPostBodyJSON(events []*event.Event) ([]byte, error) {
-	var buffer []byte
-	for i := range events {
-		protobytes, err := connector.jsonMarshal(newJSONEvent(events[i]))
-		if err != nil {
-			return buffer, err
-		}
-		buffer = append(buffer, protobytes...)
+func (connector *Forwarder) encodeEventPostBodyProtobufV2(events []*event.Event) ([]byte, string, error) {
+	evts := make([]*com_signalfx_metrics_protobuf.Event, 0, len(events))
+	for _, evt := range events {
+		evts = append(evts, connector.coreEventToProtobuf(evt))
 	}
-	return buffer, nil
+	msg := &com_signalfx_metrics_protobuf.EventUploadMessage{
+		Events: evts,
+	}
+	protobytes, err := connector.protoMarshal(msg)
+
+	// Now we can send events
+	return protobytes, "application/x-protobuf", err
 }
 
 func datumForPoint(pv datapoint.Value) *com_signalfx_metrics_protobuf.Datum {
@@ -213,16 +198,62 @@ func (connector *Forwarder) coreDatapointToProtobuf(point *datapoint.Datapoint) 
 	return v
 }
 
+func (connector *Forwarder) coreEventToProtobuf(e *event.Event) *com_signalfx_metrics_protobuf.Event {
+	ts := e.Timestamp.UnixNano() / time.Millisecond.Nanoseconds()
+	et := e.EventType
+	cat := com_signalfx_metrics_protobuf.EventCategory_USER_DEFINED
+	if catIndex, ok := com_signalfx_metrics_protobuf.EventCategory_value[e.Category]; ok {
+		cat = com_signalfx_metrics_protobuf.EventCategory(catIndex)
+	}
+
+	v := &com_signalfx_metrics_protobuf.Event{
+		EventType:  &et,
+		Timestamp:  &ts,
+		Properties: mapToProperties(e.Meta),
+		Dimensions: mapToDimensions(e.Dimensions),
+		Category:   &cat,
+	}
+	return v
+}
+
+func mapToProperties(properties map[string]interface{}) []*com_signalfx_metrics_protobuf.Property {
+	ret := make([]*com_signalfx_metrics_protobuf.Property, 0, len(properties))
+	for k, v := range properties {
+		if k == "" || v == nil {
+			continue
+		}
+		copyOfK := filterSignalfxKey(k)
+
+		pv := com_signalfx_metrics_protobuf.PropertyValue{}
+		if ival, ok := v.(int64); ok {
+			pv.IntValue = &ival
+		} else if bval, ok := v.(bool); ok {
+			pv.BoolValue = &bval
+		} else if dval, ok := v.(float64); ok {
+			pv.DoubleValue = &dval
+		} else if sval, ok := v.(string); ok {
+			pv.StrValue = &sval
+		} else {
+			// ignore, shouldn't be possible to get here from external source
+			continue
+		}
+
+		ret = append(ret, (&com_signalfx_metrics_protobuf.Property{
+			Key:   &copyOfK,
+			Value: &pv,
+		}))
+	}
+	return ret
+}
 func mapToDimensions(dimensions map[string]string) []*com_signalfx_metrics_protobuf.Dimension {
 	ret := make([]*com_signalfx_metrics_protobuf.Dimension, 0, len(dimensions))
 	for k, v := range dimensions {
 		if k == "" || v == "" {
 			continue
 		}
-		// If someone knows a better way to do this, let me know.  I can't just take the &
-		// of k and v because their content changes as the range iterates
-		copyOfK := filterSignalfxKey(string([]byte(k)))
-		copyOfV := (string([]byte(v)))
+		copyOfK := filterSignalfxKey(k)
+		copyOfV := v
+
 		ret = append(ret, (&com_signalfx_metrics_protobuf.Dimension{
 			Key:   &copyOfK,
 			Value: &copyOfV,
@@ -320,15 +351,14 @@ func (connector *Forwarder) AddEvents(ctx context.Context, events []*event.Event
 	if len(events) == 0 {
 		return nil
 	}
-	jsonBytes, err := connector.encodeEventPostBodyJSON(events)
-
+	protoBytes, bodyType, err := connector.encodeEventPostBodyProtobufV2(events)
 	if err != nil {
 		return &forwardError{
 			originalError: err,
 			message:       "Unable to marshal object",
 		}
 	}
-	return connector.sendBytes(endpoint, "application/json", defaultAuthToken, userAgent, jsonBytes)
+	return connector.sendBytes(endpoint, bodyType, defaultAuthToken, userAgent, protoBytes)
 }
 
 var atomicRequestNumber = int64(0)
