@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/signalfx/golib/errors"
 )
 
 // Documentation taken from http://metrics20.org/spec/
@@ -65,7 +67,7 @@ func (dp *Datapoint) UnmarshalJSON(b []byte) error {
 	dec := json.NewDecoder(bytes.NewBuffer(b))
 	dec.UseNumber()
 	if err := dec.Decode(&m); err != nil {
-		return err
+		return errors.Annotatef(err, "JSON decoding of byte array %v failed", b)
 	}
 	switch t := m.Value.(type) {
 	case string:

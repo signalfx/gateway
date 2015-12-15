@@ -9,8 +9,8 @@ go:
   - tip
 
 before_install:
-  - wget "http://ftp.debian.org/debian/pool/main/s/shellcheck/shellcheck_0.3.7-1_amd64.deb"
-  - dpkg -x shellcheck_0.3.7-1_amd64.deb $HOME
+  - wget "http://ftp.debian.org/debian/pool/main/s/shellcheck/shellcheck_0.3.7-5_amd64.deb"
+  - dpkg -x shellcheck_0.3.7-5_amd64.deb $HOME
   - export PATH=$HOME/usr/bin:$PATH
   - go get github.com/tools/godep
   - go get github.com/cep21/goverify

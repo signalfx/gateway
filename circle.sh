@@ -1,7 +1,9 @@
 #!/bin/bash
 set -ex
 
-CIRCLEUTIL_TAG="v1.35"
+CIRCLEUTIL_TAG="v1.40"
+DEFAULT_GOLANG_VERSION="1.5.1"
+GO_TESTED_VERSIONS="1.4.3 1.5.1"
 
 export GOLANG_VERSION="1.5.1"
 export GOROOT="$HOME/go_circle"
@@ -30,7 +32,7 @@ function do_cache() {
   . "$HOME/circleutil/scripts/common.sh"
   mkdir -p "$GO_COMPILER_PATH"
   install_all_go_versions "$GO_COMPILER_PATH"
-  install_go_version "$GO_COMPILER_PATH" "$GOLANG_VERSION"
+  install_go_version "$GO_COMPILER_PATH" "$DEFAULT_GOLANG_VERSION"
   versioned_goget "github.com/cep21/gobuild:v1.3" "github.com/tools/godep:master"
   mkdir -p "$GOPATH_INTO"
   install_shellcheck "$GOPATH_INTO"
@@ -48,8 +50,6 @@ function do_cache() {
 # Test phase of circleci
 function do_test() {
   . "$HOME/circleutil/scripts/common.sh"
-  go version
-  go env
   (
     cd "$SRC_PATH"
     shellcheck install.sh
@@ -58,8 +58,19 @@ function do_test() {
     echo -e "# Ignore Header" > /tmp/ignore_header.md
     cat /tmp/ignore_header.md README.md | grep -av curl | grep -av 'Build Status' | mdl --warnings
     python -m json.tool < exampleSfdbproxy.conf > /dev/null
-    env GOPATH="$GOPATH:$(godep path)" gobuild -verbose -verbosefile "$CIRCLE_ARTIFACTS/gobuildout.txt"
   )
+  for GO_VERSION in $GO_TESTED_VERSIONS; do
+    install_go_version "$GO_COMPILER_PATH" "$GO_VERSION"
+    rm -rf "$GOPATH/pkg"
+    go version
+    go env
+    go tool | grep cover || go get golang.org/x/tools/cmd/cover
+    (
+      cd "$SRC_PATH"
+      go clean -x ./...
+      env GOPATH="$GOPATH:$(godep path)" gobuild -verbose -verbosefile "$CIRCLE_ARTIFACTS/gobuildout.txt"
+    )
+  done
 }
 
 # Deploy phase of circleci

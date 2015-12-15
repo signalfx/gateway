@@ -36,6 +36,7 @@ var (
 	NotBeIn       = assertions.ShouldNotBeIn
 	BeEmpty       = assertions.ShouldBeEmpty
 	NotBeEmpty    = assertions.ShouldNotBeEmpty
+	HaveLength    = assertions.ShouldHaveLength
 
 	StartWith           = assertions.ShouldStartWith
 	NotStartWith        = assertions.ShouldNotStartWith
@@ -45,6 +46,9 @@ var (
 	NotBeBlank          = assertions.ShouldNotBeBlank
 	ContainSubstring    = assertions.ShouldContainSubstring
 	NotContainSubstring = assertions.ShouldNotContainSubstring
+
+	EqualWithout   = assertions.ShouldEqualWithout
+	EqualTrimSpace = assertions.ShouldEqualTrimSpace
 
 	Panic        = assertions.ShouldPanic
 	NotPanic     = assertions.ShouldNotPanic
