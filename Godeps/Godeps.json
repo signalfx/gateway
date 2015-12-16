@@ -1,11 +1,14 @@
 {
 	"ImportPath": "github.com/signalfx/metricproxy",
 	"GoVersion": "go1.5.1",
+	"Packages": [
+		"./..."
+	],
 	"Deps": [
 		{
 			"ImportPath": "github.com/Sirupsen/logrus",
-			"Comment": "v0.8.6-7-g9c060de",
-			"Rev": "9c060de643590dae45da9d7c26276463bfc46fa0"
+			"Comment": "v0.8.7-49-gcdaedc6",
+			"Rev": "cdaedc68f2894175ac2b3221869685602c759e71"
 		},
 		{
 			"ImportPath": "github.com/cep21/gohelpers/stringhelper",
@@ -24,49 +27,88 @@
 			"Rev": "b123604ccc445c5759d1bc3b425defff797c3d8c"
 		},
 		{
+			"ImportPath": "github.com/davecgh/go-spew/spew",
+			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
+		},
+		{
 			"ImportPath": "github.com/golang/protobuf/proto",
-			"Rev": "68415e7123da32b07eab49c96d2c4d6158360e9b"
+			"Rev": "221834dcb89c96e4b057ed8bb878bfe569dfacf4"
 		},
 		{
 			"ImportPath": "github.com/gorilla/context",
-			"Rev": "215affda49addc4c8ef7e2534915df2c8c35c6cd"
+			"Rev": "1c83b3eabd45b6d76072b66b746c20815fb2872d"
 		},
 		{
 			"ImportPath": "github.com/gorilla/mux",
-			"Rev": "47e8f450ef38c857cdd922ec08862ca9d65a1c6d"
+			"Rev": "9c068cf16d982f8bd444b8c352acbeec34c4fe5b"
+		},
+		{
+			"ImportPath": "github.com/jtolds/gls",
+			"Rev": "9a4a02dbe491bef4bab3c24fd9f3087d6c4c6690"
+		},
+		{
+			"ImportPath": "github.com/pmezard/go-difflib/difflib",
+			"Rev": "d8ed2627bdf02c080bf22230dbb337003b7aba2d"
 		},
 		{
 			"ImportPath": "github.com/signalfx/com_signalfx_metrics_protobuf",
 			"Rev": "4ee27186f23ce032939bb7363a04c653c333139c"
 		},
 		{
+			"ImportPath": "github.com/signalfx/gohistogram",
+			"Rev": "9127bf9764d9d26d3b3457d3540bdd39417b2001"
+		},
+		{
 			"ImportPath": "github.com/signalfx/golib/datapoint",
-			"Rev": "9f10d93a91220d2a68751a64b4c0fe4d6b219839"
+			"Rev": "b796316aeb76f289cde36684a9535402a7a3262b"
+		},
+		{
+			"ImportPath": "github.com/signalfx/golib/errors",
+			"Rev": "b796316aeb76f289cde36684a9535402a7a3262b"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/event",
-			"Rev": "9f10d93a91220d2a68751a64b4c0fe4d6b219839"
+			"Rev": "b796316aeb76f289cde36684a9535402a7a3262b"
+		},
+		{
+			"ImportPath": "github.com/signalfx/golib/nettest",
+			"Rev": "b796316aeb76f289cde36684a9535402a7a3262b"
+		},
+		{
+			"ImportPath": "github.com/signalfx/golib/sfxclient",
+			"Rev": "b796316aeb76f289cde36684a9535402a7a3262b"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/timekeeper",
-			"Rev": "9f10d93a91220d2a68751a64b4c0fe4d6b219839"
+			"Rev": "b796316aeb76f289cde36684a9535402a7a3262b"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/web",
-			"Rev": "9f10d93a91220d2a68751a64b4c0fe4d6b219839"
+			"Rev": "b796316aeb76f289cde36684a9535402a7a3262b"
+		},
+		{
+			"ImportPath": "github.com/smartystreets/assertions",
+			"Comment": "1.5.0-405-g01fedaa",
+			"Rev": "01fedaa993c0a9f9aa55111501cd7c81a49e812e"
+		},
+		{
+			"ImportPath": "github.com/smartystreets/goconvey/convey",
+			"Comment": "1.5.0-453-g5bb9e11",
+			"Rev": "5bb9e117a1a4f1a1555a4d41cd233c79b1a5209f"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
-			"Rev": "e22aedd37671fb115be6c0c25129c405cb575cfd"
+			"Comment": "v1.0-83-gd797d25",
+			"Rev": "d797d25e0fa6d53be3b1a216d24e868d6a1912ef"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
-			"Rev": "db8e4de5b2d6653f66aea53094624468caad15d2"
+			"Rev": "195180cfebf7362bd243a52477697895128c8777"
 		},
 		{
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",
-			"Comment": "v1.0-15-g588a21f",
-			"Rev": "588a21fb0fa0ebdfde42670fa214576b6f0f22df"
+			"Comment": "v1.0-18-g600ceb4",
+			"Rev": "600ceb4523e5b7ff745f91083c8a023c2bf73af5"
 		}
 	]
 }

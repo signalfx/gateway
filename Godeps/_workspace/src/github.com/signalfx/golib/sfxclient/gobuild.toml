@@ -1,0 +1,4 @@
+[metalinter]
+  [metalinter.ignored]
+    go14= "^.*has no field or method Cancel.*$" 
+

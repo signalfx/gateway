@@ -6,7 +6,7 @@
     golint = true
     gofmt = true
     varcheck = true
-    aligncheck = true
+    aligncheck = false
     gocyclo = true
     vet = true
     deadcode = true

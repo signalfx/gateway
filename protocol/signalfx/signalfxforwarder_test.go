@@ -47,17 +47,6 @@ func (vp *metricPanicDatapoint) Metric() string {
 	panic("This shouldn't happen!")
 }
 
-func TestForwarderLoaderDefaults(t *testing.T) {
-	forwardTo := config.ForwardTo{
-		FormatVersion:    workarounds.GolangDoesnotAllowPointerToUintLiteral(2),
-		DefaultAuthToken: workarounds.GolangDoesnotAllowPointerToStringLiteral("AUTH_TOKEN"),
-	}
-	ctx := context.Background()
-	forwarder, err := ForwarderLoader(ctx, &forwardTo)
-	assert.Nil(t, err)
-	defer forwarder.Close()
-}
-
 func TestMapToProperties(t *testing.T) {
 	Convey("given a map of properties", t, func() {
 		p := map[string]interface{}{
@@ -121,34 +110,6 @@ func setupServerForwarder(t *testing.T) (*dptest.BasicSink, *ListenerServer, *Fo
 	return finalDatapointDestination, l, forwarder
 }
 
-func TestDefaultSource(t *testing.T) {
-	finalDatapointDestination, l, forwarder := setupServerForwarder(t)
-	defer l.Close()
-
-	timeToSend := time.Now().Round(time.Second)
-	dpSent := datapoint.New("metric", map[string]string{}, datapoint.NewIntValue(2), datapoint.Gauge, timeToSend)
-	go forwarder.AddDatapoints(context.Background(), []*datapoint.Datapoint{dpSent})
-	dpRecieved := finalDatapointDestination.Next()
-	i := dpRecieved.Value.(datapoint.IntValue).Int()
-	assert.Equal(t, int64(2), i, "Expect 2 back")
-	assert.Equal(t, "proxy-source", dpRecieved.Dimensions["sf_source"], "Expect ahost back")
-	assert.Equal(t, timeToSend, dpRecieved.Timestamp)
-}
-
-func TestSetSource(t *testing.T) {
-	finalDatapointDestination, l, forwarder := setupServerForwarder(t)
-	defer l.Close()
-
-	timeToSend := time.Now().Round(time.Second)
-	dpSent := datapoint.New("metric", map[string]string{"cpusize": "big", "hostname": "ahost"}, datapoint.NewIntValue(2), datapoint.Gauge, timeToSend)
-	go forwarder.AddDatapoints(context.Background(), []*datapoint.Datapoint{dpSent})
-	dpRecieved := finalDatapointDestination.Next()
-	i := dpRecieved.Value.(datapoint.IntValue).Int()
-	assert.Equal(t, int64(2), i, "Expect 2 back")
-	assert.Equal(t, "ahost", dpRecieved.Dimensions["sf_source"], "Expect ahost back")
-	assert.Equal(t, timeToSend, dpRecieved.Timestamp)
-}
-
 func TestForwarderLoaderOldVersion(t *testing.T) {
 	forwardTo := config.ForwardTo{
 		FormatVersion:    workarounds.GolangDoesnotAllowPointerToUintLiteral(1),
@@ -156,7 +117,7 @@ func TestForwarderLoaderOldVersion(t *testing.T) {
 	}
 	ctx := context.Background()
 	_, err := ForwarderLoader(ctx, &forwardTo)
-	assert.NoError(t, err)
+	assert.Error(t, err)
 }
 
 func TestNoSource(t *testing.T) {
@@ -174,13 +135,6 @@ func TestNoSource(t *testing.T) {
 	assert.False(t, exists, val)
 }
 
-func TestDatumForPoint(t *testing.T) {
-	assert.Equal(t, int64(3), datumForPoint(datapoint.NewIntValue(3)).GetIntValue())
-	assert.Equal(t, 0.0, datumForPoint(datapoint.NewIntValue(3)).GetDoubleValue())
-	assert.Equal(t, .1, datumForPoint(datapoint.NewFloatValue(.1)).GetDoubleValue())
-	assert.Equal(t, "hi", datumForPoint(datapoint.NewStringValue("hi")).GetStrValue())
-}
-
 func TestConnectorProcessProtoError(t *testing.T) {
 	expectedErr := errors.New("marshal error")
 	f := Forwarder{
@@ -191,9 +145,7 @@ func TestConnectorProcessProtoError(t *testing.T) {
 			return nil, expectedErr
 		},
 	}
-	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
-	assert.Equal(t, expectedErr, err.(*forwardError).originalError)
-	err = f.AddEvents(context.Background(), []*event.Event{dptest.E()})
+	err := f.AddEvents(context.Background(), []*event.Event{dptest.E()})
 	assert.Equal(t, expectedErr, err.(*forwardError).originalError)
 }
 
@@ -212,7 +164,7 @@ func TestClientReqError(t *testing.T) {
 			}),
 		},
 	}
-	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
+	err := f.AddEvents(context.Background(), []*event.Event{dptest.E()})
 	assert.Contains(t, err.Error(), "unable to execute http request")
 }
 
@@ -235,7 +187,7 @@ func TestResponseBodyError(t *testing.T) {
 			}),
 		},
 	}
-	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
+	err := f.AddEvents(context.Background(), []*event.Event{dptest.E()})
 	assert.Equal(t, "read error", err.(*forwardError).originalError.Error())
 }
 
@@ -252,7 +204,7 @@ func TestResponseBadStatus(t *testing.T) {
 			}),
 		},
 	}
-	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
+	err := f.AddEvents(context.Background(), []*event.Event{dptest.E()})
 	assert.Contains(t, err.(*forwardError).originalError.Error(), "invalid status code")
 }
 
@@ -278,9 +230,7 @@ func TestResponseBadJSON(t *testing.T) {
 			}),
 		},
 	}
-	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
-	assert.IsType(t, &json.SyntaxError{}, err.(*forwardError).originalError)
-	err = f.AddEvents(context.Background(), []*event.Event{dptest.E()})
+	err := f.AddEvents(context.Background(), []*event.Event{dptest.E()})
 	assert.IsType(t, &json.SyntaxError{}, err.(*forwardError).originalError)
 }
 
@@ -298,9 +248,7 @@ func TestResponseBadBody(t *testing.T) {
 			}),
 		},
 	}
-	err := f.AddDatapoints(context.Background(), []*datapoint.Datapoint{dptest.DP()})
-	assert.Contains(t, err.Error(), "body decode error")
-	err = f.AddEvents(context.Background(), []*event.Event{dptest.E()})
+	err := f.AddEvents(context.Background(), []*event.Event{dptest.E()})
 	assert.Contains(t, err.Error(), "body decode error")
 }
 
@@ -314,18 +262,10 @@ func TestBasicSend(t *testing.T) {
 		defer testServer.Close()
 
 		f := NewSignalfxJSONForwarder("", time.Second, "", 10, "", "", "")
-		f.UserAgent("abcd")
-		f.AuthToken("abcdefg")
-		f.Endpoint(testServer.URL)
 		f.EventEndpoint(testServer.URL)
+		f.defaultAuthToken = "abcdefg"
+		f.userAgent = "abcd"
 		ctx := context.Background()
-
-		Convey("a valid datapoint", func() {
-			dp := dptest.DP()
-			Convey("should not error", func() {
-				So(f.AddDatapoints(ctx, []*datapoint.Datapoint{dp}), ShouldBeNil)
-			})
-		})
 		Convey("a valid event", func() {
 			e := dptest.E()
 			Convey("should not error", func() {

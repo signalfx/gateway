@@ -53,7 +53,7 @@ func New() *Logger {
 
 // Adds a field to the log entry, note that you it doesn't log until you call
 // Debug, Print, Info, Warn, Fatal or Panic. It only creates a log entry.
-// Ff you want multiple fields, use `WithFields`.
+// If you want multiple fields, use `WithFields`.
 func (logger *Logger) WithField(key string, value interface{}) *Entry {
 	return NewEntry(logger).WithField(key, value)
 }
@@ -62,6 +62,12 @@ func (logger *Logger) WithField(key string, value interface{}) *Entry {
 // each `Field`.
 func (logger *Logger) WithFields(fields Fields) *Entry {
 	return NewEntry(logger).WithFields(fields)
+}
+
+// Add an error as single field to the log entry.  All it does is call
+// `WithError` for the given `error`.
+func (logger *Logger) WithError(err error) *Entry {
+	return NewEntry(logger).WithError(err)
 }
 
 func (logger *Logger) Debugf(format string, args ...interface{}) {
