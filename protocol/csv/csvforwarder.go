@@ -10,9 +10,9 @@ import (
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/metricproxy/protocol"
 	"golang.org/x/net/context"
 )
