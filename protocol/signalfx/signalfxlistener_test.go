@@ -21,13 +21,14 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/datapoint/dptest"
+	"github.com/signalfx/golib/nettest"
+
+	"runtime"
 
 	"github.com/signalfx/golib/event"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
-	"runtime"
 )
 
 func TestInvalidForwarderLoader(t *testing.T) {
