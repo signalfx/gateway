@@ -6,8 +6,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/datapoint/dplocal"
+	"github.com/signalfx/golib/event"
 	"golang.org/x/net/context"
 )
 
