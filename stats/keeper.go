@@ -5,7 +5,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/metricproxy/dp/dpsink"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"golang.org/x/net/context"
 )
 

@@ -20,7 +20,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/web"
-	"github.com/signalfx/metricproxy/dp/dpsink"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/stats"
 	"golang.org/x/net/context"

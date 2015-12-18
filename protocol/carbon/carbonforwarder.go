@@ -18,7 +18,7 @@ import (
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/dp/dpbuffered"
 	"github.com/signalfx/metricproxy/dp/dpdimsort"
-	"github.com/signalfx/metricproxy/dp/dpsink"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/stats"
 	"golang.org/x/net/context"

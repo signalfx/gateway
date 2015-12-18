@@ -7,7 +7,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
-	"github.com/signalfx/metricproxy/dp/dplocal"
+	"github.com/signalfx/golib/datapoint/dplocal"
 	"golang.org/x/net/context"
 )
 

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/metricproxy/dp/dplocal"
+	"github.com/signalfx/golib/datapoint/dplocal"
 )
 
 type golangKeeper struct {

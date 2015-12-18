@@ -10,8 +10,8 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/dp/dplocal"
-	"github.com/signalfx/metricproxy/dp/dpsink"
+	"github.com/signalfx/golib/datapoint/dplocal"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"golang.org/x/net/context"
 )
 
