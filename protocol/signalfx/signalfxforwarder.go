@@ -17,6 +17,8 @@ import (
 
 	"errors"
 
+	"sync/atomic"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
@@ -31,7 +33,6 @@ import (
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/stats"
 	"golang.org/x/net/context"
-	"sync/atomic"
 )
 
 // Forwarder controls forwarding datapoints to SignalFx

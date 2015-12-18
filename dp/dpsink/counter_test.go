@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/event"
-	"github.com/signalfx/metricproxy/dp/dptest"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )

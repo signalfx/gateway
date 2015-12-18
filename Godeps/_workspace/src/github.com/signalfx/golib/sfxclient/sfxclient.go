@@ -34,6 +34,25 @@ type Collector interface {
 	Datapoints() []*datapoint.Datapoint
 }
 
+// HashableCollector is a Collector function that can be inserted into a hashmap
+type HashableCollector struct {
+	Callback func() []*datapoint.Datapoint
+}
+
+// CollectorFunc wraps a function to make it a Collector
+func CollectorFunc(callback func() []*datapoint.Datapoint) *HashableCollector {
+	return &HashableCollector{
+		Callback: callback,
+	}
+}
+
+// Datapoints calls the wrapped function
+func (h *HashableCollector) Datapoints() []*datapoint.Datapoint {
+	return h.Callback()
+}
+
+var _ Collector = CollectorFunc(nil)
+
 type callbackPair struct {
 	callbacks         map[Collector]struct{}
 	defaultDimensions map[string]string
@@ -49,14 +68,7 @@ func (c *callbackPair) getDatapoints(now time.Time) []*datapoint.Datapoint {
 		for _, dp := range ret {
 			// It's a bit dangerous to modify the map (we don't know how it was passed in) so
 			// make a copy to be safe
-			dims := make(map[string]string, len(dp.Dimensions)+len(c.defaultDimensions))
-			for k, v := range c.defaultDimensions {
-				dims[k] = v
-			}
-			for k, v := range dp.Dimensions {
-				dims[k] = v
-			}
-			dp.Dimensions = dims
+			dp.Dimensions = AddMaps(c.defaultDimensions, dp.Dimensions)
 			if dp.Timestamp.IsZero() {
 				dp.Timestamp = now
 			}

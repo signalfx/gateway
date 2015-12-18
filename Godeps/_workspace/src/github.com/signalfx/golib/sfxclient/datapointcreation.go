@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/signalfx/golib/datapoint"
+	"sync/atomic"
 )
 
 // Gauge creates a signalfx gauge for integer values
@@ -24,4 +25,21 @@ func Cumulative(metricName string, dimensions map[string]string, val int64) *dat
 // CumulativeF creates a signalfx cumulative counter for float values
 func CumulativeF(metricName string, dimensions map[string]string, val float64) *datapoint.Datapoint {
 	return datapoint.New(metricName, dimensions, datapoint.NewFloatValue(val), datapoint.Counter, time.Time{})
+}
+
+// CumulativeP creates a signalfx cumulative counter for integer values from a pointer that is loaded atomically
+func CumulativeP(metricName string, dimensions map[string]string, val *int64) *datapoint.Datapoint {
+	return datapoint.New(metricName, dimensions, datapoint.NewIntValue(atomic.LoadInt64(val)), datapoint.Counter, time.Time{})
+}
+
+// AddMaps adds two maps of dimensions and returns a new map of dimensions that is a + b
+func AddMaps(a, b map[string]string) map[string]string {
+	r := make(map[string]string, len(a)+len(b))
+	for k, v := range a {
+		r[k] = v
+	}
+	for k, v := range b {
+		r[k] = v
+	}
+	return r
 }

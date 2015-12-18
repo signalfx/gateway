@@ -10,6 +10,28 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
+func TestRollingBucketThreadRaces(t *testing.T) {
+	r := NewRollingBucket("mname", nil)
+	tk := timekeepertest.NewStubClock(time.Now())
+	r.Timer = tk
+	wg := sync.WaitGroup{}
+	wg.Add(100)
+	for i := 0; i < 100; i++ {
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 1000; j++ {
+				r.Add(.1)
+			}
+		}()
+	}
+	go func() {
+		for q := 0; q < 1000; q++ {
+			r.Datapoints()
+		}
+	}()
+	wg.Wait()
+}
+
 func TestRollingBucket(t *testing.T) {
 	Convey("With an empty rolling bucket", t, func() {
 		r := NewRollingBucket("mname", nil)

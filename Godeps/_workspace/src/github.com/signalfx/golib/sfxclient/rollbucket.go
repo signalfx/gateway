@@ -119,6 +119,7 @@ func (r *RollingBucket) Datapoints() []*datapoint.Datapoint {
 	r.updateTime(r.Timer.Now())
 	ret := make([]*datapoint.Datapoint, 0, 3+len(r.Quantiles))
 	ret = append(ret,
+		// Note: No need for CumulativeP because I'm in a mutex
 		Cumulative(r.MetricName+".count", r.Dimensions, r.count),
 		CumulativeF(r.MetricName+".sum", r.Dimensions, r.sum),
 		CumulativeF(r.MetricName+".sumsquare", r.Dimensions, r.sumOfSquares),

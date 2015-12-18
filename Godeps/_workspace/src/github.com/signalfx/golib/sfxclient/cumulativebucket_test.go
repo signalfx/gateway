@@ -18,6 +18,29 @@ func dpNamed(name string, dps []*datapoint.Datapoint) *datapoint.Datapoint {
 	return nil
 }
 
+func TestCumulativeBucketThreadRaces(t *testing.T) {
+	cb := &CumulativeBucket{
+		MetricName: "mname",
+		Dimensions: map[string]string{"type": "dev"},
+	}
+	wg := sync.WaitGroup{}
+	wg.Add(100)
+	for i := 0; i < 100; i++ {
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 1000; j++ {
+				cb.Add(1)
+			}
+		}()
+	}
+	go func() {
+		for q := 0; q < 1000; q++ {
+			cb.Datapoints()
+		}
+	}()
+	wg.Wait()
+}
+
 func TestCumulativeBucket(t *testing.T) {
 	Convey("When bucket is setup", t, func() {
 		cb := &CumulativeBucket{

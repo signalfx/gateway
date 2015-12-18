@@ -12,12 +12,12 @@ type atomicFloat struct {
 }
 
 func (a *atomicFloat) Get() float64 {
-	return math.Float64frombits(a.bits)
+	return math.Float64frombits(atomic.LoadUint64(&a.bits))
 }
 
 func (a *atomicFloat) Add(f float64) {
 	for {
-		oldValue := a.bits
+		oldValue := atomic.LoadUint64(&a.bits)
 		newValue := math.Float64bits(math.Float64frombits(oldValue) + f)
 		if atomic.CompareAndSwapUint64(&a.bits, oldValue, newValue) {
 			break
@@ -70,23 +70,14 @@ func (b *CumulativeBucket) MultiAdd(res *Result) {
 	b.sumOfSquares.Add(res.SumOfSquares)
 }
 
-func (b *CumulativeBucket) result() Result {
-	return Result{
-		Count:        atomic.LoadInt64(&b.count),
-		Sum:          atomic.LoadInt64(&b.sum),
-		SumOfSquares: b.sumOfSquares.Get(),
-	}
-}
-
 // Datapoints returns the count/sum/sumsquare datapoints, or nil if there is no set metric name
 func (b *CumulativeBucket) Datapoints() []*datapoint.Datapoint {
 	if b.MetricName == "" {
 		return []*datapoint.Datapoint{}
 	}
-	r := b.result()
 	return []*datapoint.Datapoint{
-		Cumulative(b.MetricName+".count", b.Dimensions, r.Count),
-		Cumulative(b.MetricName+".sum", b.Dimensions, r.Sum),
-		CumulativeF(b.MetricName+".sumsquare", b.Dimensions, r.SumOfSquares),
+		CumulativeP(b.MetricName+".count", b.Dimensions, &b.count),
+		CumulativeP(b.MetricName+".sum", b.Dimensions, &b.sum),
+		CumulativeF(b.MetricName+".sumsquare", b.Dimensions, b.sumOfSquares.Get()),
 	}
 }
