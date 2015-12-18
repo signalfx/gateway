@@ -16,7 +16,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/dp/dptest"
+	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
