@@ -1,12 +1,9 @@
 package dplocal
 
 import (
-	"os"
-
-	"time"
-
-	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/golib/datapoint"
+	"os"
+	"time"
 )
 
 var osXXXHostname = os.Hostname
@@ -26,7 +23,6 @@ func NewOnHostDatapointDimensions(metric string, value datapoint.Value, metricTy
 func Wrap(dp *datapoint.Datapoint) *datapoint.Datapoint {
 	hostname, err := osXXXHostname()
 	if err != nil {
-		log.WithField("err", err).Warn("Unable to find hostname")
 		hostname = "unknown"
 	}
 	dp.Dimensions["host"] = hostname

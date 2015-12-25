@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
@@ -27,6 +26,7 @@ import (
 	"runtime"
 
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
@@ -37,7 +37,7 @@ func TestInvalidForwarderLoader(t *testing.T) {
 	}
 	sendTo := dptest.NewBasicSink()
 	ctx := context.Background()
-	_, err := ListenerLoader(ctx, sendTo, listenFrom)
+	_, err := ListenerLoader(ctx, sendTo, listenFrom, log.Discard)
 	assert.NotEqual(t, nil, err, "Should get an error making")
 }
 
@@ -56,7 +56,7 @@ func (errorReader *errorReader) Read([]byte) (int, error) {
 func localSetup(t *testing.T) (*ListenerServer, *dptest.BasicSink, string) {
 	sendTo := dptest.NewBasicSink()
 	ctx := context.Background()
-	server, err := StartServingHTTPOnPort(ctx, sendTo, "127.0.0.1:0", time.Second, "test_server")
+	server, err := StartServingHTTPOnPort(ctx, sendTo, "127.0.0.1:0", time.Second, "test_server", log.Discard)
 	baseURI := fmt.Sprintf("http://127.0.0.1:%d", nettest.TCPPort(server.listener))
 	assert.NotNil(t, server)
 	assert.NoError(t, err)
@@ -72,7 +72,6 @@ func verifyFailure(t *testing.T, method string, baseURI string, contentType stri
 		req.Header.Add("Content-Type", contentType)
 	}
 	resp, err := client.Do(req)
-	log.Debug(resp)
 	assert.NoError(t, err)
 	assert.NotEqual(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, 0, len(doneSignal))
@@ -91,13 +90,9 @@ func verifyRequest(t *testing.T, baseURI string, contentType string, path string
 	if contentType != "" {
 		req.Header.Add("Content-Type", contentType)
 	}
-	log.WithField("req", req).Debug("Doing req")
 	resp, err := client.Do(req)
-	log.Debug("Done req")
-	log.Debug(resp)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	log.Debug("Waiting for signal")
 	_ = <-doneSignal
 	assert.Equal(t, metricName, dpOut.Metric)
 	assert.EqualValues(t, metricValue, dpOut.Value)
@@ -149,8 +144,6 @@ func TestSignalfxProtobufV1Handler(t *testing.T) {
 }
 
 func TestSignalfxProtobufV1Decoder(t *testing.T) {
-	defer log.SetLevel(log.GetLevel())
-	log.SetLevel(log.DebugLevel)
 	typeGetter := metricHandler{
 		metricCreationsMap: make(map[string]com_signalfx_metrics_protobuf.MetricType),
 	}
@@ -160,6 +153,7 @@ func TestSignalfxProtobufV1Decoder(t *testing.T) {
 	decoder := ProtobufDecoderV1{
 		TypeGetter: &typeGetter,
 		Sink:       sendTo,
+		Logger:     log.Discard,
 	}
 	req := &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBuffer([]byte("INVALID_PROTOBUF"))),
@@ -182,7 +176,6 @@ func TestSignalfxProtobufV1Decoder(t *testing.T) {
 	assert.Error(t, e, "Should get error reading len zero")
 
 	varintBytes = proto.EncodeVarint(uint64(200000))
-	log.WithField("bytes", varintBytes).Debug("Encoding")
 	req = &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBuffer(append(varintBytes, []byte("abasdfsadfafdsc")...))),
 	}
@@ -190,7 +183,6 @@ func TestSignalfxProtobufV1Decoder(t *testing.T) {
 	assert.Equal(t, errProtobufTooLarge, e, "Should get error reading len zero")
 
 	varintBytes = proto.EncodeVarint(uint64(999999999))
-	log.WithField("bytes", varintBytes).Debug("Encoding")
 	req = &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBuffer([]byte{byte(255), byte(147), byte(235), byte(235), byte(235)})),
 	}
@@ -234,7 +226,7 @@ func TestSignalfxJsonV2Handler(t *testing.T) {
 }
 
 func TestSignalfxProtoV2Decoder(t *testing.T) {
-	decoder := ProtobufDecoderV2{}
+	decoder := ProtobufDecoderV2{Logger: log.Discard}
 	req := &http.Request{
 		Body: ioutil.NopCloser(bytes.NewBufferString("")),
 	}
@@ -277,6 +269,7 @@ func TestSignalfxProtoV2Handler(t *testing.T) {
 func TestMetricHandler(t *testing.T) {
 	handler := metricHandler{
 		metricCreationsMap: make(map[string]com_signalfx_metrics_protobuf.MetricType),
+		logger:             log.Discard,
 	}
 	assert.Equal(t, com_signalfx_metrics_protobuf.MetricType_GAUGE, handler.GetMetricTypeFromMap("test"))
 	handler.metricCreationsMap["test"] = com_signalfx_metrics_protobuf.MetricType_COUNTER
@@ -465,7 +458,7 @@ func TestSignalfxJsonV2EventHandler(t *testing.T) {
 	})
 
 	Convey("given a protobuf event decoder", t, func() {
-		decoder := ProtobufEventDecoderV2{}
+		decoder := ProtobufEventDecoderV2{Logger: log.Discard}
 		ctx := context.Background()
 		Convey("show an empty request errors", func() {
 			req := &http.Request{

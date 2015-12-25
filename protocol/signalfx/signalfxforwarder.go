@@ -17,9 +17,6 @@ import (
 
 	"errors"
 
-	"sync/atomic"
-
-	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/golang/protobuf/proto"
@@ -27,9 +24,11 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/dp/dpbuffered"
+	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/stats"
 	"golang.org/x/net/context"
@@ -69,13 +68,13 @@ var defaultConfigV2 = &config.ForwardTo{
 }
 
 // ForwarderLoader loads a json forwarder forwarding points from proxy to SignalFx
-func ForwarderLoader(ctx context.Context, forwardTo *config.ForwardTo) (protocol.Forwarder, error) {
-	f, _, err := ForwarderLoader1(ctx, forwardTo)
+func ForwarderLoader(ctx context.Context, forwardTo *config.ForwardTo, logger log.Logger) (protocol.Forwarder, error) {
+	f, _, err := ForwarderLoader1(ctx, forwardTo, logger)
 	return f, err
 }
 
 // ForwarderLoader1 is a more strictly typed version of ForwarderLoader
-func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo) (protocol.Forwarder, *Forwarder, error) {
+func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo, logger log.Logger) (protocol.Forwarder, *Forwarder, error) {
 	proxyVersion, ok := ctx.Value("version").(string)
 	if !ok || proxyVersion == "" {
 		proxyVersion = "UNKNOWN_VERSION"
@@ -87,14 +86,15 @@ func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo) (protoco
 		return nil, nil, errors.New("old formats not supported in signalfxforwarder: update config to use format 3")
 	}
 	structdefaults.FillDefaultFrom(forwardTo, defaultConfigV2)
-	log.WithField("forwardTo", forwardTo).Info("Creating signalfx forwarder using final config")
+	logger = log.NewContext(logger).With(logkey.Name, *forwardTo.Name).With(logkey.Protocol, "signalfx")
+	logger.Log(logkey.ForwardTo, forwardTo, "Creating signalfx forwarder using final config")
 	fwd := NewSignalfxJSONForwarder(*forwardTo.URL, *forwardTo.TimeoutDuration,
 		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads,
 		*forwardTo.DefaultSource, *forwardTo.SourceDimensions, proxyVersion)
 	fwd.eventURL = *forwardTo.EventURL
 	counter := &dpsink.Counter{}
 	dims := protocol.ForwarderDims(*forwardTo.Name, "sfx_protobuf_v2")
-	buffer := dpbuffered.NewBufferedForwarder(ctx, *(&dpbuffered.Config{}).FromConfig(forwardTo), fwd)
+	buffer := dpbuffered.NewBufferedForwarder(ctx, *(&dpbuffered.Config{}).FromConfig(forwardTo), fwd, logger)
 	return &protocol.CompositeForwarder{
 		Sink:   dpsink.FromChain(buffer, dpsink.NextWrap(counter)),
 		Keeper: stats.ToKeeperMany(dims, counter, buffer),
@@ -281,8 +281,6 @@ func (connector *Forwarder) AddEvents(ctx context.Context, events []*event.Event
 	return connector.sendBytes(endpoint, bodyType, defaultAuthToken, userAgent, protoBytes)
 }
 
-var atomicRequestNumber = int64(0)
-
 // TODO(mwp): Move event adds to sfxclient
 func (connector *Forwarder) sendBytes(endpoint string, bodyType string, defaultAuthToken string, userAgent string, jsonBytes []byte) error {
 	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBytes))
@@ -291,14 +289,6 @@ func (connector *Forwarder) sendBytes(endpoint string, bodyType string, defaultA
 	req.Header.Set("User-Agent", userAgent)
 
 	req.Header.Set("Connection", "Keep-Alive")
-
-	if log.GetLevel() <= log.DebugLevel {
-		reqN := atomic.AddInt64(&atomicRequestNumber, 1)
-		log.WithField("req#", reqN).WithField("header", req.Header).WithField("body-len", len(jsonBytes)).Debug("Sending a request")
-		defer func() {
-			log.WithField("req#", reqN).Debug("Done sending request")
-		}()
-	}
 
 	// TODO: Set timeout from ctx
 	resp, err := connector.client.Do(req)

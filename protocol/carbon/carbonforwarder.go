@@ -16,6 +16,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/dp/dpbuffered"
 	"github.com/signalfx/metricproxy/dp/dpdimsort"
@@ -118,7 +119,7 @@ var defaultForwarderConfig = &config.ForwardTo{
 var errRequiredHost = errors.New("carbon forwarder requires host config")
 
 // ForwarderLoader loads a carbon forwarder that is buffered
-func ForwarderLoader(ctx context.Context, forwardTo *config.ForwardTo) (protocol.Forwarder, error) {
+func ForwarderLoader(ctx context.Context, forwardTo *config.ForwardTo, logger log.Logger) (protocol.Forwarder, error) {
 	structdefaults.FillDefaultFrom(forwardTo, defaultForwarderConfig)
 	if forwardTo.Host == nil {
 		return nil, errRequiredHost
@@ -129,7 +130,7 @@ func ForwarderLoader(ctx context.Context, forwardTo *config.ForwardTo) (protocol
 	}
 	counter := &dpsink.Counter{}
 	dims := protocol.ForwarderDims(*forwardTo.Name, "carbon")
-	buffer := dpbuffered.NewBufferedForwarder(ctx, *(&dpbuffered.Config{}).FromConfig(forwardTo), fwd)
+	buffer := dpbuffered.NewBufferedForwarder(ctx, *(&dpbuffered.Config{}).FromConfig(forwardTo), fwd, logger)
 	return &protocol.CompositeForwarder{
 		Sink:   dpsink.FromChain(buffer, dpsink.NextWrap(counter)),
 		Keeper: stats.ToKeeperMany(dims, counter, buffer),

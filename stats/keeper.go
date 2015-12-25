@@ -3,9 +3,10 @@ package stats
 import (
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
+	"github.com/signalfx/golib/log"
+	"github.com/signalfx/metricproxy/logkey"
 	"golang.org/x/net/context"
 )
 
@@ -68,15 +69,17 @@ type StatDrainingThread struct {
 	sendTo     []dpsink.Sink
 	listenFrom []Keeper
 	ctx        context.Context
+	logger     log.Logger
 }
 
 // NewDrainingThread returns a new DrainingThread to collect stats and send them to sinks
-func NewDrainingThread(delay time.Duration, sendTo []dpsink.Sink, listenFrom []Keeper, ctx context.Context) *StatDrainingThread {
+func NewDrainingThread(delay time.Duration, sendTo []dpsink.Sink, listenFrom []Keeper, ctx context.Context, logger log.Logger) *StatDrainingThread {
 	ret := &StatDrainingThread{
 		delay:      delay,
 		sendTo:     sendTo,
 		listenFrom: listenFrom,
 		ctx:        ctx,
+		logger:     log.NewContext(logger).With(logkey.Struct, "StatDrainingThread"),
 	}
 	go ret.start()
 	return ret
@@ -86,20 +89,17 @@ func NewDrainingThread(delay time.Duration, sendTo []dpsink.Sink, listenFrom []K
 func (thread *StatDrainingThread) Stats() []*datapoint.Datapoint {
 	points := []*datapoint.Datapoint{}
 	for _, listenFrom := range thread.listenFrom {
-		log.WithField("listenFrom", listenFrom).Debug("Loading stats")
-		stats := listenFrom.Stats()
-		log.WithField("stats", stats).Debug("Stats loaded")
 		points = append(points, listenFrom.Stats()...)
 	}
 	return points
 }
 
 func (thread *StatDrainingThread) start() error {
-	log.WithField("listenFrom", thread.listenFrom).Info("Draining stats")
+	thread.logger.Log(logkey.StatKeepers, thread.listenFrom, "Draining stats")
 	for {
 		select {
 		case <-thread.ctx.Done():
-			log.Debug("Request to stop stat thread")
+			thread.logger.Log("request to stop stat thread")
 			return thread.ctx.Err()
 		case <-time.After(thread.delay):
 			points := thread.Stats()

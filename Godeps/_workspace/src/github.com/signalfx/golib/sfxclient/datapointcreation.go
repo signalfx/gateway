@@ -34,6 +34,15 @@ func CumulativeP(metricName string, dimensions map[string]string, val *int64) *d
 
 // AddMaps adds two maps of dimensions and returns a new map of dimensions that is a + b
 func AddMaps(a, b map[string]string) map[string]string {
+	if len(a) == 0 {
+		if len(b) == 0 {
+			return map[string]string{}
+		}
+		return b
+	}
+	if len(b) == 0 {
+		return a
+	}
 	r := make(map[string]string, len(a)+len(b))
 	for k, v := range a {
 		r[k] = v

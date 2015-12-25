@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +24,7 @@ func TestCarbonInvalidListenerLoader(t *testing.T) {
 		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:999999"),
 	}
 	sendTo := dptest.NewBasicSink()
-	_, err := ListenerLoader(ctx, sendTo, listenFrom)
+	_, err := ListenerLoader(ctx, sendTo, listenFrom, log.Discard)
 	assert.NotEqual(t, nil, err, "Should get an error making")
 }
 
@@ -35,20 +35,18 @@ func TestCarbonInvalidCarbonDeconstructorListenerLoader(t *testing.T) {
 	}
 	ctx := context.Background()
 	forwardTo := dptest.NewBasicSink()
-	_, err := ListenerLoader(ctx, forwardTo, listenFrom)
+	_, err := ListenerLoader(ctx, forwardTo, listenFrom, log.Discard)
 	assert.NotEqual(t, nil, err, "Should get an error making")
 }
 
 func TestCarbonHandleConnection(t *testing.T) {
-	log.Info("START TestCarbonHandleConnection")
-	defer log.Info("END   TestCarbonHandleConnection")
 	listenFrom := &config.ListenFrom{
 		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("localhost:0"),
 	}
 
 	ctx := context.Background()
 	forwardTo := dptest.NewBasicSink()
-	listener, err := ListenerLoader(ctx, forwardTo, listenFrom)
+	listener, err := ListenerLoader(ctx, forwardTo, listenFrom, log.Discard)
 	defer listener.Close()
 
 	listeningDialAddress := fmt.Sprintf("localhost:%d", nettest.TCPPort(listener.psocket))
@@ -80,7 +78,7 @@ func TestListenerLoader(t *testing.T) {
 	}
 	ctx := context.Background()
 	forwardTo := dptest.NewBasicSink()
-	listener, err := ListenerLoader(ctx, forwardTo, listenFrom)
+	listener, err := ListenerLoader(ctx, forwardTo, listenFrom, log.Discard)
 	defer listener.Close()
 	assert.Equal(t, nil, err, "Should be ok to make")
 	defer listener.Close()

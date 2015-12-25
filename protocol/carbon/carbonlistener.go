@@ -10,13 +10,14 @@ import (
 
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dplocal"
 	"github.com/signalfx/golib/datapoint/dpsink"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
 	"github.com/signalfx/metricproxy/stats"
@@ -37,10 +38,11 @@ type Listener struct {
 
 	st stats.Keeper
 
-	stats listenerStats
-	conf  listenerConfig
-	wg    sync.WaitGroup
-	ctx   context.Context
+	logger log.Logger
+	stats  listenerStats
+	conf   listenerConfig
+	wg     sync.WaitGroup
+	ctx    context.Context
 }
 
 var _ protocol.Listener = &Listener{}
@@ -92,12 +94,14 @@ type carbonListenConn interface {
 	io.Reader
 	Close() error
 	SetDeadline(t time.Time) error
+	RemoteAddr() net.Addr
 }
 
 func (listener *Listener) handleConnection(conn carbonListenConn) error {
 	reader := bufio.NewReader(conn)
 	atomic.AddInt64(&listener.stats.totalConnections, 1)
 	atomic.AddInt64(&listener.stats.activeConnections, 1)
+	connLogger := log.NewContext(listener.logger).With(logkey.RemoteAddr, conn.RemoteAddr())
 	defer conn.Close()
 	defer atomic.AddInt64(&listener.stats.activeConnections, -1)
 	for {
@@ -105,7 +109,7 @@ func (listener *Listener) handleConnection(conn carbonListenConn) error {
 		bytes, err := reader.ReadBytes((byte)('\n'))
 		if err != nil && err != io.EOF {
 			atomic.AddInt64(&listener.stats.idleTimeouts, 1)
-			log.WithField("err", err).Warn("Listening for carbon data returned an error (Note: We timeout idle connections)")
+			connLogger.Log(log.Err, err, "Listening for carbon data returned an error (Note: We timeout idle connections)")
 			return err
 		}
 		line := strings.TrimSpace(string(bytes))
@@ -113,7 +117,7 @@ func (listener *Listener) handleConnection(conn carbonListenConn) error {
 			dp, err := NewCarbonDatapoint(line, listener.metricDeconstructor)
 			if err != nil {
 				atomic.AddInt64(&listener.stats.invalidDatapoints, 1)
-				log.WithFields(log.Fields{"line": line, "err": err}).Warn("Received data on a carbon port, but it doesn't look like carbon data")
+				connLogger.Log(logkey.CarbonLine, line, log.Err, err, "Received data on a carbon port, but it doesn't look like carbon data")
 				return err
 			}
 			listener.sink.AddDatapoints(listener.ctx, []*datapoint.Datapoint{dp})
@@ -129,7 +133,7 @@ func (listener *Listener) handleConnection(conn carbonListenConn) error {
 
 func (listener *Listener) startListening() {
 	defer listener.wg.Done()
-	defer log.Info("Carbon listener closed")
+	defer listener.logger.Log("Carbon listener closed")
 	for {
 		deadlineable, ok := listener.psocket.(*net.TCPListener)
 		if ok {
@@ -140,11 +144,10 @@ func (listener *Listener) startListening() {
 			if netErr, ok := err.(net.Error); ok {
 				if netErr.Timeout() || netErr.Temporary() {
 					atomic.AddInt64(&listener.stats.retriedListenErrors, 1)
-					log.Debug("Timeout (or temp) waiting for connection.  Expected, will continue")
 					continue
 				}
 			}
-			log.WithField("err", err).Info("Unable to accept a socket connection")
+			listener.logger.Log(log.Err, err, "Unable to accept a socket connection")
 			return
 		}
 		go listener.handleConnection(conn)
@@ -161,7 +164,7 @@ var defaultListenerConfig = &config.ListenFrom{
 }
 
 // ListenerLoader loads a listener for the carbon/graphite protocol from config
-func ListenerLoader(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (*Listener, error) {
+func ListenerLoader(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom, logger log.Logger) (*Listener, error) {
 	structdefaults.FillDefaultFrom(listenFrom, defaultListenerConfig)
 	conf := listenerConfig{
 		serverAcceptDeadline: *listenFrom.ServerAcceptDeadline,
@@ -171,12 +174,12 @@ func ListenerLoader(ctx context.Context, sink dpsink.Sink, listenFrom *config.Li
 	//  *listenFrom.Name
 	return NewListener(
 		ctx, sink, conf, *listenFrom.ListenAddr,
-		*listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions, listenFrom.MetricDeconstructorOptionsJSON)
+		*listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions, listenFrom.MetricDeconstructorOptionsJSON, logger)
 }
 
 // NewListener creates a new listener for carbon datapoints
 func NewListener(ctx context.Context, sink dpsink.Sink, conf listenerConfig, listenAddr string,
-	metricDeconstructor string, metricDeconstructorOptions string, metricDeconstructorJSON map[string]interface{}) (*Listener, error) {
+	metricDeconstructor string, metricDeconstructorOptions string, metricDeconstructorJSON map[string]interface{}, logger log.Logger) (*Listener, error) {
 	psocket, err := net.Listen("tcp", listenAddr)
 	if err != nil {
 		return nil, err
@@ -200,6 +203,7 @@ func NewListener(ctx context.Context, sink dpsink.Sink, conf listenerConfig, lis
 		metricDeconstructor: deconstructor,
 		ctx:                 ctx,
 		st:                  stats.ToKeeperMany(protocol.ListenerDims(conf.name, "carbon"), counter),
+		logger:              log.NewContext(logger).With(logkey.Protocol, "carbon", logkey.Direction, "listener", logkey.Name, conf.name),
 	}
 	receiver.wg.Add(1)
 

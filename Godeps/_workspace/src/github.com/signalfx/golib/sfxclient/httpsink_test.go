@@ -111,6 +111,13 @@ func TestHTTPDatapointSink(t *testing.T) {
 			Convey("Send should normally work", func() {
 				So(s.AddDatapoints(ctx, dps), ShouldBeNil)
 			})
+			Convey("should send timestamps", func() {
+				dps = dps[0:1]
+				now := time.Now()
+				dps[0].Timestamp = now
+				So(s.AddDatapoints(ctx, dps), ShouldBeNil)
+				So(*seenBodyPoints.Datapoints[0].Timestamp, ShouldEqual, now.UnixNano()/time.Millisecond.Nanoseconds())
+			})
 			Convey("Floats should work", func() {
 				dps[0].Value = datapoint.NewFloatValue(1.0)
 				dps = dps[0:1]

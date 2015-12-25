@@ -6,11 +6,6 @@
 	],
 	"Deps": [
 		{
-			"ImportPath": "github.com/Sirupsen/logrus",
-			"Comment": "v0.8.7-49-gcdaedc6",
-			"Rev": "cdaedc68f2894175ac2b3221869685602c759e71"
-		},
-		{
 			"ImportPath": "github.com/cep21/gohelpers/stringhelper",
 			"Rev": "ac9f0e053f1594a6565e3c6778ce2ef56900ec98"
 		},
@@ -60,31 +55,39 @@
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/datapoint",
-			"Rev": "7224a2e323fe8e492e2a595671b302e373a1f7f6"
+			"Rev": "1629dcd5cf8f4d256f5157e76a9ed8a7fa817579"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/errors",
-			"Rev": "7224a2e323fe8e492e2a595671b302e373a1f7f6"
+			"Rev": "1629dcd5cf8f4d256f5157e76a9ed8a7fa817579"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/event",
-			"Rev": "7224a2e323fe8e492e2a595671b302e373a1f7f6"
+			"Rev": "1629dcd5cf8f4d256f5157e76a9ed8a7fa817579"
+		},
+		{
+			"ImportPath": "github.com/signalfx/golib/eventcounter",
+			"Rev": "1629dcd5cf8f4d256f5157e76a9ed8a7fa817579"
+		},
+		{
+			"ImportPath": "github.com/signalfx/golib/log",
+			"Rev": "1629dcd5cf8f4d256f5157e76a9ed8a7fa817579"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/nettest",
-			"Rev": "7224a2e323fe8e492e2a595671b302e373a1f7f6"
+			"Rev": "1629dcd5cf8f4d256f5157e76a9ed8a7fa817579"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/sfxclient",
-			"Rev": "7224a2e323fe8e492e2a595671b302e373a1f7f6"
+			"Rev": "1629dcd5cf8f4d256f5157e76a9ed8a7fa817579"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/timekeeper",
-			"Rev": "7224a2e323fe8e492e2a595671b302e373a1f7f6"
+			"Rev": "1629dcd5cf8f4d256f5157e76a9ed8a7fa817579"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/web",
-			"Rev": "7224a2e323fe8e492e2a595671b302e373a1f7f6"
+			"Rev": "1629dcd5cf8f4d256f5157e76a9ed8a7fa817579"
 		},
 		{
 			"ImportPath": "github.com/smartystreets/assertions",
@@ -93,8 +96,8 @@
 		},
 		{
 			"ImportPath": "github.com/smartystreets/goconvey/convey",
-			"Comment": "1.5.0-453-g5bb9e11",
-			"Rev": "5bb9e117a1a4f1a1555a4d41cd233c79b1a5209f"
+			"Comment": "1.6.0-9-ga2d5d78",
+			"Rev": "a2d5d788f3afbce0989463251ccc5492fad832df"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
@@ -106,9 +109,18 @@
 			"Rev": "195180cfebf7362bd243a52477697895128c8777"
 		},
 		{
+			"ImportPath": "gopkg.in/logfmt.v0",
+			"Rev": "c50dc9aa845e681529d8e49d3dc11ec0195aacac"
+		},
+		{
 			"ImportPath": "gopkg.in/natefinch/lumberjack.v2",
 			"Comment": "v1.0-18-g600ceb4",
 			"Rev": "600ceb4523e5b7ff745f91083c8a023c2bf73af5"
+		},
+		{
+			"ImportPath": "gopkg.in/stack.v1",
+			"Comment": "v1.4.0",
+			"Rev": "0585967eab0016c8e4e2d55ac20585b469574cec"
 		}
 	]
 }

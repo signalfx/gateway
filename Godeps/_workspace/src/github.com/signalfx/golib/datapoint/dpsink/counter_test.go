@@ -10,6 +10,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
@@ -23,7 +24,9 @@ func TestCounterSink(t *testing.T) {
 	}
 	ctx := context.Background()
 	bs := dptest.NewBasicSink()
-	count := &Counter{}
+	count := &Counter{
+		Logger: log.Discard,
+	}
 	middleSink := NextWrap(count)(bs)
 	go func() {
 		// Allow time for us to get in the middle of a call

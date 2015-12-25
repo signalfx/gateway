@@ -8,6 +8,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/datapoint/dptest"
+	"github.com/signalfx/golib/log"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
@@ -30,7 +31,7 @@ func TestStatDrainingThreadSend(t *testing.T) {
 	testSink := dptest.NewBasicSink()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	drainer := NewDrainingThread(time.Millisecond, []dpsink.Sink{testSink}, []Keeper{&statKeeper{}}, ctx)
+	drainer := NewDrainingThread(time.Millisecond, []dpsink.Sink{testSink}, []Keeper{&statKeeper{}}, ctx, log.Discard)
 	assert.Equal(t, 1, len(drainer.Stats()))
 	<-testSink.PointsChan
 }
@@ -38,7 +39,7 @@ func TestStatDrainingThreadSend(t *testing.T) {
 func TestStatDrainingThreadCancel(t *testing.T) {
 	testSink := dptest.NewBasicSink()
 	ctx, cancel := context.WithCancel(context.Background())
-	drainer := NewDrainingThread(time.Hour, []dpsink.Sink{testSink}, []Keeper{&statKeeper{}}, ctx)
+	drainer := NewDrainingThread(time.Hour, []dpsink.Sink{testSink}, []Keeper{&statKeeper{}}, ctx, log.Discard)
 	cancel()
 	assert.Equal(t, ctx.Err(), drainer.start())
 }

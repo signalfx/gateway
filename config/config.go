@@ -5,9 +5,10 @@ import (
 	"io/ioutil"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/stringhelper"
 	"github.com/cep21/xdgbasedir"
+	"github.com/signalfx/golib/log"
+	"github.com/signalfx/metricproxy/logkey"
 )
 
 // ForwardTo configures where we forward datapoints to
@@ -118,20 +119,22 @@ func loadConfig(configFile string) (*ProxyConfig, error) {
 var xdgbasedirGetConfigFileLocation = xdgbasedir.GetConfigFileLocation
 
 // Load loads proxy configuration from a filename that is in an xdg configuration location
-func Load(configFile string) (*ProxyConfig, error) {
+func Load(configFile string, logger log.Logger) (*ProxyConfig, error) {
+	logCtx := log.NewContext(logger).With(logkey.ConfigFile, configFile)
 	filename, err := xdgbasedirGetConfigFileLocation(configFile)
 	if err != nil {
 		return nil, err
 	}
+	logCtx = logCtx.With(logkey.Filename, filename)
 	config, errFilename := loadConfig(filename)
 	if errFilename == nil {
 		return config, nil
 	}
-	log.WithFields(log.Fields{"filename": filename, "errFilename": errFilename}).Debug("Unable to load config")
+	logCtx.Log(log.Err, errFilename, "unable to load original config filename")
 	var errConfigfile error
 	config, errConfigfile = loadConfig(configFile)
 	if errConfigfile != nil {
-		log.WithFields(log.Fields{"filename": filename, "configFilename": configFile, "errFilename": errFilename, "errConfigFile": errConfigfile}).Error("Unable to load config")
+		logCtx.Log(log.Err, errConfigfile, "unable to load config again")
 		return nil, errConfigfile
 	}
 	return config, nil

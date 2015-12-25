@@ -6,13 +6,14 @@ import (
 
 	"sync"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol"
 	"golang.org/x/net/context"
 )
@@ -23,10 +24,9 @@ var csvDefaultConfig = &config.ForwardTo{
 }
 
 // ForwarderLoader loads a CSV forwarder forwarding points from proxy to a file
-func ForwarderLoader(forwardTo *config.ForwardTo) (*FilenameForwarder, error) {
+func ForwarderLoader(forwardTo *config.ForwardTo, logger log.Logger) (*FilenameForwarder, error) {
 	structdefaults.FillDefaultFrom(forwardTo, csvDefaultConfig)
-	log.WithField("forwardTo", forwardTo).Info("Creating CSV using final config")
-	return NewForwarder(*forwardTo.Name, *forwardTo.Filename)
+	return NewForwarder(*forwardTo.Name, *forwardTo.Filename, logger)
 }
 
 var _ protocol.Forwarder = &FilenameForwarder{}
@@ -36,6 +36,7 @@ type FilenameForwarder struct {
 	writeLock   sync.Mutex
 	filename    string
 	writeString func(f *os.File, s string) (ret int, err error)
+	logger      log.Logger
 }
 
 var _ dpsink.Sink = &FilenameForwarder{}
@@ -87,13 +88,14 @@ func (connector *FilenameForwarder) Close() error {
 }
 
 // NewForwarder creates a new filename forwarder
-func NewForwarder(name string, filename string) (*FilenameForwarder, error) {
+func NewForwarder(name string, filename string, logger log.Logger) (*FilenameForwarder, error) {
 	ret := &FilenameForwarder{
 		writeString: func(f *os.File, s string) (ret int, err error) { return f.WriteString(s) },
 		filename:    filename,
+		logger:      log.NewContext(logger).With(logkey.Filename, filename),
 	}
 	if err := ioutil.WriteFile(filename, []byte{}, os.FileMode(0666)); err != nil {
-		log.WithField("filename", filename).Info("Unable to verify write for file")
+		ret.logger.Log("Unable to verify write for file")
 		return nil, err
 	}
 	return ret, nil

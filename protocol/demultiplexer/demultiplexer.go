@@ -3,10 +3,11 @@ package demultiplexer
 import (
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
+	"github.com/signalfx/metricproxy/logkey"
 	"golang.org/x/net/context"
 )
 
@@ -50,14 +51,14 @@ func (streamer *Demultiplexer) AddEvents(ctx context.Context, points []*event.Ev
 }
 
 // New creates a new forwarder that sends datapoints to multiple recievers
-func New(sendTo []dpsink.Sink) *Demultiplexer {
+func New(sendTo []dpsink.Sink, logger log.Logger) *Demultiplexer {
 	ret := &Demultiplexer{
 		sendTo: make([]dpsink.Sink, len(sendTo)),
 	}
 	for i := range sendTo {
 		ret.sendTo[i] = dpsink.FromChain(sendTo[i], dpsink.NextWrap(&dpsink.RateLimitErrorLogging{
 			LogThrottle: time.Second,
-			Callback:    dpsink.LogCallback("Error forwarding points", log.StandardLogger()),
+			Logger:      log.NewContext(logger).With(logkey.Struct, "demultiplexer"),
 		}))
 	}
 	return ret

@@ -8,11 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/signalfx/golib/log"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestInvalidConfig(t *testing.T) {
-	_, err := Load("invalidodesnotexist___SDFSDFSD")
+	_, err := Load("invalidodesnotexist___SDFSDFSD", log.Discard)
 	assert.Error(t, err)
 }
 
@@ -81,14 +82,14 @@ func TestLoad(t *testing.T) {
 
 	err := ioutil.WriteFile(filename, []byte(`{"ListenFrom":[{"Timeout":"3s"}]}`), os.FileMode(0644))
 	defer os.Remove(filename)
-	_, err = Load(filename)
+	_, err = Load(filename, log.Discard)
 	prev := xdgbasedirGetConfigFileLocation
 	xdgbasedirGetConfigFileLocation = func(string) (string, error) { return "", errors.New("bad") }
 	defer func() { xdgbasedirGetConfigFileLocation = prev }()
-	_, err = Load(filename)
+	_, err = Load(filename, log.Discard)
 	assert.Equal(t, "bad", fmt.Sprintf("%s", err), "Expect error when xdg loading fails")
 	xdgbasedirGetConfigFileLocation = func(string) (string, error) { return filename, nil }
-	_, err = Load(filename)
+	_, err = Load(filename, log.Discard)
 	assert.Nil(t, err)
 
 }

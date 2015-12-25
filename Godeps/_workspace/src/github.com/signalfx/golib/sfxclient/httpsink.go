@@ -175,7 +175,12 @@ func runeFilterMap(r rune) rune {
 
 func (h *HTTPDatapointSink) coreDatapointToProtobuf(point *datapoint.Datapoint) *com_signalfx_metrics_protobuf.DataPoint {
 	m := point.Metric
-	ts := point.Timestamp.UnixNano() / time.Millisecond.Nanoseconds()
+	var ts int64
+	if point.Timestamp.IsZero() {
+		ts = 0
+	} else {
+		ts = point.Timestamp.UnixNano() / time.Millisecond.Nanoseconds()
+	}
 	mt := toMT(point.MetricType)
 	v := &com_signalfx_metrics_protobuf.DataPoint{
 		Metric:     &m,

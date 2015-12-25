@@ -2,16 +2,16 @@ package dpbuffered
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"sync/atomic"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dplocal"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/metricproxy/logkey"
 	"golang.org/x/net/context"
 )
 
@@ -50,6 +50,7 @@ type BufferedForwarder struct {
 	threadsWaitingToDie         sync.WaitGroup
 	blockingDrainWaitMutex      sync.Mutex
 	blockingEventDrainWaitMutex sync.Mutex
+	logger                      log.Logger
 
 	sendTo      dpsink.Sink
 	stopContext context.Context
@@ -194,7 +195,7 @@ func (forwarder *BufferedForwarder) start() {
 				}
 				err := forwarder.sendTo.AddDatapoints(forwarder.stopContext, datapoints)
 				if err != nil {
-					log.Error(fmt.Sprintf("Error sending datapoints %v", err))
+					forwarder.logger.Log(log.Err, err, "error sending datapoints")
 				}
 			}
 		}()
@@ -208,7 +209,7 @@ func (forwarder *BufferedForwarder) start() {
 				}
 				err := forwarder.sendTo.AddEvents(forwarder.stopContext, events)
 				if err != nil {
-					log.Error(fmt.Sprintf("Error sending events %v", err))
+					forwarder.logger.Log(log.Err, err, "error sending events")
 				}
 			}
 		}()
@@ -217,7 +218,9 @@ func (forwarder *BufferedForwarder) start() {
 
 // NewBufferedForwarder is used only by this package to create a forwarder that buffers its
 // datapoint channel
-func NewBufferedForwarder(ctx context.Context, config Config, sendTo dpsink.Sink) *BufferedForwarder {
+func NewBufferedForwarder(ctx context.Context, config Config, sendTo dpsink.Sink, logger log.Logger) *BufferedForwarder {
+	logCtx := log.NewContext(logger).With(logkey.Struct, "BufferedForwarder")
+	logCtx.Log(logkey.Config, config)
 	context, cancel := context.WithCancel(ctx)
 	ret := &BufferedForwarder{
 		stopFunc:    cancel,
@@ -226,6 +229,7 @@ func NewBufferedForwarder(ctx context.Context, config Config, sendTo dpsink.Sink
 		eChan:       make(chan []*event.Event, config.BufferSize),
 		config:      config,
 		sendTo:      sendTo,
+		logger:      logCtx,
 	}
 	ret.start()
 	return ret

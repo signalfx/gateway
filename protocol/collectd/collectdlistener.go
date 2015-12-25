@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/gorilla/mux"
@@ -144,7 +143,6 @@ var defaultCollectdConfig = &config.ListenFrom{
 // ListenerLoader loads a listener for collectd write_http protocol
 func ListenerLoader(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (*ListenerServer, error) {
 	structdefaults.FillDefaultFrom(listenFrom, defaultCollectdConfig)
-	log.WithField("listenFrom", listenFrom).Info("Creating listener using final config")
 	return StartListeningCollectDHTTPOnPort(ctx, sink, *listenFrom.ListenAddr, *listenFrom.ListenPath, *listenFrom.TimeoutDuration, *listenFrom.Name, listenFrom.Dimensions)
 }
 

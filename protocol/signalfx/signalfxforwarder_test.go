@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/golib/datapoint"
@@ -23,14 +22,11 @@ import (
 	"errors"
 
 	"github.com/signalfx/golib/datapoint/dptest"
+	"github.com/signalfx/golib/log"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
-
-func init() {
-	log.SetLevel(log.DebugLevel)
-}
 
 func TestBodySendFormat(t *testing.T) {
 	b := &BodySendFormatV2{
@@ -92,7 +88,7 @@ func setupServerForwarder(t *testing.T) (*dptest.BasicSink, *ListenerServer, *Fo
 
 	finalDatapointDestination := dptest.NewBasicSink()
 	ctx := context.Background()
-	l, err := ListenerLoader(ctx, finalDatapointDestination, &listenFromSignalfx)
+	l, err := ListenerLoader(ctx, finalDatapointDestination, &listenFromSignalfx, log.Discard)
 	assert.Equal(t, nil, err, "Expect no error")
 
 	port := nettest.TCPPort(l.listener)
@@ -105,7 +101,7 @@ func setupServerForwarder(t *testing.T) (*dptest.BasicSink, *ListenerServer, *Fo
 		SourceDimensions: workarounds.GolangDoesnotAllowPointerToStringLiteral("username,ignored,hostname"),
 	}
 
-	_, forwarder, err := ForwarderLoader1(ctx, &forwardTo)
+	_, forwarder, err := ForwarderLoader1(ctx, &forwardTo, log.Discard)
 	assert.NoError(t, err, "Expect no error")
 	return finalDatapointDestination, l, forwarder
 }
@@ -116,7 +112,7 @@ func TestForwarderLoaderOldVersion(t *testing.T) {
 		DefaultAuthToken: workarounds.GolangDoesnotAllowPointerToStringLiteral("AUTH_TOKEN"),
 	}
 	ctx := context.Background()
-	_, err := ForwarderLoader(ctx, &forwardTo)
+	_, err := ForwarderLoader(ctx, &forwardTo, log.Discard)
 	assert.Error(t, err)
 }
 

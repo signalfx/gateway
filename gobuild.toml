@@ -2,6 +2,8 @@
   duplLimit = "300"
 
 [metalinter]
+  [metalinter.ignored]
+    coverageignored = "ignored is unused"
   [metalinter.enabled]
     golint = true
     gofmt = true

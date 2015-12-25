@@ -88,10 +88,6 @@ func TestNewProtobufEvent(t *testing.T) {
 
 func TestConver(t *testing.T) {
 	assert.Panics(t, func() {
-		toMT(datapoint.MetricType(1001))
-	})
-	assert.Equal(t, com_signalfx_metrics_protobuf.MetricType_GAUGE, toMT(datapoint.Gauge))
-	assert.Panics(t, func() {
 		fromMT(com_signalfx_metrics_protobuf.MetricType(1001))
 	})
 }

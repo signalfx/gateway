@@ -11,6 +11,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
@@ -24,7 +25,7 @@ func TestFilenameForwarder(t *testing.T) {
 	conf := &config.ForwardTo{
 		Filename: workarounds.GolangDoesnotAllowPointerToStringLiteral(fileObj.Name()),
 	}
-	f, err := ForwarderLoader(conf)
+	f, err := ForwarderLoader(conf, log.Discard)
 	defer f.Close()
 	assert.NoError(t, err)
 	assert.NoError(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dptest.DP()}))
@@ -33,7 +34,7 @@ func TestFilenameForwarder(t *testing.T) {
 }
 
 func TestFilenameForwarderBadFilename(t *testing.T) {
-	_, err := NewForwarder("abcd", "/")
+	_, err := NewForwarder("abcd", "/", log.Discard)
 	assert.Error(t, err)
 }
 
@@ -42,7 +43,7 @@ func TestFilenameForwarderBadOpen(t *testing.T) {
 	fileObj, _ := ioutil.TempFile("", "gotest")
 	defer os.Remove(fileObj.Name())
 
-	f, _ := NewForwarder("unused", fileObj.Name())
+	f, _ := NewForwarder("unused", fileObj.Name(), log.Discard)
 
 	f.filename = "/"
 	assert.Error(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{}))
@@ -56,7 +57,7 @@ func TestFilenameForwarderBadWrite(t *testing.T) {
 	conf := &config.ForwardTo{
 		Filename: workarounds.GolangDoesnotAllowPointerToStringLiteral(fileObj.Name()),
 	}
-	f, _ := ForwarderLoader(conf)
+	f, _ := ForwarderLoader(conf, log.Discard)
 	f.writeString = func(f *os.File, s string) (ret int, err error) {
 		return 0, errors.New("nope")
 	}

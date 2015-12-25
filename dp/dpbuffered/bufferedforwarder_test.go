@@ -9,6 +9,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
@@ -27,7 +28,7 @@ func TestBufferedForwarderBasic(t *testing.T) {
 		MaxDrainSize:       1000,
 	}
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo)
+	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
 	defer bf.Close()
 	assert.NoError(t, bf.AddDatapoints(ctx, []*datapoint.Datapoint{}))
 	time.Sleep(time.Millisecond)
@@ -59,7 +60,7 @@ func TestBufferedForwarderBasicEvent(t *testing.T) {
 		MaxDrainSize:       1000,
 	}
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo)
+	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
 	defer bf.Close()
 	assert.NoError(t, bf.AddEvents(ctx, []*event.Event{}))
 	time.Sleep(time.Millisecond)
@@ -94,7 +95,7 @@ func TestBufferedForwarderContexts(t *testing.T) {
 	}
 
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo)
+	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
 	bf.AddDatapoints(ctx, datas)
 	canceledContext, cancelFunc := context.WithCancel(ctx)
 	waiter := make(chan struct{})
@@ -137,7 +138,7 @@ func TestBufferedForwarderContextsEvent(t *testing.T) {
 	}
 
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo)
+	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
 	bf.AddEvents(ctx, datas)
 	canceledContext, cancelFunc := context.WithCancel(ctx)
 	waiter := make(chan struct{})
@@ -175,7 +176,7 @@ func TestBufferedForwarderMaxTotalDatapoints(t *testing.T) {
 	}
 	ctx := context.Background()
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo)
+	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
 	defer bf.Close()
 
 	datas := []*datapoint.Datapoint{
@@ -197,7 +198,7 @@ func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
 	}
 	ctx := context.Background()
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo)
+	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
 	defer bf.Close()
 
 	events := []*event.Event{

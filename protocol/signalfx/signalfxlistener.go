@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"errors"
-
-	log "github.com/Sirupsen/logrus"
 	"github.com/cep21/gohelpers/structdefaults"
 	"github.com/cep21/gohelpers/workarounds"
 	"github.com/golang/protobuf/proto"
@@ -24,8 +22,10 @@ import (
 	"github.com/signalfx/golib/datapoint/dplocal"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/collectd"
 	"github.com/signalfx/metricproxy/stats"
@@ -37,6 +37,7 @@ type ListenerServer struct {
 	stats.Keeper
 	name     string
 	listener net.Listener
+	logger   log.Logger
 }
 
 var _ protocol.Listener = &ListenerServer{}
@@ -87,7 +88,6 @@ func (e *ErrorTrackerHandler) Stats(dimensions map[string]string) []*datapoint.D
 // fails
 func (e *ErrorTrackerHandler) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, req *http.Request) {
 	if err := e.reader.Read(ctx, req); err != nil {
-		log.WithField("err", err).Debug("Bad request")
 		atomic.AddInt64(&e.TotalErrors, 1)
 		rw.WriteHeader(http.StatusBadRequest)
 		rw.Write([]byte(err.Error()))
@@ -100,6 +100,7 @@ func (e *ErrorTrackerHandler) ServeHTTPC(ctx context.Context, rw http.ResponseWr
 type ProtobufDecoderV1 struct {
 	Sink       dpsink.DSink
 	TypeGetter MericTypeGetter
+	Logger     log.Logger
 }
 
 var errInvalidProtobuf = errors.New("invalid protocol buffer sent")
@@ -110,16 +111,14 @@ func (decoder *ProtobufDecoderV1) Read(ctx context.Context, req *http.Request) e
 	body := req.Body
 	bufferedBody := bufio.NewReaderSize(body, 32768)
 	for {
-		log.WithField("body", body).Debug("Starting protobuf loop")
 		buf, err := bufferedBody.Peek(1)
 		if err == io.EOF {
-			log.Debug("EOF")
 			return nil
 		}
 		buf, err = bufferedBody.Peek(4) // should be big enough for any varint
 
 		if err != nil {
-			log.WithField("err", err).Info("peek error")
+			decoder.Logger.Log(log.Err, err, "peek error")
 			return err
 		}
 		num, bytesRead := proto.DecodeVarint(buf)
@@ -164,6 +163,7 @@ func datapointProtobufIsInvalidForV1(msg *com_signalfx_metrics_protobuf.DataPoin
 type JSONDecoderV1 struct {
 	TypeGetter MericTypeGetter
 	Sink       dpsink.DSink
+	Logger     log.Logger
 }
 
 func (decoder *JSONDecoderV1) Read(ctx context.Context, req *http.Request) error {
@@ -175,9 +175,7 @@ func (decoder *JSONDecoderV1) Read(ctx context.Context, req *http.Request) error
 		} else if err != nil {
 			return err
 		} else {
-			log.WithField("dp", d).Debug("Got a new point")
 			if d.Metric == "" {
-				log.WithField("dp", d).Debug("Invalid Datapoint")
 				continue
 			}
 			mt := fromMT(decoder.TypeGetter.GetMetricTypeFromMap(d.Metric))
@@ -190,7 +188,8 @@ func (decoder *JSONDecoderV1) Read(ctx context.Context, req *http.Request) error
 
 // ProtobufDecoderV2 decodes protocol buffers in signalfx's v2 format and sends them to Sink
 type ProtobufDecoderV2 struct {
-	Sink dpsink.Sink
+	Sink   dpsink.Sink
+	Logger log.Logger
 }
 
 var errInvalidContentLength = errors.New("invalid Content-Length")
@@ -204,13 +203,12 @@ func (decoder *ProtobufDecoderV2) Read(ctx context.Context, req *http.Request) e
 	buf := make([]byte, req.ContentLength)
 	readLen, err := io.ReadFull(req.Body, buf)
 	if err != nil {
-		log.WithField("err", err).WithField("len", readLen).WithField("content-len", req.ContentLength).Warn("Unable to fully read from buffer")
+		decoder.Logger.Log(log.Err, err, logkey.ReadLen, readLen, logkey.ContentLength, req.ContentLength, "Unable to fully read from buffer")
 		return err
 	}
 	var msg com_signalfx_metrics_protobuf.DataPointUploadMessage
 	err = proto.Unmarshal(buf, &msg)
 	if err != nil {
-		log.Debug("Unable to unmarshal")
 		return err
 	}
 	dps := make([]*datapoint.Datapoint, 0, len(msg.GetDatapoints()))
@@ -224,7 +222,8 @@ func (decoder *ProtobufDecoderV2) Read(ctx context.Context, req *http.Request) e
 
 // ProtobufEventDecoderV2 decodes protocol buffers in signalfx's v2 format and sends them to Sink
 type ProtobufEventDecoderV2 struct {
-	Sink dpsink.ESink
+	Sink   dpsink.ESink
+	Logger log.Logger
 }
 
 func (decoder *ProtobufEventDecoderV2) Read(ctx context.Context, req *http.Request) error {
@@ -236,13 +235,12 @@ func (decoder *ProtobufEventDecoderV2) Read(ctx context.Context, req *http.Reque
 	buf := make([]byte, req.ContentLength)
 	readLen, err := io.ReadFull(req.Body, buf)
 	if err != nil {
-		log.WithField("err", err).WithField("len", readLen).WithField("content-len", req.ContentLength).Warn("Unable to fully read from buffer")
+		decoder.Logger.Log(log.Err, err, logkey.ReadLen, readLen, logkey.ContentLength, req.ContentLength, "Unable to fully read from buffer")
 		return err
 	}
 	var msg com_signalfx_metrics_protobuf.EventUploadMessage
 	err = proto.Unmarshal(buf, &msg)
 	if err != nil {
-		log.Debug("Unable to unmarshal")
 		return err
 	}
 	evts := make([]*event.Event, 0, len(msg.GetEvents()))
@@ -256,7 +254,8 @@ func (decoder *ProtobufEventDecoderV2) Read(ctx context.Context, req *http.Reque
 
 // JSONDecoderV2 decodes v2 json data for signalfx and sends it to Sink
 type JSONDecoderV2 struct {
-	Sink dpsink.Sink
+	Sink   dpsink.Sink
+	Logger log.Logger
 }
 
 func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error {
@@ -269,13 +268,13 @@ func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error
 	for metricType, datapoints := range d {
 		mt, ok := com_signalfx_metrics_protobuf.MetricType_value[strings.ToUpper(metricType)]
 		if !ok {
-			log.WithField("metricType", metricType).Warn("Unknown metric type")
+			decoder.Logger.Log(logkey.MetricType, metricType, "Uknown metric type")
 			continue
 		}
 		for _, jsonDatapoint := range datapoints {
 			v, err := ValueToValue(jsonDatapoint.Value)
 			if err != nil {
-				log.WithField("err", err).Warn("Unable to get value for datapoint")
+				decoder.Logger.Log(log.Err, err, "Unable to get value for datapoint")
 			} else {
 				dp := datapoint.New(jsonDatapoint.Metric, jsonDatapoint.Dimensions, v, fromMT(com_signalfx_metrics_protobuf.MetricType(mt)), fromTs(jsonDatapoint.Timestamp))
 				dps = append(dps, dp)
@@ -287,7 +286,8 @@ func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error
 
 // JSONEventDecoderV2 decodes v2 json data for signalfx events and sends it to Sink
 type JSONEventDecoderV2 struct {
-	Sink dpsink.ESink
+	Sink   dpsink.ESink
+	Logger log.Logger
 }
 
 func (decoder *JSONEventDecoderV2) Read(ctx context.Context, req *http.Request) error {
@@ -318,11 +318,11 @@ var defaultConfig = &config.ListenFrom{
 }
 
 // ListenerLoader loads a listener for signalfx protocol from config
-func ListenerLoader(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (*ListenerServer, error) {
+func ListenerLoader(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom, logger log.Logger) (*ListenerServer, error) {
 	structdefaults.FillDefaultFrom(listenFrom, defaultConfig)
 
-	log.WithField("listenFrom", listenFrom).Info("Creating signalfx listener using final config")
-	return StartServingHTTPOnPort(ctx, sink, *listenFrom.ListenAddr, *listenFrom.TimeoutDuration, *listenFrom.Name)
+	logger.Log(logkey.ListenFrom, listenFrom, "Creating signalfx listener using final config")
+	return StartServingHTTPOnPort(ctx, sink, *listenFrom.ListenAddr, *listenFrom.TimeoutDuration, *listenFrom.Name, logger)
 }
 
 type jsonMarshalStub func(v interface{}) ([]byte, error)
@@ -331,18 +331,18 @@ type metricHandler struct {
 	metricCreationsMapMutex sync.Mutex
 	metricCreationsMap      map[string]com_signalfx_metrics_protobuf.MetricType
 	jsonMarshal             jsonMarshalStub
+	logger                  log.Logger
 }
 
 func (handler *metricHandler) ServeHTTP(writter http.ResponseWriter, req *http.Request) {
 	dec := json.NewDecoder(req.Body)
 	var d []MetricCreationStruct
 	if err := dec.Decode(&d); err != nil {
-		log.WithField("err", err).Info("Invalid metric creation request")
+		handler.logger.Log(log.Err, err, "Invalid metric creation request")
 		writter.WriteHeader(http.StatusBadRequest)
 		writter.Write([]byte(`{msg:"Invalid creation request"}`))
 		return
 	}
-	log.WithField("d", d).Debug("Got metric types")
 	handler.metricCreationsMapMutex.Lock()
 	defer handler.metricCreationsMapMutex.Unlock()
 	ret := []MetricCreationResponse{}
@@ -362,7 +362,7 @@ func (handler *metricHandler) ServeHTTP(writter http.ResponseWriter, req *http.R
 	}
 	toWrite, err := unmarshal(ret)
 	if err != nil {
-		log.WithField("err", err).Warn("Unable to marshal json")
+		handler.logger.Log(log.Err, err, "Unable to marshal json")
 		writter.WriteHeader(http.StatusBadRequest)
 		writter.Write([]byte(`{msg:"Unable to marshal json!"}`))
 		return
@@ -383,7 +383,8 @@ func (handler *metricHandler) GetMetricTypeFromMap(metricName string) com_signal
 
 // StartServingHTTPOnPort servers http requests for Signalfx datapoints
 func StartServingHTTPOnPort(ctx context.Context, sink dpsink.Sink, listenAddr string,
-	clientTimeout time.Duration, name string) (*ListenerServer, error) {
+	clientTimeout time.Duration, name string, logger log.Logger) (*ListenerServer, error) {
+	logger = log.NewContext(logger).With(logkey.Protocol, "signalfx", logkey.Name, name)
 	r := mux.NewRouter()
 
 	server := http.Server{
@@ -400,22 +401,24 @@ func StartServingHTTPOnPort(ctx context.Context, sink dpsink.Sink, listenAddr st
 	listenServer := ListenerServer{
 		name:     name,
 		listener: listener,
+		logger:   logger,
 	}
 
 	metricHandler := metricHandler{
 		metricCreationsMap: make(map[string]com_signalfx_metrics_protobuf.MetricType),
+		logger:             log.NewContext(logger).With(logkey.Struct, "metricHandler"),
 	}
 	r.Handle("/v1/metric", &metricHandler)
 	r.Handle("/metric", &metricHandler)
 
 	listenServer.Keeper = stats.Combine(
 		setupNotFoundHandler(r, ctx, name),
-		setupProtobufV1(r, ctx, name, sink, &metricHandler),
-		setupJSONV1(r, ctx, name, sink, &metricHandler),
-		setupProtobufV2(r, ctx, name, sink),
-		setupProtobufEventV2(r, ctx, name, sink),
-		setupJSONV2(r, ctx, name, sink),
-		setupJSONEventV2(r, ctx, name, sink),
+		setupProtobufV1(r, ctx, name, sink, &metricHandler, logger),
+		setupJSONV1(r, ctx, name, sink, &metricHandler, logger),
+		setupProtobufV2(r, ctx, name, sink, logger),
+		setupProtobufEventV2(r, ctx, name, sink, logger),
+		setupJSONV2(r, ctx, name, sink, logger),
+		setupJSONEventV2(r, ctx, name, sink, logger),
 		setupCollectd(r, ctx, name, sink))
 
 	go server.Serve(listener)
@@ -445,9 +448,9 @@ func invalidContentType(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Invalid content type:"+r.Header.Get("Content-Type"), http.StatusBadRequest)
 }
 
-func setupProtobufV1(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, typeGetter MericTypeGetter) stats.Keeper {
+func setupProtobufV1(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, typeGetter MericTypeGetter, logger log.Logger) stats.Keeper {
 	handler, st := setupChain(ctx, sink, name, "protobuf_v1", func(s dpsink.Sink) ErrorReader {
-		return &ProtobufDecoderV1{Sink: s, TypeGetter: typeGetter}
+		return &ProtobufDecoderV1{Sink: s, TypeGetter: typeGetter, Logger: logger}
 	})
 
 	SetupProtobufV1Paths(r, handler)
@@ -460,9 +463,9 @@ func SetupProtobufV1Paths(r *mux.Router, handler http.Handler) {
 	r.Path("/v1/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
 }
 
-func setupJSONV1(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, typeGetter MericTypeGetter) stats.Keeper {
+func setupJSONV1(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, typeGetter MericTypeGetter, logger log.Logger) stats.Keeper {
 	handler, st := setupChain(ctx, sink, name, "json_v1", func(s dpsink.Sink) ErrorReader {
-		return &JSONDecoderV1{Sink: s, TypeGetter: typeGetter}
+		return &JSONDecoderV1{Sink: s, TypeGetter: typeGetter, Logger: logger}
 	})
 	SetupJSONV1Paths(r, handler)
 
@@ -475,18 +478,18 @@ func SetupJSONV1Paths(r *mux.Router, handler http.Handler) {
 	SetupJSONByPaths(r, handler, "/v1/datapoint")
 }
 
-func setupProtobufV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink) stats.Keeper {
+func setupProtobufV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, logger log.Logger) stats.Keeper {
 	handler, st := setupChain(ctx, sink, name, "protobuf_v2", func(s dpsink.Sink) ErrorReader {
-		return &ProtobufDecoderV2{Sink: s}
+		return &ProtobufDecoderV2{Sink: s, Logger: logger}
 	})
 	SetupProtobufV2DatapointPaths(r, handler)
 
 	return st
 }
 
-func setupProtobufEventV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink) stats.Keeper {
+func setupProtobufEventV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, logger log.Logger) stats.Keeper {
 	handler, st := setupChain(ctx, sink, name, "protobuf_v2", func(s dpsink.Sink) ErrorReader {
-		return &ProtobufEventDecoderV2{Sink: s}
+		return &ProtobufEventDecoderV2{Sink: s, Logger: logger}
 	})
 	SetupProtobufV2EventPaths(r, handler)
 
@@ -508,17 +511,17 @@ func SetupProtobufV2ByPaths(r *mux.Router, handler http.Handler, path string) {
 	r.Path(path).Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
 }
 
-func setupJSONV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink) stats.Keeper {
+func setupJSONV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, logger log.Logger) stats.Keeper {
 	handler, st := setupChain(ctx, sink, name, "json_v2", func(s dpsink.Sink) ErrorReader {
-		return &JSONDecoderV2{Sink: s}
+		return &JSONDecoderV2{Sink: s, Logger: logger}
 	})
 	SetupJSONV2DatapointPaths(r, handler)
 	return st
 }
 
-func setupJSONEventV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink) stats.Keeper {
+func setupJSONEventV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, logger log.Logger) stats.Keeper {
 	handler, st := setupChain(ctx, sink, name, "json_event_v2", func(s dpsink.Sink) ErrorReader {
-		return &JSONEventDecoderV2{Sink: s}
+		return &JSONEventDecoderV2{Sink: s, Logger: logger}
 	})
 	SetupJSONV2EventPaths(r, handler)
 	return st

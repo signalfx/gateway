@@ -13,8 +13,8 @@ import (
 
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
@@ -62,14 +62,21 @@ func TestProxyPidWrite(t *testing.T) {
 	assert.Nil(t, writePidFile(filename))
 }
 
-func TestInvalidLogLevel(t *testing.T) {
-	assert.Panics(t, func() {
-		logLevelMustParse("invalid_log_level")
-	})
-}
-
 func TestProxyPidWriteError(t *testing.T) {
 	assert.Error(t, writePidFile("/root"))
+}
+
+func TestGetLogOutput(t *testing.T) {
+	x := proxyCommandLineConfigurationT{
+		logDir:  "-",
+		logJSON: true,
+		logger:  log.Discard,
+	}
+	assert.Equal(t, os.Stdout, x.getLogOutput(&config.ProxyConfig{}))
+
+	l := x.getLogger(&config.ProxyConfig{})
+	_, ok := l.(*log.ErrorLogLogger).RootLogger.(*log.JSONLogger)
+	assert.True(t, ok)
 }
 
 func TestConfigLoadDimensions(t *testing.T) {
@@ -91,6 +98,7 @@ func TestConfigLoadDimensions(t *testing.T) {
 		logDir:                        "-",
 		logMaxSize:                    1,
 		ctx:                           ctx,
+		logger:                        log.Discard,
 		logMaxBackups:                 0,
 		stopChannel:                   make(chan bool),
 		closeWhenWaitingToStopChannel: make(chan struct{}),
@@ -117,7 +125,6 @@ func TestConfigLoadDimensions(t *testing.T) {
 		}
 		assert.NoError(t, err)
 		fmt.Printf("line is %s\n", line)
-		log.Info(line)
 		assert.Equal(t, "proxy.testForwardTo.", line[0:len("proxy.testForwardTo.")])
 		myProxyCommandLineConfiguration.stopChannel <- true
 	}()
@@ -136,6 +143,7 @@ func TestProxyInvalidConfig(t *testing.T) {
 		logMaxSize:     1,
 		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
+		logger:         log.Discard,
 		ctx:            context.Background(),
 	}
 	go func() {
@@ -170,6 +178,7 @@ func TestProxyOkLoading(t *testing.T) {
 		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
 		ctx:            context.Background(),
+		logger:         log.Discard,
 	}
 	go func() {
 		myProxyCommandLineConfiguration.stopChannel <- true
@@ -190,6 +199,7 @@ func TestProxyListenerError(t *testing.T) {
 		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
 		ctx:            context.Background(),
+		logger:         log.Discard,
 	}
 	go func() {
 		myProxyCommandLineConfiguration.stopChannel <- true
@@ -210,26 +220,12 @@ func TestProxyForwardError(t *testing.T) {
 		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
 		ctx:            context.Background(),
+		logger:         log.Discard,
 	}
 	go func() {
 		myProxyCommandLineConfiguration.stopChannel <- true
 	}()
 	myProxyCommandLineConfiguration.main()
-}
-
-func TestGetLogrusFormatter(t *testing.T) {
-	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
-		logJSON: true,
-	}
-	_, ok := myProxyCommandLineConfiguration.getLogrusFormatter(&config.ProxyConfig{}).(*log.JSONFormatter)
-	assert.True(t, ok)
-}
-
-func TestGetLogrusOutput(t *testing.T) {
-	myProxyCommandLineConfiguration := proxyCommandLineConfigurationT{
-		logDir: "-",
-	}
-	assert.Equal(t, os.Stdout, myProxyCommandLineConfiguration.getLogrusOutput(&config.ProxyConfig{}))
 }
 
 func TestProxyUnknownForwarder(t *testing.T) {
@@ -245,6 +241,7 @@ func TestProxyUnknownForwarder(t *testing.T) {
 		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
 		ctx:            context.Background(),
+		logger:         log.Discard,
 	}
 	go func() {
 		myProxyCommandLineConfiguration.stopChannel <- true
@@ -265,6 +262,7 @@ func TestProxyUnknownListener(t *testing.T) {
 		logMaxBackups:  0,
 		stopChannel:    make(chan bool),
 		ctx:            context.Background(),
+		logger:         log.Discard,
 	}
 	go func() {
 		myProxyCommandLineConfiguration.stopChannel <- true
@@ -275,7 +273,7 @@ func TestProxyUnknownListener(t *testing.T) {
 func TestAllListeners(t *testing.T) {
 	for _, l := range allListenerLoaders {
 		assert.Panics(t, func() {
-			l(nil, nil, nil)
+			l(nil, nil, nil, nil)
 		})
 	}
 }

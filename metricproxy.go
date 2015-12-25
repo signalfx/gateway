@@ -11,14 +11,11 @@ import (
 	"path"
 	"runtime"
 	"strconv"
-	"sync"
 
-	"strings"
-
-	"github.com/Sirupsen/logrus"
-	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/golib/datapoint/dpsink"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/carbon"
 	"github.com/signalfx/metricproxy/protocol/collectd"
@@ -35,29 +32,29 @@ const versionString = "0.8.0"
 
 // ForwardingLoader is the function definition of a function that can load a config
 // for a proxy and return the streamer
-type ForwardingLoader func(context.Context, *config.ForwardTo) (protocol.Forwarder, error)
+type ForwardingLoader func(context.Context, *config.ForwardTo, log.Logger) (protocol.Forwarder, error)
 
 // AllForwarderLoaders is a map of config names to loaders for that config
 var allForwarderLoaders = map[string]ForwardingLoader{
 	"signalfx-json": signalfx.ForwarderLoader,
 	"carbon":        carbon.ForwarderLoader,
-	"csv": func(ctx context.Context, conf *config.ForwardTo) (protocol.Forwarder, error) {
-		return csv.ForwarderLoader(conf)
+	"csv": func(ctx context.Context, conf *config.ForwardTo, logger log.Logger) (protocol.Forwarder, error) {
+		return csv.ForwarderLoader(conf, logger)
 	},
 }
 
 // A ListenerLoader loads a DatapointListener from a configuration definition
-type ListenerLoader func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (protocol.Listener, error)
+type ListenerLoader func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom, logger log.Logger) (protocol.Listener, error)
 
 // AllListenerLoaders is a map of all loaders from config, for each listener we support
 var allListenerLoaders = map[string]ListenerLoader{
-	"signalfx": func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (protocol.Listener, error) {
-		return signalfx.ListenerLoader(ctx, sink, listenFrom)
+	"signalfx": func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom, logger log.Logger) (protocol.Listener, error) {
+		return signalfx.ListenerLoader(ctx, sink, listenFrom, logger)
 	},
-	"carbon": func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (protocol.Listener, error) {
-		return carbon.ListenerLoader(ctx, sink, listenFrom)
+	"carbon": func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom, logger log.Logger) (protocol.Listener, error) {
+		return carbon.ListenerLoader(ctx, sink, listenFrom, logger)
 	},
-	"collectd": func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom) (protocol.Listener, error) {
+	"collectd": func(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom, logger log.Logger) (protocol.Listener, error) {
 		return collectd.ListenerLoader(ctx, sink, listenFrom)
 	},
 }
@@ -85,10 +82,10 @@ type proxyCommandLineConfigurationT struct {
 	allForwarders                 []protocol.Forwarder
 	allListeners                  []protocol.Listener
 	statDrainThread               *stats.StatDrainingThread
+	logger                        log.Logger
 }
 
 var proxyCommandLineConfigurationDefault proxyCommandLineConfigurationT
-var logSetupSync sync.Once
 
 func init() {
 	flag.StringVar(&proxyCommandLineConfigurationDefault.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
@@ -105,6 +102,7 @@ func init() {
 	proxyCommandLineConfigurationDefault.stopChannel = make(chan bool)
 	proxyCommandLineConfigurationDefault.ctx = context.WithValue(context.Background(), "version", versionString)
 	proxyCommandLineConfigurationDefault.closeWhenWaitingToStopChannel = make(chan struct{})
+	proxyCommandLineConfigurationDefault.logger = log.DefaultLogger.CreateChild()
 }
 
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) blockTillSetupReady() {
@@ -112,13 +110,13 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) blockTillSe
 	_ = <-proxyCommandLineConfiguration.closeWhenWaitingToStopChannel
 }
 
-func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogrusOutput(loadedConfig *config.ProxyConfig) io.Writer {
+func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogOutput(loadedConfig *config.ProxyConfig) io.Writer {
 	logDir := proxyCommandLineConfiguration.logDir
 	if loadedConfig.LogDir != nil {
 		logDir = *loadedConfig.LogDir
 	}
 	if logDir == "-" {
-		fmt.Println("Sending logging to stdout")
+		proxyCommandLineConfiguration.logger.Log("Sending logging to stdout")
 		return os.Stdout
 	}
 	logMaxSize := proxyCommandLineConfiguration.logMaxSize
@@ -134,56 +132,35 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogrusOu
 		MaxSize:    logMaxSize, // megabytes
 		MaxBackups: logMaxBackups,
 	}
-	fmt.Printf("Sending logging to %s temp is %s\n", lumberjackLogger.Filename, os.TempDir())
+	proxyCommandLineConfiguration.logger.Log(logkey.Filename, lumberjackLogger.Filename, logkey.Dir, os.TempDir(), "Logging redirect setup")
 	return lumberjackLogger
 }
 
-func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogrusFormatter(loadedConfig *config.ProxyConfig) logrus.Formatter {
+func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) getLogger(loadedConfig *config.ProxyConfig) log.Logger {
+	out := proxyCommandLineConfiguration.getLogOutput(loadedConfig)
 	useJSON := proxyCommandLineConfiguration.logJSON
 	if loadedConfig.LogFormat != nil {
 		useJSON = *loadedConfig.LogFormat == "json"
 	}
 	if useJSON {
-		return &log.JSONFormatter{}
+		return log.NewJSONLogger(out, log.DefaultErrorHandler) //  &log.JSONFormatter{}
 	}
-	return &log.TextFormatter{DisableColors: true}
+	return log.NewLogfmtLogger(out, log.DefaultErrorHandler)
 }
 
-func logLevelMustParse(level string) logrus.Level {
-	lvl, err := logrus.ParseLevel(level)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to parse level %s", level)
-		panic(err)
-	}
-	return lvl
-}
-
-func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) setupLogrus(loadedConfig *config.ProxyConfig) {
-	out := proxyCommandLineConfiguration.getLogrusOutput(loadedConfig)
-	formatter := proxyCommandLineConfiguration.getLogrusFormatter(loadedConfig)
-
-	// -race detection in unit tests w/o this
-	logSetupSync.Do(func() {
-		log.SetOutput(out)
-		log.SetFormatter(formatter)
-		if loadedConfig.LogLevel != nil {
-			log.SetLevel(logLevelMustParse(*loadedConfig.LogLevel))
-		}
-	})
-}
-
-func setupForwarders(ctx context.Context, loadedConfig *config.ProxyConfig) ([]protocol.Forwarder, error) {
+func setupForwarders(ctx context.Context, loadedConfig *config.ProxyConfig, logger log.Logger) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	allKeepers := []stats.Keeper{stats.NewGolangKeeper()}
 	for _, forwardConfig := range loadedConfig.ForwardTo {
+		logCtx := log.NewContext(logger).With(logkey.Protocol, forwardConfig.Type, logkey.Direction, "forwarder")
 		loader, ok := allForwarderLoaders[forwardConfig.Type]
 		if !ok {
-			log.WithField("type", forwardConfig.Type).Error("Unknown loader type")
+			logCtx.Log("unknown loader type")
 			return nil, fmt.Errorf("unknown loader type %s", forwardConfig.Type)
 		}
-		forwarder, err := loader(ctx, forwardConfig)
+		forwarder, err := loader(ctx, forwardConfig, logCtx)
 		if err != nil {
-			log.WithField("err", err).Error("unable to load config")
+			logCtx.Log(log.Err, err, "unable to load config")
 			return nil, err
 		}
 		allForwarders = append(allForwarders, forwarder)
@@ -192,17 +169,18 @@ func setupForwarders(ctx context.Context, loadedConfig *config.ProxyConfig) ([]p
 	return allForwarders, nil
 }
 
-func setupListeners(ctx context.Context, loadedConfig *config.ProxyConfig, multiplexer dpsink.Sink) ([]protocol.Listener, error) {
+func setupListeners(ctx context.Context, loadedConfig *config.ProxyConfig, multiplexer dpsink.Sink, logger log.Logger) ([]protocol.Listener, error) {
 	allListeners := make([]protocol.Listener, 0, len(loadedConfig.ListenFrom))
 	for _, listenConfig := range loadedConfig.ListenFrom {
+		logCtx := log.NewContext(logger).With(logkey.Protocol, listenConfig.Type, logkey.Direction, "listener")
 		loader, ok := allListenerLoaders[listenConfig.Type]
 		if !ok {
-			log.WithField("type", listenConfig.Type).Error("Unknown loader type")
+			logCtx.Log("unknown loader type")
 			return nil, fmt.Errorf("unknown loader type %s", listenConfig.Type)
 		}
-		listener, err := loader(ctx, multiplexer, listenConfig)
+		listener, err := loader(ctx, multiplexer, listenConfig, logCtx)
 		if err != nil {
-			log.WithField("err", err).Error("Unable to load config")
+			logCtx.Log(log.Err, err, "unable to load config")
 			return nil, err
 		}
 		allListeners = append(allListeners, listener)
@@ -210,19 +188,20 @@ func setupListeners(ctx context.Context, loadedConfig *config.ProxyConfig, multi
 	return allListeners, nil
 }
 
-func setupDebugServer(allKeepers []stats.Keeper, loadedConfig *config.ProxyConfig, debugServerAddrFromCmd string) {
+func setupDebugServer(allKeepers []stats.Keeper, loadedConfig *config.ProxyConfig, debugServerAddrFromCmd string, logger log.Logger) {
 	debugServerAddr := loadedConfig.LocalDebugServer
 	if debugServerAddr == nil {
 		debugServerAddr = &debugServerAddrFromCmd
 	}
+	logCtx := log.NewContext(logger).With(logkey.Protocol, "debugserver")
 	if debugServerAddr != nil && *debugServerAddr != "" {
 		go func() {
 			statusPage := statuspage.New(loadedConfig, allKeepers)
-			log.WithField("debugAddr", debugServerAddr).Info("Opening debug server")
+			logCtx.Log(logkey.DebugAddr, debugServerAddr, "opening debug server")
 			http.Handle("/status", statusPage.StatusPage())
 			http.Handle("/health", statusPage.HealthPage())
 			err := http.ListenAndServe(*debugServerAddr, nil)
-			log.WithField("err", err).Info("Finished listening")
+			logCtx.Log(log.Err, err, "finished listening")
 		}()
 	}
 }
@@ -244,15 +223,21 @@ func recastListenToKeeper(in []protocol.Listener) []stats.Keeper {
 }
 
 func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() error {
-	log.WithField("configFile", proxyCommandLineConfiguration.configFileName).Info("Looking for config file")
-	log.WithField("env", strings.Join(os.Environ(), " -*- ")).Info("Current env at start")
+	proxyCommandLineConfiguration.logger.Log(logkey.ConfigFile, proxyCommandLineConfiguration.configFileName, "Looking for config file")
+	proxyCommandLineConfiguration.logger.Log(logkey.Env, os.Environ(), "Looking for config file")
 
-	loadedConfig, err := config.Load(proxyCommandLineConfiguration.configFileName)
+	loadedConfig, err := config.Load(proxyCommandLineConfiguration.configFileName, proxyCommandLineConfiguration.logger)
 	if err != nil {
-		log.WithField("err", err).Error("Unable to load config")
+		proxyCommandLineConfiguration.logger.Log(log.Err, err, "Unable to load config")
 		return err
 	}
-	proxyCommandLineConfiguration.setupLogrus(loadedConfig)
+	logger := log.NewContext(proxyCommandLineConfiguration.getLogger(loadedConfig)).With(logkey.Time, log.DefaultTimestamp, logkey.Caller, log.DefaultCaller)
+	proxyCommandLineConfiguration.logger = logger
+	// Disable the default logger to make sure nobody else uses it
+	log.DefaultLogger.Set(log.Panic)
+	defer func() {
+		log.DefaultLogger.Set(log.Discard)
+	}()
 
 	{
 		pidFilename := proxyCommandLineConfiguration.pidFileName
@@ -261,9 +246,8 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() erro
 		}
 		writePidFile(pidFilename)
 	}
+	logger.Log(logkey.Config, loadedConfig, logkey.Env, os.Environ(), "config loaded")
 
-	log.WithField("config", loadedConfig).Info("Config loaded")
-	log.WithField("env", strings.Join(os.Environ(), " -*- ")).Info("Current env after loading config")
 	if loadedConfig.NumProcs != nil {
 		runtime.GOMAXPROCS(*loadedConfig.NumProcs)
 	} else {
@@ -271,18 +255,18 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() erro
 		runtime.GOMAXPROCS(numProcs)
 	}
 
-	proxyCommandLineConfiguration.allForwarders, err = setupForwarders(proxyCommandLineConfiguration.ctx, loadedConfig)
+	proxyCommandLineConfiguration.allForwarders, err = setupForwarders(proxyCommandLineConfiguration.ctx, loadedConfig, logger)
 	if err != nil {
 		return err
 	}
 	allKeepers := []stats.Keeper{stats.NewGolangKeeper()}
 
 	multiplexerCounter := &dpsink.Counter{}
-	multiplexer := dpsink.FromChain(demultiplexer.New(recastToSinks(proxyCommandLineConfiguration.allForwarders)), dpsink.NextWrap(multiplexerCounter))
+	multiplexer := dpsink.FromChain(demultiplexer.New(recastToSinks(proxyCommandLineConfiguration.allForwarders), logger), dpsink.NextWrap(multiplexerCounter))
 
 	allKeepers = append(allKeepers, stats.ToKeeper(multiplexerCounter, map[string]string{"location": "middle", "name": "proxy", "type": "demultiplexer"}))
 
-	proxyCommandLineConfiguration.allListeners, err = setupListeners(proxyCommandLineConfiguration.ctx, loadedConfig, multiplexer)
+	proxyCommandLineConfiguration.allListeners, err = setupListeners(proxyCommandLineConfiguration.ctx, loadedConfig, multiplexer, logger)
 	if err != nil {
 		return err
 	}
@@ -295,14 +279,14 @@ func (proxyCommandLineConfiguration *proxyCommandLineConfigurationT) main() erro
 	}
 
 	if loadedConfig.StatsDelayDuration != nil && *loadedConfig.StatsDelayDuration != 0 {
-		proxyCommandLineConfiguration.statDrainThread = stats.NewDrainingThread(*loadedConfig.StatsDelayDuration, recastToSinks(proxyCommandLineConfiguration.allForwarders), allKeepers, proxyCommandLineConfiguration.ctx)
+		proxyCommandLineConfiguration.statDrainThread = stats.NewDrainingThread(*loadedConfig.StatsDelayDuration, recastToSinks(proxyCommandLineConfiguration.allForwarders), allKeepers, proxyCommandLineConfiguration.ctx, logger)
 	} else {
-		log.Info("Skipping stat keeping")
+		logger.Log("skipping stat keeping")
 	}
 
-	setupDebugServer(allKeepers, loadedConfig, proxyCommandLineConfiguration.pprofaddr)
+	setupDebugServer(allKeepers, loadedConfig, proxyCommandLineConfiguration.pprofaddr, logger)
 
-	log.Infof("Setup done.  Blocking!")
+	logger.Log("Setup done.  Blocking!")
 	if proxyCommandLineConfiguration.closeWhenWaitingToStopChannel != nil {
 		close(proxyCommandLineConfiguration.closeWhenWaitingToStopChannel)
 	}

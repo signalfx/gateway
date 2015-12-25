@@ -4,12 +4,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dplocal"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	"golang.org/x/net/context"
 )
+
+// DefaultLogger is used by package structs that don't have a default logger set.
+var DefaultLogger = log.DefaultLogger.CreateChild()
 
 // Counter records stats on datapoints to go through it as a sink middleware
 type Counter struct {
@@ -20,6 +23,7 @@ type Counter struct {
 	ProcessErrorPoints int64
 	TotalProcessTimeNs int64
 	CallsInFlight      int64
+	Logger             log.Logger
 }
 
 // Stats related to this c, including errors processing datapoints
@@ -82,9 +86,16 @@ func (c *Counter) AddDatapoints(ctx context.Context, points []*datapoint.Datapoi
 	if err != nil {
 		atomic.AddInt64(&c.TotalProcessErrors, 1)
 		atomic.AddInt64(&c.ProcessErrorPoints, int64(len(points)))
-		log.WithField("err", err).Warn("Unable to process datapoints")
+		c.logger().Log(log.Err, err, "Unable to process datapoints")
 	}
 	return err
+}
+
+func (c *Counter) logger() log.Logger {
+	if c.Logger == nil {
+		return DefaultLogger
+	}
+	return c.Logger
 }
 
 // AddEvents will send events to the next sink and track events sent to the next sink
@@ -99,7 +110,7 @@ func (c *Counter) AddEvents(ctx context.Context, events []*event.Event, next Sin
 	if err != nil {
 		atomic.AddInt64(&c.TotalProcessErrors, 1)
 		atomic.AddInt64(&c.ProcessErrorPoints, int64(len(events)))
-		log.WithField("err", err).Warn("Unable to process events")
+		c.logger().Log(log.Err, err, "Unable to process datapoints")
 	}
 	return err
 }

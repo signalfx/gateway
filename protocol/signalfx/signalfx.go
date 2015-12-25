@@ -83,23 +83,6 @@ type MetricCreationResponse struct {
 	Message string `json:"message,omitempty"`
 }
 
-var toMTMap = map[datapoint.MetricType]com_signalfx_metrics_protobuf.MetricType{
-	datapoint.Counter:   com_signalfx_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
-	datapoint.Count:     com_signalfx_metrics_protobuf.MetricType_COUNTER,
-	datapoint.Enum:      com_signalfx_metrics_protobuf.MetricType_GAUGE,
-	datapoint.Gauge:     com_signalfx_metrics_protobuf.MetricType_GAUGE,
-	datapoint.Rate:      com_signalfx_metrics_protobuf.MetricType_GAUGE,
-	datapoint.Timestamp: com_signalfx_metrics_protobuf.MetricType_GAUGE,
-}
-
-func toMT(mt datapoint.MetricType) com_signalfx_metrics_protobuf.MetricType {
-	ret, exists := toMTMap[mt]
-	if exists {
-		return ret
-	}
-	panic(fmt.Sprintf("Unknown metric type: %d\n", mt))
-}
-
 var fromMTMap = map[com_signalfx_metrics_protobuf.MetricType]datapoint.MetricType{
 	com_signalfx_metrics_protobuf.MetricType_CUMULATIVE_COUNTER: datapoint.Counter,
 	com_signalfx_metrics_protobuf.MetricType_GAUGE:              datapoint.Gauge,

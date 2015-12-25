@@ -26,7 +26,6 @@ func (t *testSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapo
 func TestNewScheduler(t *testing.T) {
 	Convey("Default error handler should not panic", t, func() {
 		So(func() { DefaultErrorHandler(errors.New("test")) }, ShouldNotPanic)
-		So(func() { DefaultErrorHandler(nil) }, ShouldPanic)
 	})
 
 	Convey("with a testing scheduler", t, func() {
@@ -65,6 +64,17 @@ func TestNewScheduler(t *testing.T) {
 			s.AddCallback(cf)
 		})
 
+		Convey("callbacks should be removable", func() {
+			s.AddCallback(GoMetricsSource)
+			So(s.ReportOnce(ctx), ShouldBeNil)
+			firstPoints := <-sink.lastDatapoints
+			So(len(firstPoints), ShouldEqual, 30)
+			s.RemoveCallback(GoMetricsSource)
+			So(s.ReportOnce(ctx), ShouldBeNil)
+			firstPoints = <-sink.lastDatapoints
+			So(len(firstPoints), ShouldEqual, 0)
+		})
+
 		Convey("a single report should work", func() {
 			So(s.ReportOnce(ctx), ShouldBeNil)
 			firstPoints := <-sink.lastDatapoints
@@ -72,16 +82,47 @@ func TestNewScheduler(t *testing.T) {
 			So(len(sink.lastDatapoints), ShouldEqual, 0)
 		})
 		Convey("with a single callback", func() {
-			s.AddCallback(GoMetricsSource)
+			dimsToSend := map[string]string{"type": "test"}
+			collector := CollectorFunc(func() []*datapoint.Datapoint {
+				return []*datapoint.Datapoint{
+					Gauge("mname", dimsToSend, 1),
+				}
+			})
+			s.AddCallback(collector)
+			Convey("empty dims should be sendable", func() {
+				dimsToSend = nil
+				So(s.ReportOnce(ctx), ShouldBeNil)
+				firstPoints := <-sink.lastDatapoints
+				So(len(firstPoints), ShouldEqual, 1)
+				So(firstPoints[0].Dimensions, ShouldResemble, map[string]string{})
+				Convey("so should only defaults", func() {
+					s.DefaultDimensions(map[string]string{"host": "bob"})
+					So(s.ReportOnce(ctx), ShouldBeNil)
+					firstPoints := <-sink.lastDatapoints
+					So(len(firstPoints), ShouldEqual, 1)
+					So(firstPoints[0].Dimensions, ShouldResemble, map[string]string{"host": "bob"})
+				})
+			})
 			Convey("default dimensions should set", func() {
 				s.DefaultDimensions(map[string]string{"host": "bob"})
 				s.GroupedDefaultDimensions("_", map[string]string{"host": "bob2"})
 				So(s.ReportOnce(ctx), ShouldBeNil)
 				firstPoints := <-sink.lastDatapoints
-				So(firstPoints[0].Dimensions["host"], ShouldEqual, "bob")
+				So(len(firstPoints), ShouldEqual, 1)
+				So(firstPoints[0].Dimensions, ShouldResemble, map[string]string{"host": "bob", "type": "test"})
+				So(firstPoints[0].Metric, ShouldEqual, "mname")
+				So(firstPoints[0].MetricType, ShouldEqual, datapoint.Gauge)
+				So(firstPoints[0].Timestamp.UnixNano(), ShouldEqual, tk.Now().UnixNano())
 				Convey("and var should return previous points", func() {
 					So(s.Var().String(), ShouldContainSubstring, "bob")
 				})
+			})
+			Convey("zero time should be sendable", func() {
+				s.SendZeroTime = true
+				So(s.ReportOnce(ctx), ShouldBeNil)
+				firstPoints := <-sink.lastDatapoints
+				So(len(firstPoints), ShouldEqual, 1)
+				So(firstPoints[0].Timestamp.IsZero(), ShouldBeTrue)
 			})
 			Convey("and made to error out", func() {
 				sink.retErr = errors.New("nope bad done")
@@ -112,7 +153,7 @@ func TestNewScheduler(t *testing.T) {
 						runtime.Gosched()
 					}
 					firstPoints := <-sink.lastDatapoints
-					So(len(firstPoints), ShouldEqual, 30)
+					So(len(firstPoints), ShouldEqual, 1)
 					So(len(sink.lastDatapoints), ShouldEqual, 0)
 					Convey("and should skip an interval if we sleep too long", func() {
 						// Should eventually end
@@ -132,7 +173,7 @@ func TestNewScheduler(t *testing.T) {
 				})
 			})
 			Reset(func() {
-				s.RemoveCallback(GoMetricsSource)
+				s.RemoveCallback(collector)
 			})
 		})
 
