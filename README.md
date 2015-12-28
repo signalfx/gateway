@@ -1,4 +1,4 @@
-# metricproxy [![Build Status](https://travis-ci.org/signalfx/metricproxy.svg?branch=master)](https://travis-ci.org/signalfx/metricproxy) [![Docker Repository on Quay.io](https://quay.io/repository/signalfx/metricproxy/status "Docker Repository on Quay.io")](https://quay.io/repository/signalfx/metricproxy)
+# metricproxy [![Circle CI](https://circleci.com/gh/signalfx/metricproxy.svg?style=svg)](https://circleci.com/gh/signalfx/metricproxy)
 
 The proxy is a multilingual datapoint demultiplexer that can accept time
 series data from the statsd, carbon, or signalfx protocols and emit
