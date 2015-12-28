@@ -56,7 +56,7 @@ function do_test() {
     shellcheck circle.sh
     shellcheck metricproxy_initd
     echo -e "# Ignore Header" > /tmp/ignore_header.md
-    cat /tmp/ignore_header.md README.md | grep -av curl | grep -av 'Build Status' | mdl --warnings
+    cat /tmp/ignore_header.md README.md | grep -av curl | grep -av 'Circle CI' | mdl --warnings
     python -m json.tool < exampleSfdbproxy.conf > /dev/null
   )
   for GO_VERSION in $GO_TESTED_VERSIONS; do
