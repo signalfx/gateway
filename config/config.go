@@ -9,6 +9,7 @@ import (
 	"github.com/cep21/xdgbasedir"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/metricproxy/logkey"
+	"github.com/signalfx/golib/errors"
 )
 
 // ForwardTo configures where we forward datapoints to
@@ -78,13 +79,13 @@ type ProxyConfig struct {
 func decodeConfig(configBytes []byte) (*ProxyConfig, error) {
 	var config ProxyConfig
 	if err := json.Unmarshal(configBytes, &config); err != nil {
-		return nil, err
+		return nil, errors.Annotate(err, "cannot unmarshal config JSON")
 	}
 	if config.StatsDelay != nil {
 		duration, err := time.ParseDuration(*config.StatsDelay)
 		config.StatsDelayDuration = &duration
 		if err != nil {
-			return nil, err
+			return nil, errors.Annotatef(err, "cannot parse stats delay %s", *config.StatsDelay)
 		}
 	}
 	for _, f := range config.ForwardTo {
@@ -92,7 +93,7 @@ func decodeConfig(configBytes []byte) (*ProxyConfig, error) {
 			duration, err := time.ParseDuration(*f.Timeout)
 			f.TimeoutDuration = &duration
 			if err != nil {
-				return nil, err
+				return nil, errors.Annotatef(err, "cannot parse timeout %s", *f.Timeout)
 			}
 		}
 	}
@@ -101,7 +102,7 @@ func decodeConfig(configBytes []byte) (*ProxyConfig, error) {
 			duration, err := time.ParseDuration(*f.Timeout)
 			f.TimeoutDuration = &duration
 			if err != nil {
-				return nil, err
+				return nil, errors.Annotatef(err, "cannot parse timeout %s", *f.Timeout)
 			}
 		}
 	}
@@ -111,7 +112,7 @@ func decodeConfig(configBytes []byte) (*ProxyConfig, error) {
 func loadConfig(configFile string) (*ProxyConfig, error) {
 	configBytes, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		return nil, err
+		return nil, errors.Annotatef(err, "cannot read from config file %s", configFile)
 	}
 	return decodeConfig(configBytes)
 }
@@ -123,7 +124,7 @@ func Load(configFile string, logger log.Logger) (*ProxyConfig, error) {
 	logCtx := log.NewContext(logger).With(logkey.ConfigFile, configFile)
 	filename, err := xdgbasedirGetConfigFileLocation(configFile)
 	if err != nil {
-		return nil, err
+		return nil, errors.Annotatef(err, "cannot get config file for location %s", configFile)
 	}
 	logCtx = logCtx.With(logkey.Filename, filename)
 	config, errFilename := loadConfig(filename)
@@ -135,7 +136,7 @@ func Load(configFile string, logger log.Logger) (*ProxyConfig, error) {
 	config, errConfigfile = loadConfig(configFile)
 	if errConfigfile != nil {
 		logCtx.Log(log.Err, errConfigfile, "unable to load config again")
-		return nil, errConfigfile
+		return nil, errors.Annotatef(errConfigfile, "cannot load config file %s", errConfigfile)
 	}
 	return config, nil
 }

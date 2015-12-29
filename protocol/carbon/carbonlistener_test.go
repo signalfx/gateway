@@ -8,45 +8,31 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
-	"github.com/signalfx/golib/log"
+	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/nettest"
-	"github.com/signalfx/metricproxy/config"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
 
 func TestCarbonInvalidListenerLoader(t *testing.T) {
-	ctx := context.Background()
-	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:999999"),
+	listenFrom := &ListenerConfig{
+		ListenAddr: pointer.String("127.0.0.1:999999999"),
 	}
 	sendTo := dptest.NewBasicSink()
-	_, err := ListenerLoader(ctx, sendTo, listenFrom, log.Discard)
-	assert.NotEqual(t, nil, err, "Should get an error making")
-}
-
-func TestCarbonInvalidCarbonDeconstructorListenerLoader(t *testing.T) {
-	listenFrom := &config.ListenFrom{
-		ListenAddr:          workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:12247"),
-		MetricDeconstructor: workarounds.GolangDoesnotAllowPointerToStringLiteral("UNKNOWN"),
-	}
-	ctx := context.Background()
-	forwardTo := dptest.NewBasicSink()
-	_, err := ListenerLoader(ctx, forwardTo, listenFrom, log.Discard)
+	_, err := NewListener(sendTo, listenFrom)
 	assert.NotEqual(t, nil, err, "Should get an error making")
 }
 
 func TestCarbonHandleConnection(t *testing.T) {
-	listenFrom := &config.ListenFrom{
-		ListenAddr: workarounds.GolangDoesnotAllowPointerToStringLiteral("localhost:0"),
+	listenFrom := &ListenerConfig{
+		ListenAddr: pointer.String("127.0.0.1:0"),
 	}
-
 	ctx := context.Background()
 	forwardTo := dptest.NewBasicSink()
-	listener, err := ListenerLoader(ctx, forwardTo, listenFrom, log.Discard)
+	listener, err := NewListener(forwardTo, listenFrom)
+	assert.NoError(t, err)
 	defer listener.Close()
 
 	listeningDialAddress := fmt.Sprintf("localhost:%d", nettest.TCPPort(listener.psocket))
@@ -54,7 +40,7 @@ func TestCarbonHandleConnection(t *testing.T) {
 	conn, err := net.Dial("tcp", listeningDialAddress)
 	assert.NoError(t, err)
 	conn.Close()
-	assert.Error(t, listener.handleConnection(conn))
+	assert.Error(t, listener.handleConnection(ctx, conn))
 
 	conn, err = net.Dial("tcp", listeningDialAddress)
 	assert.NoError(t, err)
@@ -72,18 +58,16 @@ func TestCarbonHandleConnection(t *testing.T) {
 }
 
 func TestListenerLoader(t *testing.T) {
-	listenFrom := &config.ListenFrom{
-		ListenAddr:           workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0"),
-		ServerAcceptDeadline: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Millisecond),
+	listenFrom := &ListenerConfig{
+		ListenAddr: pointer.String("127.0.0.1:0"),
+		ServerAcceptDeadline: pointer.Duration(time.Millisecond),
 	}
-	ctx := context.Background()
 	forwardTo := dptest.NewBasicSink()
-	listener, err := ListenerLoader(ctx, forwardTo, listenFrom, log.Discard)
+	listener, err := NewListener(forwardTo, listenFrom)
 	defer listener.Close()
 	assert.Equal(t, nil, err, "Should be ok to make")
 	defer listener.Close()
 	listeningDialAddress := fmt.Sprintf("127.0.0.1:%d", nettest.TCPPort(listener.psocket))
-	assert.Equal(t, numStats, len(listener.Stats()), "Should have no stats")
 	assert.NoError(t, err, "Should be ok to make")
 
 	conn, err := net.Dial("tcp", listeningDialAddress)

@@ -6,15 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
-	"github.com/signalfx/golib/event"
-	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/nettest"
-	"github.com/signalfx/metricproxy/config"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
+	"github.com/signalfx/golib/pointer"
 )
 
 const numStats = 10
@@ -42,18 +39,16 @@ func (conn *mockConn) Write(bytes []byte) (int, error) {
 }
 
 func TestNoHost(t *testing.T) {
-	var config config.ForwardTo
-	_, err := ForwarderLoader(context.Background(), &config, log.Discard)
+	_, err := NewForwarder("", nil)
 	assert.Error(t, err)
 }
 
 func TestInvalidPort(t *testing.T) {
 
-	ft := config.ForwardTo{
-		Host: workarounds.GolangDoesnotAllowPointerToStringLiteral("zzfbdsaj_)__@#$%.zzzzzzzzzzz"),
-		Port: workarounds.GolangDoesnotAllowPointerToUint16Literal(1),
+	ft := ForwarderConfig{
+		Port: pointer.Uint16(1),
 	}
-	_, err := ForwarderLoader(context.Background(), &ft, log.Discard)
+	_, err := NewForwarder("test", &ft)
 	assert.NotEqual(t, nil, err, "Expect an error")
 }
 
@@ -67,15 +62,20 @@ func (dp *carbonDatapoint) ToCarbonLine() string {
 }
 
 func TestCreation(t *testing.T) {
-	listenFrom := config.ListenFrom{}
-	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
+	listenFrom := ListenerConfig{
+		ListenAddr: pointer.String("127.0.0.1:0"),
+	}
 	forwardTo := dptest.NewBasicSink()
 	ctx := context.Background()
-	l, err := ListenerLoader(ctx, forwardTo, &listenFrom, log.Discard)
+	l, err := NewListener(forwardTo, &listenFrom)
 	defer l.Close()
 	assert.Equal(t, nil, err, "Expect no error")
-	assert.Equal(t, numStats, len(l.Stats()), "Expect no stats")
-	forwarder, err := NewForwarder("127.0.0.1", nettest.TCPPort(l.psocket), time.Second, []string{"zzfirst"}, 10)
+	assert.Equal(t, 3, len(l.Datapoints()), "Expect no stats")
+
+	forwarderConfig := ForwarderConfig{
+		Port: pointer.Uint16(nettest.TCPPort(l.psocket)),
+	}
+	forwarder, err := NewForwarder("127.0.0.1", &forwarderConfig)
 	defer forwarder.Close()
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, 1, len(forwarder.pool.conns))
@@ -112,14 +112,18 @@ func TestCreation(t *testing.T) {
 }
 
 func TestDeadlineError(t *testing.T) {
-	listenFrom := config.ListenFrom{}
-	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
+	listenFrom := ListenerConfig{
+		ListenAddr: pointer.String("127.0.0.1:0"),
+	}
 
 	forwardTo := dptest.NewBasicSink()
 	ctx := context.Background()
-	l, err := ListenerLoader(ctx, forwardTo, &listenFrom, log.Discard)
+	l, err := NewListener(forwardTo, &listenFrom)
 	defer l.Close()
-	forwarder, err := NewForwarder("127.0.0.1", nettest.TCPPort(l.psocket), time.Second, []string{}, 10)
+	forwarderConfig := ForwarderConfig{
+		Port: pointer.Uint16(nettest.TCPPort(l.psocket)),
+	}
+	forwarder, err := NewForwarder("127.0.0.1", &forwarderConfig)
 	assert.Equal(t, nil, err, "Expect no error")
 
 	forwarder.dialer = func(network, address string, timeout time.Duration) (net.Conn, error) {
@@ -136,14 +140,18 @@ func TestDeadlineError(t *testing.T) {
 }
 
 func TestWriteError(t *testing.T) {
-	listenFrom := config.ListenFrom{}
-	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
+	listenFrom := ListenerConfig{
+		ListenAddr: pointer.String("127.0.0.1:0"),
+	}
 
 	forwardTo := dptest.NewBasicSink()
 	ctx := context.Background()
-	l, err := ListenerLoader(ctx, forwardTo, &listenFrom, log.Discard)
+	l, err := NewListener(forwardTo, &listenFrom)
 	defer l.Close()
-	forwarder, err := NewForwarder("127.0.0.1", nettest.TCPPort(l.psocket), time.Second, []string{}, 10)
+	forwarderConfig := ForwarderConfig{
+		Port: pointer.Uint16(nettest.TCPPort(l.psocket)),
+	}
+	forwarder, err := NewForwarder("127.0.0.1", &forwarderConfig)
 	assert.Equal(t, nil, err, "Expect no error")
 
 	forwarder.dialer = func(network, address string, timeout time.Duration) (net.Conn, error) {
@@ -160,15 +168,19 @@ func TestWriteError(t *testing.T) {
 }
 
 func TestCarbonWrite(t *testing.T) {
-	listenFrom := config.ListenFrom{}
-	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
+	listenFrom := ListenerConfig{
+		ListenAddr: pointer.String("127.0.0.1:0"),
+	}
 	forwardTo := dptest.NewBasicSink()
 	ctx := context.Background()
-	l, err := ListenerLoader(ctx, forwardTo, &listenFrom, log.Discard)
+	l, err := NewListener(forwardTo, &listenFrom)
 	defer l.Close()
 	assert.Equal(t, nil, err, "Expect no error")
-	assert.Equal(t, numStats, len(l.Stats()), "Expect no stats")
-	forwarder, err := NewForwarder("127.0.0.1", nettest.TCPPort(l.psocket), time.Second, []string{"zzfirst"}, 10)
+	assert.Equal(t, 3, len(l.Datapoints()), "Expect no stats")
+	forwarderConfig := ForwarderConfig{
+		Port: pointer.Uint16(nettest.TCPPort(l.psocket)),
+	}
+	forwarder, err := NewForwarder("127.0.0.1", &forwarderConfig)
 	assert.Equal(t, nil, err, "Expect no error")
 	assert.Equal(t, 1, len(forwarder.pool.conns))
 	timeToSend := time.Now().Round(time.Second)
@@ -182,51 +194,21 @@ func TestCarbonWrite(t *testing.T) {
 }
 
 func TestLoader(t *testing.T) {
-	listenFrom := config.ListenFrom{}
-	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
+	listenFrom := ListenerConfig{
+		ListenAddr: pointer.String("127.0.0.1:0"),
+	}
 	ctx := context.Background()
 	forwardTo := dptest.NewBasicSink()
-	l, err := ListenerLoader(ctx, forwardTo, &listenFrom, log.Discard)
-	port := nettest.TCPPort(l.psocket)
+	l, err := NewListener(forwardTo, &listenFrom)
 
-	ft := config.ForwardTo{
-		Host: workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1"),
-		Port: workarounds.GolangDoesnotAllowPointerToUint16Literal(port),
+	forwarderConfig := ForwarderConfig{
+		Port: pointer.Uint16(nettest.TCPPort(l.psocket)),
 	}
-	f, err := ForwarderLoader(context.Background(), &ft, log.Discard)
+	f, err := NewForwarder("127.0.0.1", &forwarderConfig)
 	assert.NoError(t, err)
 	dpSent := dptest.DP()
 	dpSent.Dimensions = map[string]string{}
 	assert.NoError(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dpSent}))
 	dpSeen := forwardTo.Next()
 	assert.Equal(t, dpSent.Metric, dpSeen.Metric)
-	assert.Equal(t, numStats+1, len(f.Stats()))
-}
-
-func TestNonNil(t *testing.T) {
-	e1 := errors.New("nope")
-	assert.Equal(t, e1, nonNil(e1, nil))
-	assert.Equal(t, e1, nonNil(nil, e1))
-	assert.Nil(t, nonNil(nil, nil))
-}
-
-func TestCarbonNoWriteEvents(t *testing.T) {
-	listenFrom := config.ListenFrom{}
-	listenFrom.ListenAddr = workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:0")
-	forwardTo := dptest.NewBasicSink()
-	ctx := context.Background()
-	l, err := ListenerLoader(ctx, forwardTo, &listenFrom, log.Discard)
-	defer l.Close()
-	assert.Equal(t, nil, err, "Expect no error")
-	assert.Equal(t, numStats, len(l.Stats()), "Expect no stats")
-	forwarder, err := NewForwarder("127.0.0.1", nettest.TCPPort(l.psocket), time.Second, []string{"zzfirst"}, 10)
-	assert.Equal(t, nil, err, "Expect no error")
-	assert.Equal(t, 1, len(forwarder.pool.conns))
-	timeToSend := time.Now().Round(time.Second)
-	eSent := dptest.E()
-	eSent.Timestamp = timeToSend
-	eSent.Meta["blarg"] = "abcd 123 123"
-	forwarder.AddEvents(ctx, []*event.Event{eSent})
-	assert.Equal(t, 0, len(forwardTo.EventsChan))
-
 }

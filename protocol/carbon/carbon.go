@@ -1,13 +1,13 @@
 package carbon
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
+	"github.com/signalfx/golib/errors"
 )
 
 type carbonMetadata int
@@ -19,8 +19,7 @@ const (
 // NativeCarbonLine inspects the datapoints metadata to see if it has information about the carbon
 // source it came from
 func NativeCarbonLine(dp *datapoint.Datapoint) (string, bool) {
-	s, exists := dp.Meta[carbonNative]
-	if exists {
+	if s, exists := dp.Meta[carbonNative]; exists {
 		return s.(string), true
 	}
 	return "", false
@@ -34,7 +33,7 @@ func NewCarbonDatapoint(line string, metricDeconstructor metricdeconstructor.Met
 		carbonNative: line,
 	}
 	if len(parts) != 3 {
-		return nil, fmt.Errorf("invalid carbon input line: %s", line)
+		return nil, errors.Errorf("invalid carbon input line: %s", line)
 	}
 	originalMetricName := parts[0]
 	metricName, mtype, dimensions, err := metricDeconstructor.Parse(originalMetricName)
@@ -43,7 +42,7 @@ func NewCarbonDatapoint(line string, metricDeconstructor metricdeconstructor.Met
 	}
 	metricTime, err := strconv.ParseInt(parts[2], 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("invalid carbon metric time on input line %s: %s", line, err)
+		return nil, errors.Annotatef(err, "invalid carbon metric time on input line %s", line)
 	}
 
 	v, err := func() (datapoint.Value, error) {
@@ -53,7 +52,7 @@ func NewCarbonDatapoint(line string, metricDeconstructor metricdeconstructor.Met
 		}
 		metricValueFloat, err := strconv.ParseFloat(parts[1], 64)
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse carbon metric value on line %s: %s", line, err)
+			return nil, errors.Annotatef(err, "unable to parse carbon metric value on line %s", line)
 		}
 		return datapoint.NewFloatValue(metricValueFloat), nil
 	}()

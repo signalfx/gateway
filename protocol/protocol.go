@@ -3,22 +3,19 @@ package protocol
 import (
 	"io"
 
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/metricproxy/stats"
+	"github.com/signalfx/golib/sfxclient"
 )
 
 // Forwarder is the basic interface endpoints must support for the proxy to forward to them
 type Forwarder interface {
-	dpsink.Sink
-	stats.Keeper
+	sfxclient.Collector
 	io.Closer
 }
 
 // CompositeForwarder is a helper struct that expects users to inject their own versions of each
 // type
 type CompositeForwarder struct {
-	dpsink.Sink
-	stats.Keeper
+	sfxclient.Collector
 	io.Closer
 }
 
@@ -26,7 +23,7 @@ var _ Forwarder = &CompositeForwarder{}
 
 // Listener is the basic interface anything that listens for new metrics must implement
 type Listener interface {
-	stats.Keeper
+	sfxclient.Collector
 	io.Closer
 }
 
@@ -51,7 +48,7 @@ func ForwarderDims(name string, typ string) map[string]string {
 // CompositeListener is a helper struct that expects users to inject their own versions of each
 // type
 type CompositeListener struct {
-	stats.Keeper
+	sfxclient.Collector
 	io.Closer
 }
 
