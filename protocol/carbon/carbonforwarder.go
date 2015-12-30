@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/errors"
+	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/metricproxy/dp/dpdimsort"
 	"golang.org/x/net/context"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/timekeeper"
-	"github.com/signalfx/golib/pointer"
 )
 
 // Forwarder is a sink that forwards points to a carbon endpoint
@@ -22,7 +22,7 @@ type Forwarder struct {
 	connectionAddress string
 	connectionTimeout time.Duration
 
-	tk timekeeper.TimeKeeper
+	tk     timekeeper.TimeKeeper
 	pool   connPool
 	dialer func(network, address string, timeout time.Duration) (net.Conn, error)
 }
@@ -49,15 +49,16 @@ type Forwarder struct {
 //	}, nil
 //}
 
+// ForwarderConfig controls optional parameters for a carbon forwarder
 type ForwarderConfig struct {
-	Port *uint16
-	Timeout *time.Duration
-	DimensionOrder []string
+	Port            *uint16
+	Timeout         *time.Duration
+	DimensionOrder  []string
 	DrainingThreads *uint32
-	BufferSize *uint32
-	Name *string
-	MaxDrainSize *uint32
-	Timer timekeeper.TimeKeeper
+	BufferSize      *uint32
+	Name            *string
+	MaxDrainSize    *uint32
+	Timer           timekeeper.TimeKeeper
 }
 
 var defaultForwarderConfig = &ForwarderConfig{
@@ -85,7 +86,7 @@ func NewForwarder(host string, passedConf *ForwarderConfig) (*Forwarder, error) 
 		dimensionComparor: dpdimsort.NewOrdering(conf.DimensionOrder),
 		connectionTimeout: *conf.Timeout,
 		connectionAddress: connectionAddress,
-		tk: conf.Timer,
+		tk:                conf.Timer,
 		dialer:            net.DialTimeout,
 		pool: connPool{
 			conns: make([]net.Conn, 0, *conf.DrainingThreads),
@@ -98,6 +99,12 @@ func NewForwarder(host string, passedConf *ForwarderConfig) (*Forwarder, error) 
 // Close empties out the connections' pool of open connections
 func (f *Forwarder) Close() error {
 	return f.pool.Close()
+}
+
+// Datapoints returns connection pool datapoints
+func (f *Forwarder) Datapoints() []*datapoint.Datapoint {
+	connDp := f.pool.Datapoints()
+	return connDp
 }
 
 func (f *Forwarder) datapointToGraphite(dp *datapoint.Datapoint) string {
@@ -121,6 +128,24 @@ func minTime(times []time.Time) time.Time {
 	return times[1]
 }
 
+func (f *Forwarder) setMinTime(ctx context.Context, openConnection net.Conn) error {
+	var timesVar [2]time.Time
+	timeSlice := timesVar[0:0:2]
+	if f.connectionTimeout.Nanoseconds() != 0 {
+		timeSlice = append(timeSlice, f.tk.Now().Add(f.connectionTimeout))
+	}
+	if ctxTimeout, ok := ctx.Deadline(); ok {
+		timeSlice = append(timeSlice, ctxTimeout)
+	}
+	if len(timeSlice) > 0 {
+		min := minTime(timeSlice)
+		if err := openConnection.SetDeadline(min); err != nil {
+			return errors.Annotate(err, "cannot set connection deadline")
+		}
+	}
+	return nil
+}
+
 // AddDatapoints sends the points to a carbon endpoint.  Tries to reuse open connections
 func (f *Forwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) (err error) {
 	openConnection := f.pool.Get()
@@ -139,19 +164,8 @@ func (f *Forwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datap
 		}
 	}()
 
-	var timesVar [2]time.Time
-	timeSlice := timesVar[0:2]
-	if f.connectionTimeout.Nanoseconds() != 0 {
-		timeSlice = append(timeSlice, f.tk.Now().Add(f.connectionTimeout))
-	}
-	if ctxTimeout, ok := ctx.Deadline(); ok {
-		timeSlice = append(timeSlice, ctxTimeout)
-	}
-	if len(timeSlice) > 0 {
-		min := minTime(timeSlice)
-		if err = openConnection.SetDeadline(min); err != nil {
-			return errors.Annotate(err, "cannot set connection deadline")
-		}
+	if err := f.setMinTime(ctx, openConnection); err != nil {
+		return err
 	}
 
 	var buf bytes.Buffer

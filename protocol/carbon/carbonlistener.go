@@ -12,23 +12,23 @@ import (
 
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
+	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
+	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/sfxclient"
 	"golang.org/x/net/context"
 )
 
 // Listener once setup will listen for carbon protocol points to forward on
 type Listener struct {
-	psocket             net.Listener
-	sink                dpsink.Sink
-	metricDeconstructor metricdeconstructor.MetricDeconstructor
+	psocket              net.Listener
+	sink                 dpsink.Sink
+	metricDeconstructor  metricdeconstructor.MetricDeconstructor
 	serverAcceptDeadline time.Duration
-	connectionTimeout time.Duration
+	connectionTimeout    time.Duration
 
 	logger log.Logger
 	stats  listenerStats
@@ -47,12 +47,14 @@ type listenerStats struct {
 	activeConnections   int64
 }
 
-// Stats reports information about the total points seen by carbon
+// Datapoints reports information about the total points seen by carbon
 func (listener *Listener) Datapoints() []*datapoint.Datapoint {
-	return []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{
 		sfxclient.Cumulative("invalid_datapoints", nil, atomic.LoadInt64(&listener.stats.invalidDatapoints)),
 		sfxclient.Cumulative("total_connections", nil, atomic.LoadInt64(&listener.stats.totalConnections)),
 		sfxclient.Gauge("active_connections", nil, atomic.LoadInt64(&listener.stats.activeConnections)),
+		sfxclient.Cumulative("idle_timeouts", nil, atomic.LoadInt64(&listener.stats.idleTimeouts)),
+		sfxclient.Cumulative("retry_listen_errors", nil, atomic.LoadInt64(&listener.stats.retriedListenErrors)),
 	}
 }
 
@@ -150,21 +152,22 @@ func (listener *Listener) startListening() {
 //		*listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions, listenFrom.MetricDeconstructorOptionsJSON, logger)
 //}
 
+// ListenerConfig controls optional parameters for carbon listeners
 type ListenerConfig struct {
 	ServerAcceptDeadline *time.Duration
 	ConnectionTimeout    *time.Duration
 	Name                 *string
-	ListenAddr *string
-	MetricDeconstructor metricdeconstructor.MetricDeconstructor
-	Logger log.Logger
+	ListenAddr           *string
+	MetricDeconstructor  metricdeconstructor.MetricDeconstructor
+	Logger               log.Logger
 }
 
-var defaultListenerConfig = &ListenerConfig {
+var defaultListenerConfig = &ListenerConfig{
 	ServerAcceptDeadline: pointer.Duration(time.Second),
-	ConnectionTimeout: pointer.Duration(time.Second * 30),
-	Name: pointer.String("carbonlistener"),
-	ListenAddr: pointer.String("127.0.0.1:2003"),
-	MetricDeconstructor: &metricdeconstructor.IdentityMetricDeconstructor{},
+	ConnectionTimeout:    pointer.Duration(time.Second * 30),
+	Name:                 pointer.String("carbonlistener"),
+	ListenAddr:           pointer.String("127.0.0.1:2003"),
+	MetricDeconstructor:  &metricdeconstructor.IdentityMetricDeconstructor{},
 }
 
 // NewListener creates a new listener for carbon datapoints
@@ -176,12 +179,12 @@ func NewListener(sendTo dpsink.Sink, passedConf *ListenerConfig) (*Listener, err
 	}
 
 	receiver := Listener{
-		sink:                sendTo,
-		psocket:             psocket,
-		metricDeconstructor: conf.MetricDeconstructor,
+		sink:                 sendTo,
+		psocket:              psocket,
+		metricDeconstructor:  conf.MetricDeconstructor,
 		serverAcceptDeadline: *conf.ServerAcceptDeadline,
-		connectionTimeout: *conf.ConnectionTimeout,
-		logger:              log.NewContext(conf.Logger).With(logkey.Protocol, "carbon", logkey.Direction, "listener", logkey.Name, *conf.Name),
+		connectionTimeout:    *conf.ConnectionTimeout,
+		logger:               log.NewContext(conf.Logger).With(logkey.Protocol, "carbon", logkey.Direction, "listener", logkey.Name, *conf.Name),
 	}
 	receiver.wg.Add(1)
 

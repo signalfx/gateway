@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
 	"github.com/signalfx/golib/errors"
+	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
 )
 
 type carbonMetadata int
