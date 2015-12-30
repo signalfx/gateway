@@ -188,6 +188,6 @@ func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer,
 // SetupCollectdPaths tells the router which paths the given handler (which should handle collectd json)
 // should see
 func SetupCollectdPaths(r *mux.Router, handler http.Handler, endpoint string) {
-	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
-	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "").HandlerFunc(web.InvalidContentType)
+	r.Path(endpoint).Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
+	r.Path(endpoint).Methods("POST").Headers("Content-Type", "").HandlerFunc(web.InvalidContentType)
 }

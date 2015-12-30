@@ -7,11 +7,11 @@ import (
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/pointer"
 	. "github.com/smartystreets/goconvey/convey"
+	"golang.org/x/net/context"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
-"golang.org/x/net/context"
-    "net/http/httptest"
-"strings"
 )
 
 const testCollectdBody = `[
@@ -232,7 +232,6 @@ func TestCollectDListener(t *testing.T) {
 	})
 }
 
-
 func BenchmarkCollectdListener(b *testing.B) {
 	bytes := int64(0)
 	smallCollectdBody := `[
@@ -275,12 +274,12 @@ func BenchmarkCollectdListener(b *testing.B) {
 		b.StopTimer()
 		bytes += int64(len(testCollectdBody))
 		item := <-sendTo.PointsChan
-        if len(item) != 1 {
-            b.Fatalf("Saw more than one item: %d", len(item))
-        }
-        if len(sendTo.PointsChan) != 0 {
-            b.Fatalf("Even more: %d?", len(sendTo.PointsChan))
-        }
+		if len(item) != 1 {
+			b.Fatalf("Saw more than one item: %d", len(item))
+		}
+		if len(sendTo.PointsChan) != 0 {
+			b.Fatalf("Even more: %d?", len(sendTo.PointsChan))
+		}
 	}
 	b.SetBytes(bytes)
 }

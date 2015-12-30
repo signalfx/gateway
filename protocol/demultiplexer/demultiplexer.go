@@ -3,15 +3,15 @@ package demultiplexer
 import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
+	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
 	"golang.org/x/net/context"
-	"github.com/signalfx/golib/errors"
 )
 
 // Demultiplexer is a sink that forwards points it sees to multiple sinks
 type Demultiplexer struct {
 	DatapointSinks []dpsink.DSink
-	EventSinks []dpsink.ESink
+	EventSinks     []dpsink.ESink
 }
 
 var _ dpsink.Sink = &Demultiplexer{}

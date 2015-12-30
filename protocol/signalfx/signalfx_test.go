@@ -7,9 +7,9 @@ import (
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	. "github.com/smartystreets/goconvey/convey"
 
+	"errors"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/pointer"
-	"errors"
 )
 
 func TestValueToValue(t *testing.T) {
@@ -94,7 +94,7 @@ func TestNewDatumValue(t *testing.T) {
 			f1 := 1.2
 			So(f1, ShouldEqual, NewDatumValue(&com_signalfx_metrics_protobuf.Datum{DoubleValue: &f1}).(datapoint.FloatValue).Float())
 		})
-		Convey("int should convert",func() {
+		Convey("int should convert", func() {
 			i1 := int64(3)
 			So(i1, ShouldEqual, NewDatumValue(&com_signalfx_metrics_protobuf.Datum{IntValue: &i1}).(datapoint.IntValue).Int())
 		})

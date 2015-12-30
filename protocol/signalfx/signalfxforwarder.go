@@ -15,16 +15,15 @@ import (
 
 	"sync"
 
-
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/datapoint/dpsink"
+	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/sfxclient"
 	"golang.org/x/net/context"
 )
 
@@ -44,31 +43,31 @@ type Forwarder struct {
 	jsonMarshal  func(v interface{}) ([]byte, error)
 }
 
+// ForwarderConfig controls optional parameters for a signalfx forwarder
 type ForwarderConfig struct {
-	DatapointURL *string
-	EventURL *string
-	Timeout *time.Duration
+	DatapointURL     *string
+	EventURL         *string
+	Timeout          *time.Duration
 	SourceDimensions *string
-	FormatVersion *uint32
-	Logger log.Logger
-	ProxyVersion *string
-	MaxIdleConns *int
-	AuthToken *string
-	ProtoMarshal func(pb proto.Message) ([]byte, error)
-	JsonMarshal  func(v interface{}) ([]byte, error)
+	FormatVersion    *uint32
+	Logger           log.Logger
+	ProxyVersion     *string
+	MaxIdleConns     *int
+	AuthToken        *string
+	ProtoMarshal     func(pb proto.Message) ([]byte, error)
+	JSONMarshal      func(v interface{}) ([]byte, error)
 }
-
 
 var defaultForwarderConfig = &ForwarderConfig{
 	DatapointURL: pointer.String("https://ingest.signalfx.com/v2/datapoint"),
-	EventURL: pointer.String("https://ingest.signalfx.com/v2/event"),
-	AuthToken: pointer.String(""),
-	Timeout:         pointer.Duration(time.Second * 30),
-	Logger: log.Discard,
+	EventURL:     pointer.String("https://ingest.signalfx.com/v2/event"),
+	AuthToken:    pointer.String(""),
+	Timeout:      pointer.Duration(time.Second * 30),
+	Logger:       log.Discard,
 	ProxyVersion: pointer.String("UNKNOWN_VERSION"),
 	MaxIdleConns: pointer.Int(20),
-	ProtoMarshal:proto.Marshal,
-	JsonMarshal: json.Marshal,
+	ProtoMarshal: proto.Marshal,
+	JSONMarshal:  json.Marshal,
 }
 
 //// ForwarderLoader loads a json forwarder forwarding points from proxy to SignalFx
@@ -106,7 +105,7 @@ var defaultForwarderConfig = &ForwarderConfig{
 //	}, fwd, nil
 //}
 
-// NewJSONForwarder creates a new JSON forwarder
+// NewForwarder creates a new JSON forwarder
 func NewForwarder(conf *ForwarderConfig) *Forwarder {
 	conf = pointer.FillDefaultFrom(conf, defaultForwarderConfig).(*ForwarderConfig)
 	tr := &http.Transport{
@@ -121,7 +120,7 @@ func NewForwarder(conf *ForwarderConfig) *Forwarder {
 	datapointSendingSink := sfxclient.NewHTTPDatapointSink()
 	datapointSendingSink.Client = http.Client{
 		Transport: tr,
-		Timeout: *conf.Timeout,
+		Timeout:   *conf.Timeout,
 	}
 	datapointSendingSink.AuthToken = *conf.AuthToken
 	datapointSendingSink.UserAgent = fmt.Sprintf("SignalfxProxy/%s (gover %s)", *conf.ProxyVersion, runtime.Version())
@@ -132,8 +131,8 @@ func NewForwarder(conf *ForwarderConfig) *Forwarder {
 		tr:               tr,
 		client:           &datapointSendingSink.Client,
 		protoMarshal:     conf.ProtoMarshal,
-		eventURL: *conf.EventURL,
-		jsonMarshal:      conf.JsonMarshal,
+		eventURL:         *conf.EventURL,
+		jsonMarshal:      conf.JSONMarshal,
 		datapointSink:    datapointSendingSink,
 	}
 	return ret

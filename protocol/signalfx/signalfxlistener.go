@@ -17,15 +17,15 @@ import (
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
+	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
+	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol/collectd"
 	"golang.org/x/net/context"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/sfxclient"
 )
 
 // ListenerServer controls listening on a socket for SignalFx connections
@@ -34,7 +34,7 @@ type ListenerServer struct {
 	logger   log.Logger
 
 	internalCollectors sfxclient.Collector
-	metricHandler metricHandler
+	metricHandler      metricHandler
 }
 
 // Close the exposed socket listening for new connections
@@ -42,6 +42,7 @@ func (streamer *ListenerServer) Close() error {
 	return streamer.listener.Close()
 }
 
+// Datapoints returns the datapoints about various internal endpoints
 func (streamer *ListenerServer) Datapoints() []*datapoint.Datapoint {
 	return streamer.internalCollectors.Datapoints()
 }
@@ -69,7 +70,6 @@ func (e *ErrorTrackerHandler) Datapoints() []*datapoint.Datapoint {
 		sfxclient.Cumulative("total_errors", nil, atomic.LoadInt64(&e.TotalErrors)),
 	}
 }
-
 
 // ServeHTTPC will serve the wrapped ErrorReader and return the error (if any) to rw if ErrorReader
 // fails
@@ -300,20 +300,21 @@ func (decoder *JSONEventDecoderV2) Read(ctx context.Context, req *http.Request) 
 	return decoder.Sink.AddEvents(ctx, evts)
 }
 
+// ListenerConfig controls optional parameters for the listener
 type ListenerConfig struct {
-	ListenAddr *string
-	Timeout *time.Duration
-	Logger log.Logger
+	ListenAddr  *string
+	Timeout     *time.Duration
+	Logger      log.Logger
 	RootContext context.Context
-	JsonMarshal func(v interface{}) ([]byte, error)
+	JSONMarshal func(v interface{}) ([]byte, error)
 }
 
-var defaultListenerConfig  = &ListenerConfig {
-	ListenAddr: pointer.String("127.0.0.1:12345"),
-	Timeout: pointer.Duration(time.Second),
-	Logger: log.Discard,
+var defaultListenerConfig = &ListenerConfig{
+	ListenAddr:  pointer.String("127.0.0.1:12345"),
+	Timeout:     pointer.Duration(time.Second),
+	Logger:      log.Discard,
 	RootContext: context.Background(),
-	JsonMarshal: json.Marshal,
+	JSONMarshal: json.Marshal,
 }
 
 type metricHandler struct {
@@ -366,7 +367,7 @@ func (handler *metricHandler) GetMetricTypeFromMap(metricName string) com_signal
 	return mt
 }
 
-// StartServingHTTPOnPort servers http requests for Signalfx datapoints
+// NewListener servers http requests for Signalfx datapoints
 func NewListener(sink dpsink.Sink, conf *ListenerConfig) (*ListenerServer, error) {
 	conf = pointer.FillDefaultFrom(conf, defaultListenerConfig).(*ListenerConfig)
 
@@ -385,10 +386,10 @@ func NewListener(sink dpsink.Sink, conf *ListenerConfig) (*ListenerServer, error
 	listenServer := ListenerServer{
 		listener: listener,
 		logger:   conf.Logger,
-		metricHandler : metricHandler{
+		metricHandler: metricHandler{
 			metricCreationsMap: make(map[string]com_signalfx_metrics_protobuf.MetricType),
 			logger:             log.NewContext(conf.Logger).With(logkey.Struct, "metricHandler"),
-			jsonMarshal: conf.JsonMarshal,
+			jsonMarshal:        conf.JSONMarshal,
 		},
 	}
 
@@ -415,7 +416,7 @@ func setupNotFoundHandler(r *mux.Router, ctx context.Context) sfxclient.Collecto
 	r.NotFoundHandler = web.NewHandler(ctx, web.FromHTTP(http.NotFoundHandler())).Add(web.NextHTTP(metricTracking.ServeHTTP))
 	return &sfxclient.WithDimensions{
 		Dimensions: map[string]string{"type": "http404"},
-		Collector: &metricTracking,
+		Collector:  &metricTracking,
 	}
 }
 
@@ -434,7 +435,7 @@ func setupChain(ctx context.Context, sink dpsink.Sink, chainType string, getRead
 			&errorTracker,
 			counter,
 		),
-		Dimensions: map[string]string {
+		Dimensions: map[string]string{
 			"type": "sfx_" + chainType,
 		},
 	}
@@ -541,8 +542,8 @@ func SetupJSONByPaths(r *mux.Router, handler http.Handler, endpoint string) {
 func setupCollectd(r *mux.Router, ctx context.Context, sink dpsink.Sink) sfxclient.Collector {
 	counter := &dpsink.Counter{}
 	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
-	decoder := collectd.JSONDecoder {
-		SendTo:      finalSink,
+	decoder := collectd.JSONDecoder{
+		SendTo: finalSink,
 	}
 	metricTracking := &web.RequestCounter{}
 	httpHandler := web.NewHandler(ctx, &decoder).Add(web.NextHTTP(metricTracking.ServeHTTP))
@@ -553,7 +554,7 @@ func setupCollectd(r *mux.Router, ctx context.Context, sink dpsink.Sink) sfxclie
 			counter,
 			&decoder,
 		),
-		Dimensions: map[string]string {
+		Dimensions: map[string]string{
 			"type": "collectd",
 		},
 	}

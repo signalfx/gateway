@@ -1,25 +1,26 @@
 package signalfx
+
 import (
-	"testing"
-	. "github.com/smartystreets/goconvey/convey"
-	"github.com/signalfx/golib/datapoint/dptest"
-	"golang.org/x/net/context"
-	"github.com/signalfx/golib/log"
+	"bytes"
 	"fmt"
+	"github.com/golang/protobuf/proto"
+	"github.com/signalfx/com_signalfx_metrics_protobuf"
+	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/datapoint/dptest"
+	"github.com/signalfx/golib/errors"
+	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
-	"bytes"
-	"github.com/signalfx/golib/datapoint"
-	"time"
-	"github.com/signalfx/golib/event"
-	"net/http"
-	"strings"
-	"github.com/signalfx/com_signalfx_metrics_protobuf"
-	"github.com/golang/protobuf/proto"
+	. "github.com/smartystreets/goconvey/convey"
+	"golang.org/x/net/context"
 	"io"
-	"runtime"
 	"io/ioutil"
-	"github.com/signalfx/golib/errors"
+	"net/http"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
 )
 
 //
@@ -78,6 +79,7 @@ type errorReader struct{}
 func (errorReader *errorReader) Read([]byte) (int, error) {
 	return 0, errReadErr
 }
+
 //
 //func localSetup(t *testing.T) (*ListenerServer, *dptest.BasicSink, string) {
 //	sendTo := dptest.NewBasicSink()
@@ -574,27 +576,27 @@ func TestSignalfxProtobufV1Decoder(t *testing.T) {
 			So(decoder.Read(ctx, req).Error(), ShouldContainSubstring, "proto")
 		})
 
-//		varintBytes = proto.EncodeVarint(uint64(999999999))
-//		req = &http.Request{
-//			Body: ioutil.NopCloser(bytes.NewBuffer([]byte{byte(255), byte(147), byte(235), byte(235), byte(235)})),
-//		}
-//		e = decoder.Read(ctx, req)
-//		assert.Equal(t, errInvalidProtobufVarint, e)
-//
-//		req = &http.Request{
-//			Body: ioutil.NopCloser(&errorReader{}),
-//		}
-//		e = decoder.Read(ctx, req)
-//		assert.Error(t, e, "Should get error reading if reader fails")
-//
-//		varintBytes = proto.EncodeVarint(uint64(20))
-//		req = &http.Request{
-//			Body: ioutil.NopCloser(bytes.NewBuffer(append(varintBytes, []byte("01234567890123456789")...))),
-//		}
-//		e = decoder.Read(ctx, req)
-//		assert.Contains(t, e.Error(), "proto")
-//
-//		assert.Equal(t, 0, len(sendTo.PointsChan))
+		//		varintBytes = proto.EncodeVarint(uint64(999999999))
+		//		req = &http.Request{
+		//			Body: ioutil.NopCloser(bytes.NewBuffer([]byte{byte(255), byte(147), byte(235), byte(235), byte(235)})),
+		//		}
+		//		e = decoder.Read(ctx, req)
+		//		assert.Equal(t, errInvalidProtobufVarint, e)
+		//
+		//		req = &http.Request{
+		//			Body: ioutil.NopCloser(&errorReader{}),
+		//		}
+		//		e = decoder.Read(ctx, req)
+		//		assert.Error(t, e, "Should get error reading if reader fails")
+		//
+		//		varintBytes = proto.EncodeVarint(uint64(20))
+		//		req = &http.Request{
+		//			Body: ioutil.NopCloser(bytes.NewBuffer(append(varintBytes, []byte("01234567890123456789")...))),
+		//		}
+		//		e = decoder.Read(ctx, req)
+		//		assert.Contains(t, e.Error(), "proto")
+		//
+		//		assert.Equal(t, 0, len(sendTo.PointsChan))
 	})
 }
 
@@ -651,7 +653,7 @@ func TestSignalfxListenerFailure(t *testing.T) {
 }
 
 func TestMapToProperties(t *testing.T) {
-	if len(mapToProperties(map[string]interface{}{"test":errors.New("unknown")})) > 0 {
+	if len(mapToProperties(map[string]interface{}{"test": errors.New("unknown")})) > 0 {
 		t.Error("Unexpected map length")
 	}
 }
@@ -660,7 +662,7 @@ func TestCheckResp(t *testing.T) {
 	Convey("With a resp", t, func() {
 		resp := &http.Response{
 			StatusCode: http.StatusOK,
-			Body: ioutil.NopCloser(strings.NewReader(`"OK"`)),
+			Body:       ioutil.NopCloser(strings.NewReader(`"OK"`)),
 		}
 		Convey("I should check read errors", func() {
 			resp.Body = ioutil.NopCloser(&errorReader{})
@@ -690,16 +692,16 @@ func TestSignalfxListener(t *testing.T) {
 		logger := log.NewLogfmtLogger(logBuf, log.Panic)
 		listenConf := &ListenerConfig{
 			ListenAddr: pointer.String("127.0.0.1:0"),
-			Logger: logger,
+			Logger:     logger,
 		}
 		listener, err := NewListener(sendTo, listenConf)
 		So(err, ShouldBeNil)
 		baseURI := fmt.Sprintf("http://127.0.0.1:%d", nettest.TCPPort(listener.listener))
 		Convey("And a signalfx forwarder", func() {
-			forwardConfig := &ForwarderConfig {
+			forwardConfig := &ForwarderConfig{
 				DatapointURL: pointer.String(fmt.Sprintf("%s/v2/datapoint", baseURI)),
-				EventURL: pointer.String(fmt.Sprintf("%s/v2/event", baseURI)),
-				Logger: logger,
+				EventURL:     pointer.String(fmt.Sprintf("%s/v2/event", baseURI)),
+				Logger:       logger,
 			}
 			forwarder := NewForwarder(forwardConfig)
 			Convey("event post to nowhere should fail", func() {
@@ -743,8 +745,8 @@ func TestSignalfxListener(t *testing.T) {
 			})
 			Convey("Should filter event properties/dimensions that are empty", func() {
 				eventSent := dptest.E()
-				eventSent.Dimensions = map[string]string{"":"test"}
-				eventSent.Meta = map[string]interface{}{"":"test"}
+				eventSent.Dimensions = map[string]string{"": "test"}
+				eventSent.Meta = map[string]interface{}{"": "test"}
 				eventSent.Timestamp = eventSent.Timestamp.Round(time.Millisecond)
 				So(forwarder.AddEvents(ctx, []*event.Event{eventSent}), ShouldBeNil)
 				eventSeen := sendTo.NextEvent()
@@ -756,7 +758,7 @@ func TestSignalfxListener(t *testing.T) {
 
 		trySend := func(body string, contentType string, pathSuffix string) {
 			client := http.Client{}
-			req, err := http.NewRequest("POST", baseURI + pathSuffix, strings.NewReader(body))
+			req, err := http.NewRequest("POST", baseURI+pathSuffix, strings.NewReader(body))
 			So(err, ShouldBeNil)
 			req.Header.Add("Content-Type", contentType)
 			resp, err := client.Do(req)
@@ -765,7 +767,7 @@ func TestSignalfxListener(t *testing.T) {
 		}
 		verifyStatusCode := func(body string, contentType string, pathSuffix string, expectedStatusCode int) {
 			client := http.Client{}
-			req, err := http.NewRequest("POST", baseURI + pathSuffix, strings.NewReader(body))
+			req, err := http.NewRequest("POST", baseURI+pathSuffix, strings.NewReader(body))
 			So(err, ShouldBeNil)
 			req.Header.Add("Content-Type", contentType)
 			resp, err := client.Do(req)
@@ -786,11 +788,11 @@ func TestSignalfxListener(t *testing.T) {
 		})
 		Convey("Should be able to send a v2 JSON point", func() {
 			now := time.Now().Round(time.Second)
-			v1Body := fmt.Sprintf(`{"gauge": [{"metric":"bob", "value": 3, "timestamp": %d}]}`, now.UnixNano() / time.Millisecond.Nanoseconds())
+			v1Body := fmt.Sprintf(`{"gauge": [{"metric":"bob", "value": 3, "timestamp": %d}]}`, now.UnixNano()/time.Millisecond.Nanoseconds())
 			trySend(v1Body, "application/json", "/v2/datapoint")
 			datapointSent := datapoint.Datapoint{
-				Metric: "bob",
-				Value: datapoint.NewIntValue(3),
+				Metric:    "bob",
+				Value:     datapoint.NewIntValue(3),
 				Timestamp: now,
 			}
 			datapointSeen := sendTo.Next()
@@ -808,21 +810,19 @@ func TestSignalfxListener(t *testing.T) {
 
 			verifyStatusCode("INVALID_JSON", "application/json", "/v1/event", http.StatusNotFound)
 
-
-
 			dps := listener.Datapoints()
-			So(dptest.ExactlyOneDims(dps, "total_errors", map[string]string{"type":"sfx_protobuf_v2"}).Value.String(), ShouldEqual, "0")
+			So(dptest.ExactlyOneDims(dps, "total_errors", map[string]string{"type": "sfx_protobuf_v2"}).Value.String(), ShouldEqual, "0")
 			verifyStatusCode("INVALID_PROTOBUF", "application/x-protobuf", "/v2/datapoint", http.StatusBadRequest)
 			dps = listener.Datapoints()
-			So(dptest.ExactlyOneDims(dps, "total_errors", map[string]string{"type":"sfx_protobuf_v2"}).Value.String(), ShouldEqual, "1")
+			So(dptest.ExactlyOneDims(dps, "total_errors", map[string]string{"type": "sfx_protobuf_v2"}).Value.String(), ShouldEqual, "1")
 		})
 		Convey("Should be able to send a v2 JSON event", func() {
 			now := time.Now().Round(time.Second)
-			body := fmt.Sprintf(`[{"eventType":"ET", "category": "cat", "timestamp": %d}]`, now.UnixNano() / time.Millisecond.Nanoseconds())
+			body := fmt.Sprintf(`[{"eventType":"ET", "category": "cat", "timestamp": %d}]`, now.UnixNano()/time.Millisecond.Nanoseconds())
 			trySend(body, "application/json", "/v2/event")
-			eventSent := event.Event {
+			eventSent := event.Event{
 				EventType: "ET",
-				Category: "cat",
+				Category:  "cat",
 				Timestamp: now,
 			}
 			eventSeen := sendTo.NextEvent()
@@ -840,9 +840,9 @@ func TestSignalfxListener(t *testing.T) {
 		})
 		Convey("Should be able to send a v1 JSON point", func() {
 			datapointSent := datapoint.Datapoint{
-				Metric: "bob",
-				Value: datapoint.NewIntValue(3),
-				Dimensions: map[string]string{"sf_source":"name"},
+				Metric:     "bob",
+				Value:      datapoint.NewIntValue(3),
+				Dimensions: map[string]string{"sf_source": "name"},
 			}
 			trySend(`{"metric":"bob", "source": "name", "value": 3}`, "application/json", "/v1/datapoint")
 			datapointSeen := sendTo.Next()
@@ -862,7 +862,7 @@ func TestSignalfxListener(t *testing.T) {
 		Convey("Should be able to send a v1 protobuf point", func() {
 			datapointSent := datapoint.Datapoint{
 				Metric: "metric",
-				Value: datapoint.NewIntValue(3),
+				Value:  datapoint.NewIntValue(3),
 			}
 			dp := &com_signalfx_metrics_protobuf.DataPoint{
 				Metric: pointer.String("metric"),
