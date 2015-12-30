@@ -141,7 +141,6 @@ func (decoder *JSONDecoder) Datapoints() []*datapoint.Datapoint {
 
 // ListenerConfig controls optional parameters for collectd listeners
 type ListenerConfig struct {
-	Name              *string
 	ListenAddr        *string
 	ListenPath        *string
 	Timeout           *time.Duration
@@ -150,7 +149,6 @@ type ListenerConfig struct {
 }
 
 var defaultListenerConfig = &ListenerConfig{
-	Name:            pointer.String("collectd"),
 	ListenAddr:      pointer.String("127.0.0.1:8081"),
 	ListenPath:      pointer.String("/post-collectd"),
 	Timeout:         pointer.Duration(time.Second * 30),
@@ -181,8 +179,15 @@ func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer,
 		},
 	}
 	httpHandler := web.NewHandler(conf.StartingContext, &listenServer.decoder)
-	r.Path(*conf.ListenPath).Headers("Content-type", "application/json").Handler(httpHandler)
+	SetupCollectdPaths(r, httpHandler, *conf.ListenPath)
 
 	go listenServer.server.Serve(listener)
 	return &listenServer, nil
+}
+
+// SetupCollectdPaths tells the router which paths the given handler (which should handle collectd json)
+// should see
+func SetupCollectdPaths(r *mux.Router, handler http.Handler, endpoint string) {
+	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
+	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "").HandlerFunc(web.InvalidContentType)
 }

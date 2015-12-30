@@ -12,52 +12,43 @@ import (
 	"sync/atomic"
 	"time"
 
-	"errors"
-	"github.com/cep21/gohelpers/structdefaults"
-	"github.com/cep21/gohelpers/workarounds"
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dplocal"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/web"
-	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/logkey"
-	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/collectd"
-	"github.com/signalfx/metricproxy/stats"
 	"golang.org/x/net/context"
+	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/errors"
+	"github.com/signalfx/golib/sfxclient"
 )
 
 // ListenerServer controls listening on a socket for SignalFx connections
 type ListenerServer struct {
-	stats.Keeper
-	name     string
 	listener net.Listener
 	logger   log.Logger
-}
 
-var _ protocol.Listener = &ListenerServer{}
+	internalCollectors sfxclient.Collector
+	metricHandler metricHandler
+}
 
 // Close the exposed socket listening for new connections
 func (streamer *ListenerServer) Close() error {
 	return streamer.listener.Close()
 }
 
+func (streamer *ListenerServer) Datapoints() []*datapoint.Datapoint {
+	return streamer.internalCollectors.Datapoints()
+}
+
 // MericTypeGetter is an old metric interface that returns the type of a metric name
 type MericTypeGetter interface {
 	GetMetricTypeFromMap(metricName string) com_signalfx_metrics_protobuf.MetricType
-}
-
-// ConstTypeGetter always returns the wrapped metric type as a MericTypeGetter
-type ConstTypeGetter com_signalfx_metrics_protobuf.MetricType
-
-// GetMetricTypeFromMap returns the wrapped metric type object
-func (c ConstTypeGetter) GetMetricTypeFromMap(metricName string) com_signalfx_metrics_protobuf.MetricType {
-	return com_signalfx_metrics_protobuf.MetricType(c)
 }
 
 // ErrorReader are datapoint streamers that read from a HTTP request and return errors if
@@ -72,17 +63,13 @@ type ErrorTrackerHandler struct {
 	reader      ErrorReader
 }
 
-// Stats returns the number of calls to AddDatapoint
-func (e *ErrorTrackerHandler) Stats(dimensions map[string]string) []*datapoint.Datapoint {
+// Datapoints gets TotalErrors stats
+func (e *ErrorTrackerHandler) Datapoints() []*datapoint.Datapoint {
 	return []*datapoint.Datapoint{
-		dplocal.NewOnHostDatapointDimensions(
-			"total_errors",
-			datapoint.NewIntValue(e.TotalErrors),
-			datapoint.Counter,
-			dimensions),
+		sfxclient.Cumulative("total_errors", nil, atomic.LoadInt64(&e.TotalErrors)),
 	}
-
 }
+
 
 // ServeHTTPC will serve the wrapped ErrorReader and return the error (if any) to rw if ErrorReader
 // fails
@@ -281,6 +268,9 @@ func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error
 			}
 		}
 	}
+	if len(dps) == 0 {
+		return nil
+	}
 	return decoder.Sink.AddDatapoints(ctx, dps)
 }
 
@@ -299,10 +289,10 @@ func (decoder *JSONEventDecoderV2) Read(ctx context.Context, req *http.Request) 
 	evts := make([]*event.Event, 0, len(e))
 	for _, jsonEvent := range e {
 		if jsonEvent.Category == nil {
-			jsonEvent.Category = workarounds.GolangDoesnotAllowPointerToStringLiteral("USER_DEFINED")
+			jsonEvent.Category = pointer.String("USER_DEFINED")
 		}
 		if jsonEvent.Timestamp == nil {
-			jsonEvent.Timestamp = workarounds.GolangDoesnotAllowPointerToIntLiteral(0)
+			jsonEvent.Timestamp = pointer.Int64(0)
 		}
 		evt := event.NewWithMeta(jsonEvent.EventType, *jsonEvent.Category, jsonEvent.Dimensions, jsonEvent.Properties, fromTs(*jsonEvent.Timestamp))
 		evts = append(evts, evt)
@@ -310,27 +300,26 @@ func (decoder *JSONEventDecoderV2) Read(ctx context.Context, req *http.Request) 
 	return decoder.Sink.AddEvents(ctx, evts)
 }
 
-var defaultConfig = &config.ListenFrom{
-	ListenAddr:      workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:12345"),
-	TimeoutDuration: workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
-	Name:            workarounds.GolangDoesnotAllowPointerToStringLiteral("signalfxlistener"),
-	JSONEngine:      workarounds.GolangDoesnotAllowPointerToStringLiteral("native"),
+type ListenerConfig struct {
+	ListenAddr *string
+	Timeout *time.Duration
+	Logger log.Logger
+	RootContext context.Context
+	JsonMarshal func(v interface{}) ([]byte, error)
 }
 
-// ListenerLoader loads a listener for signalfx protocol from config
-func ListenerLoader(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom, logger log.Logger) (*ListenerServer, error) {
-	structdefaults.FillDefaultFrom(listenFrom, defaultConfig)
-
-	logger.Log(logkey.ListenFrom, listenFrom, "Creating signalfx listener using final config")
-	return StartServingHTTPOnPort(ctx, sink, *listenFrom.ListenAddr, *listenFrom.TimeoutDuration, *listenFrom.Name, logger)
+var defaultListenerConfig  = &ListenerConfig {
+	ListenAddr: pointer.String("127.0.0.1:12345"),
+	Timeout: pointer.Duration(time.Second),
+	Logger: log.Discard,
+	RootContext: context.Background(),
+	JsonMarshal: json.Marshal,
 }
-
-type jsonMarshalStub func(v interface{}) ([]byte, error)
 
 type metricHandler struct {
 	metricCreationsMapMutex sync.Mutex
 	metricCreationsMap      map[string]com_signalfx_metrics_protobuf.MetricType
-	jsonMarshal             jsonMarshalStub
+	jsonMarshal             func(v interface{}) ([]byte, error)
 	logger                  log.Logger
 }
 
@@ -356,11 +345,7 @@ func (handler *metricHandler) ServeHTTP(writter http.ResponseWriter, req *http.R
 		handler.metricCreationsMap[m.MetricName] = com_signalfx_metrics_protobuf.MetricType(metricType)
 		ret = append(ret, MetricCreationResponse{Code: 409})
 	}
-	unmarshal := handler.jsonMarshal
-	if unmarshal == nil {
-		unmarshal = json.Marshal
-	}
-	toWrite, err := unmarshal(ret)
+	toWrite, err := handler.jsonMarshal(ret)
 	if err != nil {
 		handler.logger.Log(log.Err, err, "Unable to marshal json")
 		writter.WriteHeader(http.StatusBadRequest)
@@ -382,56 +367,59 @@ func (handler *metricHandler) GetMetricTypeFromMap(metricName string) com_signal
 }
 
 // StartServingHTTPOnPort servers http requests for Signalfx datapoints
-func StartServingHTTPOnPort(ctx context.Context, sink dpsink.Sink, listenAddr string,
-	clientTimeout time.Duration, name string, logger log.Logger) (*ListenerServer, error) {
-	logger = log.NewContext(logger).With(logkey.Protocol, "signalfx", logkey.Name, name)
+func NewListener(sink dpsink.Sink, conf *ListenerConfig) (*ListenerServer, error) {
+	conf = pointer.FillDefaultFrom(conf, defaultListenerConfig).(*ListenerConfig)
+
+	listener, err := net.Listen("tcp", *conf.ListenAddr)
+	if err != nil {
+		return nil, errors.Annotatef(err, "cannot open listening address %s", *conf.ListenAddr)
+	}
 	r := mux.NewRouter()
 
 	server := http.Server{
 		Handler:      r,
-		Addr:         listenAddr,
-		ReadTimeout:  clientTimeout,
-		WriteTimeout: clientTimeout,
-	}
-
-	listener, err := net.Listen("tcp", listenAddr)
-	if err != nil {
-		return nil, err
+		Addr:         *conf.ListenAddr,
+		ReadTimeout:  *conf.Timeout,
+		WriteTimeout: *conf.Timeout,
 	}
 	listenServer := ListenerServer{
-		name:     name,
 		listener: listener,
-		logger:   logger,
+		logger:   conf.Logger,
+		metricHandler : metricHandler{
+			metricCreationsMap: make(map[string]com_signalfx_metrics_protobuf.MetricType),
+			logger:             log.NewContext(conf.Logger).With(logkey.Struct, "metricHandler"),
+			jsonMarshal: conf.JsonMarshal,
+		},
 	}
 
-	metricHandler := metricHandler{
-		metricCreationsMap: make(map[string]com_signalfx_metrics_protobuf.MetricType),
-		logger:             log.NewContext(logger).With(logkey.Struct, "metricHandler"),
-	}
-	r.Handle("/v1/metric", &metricHandler)
-	r.Handle("/metric", &metricHandler)
+	r.Handle("/v1/metric", &listenServer.metricHandler)
+	r.Handle("/metric", &listenServer.metricHandler)
 
-	listenServer.Keeper = stats.Combine(
-		setupNotFoundHandler(r, ctx, name),
-		setupProtobufV1(r, ctx, name, sink, &metricHandler, logger),
-		setupJSONV1(r, ctx, name, sink, &metricHandler, logger),
-		setupProtobufV2(r, ctx, name, sink, logger),
-		setupProtobufEventV2(r, ctx, name, sink, logger),
-		setupJSONV2(r, ctx, name, sink, logger),
-		setupJSONEventV2(r, ctx, name, sink, logger),
-		setupCollectd(r, ctx, name, sink))
+	listenServer.internalCollectors = sfxclient.NewMultiCollector(
+		setupNotFoundHandler(r, conf.RootContext),
+		setupProtobufV1(r, conf.RootContext, sink, &listenServer.metricHandler, conf.Logger),
+		setupJSONV1(r, conf.RootContext, sink, &listenServer.metricHandler, conf.Logger),
+		setupProtobufV2(r, conf.RootContext, sink, conf.Logger),
+		setupProtobufEventV2(r, conf.RootContext, sink, conf.Logger),
+		setupJSONV2(r, conf.RootContext, sink, conf.Logger),
+		setupJSONEventV2(r, conf.RootContext, sink, conf.Logger),
+		setupCollectd(r, conf.RootContext, sink),
+	)
 
 	go server.Serve(listener)
 	return &listenServer, err
 }
 
-func setupNotFoundHandler(r *mux.Router, ctx context.Context, name string) stats.Keeper {
+func setupNotFoundHandler(r *mux.Router, ctx context.Context) sfxclient.Collector {
 	metricTracking := web.RequestCounter{}
 	r.NotFoundHandler = web.NewHandler(ctx, web.FromHTTP(http.NotFoundHandler())).Add(web.NextHTTP(metricTracking.ServeHTTP))
-	return stats.ToKeeperMany(map[string]string{"location": "listener", "name": name, "type": "http404"}, &metricTracking)
+	return &sfxclient.WithDimensions{
+		Dimensions: map[string]string{"type": "http404"},
+		Collector: &metricTracking,
+	}
 }
 
-func setupChain(ctx context.Context, sink dpsink.Sink, name string, chainType string, getReader func(dpsink.Sink) ErrorReader) (*web.Handler, stats.Keeper) {
+func setupChain(ctx context.Context, sink dpsink.Sink, chainType string, getReader func(dpsink.Sink) ErrorReader) (*web.Handler, sfxclient.Collector) {
 	counter := &dpsink.Counter{}
 	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
 	errReader := getReader(finalSink)
@@ -440,16 +428,21 @@ func setupChain(ctx context.Context, sink dpsink.Sink, name string, chainType st
 	}
 	metricTracking := web.RequestCounter{}
 	handler := web.NewHandler(ctx, &errorTracker).Add(web.NextHTTP(metricTracking.ServeHTTP))
-	st := stats.ToKeeperMany(protocol.ListenerDims(name, "sfx_"+chainType), &metricTracking, &errorTracker, counter)
+	st := &sfxclient.WithDimensions{
+		Collector: sfxclient.NewMultiCollector(
+			&metricTracking,
+			&errorTracker,
+			counter,
+		),
+		Dimensions: map[string]string {
+			"type": "sfx_" + chainType,
+		},
+	}
 	return handler, st
 }
 
-func invalidContentType(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Invalid content type:"+r.Header.Get("Content-Type"), http.StatusBadRequest)
-}
-
-func setupProtobufV1(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, typeGetter MericTypeGetter, logger log.Logger) stats.Keeper {
-	handler, st := setupChain(ctx, sink, name, "protobuf_v1", func(s dpsink.Sink) ErrorReader {
+func setupProtobufV1(r *mux.Router, ctx context.Context, sink dpsink.Sink, typeGetter MericTypeGetter, logger log.Logger) sfxclient.Collector {
+	handler, st := setupChain(ctx, sink, "protobuf_v1", func(s dpsink.Sink) ErrorReader {
 		return &ProtobufDecoderV1{Sink: s, TypeGetter: typeGetter, Logger: logger}
 	})
 
@@ -463,8 +456,8 @@ func SetupProtobufV1Paths(r *mux.Router, handler http.Handler) {
 	r.Path("/v1/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
 }
 
-func setupJSONV1(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, typeGetter MericTypeGetter, logger log.Logger) stats.Keeper {
-	handler, st := setupChain(ctx, sink, name, "json_v1", func(s dpsink.Sink) ErrorReader {
+func setupJSONV1(r *mux.Router, ctx context.Context, sink dpsink.Sink, typeGetter MericTypeGetter, logger log.Logger) sfxclient.Collector {
+	handler, st := setupChain(ctx, sink, "json_v1", func(s dpsink.Sink) ErrorReader {
 		return &JSONDecoderV1{Sink: s, TypeGetter: typeGetter, Logger: logger}
 	})
 	SetupJSONV1Paths(r, handler)
@@ -478,8 +471,8 @@ func SetupJSONV1Paths(r *mux.Router, handler http.Handler) {
 	SetupJSONByPaths(r, handler, "/v1/datapoint")
 }
 
-func setupProtobufV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, logger log.Logger) stats.Keeper {
-	handler, st := setupChain(ctx, sink, name, "protobuf_v2", func(s dpsink.Sink) ErrorReader {
+func setupProtobufV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger) sfxclient.Collector {
+	handler, st := setupChain(ctx, sink, "protobuf_v2", func(s dpsink.Sink) ErrorReader {
 		return &ProtobufDecoderV2{Sink: s, Logger: logger}
 	})
 	SetupProtobufV2DatapointPaths(r, handler)
@@ -487,8 +480,8 @@ func setupProtobufV2(r *mux.Router, ctx context.Context, name string, sink dpsin
 	return st
 }
 
-func setupProtobufEventV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, logger log.Logger) stats.Keeper {
-	handler, st := setupChain(ctx, sink, name, "protobuf_v2", func(s dpsink.Sink) ErrorReader {
+func setupProtobufEventV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger) sfxclient.Collector {
+	handler, st := setupChain(ctx, sink, "protobuf_event_v2", func(s dpsink.Sink) ErrorReader {
 		return &ProtobufEventDecoderV2{Sink: s, Logger: logger}
 	})
 	SetupProtobufV2EventPaths(r, handler)
@@ -511,16 +504,16 @@ func SetupProtobufV2ByPaths(r *mux.Router, handler http.Handler, path string) {
 	r.Path(path).Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
 }
 
-func setupJSONV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, logger log.Logger) stats.Keeper {
-	handler, st := setupChain(ctx, sink, name, "json_v2", func(s dpsink.Sink) ErrorReader {
+func setupJSONV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger) sfxclient.Collector {
+	handler, st := setupChain(ctx, sink, "json_v2", func(s dpsink.Sink) ErrorReader {
 		return &JSONDecoderV2{Sink: s, Logger: logger}
 	})
 	SetupJSONV2DatapointPaths(r, handler)
 	return st
 }
 
-func setupJSONEventV2(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink, logger log.Logger) stats.Keeper {
-	handler, st := setupChain(ctx, sink, name, "json_event_v2", func(s dpsink.Sink) ErrorReader {
+func setupJSONEventV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger) sfxclient.Collector {
+	handler, st := setupChain(ctx, sink, "json_event_v2", func(s dpsink.Sink) ErrorReader {
 		return &JSONEventDecoderV2{Sink: s, Logger: logger}
 	})
 	SetupJSONV2EventPaths(r, handler)
@@ -541,19 +534,27 @@ func SetupJSONV2EventPaths(r *mux.Router, handler http.Handler) {
 // endpoint) should see
 func SetupJSONByPaths(r *mux.Router, handler http.Handler, endpoint string) {
 	r.Path(endpoint).Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
-	r.Path(endpoint).Methods("POST").Headers("Content-Type", "").HandlerFunc(invalidContentType)
+	r.Path(endpoint).Methods("POST").Headers("Content-Type", "").HandlerFunc(web.InvalidContentType)
 	r.Path(endpoint).Methods("POST").Handler(handler)
 }
 
-func setupCollectd(r *mux.Router, ctx context.Context, name string, sink dpsink.Sink) stats.Keeper {
-	h, st := collectd.SetupHandler(ctx, name, sink, nil)
-	SetupCollectdPaths(r, h)
-	return st
-}
-
-// SetupCollectdPaths tells the router which paths the given handler (which should handle collectd json)
-// should see
-func SetupCollectdPaths(r *mux.Router, handler http.Handler) {
-	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
-	r.Path("/v1/collectd").Methods("POST").Headers("Content-Type", "").HandlerFunc(invalidContentType)
+func setupCollectd(r *mux.Router, ctx context.Context, sink dpsink.Sink) sfxclient.Collector {
+	counter := &dpsink.Counter{}
+	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
+	decoder := collectd.JSONDecoder {
+		SendTo:      finalSink,
+	}
+	metricTracking := &web.RequestCounter{}
+	httpHandler := web.NewHandler(ctx, &decoder).Add(web.NextHTTP(metricTracking.ServeHTTP))
+	collectd.SetupCollectdPaths(r, httpHandler, "/v1/collectd")
+	return &sfxclient.WithDimensions{
+		Collector: sfxclient.NewMultiCollector(
+			metricTracking,
+			counter,
+			&decoder,
+		),
+		Dimensions: map[string]string {
+			"type": "collectd",
+		},
+	}
 }
