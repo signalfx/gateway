@@ -29,18 +29,19 @@ type JSONWriteFormat struct {
 	Severity *string                `json:"severity"`
 }
 
+var dsTypeToMetricType = map[string]datapoint.MetricType{
+	"gauge":    datapoint.Gauge,
+	"derive":   datapoint.Counter,
+	"counter":  datapoint.Counter,
+	"absolute": datapoint.Count,
+}
+
 func metricTypeFromDsType(dstype *string) datapoint.MetricType {
 	if dstype == nil {
 		return datapoint.Gauge
 	}
 
-	m := map[string]datapoint.MetricType{
-		"gauge":    datapoint.Gauge,
-		"derive":   datapoint.Counter,
-		"counter":  datapoint.Counter,
-		"absolute": datapoint.Count,
-	}
-	v, ok := m[*dstype]
+	v, ok := dsTypeToMetricType[*dstype]
 	if ok {
 		return v
 	}
