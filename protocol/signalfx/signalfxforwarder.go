@@ -49,7 +49,6 @@ type ForwarderConfig struct {
 	EventURL         *string
 	Timeout          *time.Duration
 	SourceDimensions *string
-	FormatVersion    *uint32
 	Logger           log.Logger
 	ProxyVersion     *string
 	MaxIdleConns     *int
@@ -150,6 +149,15 @@ func (connector *Forwarder) encodeEventPostBodyProtobufV2(events []*event.Event)
 
 	// Now we can send events
 	return protobytes, "application/x-protobuf", err
+}
+
+func (connector *Forwarder) Datapoints() []*datapoint.Datapoint {
+	return nil
+}
+
+func (connector *Forwarder) Close() error {
+	connector.tr.CloseIdleConnections()
+	return nil
 }
 
 func (connector *Forwarder) coreEventToProtobuf(e *event.Event) *com_signalfx_metrics_protobuf.Event {

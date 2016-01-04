@@ -16,13 +16,11 @@ import (
 // Config controls the optional configuration of the csv forwarder
 type Config struct {
 	Filename    *string
-	Name        *string
 	WriteString func(f *os.File, s string) (ret int, err error)
 }
 
 var defaultConfig = &Config{
 	Filename:    pointer.String("datapoints.csv"),
-	Name:        pointer.String("filename-drainer"),
 	WriteString: func(f *os.File, s string) (ret int, err error) { return f.WriteString(s) },
 }
 
@@ -34,6 +32,10 @@ type Forwarder struct {
 }
 
 var _ dpsink.Sink = &Forwarder{}
+
+func (f *Forwarder) Datapoints() []*datapoint.Datapoint {
+	return nil
+}
 
 // AddDatapoints writes the points to a file
 func (f *Forwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {

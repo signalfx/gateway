@@ -51,24 +51,18 @@ type Forwarder struct {
 
 // ForwarderConfig controls optional parameters for a carbon forwarder
 type ForwarderConfig struct {
-	Port            *uint16
-	Timeout         *time.Duration
-	DimensionOrder  []string
-	DrainingThreads *uint32
-	BufferSize      *uint32
-	Name            *string
-	MaxDrainSize    *uint32
-	Timer           timekeeper.TimeKeeper
+	Port                   *uint16
+	Timeout                *time.Duration
+	DimensionOrder         []string
+	IdleConnectionPoolSize *int
+	Timer                  timekeeper.TimeKeeper
 }
 
 var defaultForwarderConfig = &ForwarderConfig{
-	Timeout:         pointer.Duration(time.Second * 30),
-	BufferSize:      pointer.Uint32(uint32(10000)),
-	Port:            pointer.Uint16(2003),
-	DrainingThreads: pointer.Uint32(uint32(5)),
-	Name:            pointer.String("carbonforwarder"),
-	MaxDrainSize:    pointer.Uint32(uint32(1000)),
-	Timer:           &timekeeper.RealTime{},
+	Timeout: pointer.Duration(time.Second * 30),
+	Port:    pointer.Uint16(2003),
+	IdleConnectionPoolSize: pointer.Int(5),
+	Timer: &timekeeper.RealTime{},
 }
 
 // NewForwarder creates a new unbuffered forwarder for sending points to carbon
@@ -89,7 +83,7 @@ func NewForwarder(host string, passedConf *ForwarderConfig) (*Forwarder, error) 
 		tk:                conf.Timer,
 		dialer:            net.DialTimeout,
 		pool: connPool{
-			conns: make([]net.Conn, 0, *conf.DrainingThreads),
+			conns: make([]net.Conn, 0, *conf.IdleConnectionPoolSize),
 		},
 	}
 	ret.pool.Return(conn)

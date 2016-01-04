@@ -7,9 +7,11 @@ import (
 
 	"github.com/cep21/gohelpers/stringhelper"
 	"github.com/cep21/xdgbasedir"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/golib/errors"
+	"github.com/signalfx/golib/log"
+	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/metricproxy/logkey"
+	"os"
 )
 
 // ForwardTo configures where we forward datapoints to
@@ -25,7 +27,7 @@ type ForwardTo struct {
 	DefaultAuthToken  *string
 	BufferSize        *uint32
 	Name              *string
-	DrainingThreads   *uint32
+	DrainingThreads   *int
 	MetricCreationURL *string
 	MaxDrainSize      *uint32
 	Filename          *string
@@ -74,6 +76,15 @@ type ProxyConfig struct {
 	LogMaxBackups      *int
 	LogFormat          *string
 	LogLevel           *string
+	PprofAddr          *string
+}
+
+var DefaultProxyConfig = &ProxyConfig{
+	PidFilename:   pointer.String("metricproxy.pid"),
+	LogDir:        pointer.String(os.TempDir()),
+	LogMaxSize:    pointer.Int(100),
+	LogMaxBackups: pointer.Int(10),
+	LogFormat:     pointer.String(""),
 }
 
 func decodeConfig(configBytes []byte) (*ProxyConfig, error) {
@@ -119,8 +130,21 @@ func loadConfig(configFile string) (*ProxyConfig, error) {
 
 var xdgbasedirGetConfigFileLocation = xdgbasedir.GetConfigFileLocation
 
-// Load loads proxy configuration from a filename that is in an xdg configuration location
+func (p *ProxyConfig) String() string {
+	// TODO: Format this
+	return "<config object>"
+}
+
 func Load(configFile string, logger log.Logger) (*ProxyConfig, error) {
+	p, err := loadNoDefault(configFile, logger)
+	if err != nil {
+		return nil, err
+	}
+	return pointer.FillDefaultFrom(p, DefaultProxyConfig).(*ProxyConfig), nil
+}
+
+// Load loads proxy configuration from a filename that is in an xdg configuration location
+func loadNoDefault(configFile string, logger log.Logger) (*ProxyConfig, error) {
 	logCtx := log.NewContext(logger).With(logkey.ConfigFile, configFile)
 	filename, err := xdgbasedirGetConfigFileLocation(configFile)
 	if err != nil {

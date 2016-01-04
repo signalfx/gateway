@@ -125,7 +125,9 @@ func (listener *Listener) startListening() {
 			listener.logger.Log(log.Err, err, "Unable to accept a socket connection")
 			return
 		}
-		go listener.handleConnection(context.Background(), conn)
+		go func() {
+			listener.handleConnection(context.Background(), conn)
+		}()
 	}
 }
 
@@ -156,7 +158,6 @@ func (listener *Listener) startListening() {
 type ListenerConfig struct {
 	ServerAcceptDeadline *time.Duration
 	ConnectionTimeout    *time.Duration
-	Name                 *string
 	ListenAddr           *string
 	MetricDeconstructor  metricdeconstructor.MetricDeconstructor
 	Logger               log.Logger
@@ -165,9 +166,12 @@ type ListenerConfig struct {
 var defaultListenerConfig = &ListenerConfig{
 	ServerAcceptDeadline: pointer.Duration(time.Second),
 	ConnectionTimeout:    pointer.Duration(time.Second * 30),
-	Name:                 pointer.String("carbonlistener"),
 	ListenAddr:           pointer.String("127.0.0.1:2003"),
 	MetricDeconstructor:  &metricdeconstructor.IdentityMetricDeconstructor{},
+}
+
+func (l *Listener) Addr() net.Addr {
+	return l.psocket.Addr()
 }
 
 // NewListener creates a new listener for carbon datapoints
@@ -184,7 +188,7 @@ func NewListener(sendTo dpsink.Sink, passedConf *ListenerConfig) (*Listener, err
 		metricDeconstructor:  conf.MetricDeconstructor,
 		serverAcceptDeadline: *conf.ServerAcceptDeadline,
 		connectionTimeout:    *conf.ConnectionTimeout,
-		logger:               log.NewContext(conf.Logger).With(logkey.Protocol, "carbon", logkey.Direction, "listener", logkey.Name, *conf.Name),
+		logger:               log.NewContext(conf.Logger).With(logkey.Protocol, "carbon", logkey.Direction, "listener"),
 	}
 	receiver.wg.Add(1)
 
