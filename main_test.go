@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/log"
@@ -10,6 +11,7 @@ import (
 	"github.com/signalfx/metricproxy/protocol/carbon"
 	. "github.com/smartystreets/goconvey/convey"
 	"golang.org/x/net/context"
+	"io"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -41,6 +43,7 @@ const config1 = `
 
 func TestProxy1(t *testing.T) {
 	Convey("a setup carbon proxy", t, func() {
+		logBuf := &bytes.Buffer{}
 		fileObj, err := ioutil.TempFile("", "TestProxy")
 		So(err, ShouldBeNil)
 		filename := fileObj.Name()
@@ -57,7 +60,7 @@ func TestProxy1(t *testing.T) {
 			flags: proxyFlags{
 				configFileName: filename,
 			},
-			logger:          log.NewHierarchy(log.DefaultLogger),
+			logger:          log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic)),
 			tk:              timekeeper.RealTime{},
 			setupDoneSignal: make(chan struct{}),
 		}

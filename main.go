@@ -18,6 +18,9 @@ import (
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol"
+
+	"expvar"
+	"github.com/signalfx/metricproxy/debug"
 	"github.com/signalfx/metricproxy/protocol/demultiplexer"
 	"golang.org/x/net/context"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
@@ -44,6 +47,7 @@ type proxy struct {
 	logger          *log.Hierarchy
 	setupDoneSignal chan struct{}
 	tk              timekeeper.TimeKeeper
+	debugServer     *debug.Server
 }
 
 var mainInstance = proxy{
@@ -154,23 +158,27 @@ func splitSinks(forwarders []protocol.Forwarder) ([]dpsink.DSink, []dpsink.ESink
 	return dsinks, esinks, nil
 }
 
-//func setupDebugServer(allKeepers []stats.Keeper, loadedConfig *config.ProxyConfig, debugServerAddrFromCmd string, logger log.Logger) {
-//	debugServerAddr := loadedConfig.LocalDebugServer
-//	if debugServerAddr == nil {
-//		debugServerAddr = &debugServerAddrFromCmd
-//	}
-//	logCtx := log.NewContext(logger).With(logkey.Protocol, "debugserver")
-//	if debugServerAddr != nil && *debugServerAddr != "" {
-//		go func() {
-//			statusPage := statuspage.New(loadedConfig, allKeepers)
-//			logCtx.Log(logkey.DebugAddr, debugServerAddr, "opening debug server")
-//			http.Handle("/status", statusPage.StatusPage())
-//			http.Handle("/health", statusPage.HealthPage())
-//			err := http.ListenAndServe(*debugServerAddr, nil)
-//			logCtx.Log(log.Err, err, "finished listening")
-//		}()
-//	}
-//}
+func (p *proxy) setupDebugServer(conf *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler) error {
+	if conf.LocalDebugServer == nil {
+		return nil
+	}
+	debugServer, err := debug.New(*conf.LocalDebugServer, p, &debug.Config{
+		Logger: log.NewContext(logger).With(logkey.Protocol, "debugserver"),
+	})
+	if err != nil {
+		return errors.Annotate(err, "cannot setup debug server")
+	}
+	p.debugServer = debugServer
+	p.debugServer.Exp2.Exported["config"] = conf.Var()
+	p.debugServer.Exp2.Exported["datapoints"] = scheduler.Var()
+	p.debugServer.Exp2.Exported["goruntime"] = expvar.Func(func() interface{} {
+		return runtime.Version()
+	})
+	p.debugServer.Exp2.Exported["proxy_version"] = expvar.Func(func() interface{} {
+		return versionString
+	})
+	return nil
+}
 
 func (p *proxy) main(ctx context.Context) error {
 	p.logger.Log(logkey.ConfigFile, p.flags.configFileName, "Looking for config file")
@@ -258,8 +266,9 @@ func (p *proxy) main(ctx context.Context) error {
 	} else {
 		logger.Log("skipping stat keeping")
 	}
-
-	//	setupDebugServer(allKeepers, loadedConfig, p.pprofaddr, logger)
+	if err := p.setupDebugServer(loadedConfig, logger, scheduler); err != nil {
+		return err
+	}
 
 	logger.Log("Setup done.  Blocking!")
 	if p.setupDoneSignal != nil {
@@ -267,6 +276,12 @@ func (p *proxy) main(ctx context.Context) error {
 	}
 	<-ctx.Done()
 	cancelFunc()
+	if p.debugServer != nil {
+		err := p.debugServer.Close()
+		if err != nil {
+			logger.Log(log.Err, err, "cannot close debug server cleanly")
+		}
+	}
 	wg.Wait()
 	return nil
 }

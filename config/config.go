@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"time"
 
+	"expvar"
 	"github.com/cep21/gohelpers/stringhelper"
 	"github.com/cep21/xdgbasedir"
 	"github.com/signalfx/golib/errors"
@@ -16,41 +17,41 @@ import (
 
 // ForwardTo configures where we forward datapoints to
 type ForwardTo struct {
-	URL               *string
-	EventURL          *string
-	Host              *string
-	Port              *uint16
+	URL               *string `json:",omitempty"`
+	EventURL          *string `json:",omitempty"`
+	Host              *string `json:",omitempty"`
+	Port              *uint16 `json:",omitempty"`
 	Type              string
 	TimeoutDuration   *time.Duration `json:"-"`
-	Timeout           *string
-	DefaultSource     *string
-	DefaultAuthToken  *string
-	BufferSize        *uint32
-	Name              *string
-	DrainingThreads   *int
-	MetricCreationURL *string
-	MaxDrainSize      *uint32
-	Filename          *string
-	SourceDimensions  *string
-	FormatVersion     *uint32
-	DimensionsOrder   []string
+	Timeout           *string        `json:",omitempty"`
+	DefaultSource     *string        `json:",omitempty"`
+	DefaultAuthToken  *string        `json:",omitempty"`
+	BufferSize        *uint32        `json:",omitempty"`
+	Name              *string        `json:",omitempty"`
+	DrainingThreads   *int           `json:",omitempty"`
+	MetricCreationURL *string        `json:",omitempty"`
+	MaxDrainSize      *uint32        `json:",omitempty"`
+	Filename          *string        `json:",omitempty"`
+	SourceDimensions  *string        `json:",omitempty"`
+	FormatVersion     *uint32        `json:",omitempty"`
+	DimensionsOrder   []string       `json:",omitempty"`
 }
 
 // ListenFrom configures how we listen for datapoints to forward
 type ListenFrom struct {
 	Type                           string
-	ListenAddr                     *string
-	Dimensions                     map[string]string
-	MetricDeconstructor            *string
-	MetricDeconstructorOptions     *string
-	MetricDeconstructorOptionsJSON map[string]interface{}
-	Timeout                        *string
-	Name                           *string
-	ListenPath                     *string
-	JSONEngine                     *string
-	Encrypted                      *bool
-	TimeoutDuration                *time.Duration `json:"-"`
-	ServerAcceptDeadline           *time.Duration `json:"-"`
+	ListenAddr                     *string                `json:",omitempty"`
+	Dimensions                     map[string]string      `json:",omitempty"`
+	MetricDeconstructor            *string                `json:",omitempty"`
+	MetricDeconstructorOptions     *string                `json:",omitempty"`
+	MetricDeconstructorOptionsJSON map[string]interface{} `json:",omitempty"`
+	Timeout                        *string                `json:",omitempty"`
+	Name                           *string                `json:",omitempty"`
+	ListenPath                     *string                `json:",omitempty"`
+	JSONEngine                     *string                `json:",omitempty"`
+	Encrypted                      *bool                  `json:",omitempty"`
+	TimeoutDuration                *time.Duration         `json:"-"`
+	ServerAcceptDeadline           *time.Duration         `json:"-"`
 }
 
 func (listenFrom *ListenFrom) String() string {
@@ -63,20 +64,18 @@ func (forwardTo *ForwardTo) String() string {
 
 // ProxyConfig is the full config as presented inside the proxy config file
 type ProxyConfig struct {
-	ForwardTo          []*ForwardTo
-	ListenFrom         []*ListenFrom
-	StatsDelay         *string
+	ForwardTo          []*ForwardTo   `json:",omitempty"`
+	ListenFrom         []*ListenFrom  `json:",omitempty"`
+	StatsDelay         *string        `json:",omitempty"`
 	StatsDelayDuration *time.Duration `json:"-"`
-	NumProcs           *int
-	EnableStatusPage   *bool
-	LocalDebugServer   *string
-	PidFilename        *string
-	LogDir             *string
-	LogMaxSize         *int
-	LogMaxBackups      *int
-	LogFormat          *string
-	LogLevel           *string
-	PprofAddr          *string
+	NumProcs           *int           `json:",omitempty"`
+	LocalDebugServer   *string        `json:",omitempty"`
+	PidFilename        *string        `json:",omitempty"`
+	LogDir             *string        `json:",omitempty"`
+	LogMaxSize         *int           `json:",omitempty"`
+	LogMaxBackups      *int           `json:",omitempty"`
+	LogFormat          *string        `json:",omitempty"`
+	PprofAddr          *string        `json:",omitempty"`
 }
 
 var DefaultProxyConfig = &ProxyConfig{
@@ -133,6 +132,12 @@ var xdgbasedirGetConfigFileLocation = xdgbasedir.GetConfigFileLocation
 func (p *ProxyConfig) String() string {
 	// TODO: Format this
 	return "<config object>"
+}
+
+func (p *ProxyConfig) Var() expvar.Var {
+	return expvar.Func(func() interface{} {
+		return p
+	})
 }
 
 func Load(configFile string, logger log.Logger) (*ProxyConfig, error) {
