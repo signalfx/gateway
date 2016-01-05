@@ -27,28 +27,6 @@ type Forwarder struct {
 	dialer func(network, address string, timeout time.Duration) (net.Conn, error)
 }
 
-// ForwarderLoader loads a carbon forwarder that is buffered
-//func ForwarderLoader(ctx context.Context, forwardTo *config.ForwardTo, logger log.Logger) (protocol.Forwarder, error) {
-//	structdefaults.FillDefaultFrom(forwardTo, defaultForwarderConfig)
-//	if forwardTo.Host == nil {
-//		return nil, errors.Annotate(errRequiredHost, "host required in config")
-//	}
-//	fwd, err := NewForwarder(*forwardTo.Host, *forwardTo.Port, *forwardTo.TimeoutDuration, forwardTo.DimensionsOrder, *forwardTo.DrainingThreads)
-//	if err != nil {
-//		return nil, errors.Annotate(err, "cannot create carbon forwarder")
-//	}
-//	// TODO: Make sure this is common in a layer above me
-//	return fwd, nil
-//	counter := &dpsink.Counter{}
-//	dims := protocol.ForwarderDims(*forwardTo.Name, "carbon")
-//	buffer := dpbuffered.NewBufferedForwarder(ctx, *(&dpbuffered.Config{}).FromConfig(forwardTo), fwd, logger)
-//	return &protocol.CompositeForwarder{
-//		Sink:   dpsink.FromChain(buffer, dpsink.NextWrap(counter)),
-//		Keeper: stats.ToKeeperMany(dims, counter, buffer),
-//		Closer: protocol.CompositeCloser(protocol.OkCloser(buffer.Close), fwd),
-//	}, nil
-//}
-
 // ForwarderConfig controls optional parameters for a carbon forwarder
 type ForwarderConfig struct {
 	Port                   *uint16

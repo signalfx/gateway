@@ -6,6 +6,7 @@ import (
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/carbon"
+	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
 	"github.com/signalfx/metricproxy/protocol/collectd"
 	"github.com/signalfx/metricproxy/protocol/csv"
 	"github.com/signalfx/metricproxy/protocol/signalfx"
@@ -139,13 +140,35 @@ type carbonLoader struct {
 	logger log.Logger
 }
 
+func (s *carbonLoader) loadMetricDeconstructor(conf *ListenFrom) (metricdeconstructor.MetricDeconstructor, error) {
+	if conf.MetricDeconstructor == nil {
+		return nil, nil
+	}
+	opts := ""
+	if conf.MetricDeconstructorOptions != nil {
+		opts = *conf.MetricDeconstructorOptions
+	}
+	md, err := metricdeconstructor.Load(*conf.MetricDeconstructor, opts)
+	if err == nil {
+		return md, nil
+	}
+
+	return metricdeconstructor.LoadJSON(*conf.MetricDeconstructor, conf.MetricDeconstructorOptionsJSON)
+}
+
 func (s *carbonLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
+	md, err := s.loadMetricDeconstructor(conf)
+	if err != nil {
+		return nil, errors.Annotate(err, "cannot load metric deconstructor")
+	}
 	sfConf := carbon.ListenerConfig{
 		ServerAcceptDeadline: conf.ServerAcceptDeadline,
 		ConnectionTimeout:    conf.TimeoutDuration,
 		ListenAddr:           conf.ListenAddr,
 		Logger:               s.logger,
+		MetricDeconstructor:  md,
 	}
+
 	return carbon.NewListener(sink, &sfConf)
 }
 

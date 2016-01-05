@@ -39,7 +39,9 @@ const config1 = `
       {
       	"Type":"carbon",
       	"Name": "duplicate listener",
-      	"ListenAddr": "127.0.0.1:0"
+      	"ListenAddr": "127.0.0.1:0",
+        "MetricDeconstructor": "commakeys",
+        "MetricDeconstructorOptions": "mtypedim:metrictype"
 	  }
     ],
     "LocalDebugServer": "127.0.0.1:0",
