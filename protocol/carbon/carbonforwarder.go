@@ -54,14 +54,14 @@ type ForwarderConfig struct {
 	Port                   *uint16
 	Timeout                *time.Duration
 	DimensionOrder         []string
-	IdleConnectionPoolSize *int
+	IdleConnectionPoolSize *int64
 	Timer                  timekeeper.TimeKeeper
 }
 
 var defaultForwarderConfig = &ForwarderConfig{
 	Timeout: pointer.Duration(time.Second * 30),
 	Port:    pointer.Uint16(2003),
-	IdleConnectionPoolSize: pointer.Int(5),
+	IdleConnectionPoolSize: pointer.Int64(5),
 	Timer: &timekeeper.RealTime{},
 }
 

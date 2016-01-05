@@ -155,5 +155,6 @@ func (s *carbonLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) {
 		DimensionOrder:         conf.DimensionsOrder,
 		IdleConnectionPoolSize: conf.DrainingThreads,
 	}
-	return carbon.NewForwarder(*conf.Host, &sfConf)
+	f, err := carbon.NewForwarder(*conf.Host, &sfConf)
+	return &protocol.UneventfulForwarder{f}, err
 }

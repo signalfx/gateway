@@ -27,6 +27,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"fmt"
+	"github.com/signalfx/golib/eventcounter"
+	"github.com/signalfx/metricproxy/dp/dpbuffered"
 )
 
 const versionString = "0.9.0"
@@ -85,25 +88,47 @@ func (p *proxy) getLogger(loadedConfig *config.ProxyConfig) log.Logger {
 	return log.NewLogfmtLogger(out, log.DefaultErrorHandler)
 }
 
-func setupForwarders(loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Forwarder, error) {
+func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
-	for _, forwardConfig := range loadedConfig.ForwardTo {
+	for idx, forwardConfig := range loadedConfig.ForwardTo {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, forwardConfig.Type, logkey.Direction, "forwarder")
 		forwarder, err := loader.Forwarder(forwardConfig)
 		if err != nil {
 			logCtx.Log(log.Err, err, "unable to load config")
 			return nil, err
 		}
-		allForwarders = append(allForwarders, forwarder)
+//		allForwarders = append(allForwarders, forwarder)
 		name := func() string {
 			if forwardConfig.Name != nil {
 				return *forwardConfig.Name
 			}
 			return forwardConfig.Type
 		}()
-		// TODO: Add buffering and counting
-		scheduler.AddGroupedCallback(name+"_f", forwarder)
-		scheduler.GroupedDefaultDimensions(name+"_f", map[string]string{
+		// Buffering -> counting -> (forwarder)
+		limitedLogger := &log.RateLimitedLogger{
+			EventCounter: eventcounter.New(tk.Now(), time.Second),
+			Limit: 2,	// Only 1 a second
+			Logger: logCtx,
+			Now: tk.Now,
+		}
+		count := &dpsink.Counter{
+			Logger: limitedLogger,
+		}
+		endingSink := dpsink.FromChain(forwarder, dpsink.NextWrap(count))
+		bconf := &dpbuffered.Config{
+			BufferSize: forwardConfig.BufferSize,
+			MaxTotalDatapoints: forwardConfig.BufferSize,
+			MaxTotalEvents: forwardConfig.BufferSize,
+			MaxDrainSize: forwardConfig.MaxDrainSize,
+			NumDrainingThreads: forwardConfig.DrainingThreads,
+		}
+		bf := dpbuffered.NewBufferedForwarder(ctx, bconf, endingSink, limitedLogger)
+		allForwarders = append(allForwarders, bf)
+
+		groupName := fmt.Sprintf("%s_f_%d", name, idx)
+
+		scheduler.AddGroupedCallback(groupName, forwarder)
+		scheduler.GroupedDefaultDimensions(groupName, map[string]string{
 			"name":      name,
 			"direction": "forwarder",
 			"type":      forwardConfig.Type,
@@ -112,25 +137,36 @@ func setupForwarders(loader *config.Loader, loadedConfig *config.ProxyConfig, lo
 	return allForwarders, nil
 }
 
-func setupListeners(loader *config.Loader, loadedConfig *config.ProxyConfig, multiplexer dpsink.Sink, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Listener, error) {
+func setupListeners(tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, multiplexer dpsink.Sink, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Listener, error) {
 	allListeners := make([]protocol.Listener, 0, len(loadedConfig.ListenFrom))
-	for _, listenConfig := range loadedConfig.ListenFrom {
+	for idx, listenConfig := range loadedConfig.ListenFrom {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, listenConfig.Type, logkey.Direction, "listener")
-		listener, err := loader.Listener(multiplexer, listenConfig)
-		if err != nil {
-			logCtx.Log(log.Err, err, "unable to load config")
-			return nil, err
-		}
-		allListeners = append(allListeners, listener)
 		name := func() string {
 			if listenConfig.Name != nil {
 				return *listenConfig.Name
 			}
 			return listenConfig.Type
 		}()
-		// TODO: Add counting
-		scheduler.AddGroupedCallback(name+"_l", listener)
-		scheduler.GroupedDefaultDimensions(name+"_l", map[string]string{
+		count := &dpsink.Counter{
+			Logger: &log.RateLimitedLogger{
+				EventCounter: eventcounter.New(tk.Now(), time.Second),
+				Limit: 1,	// Only 1 a second
+				Logger: logCtx,
+				Now: tk.Now,
+			},
+		}
+		endingSink := dpsink.FromChain(multiplexer, dpsink.NextWrap(count))
+
+		listener, err := loader.Listener(endingSink, listenConfig)
+		if err != nil {
+			logCtx.Log(log.Err, err, "unable to load config")
+			return nil, err
+		}
+		allListeners = append(allListeners, listener)
+		groupName := fmt.Sprintf("%s_l_%d", name, idx)
+		scheduler.AddGroupedCallback(groupName, listener)
+		scheduler.AddGroupedCallback(groupName, count)
+		scheduler.GroupedDefaultDimensions(groupName, map[string]string{
 			"name":      name,
 			"direction": "listener",
 			"type":      listenConfig.Type,
@@ -139,23 +175,14 @@ func setupListeners(loader *config.Loader, loadedConfig *config.ProxyConfig, mul
 	return allListeners, nil
 }
 
-func splitSinks(forwarders []protocol.Forwarder) ([]dpsink.DSink, []dpsink.ESink, error) {
+func splitSinks(forwarders []protocol.Forwarder) ([]dpsink.DSink, []dpsink.ESink) {
 	dsinks := make([]dpsink.DSink, 0, len(forwarders))
 	esinks := make([]dpsink.ESink, 0, len(forwarders))
 	for _, f := range forwarders {
-		dsink, isDsink := f.(dpsink.DSink)
-		esink, isEsink := f.(dpsink.ESink)
-		if !isDsink && !isEsink {
-			return nil, nil, errors.Errorf("forwarder %s is neither datapoint nor event sink", f)
-		}
-		if isDsink {
-			dsinks = append(dsinks, dsink)
-		}
-		if isEsink {
-			esinks = append(esinks, esink)
-		}
+		dsinks = append(dsinks, f)
+		esinks = append(esinks, f)
 	}
-	return dsinks, esinks, nil
+	return dsinks, esinks
 }
 
 func (p *proxy) setupDebugServer(conf *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler) error {
@@ -200,6 +227,7 @@ func (p *proxy) main(ctx context.Context) error {
 	if err := writePidFile(pidFilename); err != nil {
 		logger.Log(log.Err, err, logkey.Filename, pidFilename, "cannot store pid in pid file")
 	}
+	defer os.Remove(pidFilename)
 	logger.Log(logkey.Config, loadedConfig, logkey.Env, strings.Join(os.Environ(), "-"), "config loaded")
 
 	if loadedConfig.NumProcs != nil {
@@ -213,7 +241,7 @@ func (p *proxy) main(ctx context.Context) error {
 	scheduler := sfxclient.NewScheduler()
 	scheduler.AddCallback(sfxclient.GoMetricsSource)
 
-	forwarders, err := setupForwarders(loader, loadedConfig, logger, scheduler)
+	forwarders, err := setupForwarders(ctx, p.tk, loader, loadedConfig, logger, scheduler)
 	if err != nil {
 		return errors.Annotate(err, "unable to setup forwarders")
 	}
@@ -225,17 +253,14 @@ func (p *proxy) main(ctx context.Context) error {
 			}
 		}
 	}()
-	dpSinks, eSinks, err := splitSinks(forwarders)
-	if err != nil {
-		return errors.Annotate(err, "cannot split forwarding sinks")
-	}
+	dpSinks, eSinks := splitSinks(forwarders)
 
 	multiplexer := &demultiplexer.Demultiplexer{
 		DatapointSinks: dpSinks,
 		EventSinks:     eSinks,
 	}
 
-	listeners, err := setupListeners(loader, loadedConfig, multiplexer, logger, scheduler)
+	listeners, err := setupListeners(p.tk, loader, loadedConfig, multiplexer, logger, scheduler)
 	if err != nil {
 		return errors.Annotate(err, "cannot setup listeners from configuration")
 	}
@@ -257,15 +282,17 @@ func (p *proxy) main(ctx context.Context) error {
 	if loadedConfig.StatsDelayDuration != nil && *loadedConfig.StatsDelayDuration != 0 {
 		scheduler.Sink = multiplexer
 		scheduler.ReportingDelayNs = loadedConfig.StatsDelayDuration.Nanoseconds()
-		wg.Add(1)
-		go func() {
-			err := scheduler.Schedule(finisehdContext)
-			logger.Log(log.Err, err, logkey.Struct, "scheduler", "Schedule finished")
-			wg.Done()
-		}()
 	} else {
 		logger.Log("skipping stat keeping")
 	}
+
+	// Schedule datapoint collection to a Discard sink so we can get the stats in Expvar()
+	wg.Add(1)
+	go func() {
+		err := scheduler.Schedule(finisehdContext)
+		logger.Log(log.Err, err, logkey.Struct, "scheduler", "Schedule finished")
+		wg.Done()
+	}()
 	if err := p.setupDebugServer(loadedConfig, logger, scheduler); err != nil {
 		return err
 	}

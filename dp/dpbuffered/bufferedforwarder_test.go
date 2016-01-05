@@ -8,6 +8,7 @@ import (
 
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
+	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/metricproxy/config"
@@ -20,12 +21,12 @@ const numStats = 4
 // TODO figure out why this test is flaky, should be > 2, but change to >= 2 so it passes
 func TestBufferedForwarderBasic(t *testing.T) {
 	ctx := context.Background()
-	config := Config{
-		BufferSize:         210,
-		MaxTotalDatapoints: 1000,
-		MaxTotalEvents:     1000,
-		NumDrainingThreads: 1,
-		MaxDrainSize:       1000,
+	config := &Config{
+		BufferSize:         pointer.Int64(210),
+		MaxTotalDatapoints: pointer.Int64(1000),
+		MaxTotalEvents:     pointer.Int64(1000),
+		NumDrainingThreads: pointer.Int64(1),
+		MaxDrainSize:       pointer.Int64(1000),
 	}
 	sendTo := dptest.NewBasicSink()
 	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
@@ -52,12 +53,12 @@ func TestBufferedForwarderBasic(t *testing.T) {
 // TODO figure out why this test is flaky, should be > 2, but change to >= 2 so it passes
 func TestBufferedForwarderBasicEvent(t *testing.T) {
 	ctx := context.Background()
-	config := Config{
-		BufferSize:         210,
-		MaxTotalDatapoints: 1000,
-		MaxTotalEvents:     1000,
-		NumDrainingThreads: 1,
-		MaxDrainSize:       1000,
+	config := &Config{
+		BufferSize:         pointer.Int64(210),
+		MaxTotalDatapoints: pointer.Int64(1000),
+		MaxTotalEvents:     pointer.Int64(1000),
+		NumDrainingThreads: pointer.Int64(1),
+		MaxDrainSize:       pointer.Int64(1000),
 	}
 	sendTo := dptest.NewBasicSink()
 	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
@@ -83,11 +84,11 @@ func TestBufferedForwarderBasicEvent(t *testing.T) {
 
 func TestBufferedForwarderContexts(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	config := Config{
-		BufferSize:         0,
-		MaxTotalDatapoints: 10,
-		NumDrainingThreads: 2,
-		MaxDrainSize:       1000,
+	config := &Config{
+		BufferSize:         pointer.Int64(0),
+		MaxTotalDatapoints: pointer.Int64(10),
+		NumDrainingThreads: pointer.Int64(2),
+		MaxDrainSize:       pointer.Int64(1000),
 	}
 
 	datas := []*datapoint.Datapoint{
@@ -126,11 +127,11 @@ outer:
 
 func TestBufferedForwarderContextsEvent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	config := Config{
-		BufferSize:         0,
-		MaxTotalEvents:     10,
-		NumDrainingThreads: 2,
-		MaxDrainSize:       1000,
+	config := &Config{
+		BufferSize:         pointer.Int64(0),
+		MaxTotalEvents:     pointer.Int64(10),
+		NumDrainingThreads: pointer.Int64(2),
+		MaxDrainSize:       pointer.Int64(1000),
 	}
 
 	datas := []*event.Event{
@@ -168,11 +169,11 @@ outer:
 }
 
 func TestBufferedForwarderMaxTotalDatapoints(t *testing.T) {
-	config := Config{
-		BufferSize:         15,
-		MaxTotalDatapoints: 7,
-		NumDrainingThreads: 1,
-		MaxDrainSize:       1000,
+	config := &Config{
+		BufferSize:         pointer.Int64(15),
+		MaxTotalDatapoints: pointer.Int64(7),
+		NumDrainingThreads: pointer.Int64(1),
+		MaxDrainSize:       pointer.Int64(1000),
 	}
 	ctx := context.Background()
 	sendTo := dptest.NewBasicSink()
@@ -190,11 +191,11 @@ func TestBufferedForwarderMaxTotalDatapoints(t *testing.T) {
 }
 
 func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
-	config := Config{
-		BufferSize:         15,
-		MaxTotalEvents:     7,
-		NumDrainingThreads: 1,
-		MaxDrainSize:       1000,
+	config := &Config{
+		BufferSize:         pointer.Int64(15),
+		MaxTotalEvents:     pointer.Int64(7),
+		NumDrainingThreads: pointer.Int64(1),
+		MaxDrainSize:       pointer.Int64(1000),
 	}
 	ctx := context.Background()
 	sendTo := dptest.NewBasicSink()
@@ -209,20 +210,4 @@ func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
 		bf.AddEvents(ctx, events)
 	}
 	assert.Equal(t, ErrEBufferFull, bf.AddEvents(ctx, events), "With small buffer size, I should error out with a full buffer")
-}
-
-func TestConfigLoad(t *testing.T) {
-	c1 := Config{}
-	c2 := config.ForwardTo{}
-	aOne := uint32(1)
-	c2.BufferSize = &aOne
-	c2.BufferSize = &aOne
-	c2.BufferSize = &aOne
-	c2.DrainingThreads = &aOne
-	c2.MaxDrainSize = &aOne
-
-	c1.FromConfig(&c2)
-
-	assert.Equal(t, int64(2), c1.BufferSize)
-	assert.Equal(t, int64(1), c1.MaxDrainSize)
 }

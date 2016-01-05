@@ -6,33 +6,30 @@ import (
 	"sync/atomic"
 
 	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dplocal"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
-	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/metricproxy/logkey"
 	"golang.org/x/net/context"
+	"github.com/signalfx/golib/sfxclient"
 )
 
 // Config controls BufferedForwarder limits
 type Config struct {
-	BufferSize         int64
-	MaxTotalDatapoints int64
-	MaxTotalEvents     int64
-	MaxDrainSize       int64
-	NumDrainingThreads int64
+	BufferSize         *int64
+	MaxTotalDatapoints *int64
+	MaxTotalEvents     *int64
+	MaxDrainSize       *int64
+	NumDrainingThreads *int64
 }
 
-// FromConfig loads the default config for a buffered forwarder from the proxy's config
-func (c *Config) FromConfig(conf *config.ForwardTo) *Config {
-	c.BufferSize = int64(*conf.BufferSize + 1)
-	c.MaxTotalDatapoints = int64(*conf.BufferSize)
-	c.MaxTotalEvents = int64(*conf.BufferSize)
-
-	c.NumDrainingThreads = int64(*conf.DrainingThreads)
-	c.MaxDrainSize = int64(*conf.MaxDrainSize)
-	return c
+var DefaultConfig = &Config {
+	BufferSize: pointer.Int64(10000),
+	MaxTotalDatapoints: pointer.Int64(10000),
+	MaxTotalEvents: pointer.Int64(10000),
+	MaxDrainSize: pointer.Int64(1000),
+	NumDrainingThreads: pointer.Int64(5),
 }
 
 type stats struct {
@@ -45,7 +42,7 @@ type stats struct {
 type BufferedForwarder struct {
 	dpChan                      (chan []*datapoint.Datapoint)
 	eChan                       (chan []*event.Event)
-	config                      Config
+	config                      *Config
 	stats                       stats
 	threadsWaitingToDie         sync.WaitGroup
 	blockingDrainWaitMutex      sync.Mutex
@@ -65,7 +62,7 @@ var ErrDPBufferFull = errors.New("unable to send more datapoints.  Buffer full")
 // AddDatapoints sends the datapoints to a chan buffer that eventually is flushed in big groups
 func (forwarder *BufferedForwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
 	atomic.AddInt64(&forwarder.stats.totalDatapointsBuffered, int64(len(points)))
-	if forwarder.config.MaxTotalDatapoints <= atomic.LoadInt64(&forwarder.stats.totalDatapointsBuffered) {
+	if *forwarder.config.MaxTotalDatapoints <= atomic.LoadInt64(&forwarder.stats.totalDatapointsBuffered) {
 		atomic.AddInt64(&forwarder.stats.totalDatapointsBuffered, int64(-len(points)))
 		return ErrDPBufferFull
 	}
@@ -85,7 +82,7 @@ var ErrEBufferFull = errors.New("unable to send more events.  Buffer full")
 // AddEvents sends the events to a chan buffer that eventually is flushed in big groups
 func (forwarder *BufferedForwarder) AddEvents(ctx context.Context, events []*event.Event) error {
 	atomic.AddInt64(&forwarder.stats.totalEventsBuffered, int64(len(events)))
-	if forwarder.config.MaxTotalEvents <= atomic.LoadInt64(&forwarder.stats.totalEventsBuffered) {
+	if *forwarder.config.MaxTotalEvents <= atomic.LoadInt64(&forwarder.stats.totalEventsBuffered) {
 		atomic.AddInt64(&forwarder.stats.totalEventsBuffered, int64(-len(events)))
 		return ErrEBufferFull
 	}
@@ -100,29 +97,13 @@ func (forwarder *BufferedForwarder) AddEvents(ctx context.Context, events []*eve
 }
 
 // Stats related to this forwarder, including errors processing datapoints
-func (forwarder *BufferedForwarder) Stats(dimensions map[string]string) []*datapoint.Datapoint {
-	ret := make([]*datapoint.Datapoint, 0, 2)
-	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
-		"datapoint_chan_backup_size",
-		datapoint.NewIntValue(int64(len(forwarder.dpChan))),
-		datapoint.Gauge,
-		dimensions))
-	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
-		"event_chan_backup_size",
-		datapoint.NewIntValue(int64(len(forwarder.eChan))),
-		datapoint.Gauge,
-		dimensions))
-	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
-		"datapoint_backup_size",
-		datapoint.NewIntValue(atomic.LoadInt64(&forwarder.stats.totalDatapointsBuffered)),
-		datapoint.Gauge,
-		dimensions))
-	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
-		"event_backup_size",
-		datapoint.NewIntValue(atomic.LoadInt64(&forwarder.stats.totalEventsBuffered)),
-		datapoint.Gauge,
-		dimensions))
-	return ret
+func (forwarder *BufferedForwarder) Datapoints() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint {
+		sfxclient.Gauge("datapoint_chan_backup_size", nil, int64(len(forwarder.dpChan))),
+		sfxclient.Gauge("event_chan_backup_size", nil, int64(len(forwarder.eChan))),
+		sfxclient.Gauge("datapoint_backup_size", nil, atomic.LoadInt64(&forwarder.stats.totalDatapointsBuffered)),
+		sfxclient.Gauge("event_backup_size", nil, atomic.LoadInt64(&forwarder.stats.totalEventsBuffered)),
+	}
 }
 
 func (forwarder *BufferedForwarder) blockingDrainUpTo() []*datapoint.Datapoint {
@@ -134,7 +115,7 @@ func (forwarder *BufferedForwarder) blockingDrainUpTo() []*datapoint.Datapoint {
 	select {
 	case datapoints := <-forwarder.dpChan:
 	Loop:
-		for int64(len(datapoints)) < forwarder.config.MaxDrainSize {
+		for int64(len(datapoints)) < *forwarder.config.MaxDrainSize {
 			select {
 			case datapoint := <-forwarder.dpChan:
 				datapoints = append(datapoints, datapoint...)
@@ -160,7 +141,7 @@ func (forwarder *BufferedForwarder) blockingDrainEventsUpTo() []*event.Event {
 	select {
 	case events := <-forwarder.eChan:
 	Loop:
-		for int64(len(events)) < forwarder.config.MaxDrainSize {
+		for int64(len(events)) < *forwarder.config.MaxDrainSize {
 			select {
 			case event := <-forwarder.eChan:
 				events = append(events, event...)
@@ -178,13 +159,14 @@ func (forwarder *BufferedForwarder) blockingDrainEventsUpTo() []*event.Event {
 }
 
 // Close stops the threads that are flushing channel points to the next forwarder
-func (forwarder *BufferedForwarder) Close() {
+func (forwarder *BufferedForwarder) Close() error {
 	forwarder.stopFunc()
 	forwarder.threadsWaitingToDie.Wait()
+	return nil
 }
 
 func (forwarder *BufferedForwarder) start() {
-	for i := int64(0); i < forwarder.config.NumDrainingThreads; i++ {
+	for i := int64(0); i < *forwarder.config.NumDrainingThreads; i++ {
 		forwarder.threadsWaitingToDie.Add(1)
 		go func() {
 			defer forwarder.threadsWaitingToDie.Done()
@@ -218,15 +200,16 @@ func (forwarder *BufferedForwarder) start() {
 
 // NewBufferedForwarder is used only by this package to create a forwarder that buffers its
 // datapoint channel
-func NewBufferedForwarder(ctx context.Context, config Config, sendTo dpsink.Sink, logger log.Logger) *BufferedForwarder {
+func NewBufferedForwarder(ctx context.Context, config *Config, sendTo dpsink.Sink, logger log.Logger) *BufferedForwarder {
+	config = pointer.FillDefaultFrom(config, DefaultConfig).(*Config)
 	logCtx := log.NewContext(logger).With(logkey.Struct, "BufferedForwarder")
 	logCtx.Log(logkey.Config, config)
 	context, cancel := context.WithCancel(ctx)
 	ret := &BufferedForwarder{
 		stopFunc:    cancel,
 		stopContext: context,
-		dpChan:      make(chan []*datapoint.Datapoint, config.BufferSize),
-		eChan:       make(chan []*event.Event, config.BufferSize),
+		dpChan:      make(chan []*datapoint.Datapoint, *config.BufferSize),
+		eChan:       make(chan []*event.Event, *config.BufferSize),
 		config:      config,
 		sendTo:      sendTo,
 		logger:      logCtx,

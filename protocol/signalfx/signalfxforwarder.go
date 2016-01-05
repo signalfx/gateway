@@ -51,7 +51,7 @@ type ForwarderConfig struct {
 	SourceDimensions *string
 	Logger           log.Logger
 	ProxyVersion     *string
-	MaxIdleConns     *int
+	MaxIdleConns     *int64
 	AuthToken        *string
 	ProtoMarshal     func(pb proto.Message) ([]byte, error)
 	JSONMarshal      func(v interface{}) ([]byte, error)
@@ -64,7 +64,7 @@ var defaultForwarderConfig = &ForwarderConfig{
 	Timeout:      pointer.Duration(time.Second * 30),
 	Logger:       log.Discard,
 	ProxyVersion: pointer.String("UNKNOWN_VERSION"),
-	MaxIdleConns: pointer.Int(20),
+	MaxIdleConns: pointer.Int64(20),
 	ProtoMarshal: proto.Marshal,
 	JSONMarshal:  json.Marshal,
 }
@@ -109,7 +109,7 @@ func NewForwarder(conf *ForwarderConfig) *Forwarder {
 	conf = pointer.FillDefaultFrom(conf, defaultForwarderConfig).(*ForwarderConfig)
 	tr := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
-		MaxIdleConnsPerHost:   *conf.MaxIdleConns * 2,
+		MaxIdleConnsPerHost:   int(*conf.MaxIdleConns * 2),
 		ResponseHeaderTimeout: *conf.Timeout,
 		Dial: func(network, addr string) (net.Conn, error) {
 			return net.DialTimeout(network, addr, *conf.Timeout)

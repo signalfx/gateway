@@ -26,11 +26,11 @@ type ForwardTo struct {
 	Timeout           *string        `json:",omitempty"`
 	DefaultSource     *string        `json:",omitempty"`
 	DefaultAuthToken  *string        `json:",omitempty"`
-	BufferSize        *uint32        `json:",omitempty"`
+	BufferSize        *int64        `json:",omitempty"`
 	Name              *string        `json:",omitempty"`
-	DrainingThreads   *int           `json:",omitempty"`
+	DrainingThreads   *int64           `json:",omitempty"`
 	MetricCreationURL *string        `json:",omitempty"`
-	MaxDrainSize      *uint32        `json:",omitempty"`
+	MaxDrainSize      *int64        `json:",omitempty"`
 	Filename          *string        `json:",omitempty"`
 	SourceDimensions  *string        `json:",omitempty"`
 	FormatVersion     *uint32        `json:",omitempty"`
