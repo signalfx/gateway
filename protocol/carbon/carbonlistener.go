@@ -170,8 +170,9 @@ var defaultListenerConfig = &ListenerConfig{
 	MetricDeconstructor:  &metricdeconstructor.IdentityMetricDeconstructor{},
 }
 
-func (l *Listener) Addr() net.Addr {
-	return l.psocket.Addr()
+// Addr returns the listening address of this carbon listener
+func (listener *Listener) Addr() net.Addr {
+	return listener.psocket.Addr()
 }
 
 // NewListener creates a new listener for carbon datapoints

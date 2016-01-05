@@ -20,6 +20,7 @@ type listenerLoader interface {
 	Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error)
 }
 
+// NewLoader creates the default loader for proxy protocols
 func NewLoader(ctx context.Context, logger log.Logger, version string) *Loader {
 	sfxL := &signalFxLoader{
 		logger:        logger,
@@ -51,11 +52,13 @@ func NewLoader(ctx context.Context, logger log.Logger, version string) *Loader {
 	}
 }
 
+// Loader is able to load forwarders and listeners from config type strings
 type Loader struct {
 	forwarders map[string]forwarderLoader
 	listeners  map[string]listenerLoader
 }
 
+// Forwarder loads a forwarder based upon config, finding the right forwarder first
 func (l *Loader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) {
 	if conf.Type == "" {
 		return nil, errors.New("type required to load config")
@@ -66,6 +69,7 @@ func (l *Loader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) {
 	return nil, errors.Errorf("cannot find config %s", conf.Type)
 }
 
+// Listener loads a listener based upon config, finding the right listener first
 func (l *Loader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
 	if conf.Type == "" {
 		return nil, errors.New("type required to load config")
@@ -147,7 +151,7 @@ func (s *carbonLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Li
 
 func (s *carbonLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) {
 	if conf.Host == nil {
-		return nil, errors.New("Carbon loader requires config 'host' set")
+		return nil, errors.New("carbon loader requires config 'host' set")
 	}
 	sfConf := carbon.ForwarderConfig{
 		Port:                   conf.Port,

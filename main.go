@@ -51,11 +51,15 @@ type proxy struct {
 	setupDoneSignal chan struct{}
 	tk              timekeeper.TimeKeeper
 	debugServer     *debug.Server
+	stdout          io.Writer
+	gomaxprocs      func(int) int
 }
 
 var mainInstance = proxy{
-	tk:     timekeeper.RealTime{},
-	logger: log.DefaultLogger.CreateChild(),
+	tk:         timekeeper.RealTime{},
+	logger:     log.DefaultLogger.CreateChild(),
+	stdout:     os.Stdout,
+	gomaxprocs: runtime.GOMAXPROCS,
 }
 
 func init() {
@@ -66,7 +70,7 @@ func (p *proxy) getLogOutput(loadedConfig *config.ProxyConfig) io.Writer {
 	logDir := *loadedConfig.LogDir
 	if logDir == "-" {
 		p.logger.Log("Sending logging to stdout")
-		return os.Stdout
+		return p.stdout
 	}
 	logMaxSize := *loadedConfig.LogMaxSize
 	logMaxBackups := *loadedConfig.LogMaxBackups
@@ -88,6 +92,13 @@ func (p *proxy) getLogger(loadedConfig *config.ProxyConfig) log.Logger {
 	return log.NewLogfmtLogger(out, log.DefaultErrorHandler)
 }
 
+func forwarderName(f *config.ForwardTo) string {
+	if f.Name != nil {
+		return *f.Name
+	}
+	return f.Type
+}
+
 func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
@@ -98,12 +109,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 			return nil, err
 		}
 		//		allForwarders = append(allForwarders, forwarder)
-		name := func() string {
-			if forwardConfig.Name != nil {
-				return *forwardConfig.Name
-			}
-			return forwardConfig.Type
-		}()
+		name := forwarderName(forwardConfig)
 		// Buffering -> counting -> (forwarder)
 		limitedLogger := &log.RateLimitedLogger{
 			EventCounter: eventcounter.New(tk.Now(), time.Second),
@@ -207,12 +213,12 @@ func (p *proxy) setupDebugServer(conf *config.ProxyConfig, logger log.Logger, sc
 	return nil
 }
 
-func setupGoMaxProcs(numProcs *int) {
+func setupGoMaxProcs(numProcs *int, gomaxprocs func(int) int) {
 	if numProcs != nil {
-		runtime.GOMAXPROCS(*numProcs)
+		gomaxprocs(*numProcs)
 	} else {
 		numProcs := runtime.NumCPU()
-		runtime.GOMAXPROCS(numProcs)
+		gomaxprocs(numProcs)
 	}
 }
 
@@ -259,7 +265,7 @@ func (p *proxy) run(ctx context.Context) error {
 	defer os.Remove(pidFilename)
 	logger.Log(logkey.Config, loadedConfig, logkey.Env, strings.Join(os.Environ(), "-"), "config loaded")
 
-	setupGoMaxProcs(loadedConfig.NumProcs)
+	setupGoMaxProcs(loadedConfig.NumProcs, p.gomaxprocs)
 
 	loader := config.NewLoader(ctx, logger, versionString)
 	scheduler := sfxclient.NewScheduler()

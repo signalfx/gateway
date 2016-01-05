@@ -24,6 +24,7 @@ type Config struct {
 	NumDrainingThreads *int64
 }
 
+// DefaultConfig are default values for buffered forwarders
 var DefaultConfig = &Config{
 	BufferSize:         pointer.Int64(10000),
 	MaxTotalDatapoints: pointer.Int64(10000),
@@ -96,7 +97,7 @@ func (forwarder *BufferedForwarder) AddEvents(ctx context.Context, events []*eve
 	}
 }
 
-// Stats related to this forwarder, including errors processing datapoints
+// Datapoints related to this forwarder, including errors processing datapoints
 func (forwarder *BufferedForwarder) Datapoints() []*datapoint.Datapoint {
 	return []*datapoint.Datapoint{
 		sfxclient.Gauge("datapoint_chan_backup_size", nil, int64(len(forwarder.dpChan))),

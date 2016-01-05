@@ -78,6 +78,7 @@ type ProxyConfig struct {
 	PprofAddr          *string        `json:",omitempty"`
 }
 
+// DefaultProxyConfig is default values for the proxy config
 var DefaultProxyConfig = &ProxyConfig{
 	PidFilename:   pointer.String("metricproxy.pid"),
 	LogDir:        pointer.String(os.TempDir()),
@@ -134,12 +135,14 @@ func (p *ProxyConfig) String() string {
 	return "<config object>"
 }
 
+// Var returns the proxy config itself as an expvar
 func (p *ProxyConfig) Var() expvar.Var {
 	return expvar.Func(func() interface{} {
 		return p
 	})
 }
 
+// Load loads proxy configuration from a filename that is in an xdg configuration location
 func Load(configFile string, logger log.Logger) (*ProxyConfig, error) {
 	p, err := loadNoDefault(configFile, logger)
 	if err != nil {
@@ -148,7 +151,6 @@ func Load(configFile string, logger log.Logger) (*ProxyConfig, error) {
 	return pointer.FillDefaultFrom(p, DefaultProxyConfig).(*ProxyConfig), nil
 }
 
-// Load loads proxy configuration from a filename that is in an xdg configuration location
 func loadNoDefault(configFile string, logger log.Logger) (*ProxyConfig, error) {
 	logCtx := log.NewContext(logger).With(logkey.ConfigFile, configFile)
 	filename, err := xdgbasedirGetConfigFileLocation(configFile)

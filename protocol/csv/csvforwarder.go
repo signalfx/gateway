@@ -33,6 +33,7 @@ type Forwarder struct {
 
 var _ dpsink.Sink = &Forwarder{}
 
+// Datapoints returns nothing and exists to satisfy the protocol.Forwarder interface
 func (f *Forwarder) Datapoints() []*datapoint.Datapoint {
 	return nil
 }

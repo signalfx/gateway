@@ -151,10 +151,12 @@ func (connector *Forwarder) encodeEventPostBodyProtobufV2(events []*event.Event)
 	return protobytes, "application/x-protobuf", err
 }
 
+// Datapoints returns nothing.
 func (connector *Forwarder) Datapoints() []*datapoint.Datapoint {
 	return nil
 }
 
+// Close will terminate idle HTTP client connections
 func (connector *Forwarder) Close() error {
 	connector.tr.CloseIdleConnections()
 	return nil

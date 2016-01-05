@@ -9,6 +9,7 @@ import (
 	"golang.org/x/net/context"
 )
 
+// DatapointForwarder can send datapoints and not events
 type DatapointForwarder interface {
 	sfxclient.Collector
 	io.Closer
@@ -28,10 +29,12 @@ type Listener interface {
 	io.Closer
 }
 
+// UneventfulForwarder converts a datapoint only forwarder into a datapoint/event forwarder
 type UneventfulForwarder struct {
 	DatapointForwarder
 }
 
+// AddEvents does nothing and returns nil
 func (u *UneventfulForwarder) AddEvents(ctx context.Context, events []*event.Event) error {
 	return nil
 }
