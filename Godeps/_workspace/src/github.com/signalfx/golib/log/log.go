@@ -46,6 +46,9 @@ type Context struct {
 
 // NewContext creates a context out of a logger
 func NewContext(logger Logger) *Context {
+	if logger == nil {
+		return nil
+	}
 	if c, ok := logger.(*Context); ok {
 		return c
 	}

@@ -26,5 +26,5 @@ func TestRequestCounter(t *testing.T) {
 	})
 	m.ServeHTTP(nil, nil, f)
 
-	assert.Equal(t, 3, len(m.Stats(map[string]string{})))
+	assert.Equal(t, 3, len(m.Datapoints()))
 }

@@ -30,7 +30,7 @@ func init() {
 	globalSource.TimeSource = time.Now
 	globalEventSource.EventType = "imanotify.notify_instance"
 	globalEventSource.Dims = map[string]string{"host": "mwp-signalbox", "plugin": "my_plugin", "f": "x", "plugin_instance": "my_plugin_instance", "k": "v"}
-	globalEventSource.Meta = map[string]interface{}{"string": "value", "boolean": true, "int": int64(40), "double": 0.0, "": "nothing"}
+	globalEventSource.Meta = map[string]interface{}{"string": "value", "boolean": true, "int": int64(40), "double": 0.0}
 	globalEventSource.TimeSource = time.Now
 	globalEventSource.EventCategory = "COLLECTD"
 }

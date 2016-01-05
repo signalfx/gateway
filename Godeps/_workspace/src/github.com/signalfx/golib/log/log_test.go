@@ -88,9 +88,12 @@ func toStr(in []interface{}) []string {
 func TestLoggingBasics(t *testing.T) {
 	Convey("A nil logger should work as expected", t, func() {
 		var l *Context
+		var l2 Logger
 		So(IsDisabled(l), ShouldBeTrue)
 		So(l.With("a", "b"), ShouldBeNil)
 		So(l.WithPrefix("a", "b"), ShouldBeNil)
+		So(IsDisabled(NewContext(nil)), ShouldBeTrue)
+		So(IsDisabled(NewContext(l2)), ShouldBeTrue)
 	})
 	Convey("A normal logger", t, func() {
 		mem := NewChannelLogger(10, nil)

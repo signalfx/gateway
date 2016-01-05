@@ -163,3 +163,8 @@ func (i *VarAdder) Generate(next ContextHandler) ContextHandler {
 		next.ServeHTTPC(context.WithValue(ctx, i.Key, i.Value), rw, r)
 	})
 }
+
+// InvalidContentType is a HTTP handler helper to signal that the content type header is wrong
+func InvalidContentType(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Invalid content type:"+r.Header.Get("Content-Type"), http.StatusBadRequest)
+}

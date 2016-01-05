@@ -22,6 +22,9 @@ func NewOnHostDatapointDimensions(metric string, value datapoint.Value, metricTy
 // Wrap a normal datapoint to give it dimensions about the current hostname
 func Wrap(dp *datapoint.Datapoint) *datapoint.Datapoint {
 	hostname, err := osXXXHostname()
+	if dp.Dimensions == nil {
+		dp.Dimensions = make(map[string]string, 2)
+	}
 	if err != nil {
 		hostname = "unknown"
 	}

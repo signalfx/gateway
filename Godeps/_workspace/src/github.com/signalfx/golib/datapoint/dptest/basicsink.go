@@ -82,6 +82,7 @@ func (f *BasicSink) Resize(size int) {
 		panic("can only resize when empty")
 	}
 	f.PointsChan = make(chan []*datapoint.Datapoint, size)
+	f.EventsChan = make(chan []*event.Event, size)
 }
 
 // NewBasicSink creates a BasicSink with an unbuffered chan.  Note, calls to AddDatapoints will then

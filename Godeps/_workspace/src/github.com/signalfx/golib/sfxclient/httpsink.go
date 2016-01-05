@@ -74,7 +74,7 @@ func (h *HTTPDatapointSink) AddDatapoints(ctx context.Context, points []*datapoi
 	if err != nil {
 		return errors.Annotate(err, "cannot encode datapoints into protocol buffers")
 	}
-	req, err := http.NewRequest("POST", h.Endpoint, bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", h.Endpoint, bytes.NewReader(body))
 	if err != nil {
 		return errors.Annotatef(err, "cannot parse new HTTP request to %s", h.Endpoint)
 	}
