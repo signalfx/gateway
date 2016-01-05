@@ -58,7 +58,7 @@ func New(listenAddr string, explorableObj interface{}, conf *Config) (*Server, e
 	}
 	m.PathPrefix("/debug/pprof/cmdline").HandlerFunc(pprof.Cmdline)
 	m.PathPrefix("/debug/pprof/profile").HandlerFunc(pprof.Profile)
-	m.PathPrefix("/debug/pprof/trace").HandlerFunc(pprof.Trace)
+	setupTrace(m)
 	m.PathPrefix("/debug/pprof/symbol").HandlerFunc(pprof.Symbol)
 	m.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index)
 	e := &explorable.Handler{
