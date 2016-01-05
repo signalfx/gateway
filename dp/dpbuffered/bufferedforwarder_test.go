@@ -8,10 +8,9 @@ import (
 
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
-	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
-	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/golib/pointer"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
@@ -47,7 +46,7 @@ func TestBufferedForwarderBasic(t *testing.T) {
 	// Wait for more points
 	seen := <-sendTo.PointsChan
 	assert.True(t, len(seen) >= 2, fmt.Sprintf("Points should buffer: %d", len(seen)))
-	assert.Equal(t, numStats, len(bf.Stats(map[string]string{})), "Checking returned stats size")
+	assert.Equal(t, numStats, len(bf.Datapoints()), "Checking returned stats size")
 }
 
 // TODO figure out why this test is flaky, should be > 2, but change to >= 2 so it passes
@@ -79,7 +78,7 @@ func TestBufferedForwarderBasicEvent(t *testing.T) {
 	// Wait for more events
 	seen := <-sendTo.EventsChan
 	assert.True(t, len(seen) >= 2, fmt.Sprintf("Events should buffer: %d", len(seen)))
-	assert.Equal(t, numStats, len(bf.Stats(map[string]string{})), "Checking returned stats size")
+	assert.Equal(t, numStats, len(bf.Datapoints()), "Checking returned stats size")
 }
 
 func TestBufferedForwarderContexts(t *testing.T) {

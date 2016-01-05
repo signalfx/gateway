@@ -13,24 +13,34 @@ import (
 	"net/http/pprof"
 )
 
+// Server exposes private debugging information
 type Server struct {
 	httpServer http.Server
 	Exp2       *expvar2.Handler
 	listener   net.Listener
 }
 
+// Config controls optional parameters for the debug server
 type Config struct {
 	Logger log.Logger
 }
 
+// DefaultConfig is used by default for unset config parameters
 var DefaultConfig = &Config{
 	Logger: log.DefaultLogger.CreateChild(),
 }
 
+// Close stops the listening HTTP server
 func (s *Server) Close() error {
 	return s.listener.Close()
 }
 
+// Addr returns the net address of the listening HTTP server
+func (s *Server) Addr() net.Addr {
+	return s.listener.Addr()
+}
+
+// New creates a new debug server
 func New(listenAddr string, explorableObj interface{}, conf *Config) (*Server, error) {
 	conf = pointer.FillDefaultFrom(conf, DefaultConfig).(*Config)
 	l, err := net.Listen("tcp", listenAddr)

@@ -20,16 +20,16 @@ import (
 	"github.com/signalfx/metricproxy/protocol"
 
 	"expvar"
+	"fmt"
+	"github.com/signalfx/golib/eventcounter"
 	"github.com/signalfx/metricproxy/debug"
+	"github.com/signalfx/metricproxy/dp/dpbuffered"
 	"github.com/signalfx/metricproxy/protocol/demultiplexer"
 	"golang.org/x/net/context"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 	"strings"
 	"sync"
 	"time"
-	"fmt"
-	"github.com/signalfx/golib/eventcounter"
-	"github.com/signalfx/metricproxy/dp/dpbuffered"
 )
 
 const versionString = "0.9.0"
@@ -97,7 +97,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 			logCtx.Log(log.Err, err, "unable to load config")
 			return nil, err
 		}
-//		allForwarders = append(allForwarders, forwarder)
+		//		allForwarders = append(allForwarders, forwarder)
 		name := func() string {
 			if forwardConfig.Name != nil {
 				return *forwardConfig.Name
@@ -107,19 +107,19 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 		// Buffering -> counting -> (forwarder)
 		limitedLogger := &log.RateLimitedLogger{
 			EventCounter: eventcounter.New(tk.Now(), time.Second),
-			Limit: 2,	// Only 1 a second
-			Logger: logCtx,
-			Now: tk.Now,
+			Limit:        2, // Only 1 a second
+			Logger:       logCtx,
+			Now:          tk.Now,
 		}
 		count := &dpsink.Counter{
 			Logger: limitedLogger,
 		}
 		endingSink := dpsink.FromChain(forwarder, dpsink.NextWrap(count))
 		bconf := &dpbuffered.Config{
-			BufferSize: forwardConfig.BufferSize,
+			BufferSize:         forwardConfig.BufferSize,
 			MaxTotalDatapoints: forwardConfig.BufferSize,
-			MaxTotalEvents: forwardConfig.BufferSize,
-			MaxDrainSize: forwardConfig.MaxDrainSize,
+			MaxTotalEvents:     forwardConfig.BufferSize,
+			MaxDrainSize:       forwardConfig.MaxDrainSize,
 			NumDrainingThreads: forwardConfig.DrainingThreads,
 		}
 		bf := dpbuffered.NewBufferedForwarder(ctx, bconf, endingSink, limitedLogger)
@@ -150,9 +150,9 @@ func setupListeners(tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfi
 		count := &dpsink.Counter{
 			Logger: &log.RateLimitedLogger{
 				EventCounter: eventcounter.New(tk.Now(), time.Second),
-				Limit: 1,	// Only 1 a second
-				Logger: logCtx,
-				Now: tk.Now,
+				Limit:        1, // Only 1 a second
+				Logger:       logCtx,
+				Now:          tk.Now,
 			},
 		}
 		endingSink := dpsink.FromChain(multiplexer, dpsink.NextWrap(count))

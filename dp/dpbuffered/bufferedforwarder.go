@@ -10,9 +10,9 @@ import (
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/metricproxy/logkey"
 	"golang.org/x/net/context"
-	"github.com/signalfx/golib/sfxclient"
 )
 
 // Config controls BufferedForwarder limits
@@ -24,11 +24,11 @@ type Config struct {
 	NumDrainingThreads *int64
 }
 
-var DefaultConfig = &Config {
-	BufferSize: pointer.Int64(10000),
+var DefaultConfig = &Config{
+	BufferSize:         pointer.Int64(10000),
 	MaxTotalDatapoints: pointer.Int64(10000),
-	MaxTotalEvents: pointer.Int64(10000),
-	MaxDrainSize: pointer.Int64(1000),
+	MaxTotalEvents:     pointer.Int64(10000),
+	MaxDrainSize:       pointer.Int64(1000),
 	NumDrainingThreads: pointer.Int64(5),
 }
 
@@ -98,7 +98,7 @@ func (forwarder *BufferedForwarder) AddEvents(ctx context.Context, events []*eve
 
 // Stats related to this forwarder, including errors processing datapoints
 func (forwarder *BufferedForwarder) Datapoints() []*datapoint.Datapoint {
-	return []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{
 		sfxclient.Gauge("datapoint_chan_backup_size", nil, int64(len(forwarder.dpChan))),
 		sfxclient.Gauge("event_chan_backup_size", nil, int64(len(forwarder.eChan))),
 		sfxclient.Gauge("datapoint_backup_size", nil, atomic.LoadInt64(&forwarder.stats.totalDatapointsBuffered)),
