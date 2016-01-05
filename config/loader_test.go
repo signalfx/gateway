@@ -7,6 +7,7 @@ import (
 	"github.com/signalfx/metricproxy/protocol/carbon"
 	. "github.com/smartystreets/goconvey/convey"
 	"golang.org/x/net/context"
+	"os"
 	"testing"
 )
 
@@ -43,9 +44,10 @@ func TestConfigLoader(t *testing.T) {
 		})
 
 		Convey("should load CSV forwarder", func() {
-			f, err := l.Forwarder(&ForwardTo{Type: "csv"})
+			f, err := l.Forwarder(&ForwardTo{Type: "csv", Filename: pointer.String("datapoints.csv")})
 			So(err, ShouldBeNil)
 			So(f.Close(), ShouldBeNil)
+			os.Remove("datapoints.csv")
 		})
 
 		Convey("should load CollectD listener", func() {
