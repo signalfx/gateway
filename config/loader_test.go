@@ -2,8 +2,8 @@ package config
 
 import (
 	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/nettest"
+	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/metricproxy/protocol/carbon"
 	. "github.com/smartystreets/goconvey/convey"
 	"golang.org/x/net/context"

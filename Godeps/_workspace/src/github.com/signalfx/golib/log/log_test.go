@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func TestWithConcurrent(t *testing.T) {
+func TestWithConcurrentInternal(t *testing.T) {
 	// Create some buckets to count how many events each goroutine logs.
 	const goroutines = 10
 	counts := [goroutines]int{}
