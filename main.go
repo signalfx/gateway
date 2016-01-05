@@ -108,7 +108,6 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 			logCtx.Log(log.Err, err, "unable to load config")
 			return nil, err
 		}
-		//		allForwarders = append(allForwarders, forwarder)
 		name := forwarderName(forwardConfig)
 		// Buffering -> counting -> (forwarder)
 		limitedLogger := &log.RateLimitedLogger{

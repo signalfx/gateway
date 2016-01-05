@@ -31,12 +31,12 @@ func TestBufferedForwarderBasic(t *testing.T) {
 	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
 	defer bf.Close()
 	assert.NoError(t, bf.AddDatapoints(ctx, []*datapoint.Datapoint{}))
-	time.Sleep(time.Millisecond)
+	time.Sleep(time.Millisecond * 10)
+	datas := []*datapoint.Datapoint{
+		dptest.DP(),
+		dptest.DP(),
+	}
 	for i := 0; i < 100; i++ {
-		datas := []*datapoint.Datapoint{
-			{},
-			{},
-		}
 		assert.NoError(t, bf.AddDatapoints(ctx, datas))
 		if i == 0 {
 			seen := <-sendTo.PointsChan
@@ -53,7 +53,7 @@ func TestBufferedForwarderBasic(t *testing.T) {
 func TestBufferedForwarderBasicEvent(t *testing.T) {
 	ctx := context.Background()
 	config := &Config{
-		BufferSize:         pointer.Int64(210),
+		BufferSize:         pointer.Int64(2000),
 		MaxTotalDatapoints: pointer.Int64(1000),
 		MaxTotalEvents:     pointer.Int64(1000),
 		NumDrainingThreads: pointer.Int64(1),
@@ -63,12 +63,12 @@ func TestBufferedForwarderBasicEvent(t *testing.T) {
 	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
 	defer bf.Close()
 	assert.NoError(t, bf.AddEvents(ctx, []*event.Event{}))
-	time.Sleep(time.Millisecond)
+	time.Sleep(time.Millisecond * 5)
+	datas := []*event.Event{
+		dptest.E(),
+		dptest.E(),
+	}
 	for i := 0; i < 100; i++ {
-		datas := []*event.Event{
-			dptest.E(),
-			dptest.E(),
-		}
 		assert.NoError(t, bf.AddEvents(ctx, datas))
 		if i == 0 {
 			seen := <-sendTo.EventsChan
