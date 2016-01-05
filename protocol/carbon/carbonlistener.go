@@ -131,29 +131,6 @@ func (listener *Listener) startListening() {
 	}
 }
 
-//var defaultListenerConfig = &config.ListenFrom{
-//	ListenAddr:                 workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:2003"),
-//	Name:                       workarounds.GolangDoesnotAllowPointerToStringLiteral("carbonlistener"),
-//	TimeoutDuration:            workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
-//	MetricDeconstructor:        workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
-//	MetricDeconstructorOptions: workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
-//	ServerAcceptDeadline:       workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second),
-//}
-
-//// ListenerLoader loads a listener for the carbon/graphite protocol from config
-//func ListenerLoader(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom, logger log.Logger) (*Listener, error) {
-//	structdefaults.FillDefaultFrom(listenFrom, defaultListenerConfig)
-//	conf := listenerConfig{
-//		serverAcceptDeadline: *listenFrom.ServerAcceptDeadline,
-//		connectionTimeout:    *listenFrom.TimeoutDuration,
-//		name:                 *listenFrom.Name,
-//	}
-//	//  *listenFrom.Name
-//	return NewListener(
-//		ctx, sink, conf, *listenFrom.ListenAddr,
-//		*listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions, listenFrom.MetricDeconstructorOptionsJSON, logger)
-//}
-
 // ListenerConfig controls optional parameters for carbon listeners
 type ListenerConfig struct {
 	ServerAcceptDeadline *time.Duration

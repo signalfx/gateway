@@ -108,7 +108,7 @@ func TestCarbonListenerNormal(t *testing.T) {
 			listener, err = NewListener(sendTo, listenFrom)
 			So(err, ShouldBeNil)
 
-			connAddr := fmt.Sprintf("127.0.0.1:%d", nettest.TCPPort(listener.psocket))
+			connAddr := fmt.Sprintf("127.0.0.1:%d", nettest.TCPPort(listener))
 			s, err := net.Dial("tcp", connAddr)
 			So(err, ShouldBeNil)
 			// Wait for the idle timeout
@@ -131,7 +131,7 @@ func TestCarbonListenerNormal(t *testing.T) {
 			dps := listener.Datapoints()
 			So(dptest.ExactlyOne(dps, "invalid_datapoints").Value.String(), ShouldEqual, "0")
 
-			connAddr := fmt.Sprintf("127.0.0.1:%d", nettest.TCPPort(listener.psocket))
+			connAddr := fmt.Sprintf("127.0.0.1:%d", nettest.TCPPort(listener))
 			s, err := net.Dial("tcp", connAddr)
 			So(err, ShouldBeNil)
 			_, err = io.WriteString(s, "hello world bob\n")
@@ -148,7 +148,7 @@ func TestCarbonListenerNormal(t *testing.T) {
 		})
 		Convey("with a forwarder", func() {
 			forwarderConfig := ForwarderConfig{
-				Port: pointer.Uint16(nettest.TCPPort(listener.psocket)),
+				Port: pointer.Uint16(nettest.TCPPort(listener)),
 			}
 			forwarder, err := NewForwarder("127.0.0.1", &forwarderConfig)
 			So(err, ShouldBeNil)
