@@ -14,7 +14,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-	"runtime"
 )
 
 var errDeadline = errors.New("nope")
@@ -30,7 +29,7 @@ func (u *undeadlineable) SetDeadline(t time.Time) error {
 func TestCarbonListenerBadAddr(t *testing.T) {
 	Convey("bad listener ports shouldn't be able to accept", t, func() {
 		listenFrom := &ListenerConfig{
-			ListenAddr: pointer.String("127.0.0.1:90090999"),
+			ListenAddr: pointer.String("127.0.0.1:90090999r"),
 		}
 		sendTo := dptest.NewBasicSink()
 		_, err := NewListener(sendTo, listenFrom)
@@ -64,8 +63,13 @@ func TestCarbonForwarderNormal(t *testing.T) {
 			eventuallyTimesOut := func(ctx context.Context) {
 				var err error
 				for err == nil {
+					dps := []*datapoint.Datapoint{}
+					// Make this really big so the OS doesn't try to buffer it in the socket
+					for i := 0; i < 10000; i++ {
+						dps = append(dps, dptest.DP())
+					}
 					// Eventually this should timeout b/c of the above context
-					err = forwarder.AddDatapoints(ctx, []*datapoint.Datapoint{dptest.DP()})
+					err = forwarder.AddDatapoints(ctx, dps)
 					time.Sleep(time.Millisecond)
 				}
 

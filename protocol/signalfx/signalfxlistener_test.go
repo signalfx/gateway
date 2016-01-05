@@ -163,7 +163,7 @@ func verifyEventRequest(baseURI string, contentType string, path string, body io
 func TestSignalfxListenerFailure(t *testing.T) {
 	Convey("invalid addr should not listen", t, func() {
 		listenConf := &ListenerConfig{
-			ListenAddr: pointer.String("127.0.0.1:9999999999"),
+			ListenAddr: pointer.String("127.0.0.1:9999999999r"),
 		}
 		_, err := NewListener(nil, listenConf)
 		So(err, ShouldNotBeNil)

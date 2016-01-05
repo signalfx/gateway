@@ -158,7 +158,7 @@ const testCollectdBody = `[
 func TestCollectDListener(t *testing.T) {
 	Convey("invalid listener host should fail to connect", t, func() {
 		conf := &ListenerConfig{
-			ListenAddr: pointer.String("127.0.0.1:99999999"),
+			ListenAddr: pointer.String("127.0.0.1:99999999r"),
 		}
 		sendTo := dptest.NewBasicSink()
 
