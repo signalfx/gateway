@@ -18,6 +18,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"github.com/signalfx/metricproxy/config"
 )
 
 const config1 = `
@@ -40,6 +41,57 @@ const config1 = `
     ]
   }
 `
+
+const invalidForwarderConfig = `
+  {
+    "ListenFrom":[
+    ],
+    "ForwardTo":[
+      {
+      	"Type":"unkndfdown"
+      }
+    ]
+  }
+`
+
+const invalidListenerConfig = `
+  {
+    "ListenFrom":[
+    	{
+    		"Type":"unknown"
+		}
+    ],
+    "ForwardTo":[
+    ]
+  }
+`
+
+func TestFailingConfigs(t *testing.T) {
+	Convey("bad configs should fail to load", t, func() {
+		invalidConfigs := []string{
+			invalidForwarderConfig,
+			"__INVALID__JSON__",
+			invalidListenerConfig,
+		}
+		for _, c := range invalidConfigs {
+			logBuf := &bytes.Buffer{}
+			fileObj, err := ioutil.TempFile("", "TestProxy")
+			So(err, ShouldBeNil)
+			filename := fileObj.Name()
+			So(os.Remove(filename), ShouldBeNil)
+			ctx := context.Background()
+			So(ioutil.WriteFile(filename, []byte(c), os.FileMode(0666)), ShouldBeNil)
+			p := proxy{
+				flags: proxyFlags{
+					configFileName: filename,
+				},
+				logger:          log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic)),
+				tk:              timekeeper.RealTime{},
+			}
+			So(p.main(ctx), ShouldNotBeNil)
+		}
+	})
+}
 
 func TestProxy1(t *testing.T) {
 	Convey("a setup carbon proxy", t, func() {
@@ -70,7 +122,7 @@ func TestProxy1(t *testing.T) {
 			close(mainDoneChan)
 		}()
 		<-p.setupDoneSignal
-		listeningCarbonProxyPort := nettest.TCPPort(p.allListeners[0].(*carbon.Listener))
+		listeningCarbonProxyPort := nettest.TCPPort(p.listeners[0].(*carbon.Listener))
 
 		Convey("should proxy a carbon point", func() {
 			cf, err := carbon.NewForwarder("127.0.0.1", &carbon.ForwarderConfig{
@@ -83,6 +135,22 @@ func TestProxy1(t *testing.T) {
 			So(cf.AddDatapoints(ctx, []*datapoint.Datapoint{dp}), ShouldBeNil)
 			seenDatapoint := sendTo.Next()
 			So(dp.String(), ShouldEqual, seenDatapoint.String())
+		})
+
+		Convey("getLogOutput should work correctly", func() {
+			So(p.getLogOutput(&config.ProxyConfig{
+				LogDir: pointer.String("-"),
+			}), ShouldEqual, os.Stdout)
+			So(p.getLogOutput(&config.ProxyConfig{
+				LogDir: pointer.String(""),
+				LogMaxSize: pointer.Int(0),
+				LogMaxBackups: pointer.Int(0),
+			}), ShouldNotEqual, os.Stdout)
+			l := p.getLogger(&config.ProxyConfig{
+				LogDir: pointer.String("-"),
+				LogFormat: pointer.String("json"),
+			})
+			So(l.(*log.ErrorLogLogger).RootLogger, ShouldHaveSameTypeAs, &log.JSONLogger{})
 		})
 
 		Reset(func() {

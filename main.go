@@ -45,9 +45,9 @@ type proxyFlags struct {
 
 type proxy struct {
 	flags           proxyFlags
-	allListeners    []protocol.Listener
-	allDPForwarders []protocol.Forwarder
-	logger          *log.Hierarchy
+	listeners       []protocol.Listener
+	forwarders      []protocol.Forwarder
+	logger          log.Logger
 	setupDoneSignal chan struct{}
 	tk              timekeeper.TimeKeeper
 	debugServer     *debug.Server
@@ -138,7 +138,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 }
 
 func setupListeners(tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, multiplexer dpsink.Sink, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Listener, error) {
-	allListeners := make([]protocol.Listener, 0, len(loadedConfig.ListenFrom))
+	listeners := make([]protocol.Listener, 0, len(loadedConfig.ListenFrom))
 	for idx, listenConfig := range loadedConfig.ListenFrom {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, listenConfig.Type, logkey.Direction, "listener")
 		name := func() string {
@@ -162,7 +162,7 @@ func setupListeners(tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfi
 			logCtx.Log(log.Err, err, "unable to load config")
 			return nil, err
 		}
-		allListeners = append(allListeners, listener)
+		listeners = append(listeners, listener)
 		groupName := fmt.Sprintf("%s_l_%d", name, idx)
 		scheduler.AddGroupedCallback(groupName, listener)
 		scheduler.AddGroupedCallback(groupName, count)
@@ -172,7 +172,7 @@ func setupListeners(tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfi
 			"type":      listenConfig.Type,
 		})
 	}
-	return allListeners, nil
+	return listeners, nil
 }
 
 func splitSinks(forwarders []protocol.Forwarder) ([]dpsink.DSink, []dpsink.ESink) {
@@ -207,7 +207,36 @@ func (p *proxy) setupDebugServer(conf *config.ProxyConfig, logger log.Logger, sc
 	return nil
 }
 
+func setupGoMaxProcs(numProcs *int) {
+	if numProcs != nil {
+		runtime.GOMAXPROCS(*numProcs)
+	} else {
+		numProcs := runtime.NumCPU()
+		runtime.GOMAXPROCS(numProcs)
+	}
+}
+
+func (p *proxy) Close() error {
+	errs := make([]error, len(p.forwarders)+len(p.listeners)+1)
+	for _, f := range p.forwarders {
+		errs = append(errs, f.Close())
+	}
+	for _, l := range p.listeners {
+		errs = append(errs, l.Close())
+	}
+	if p.debugServer != nil {
+		errs = append(errs, p.debugServer.Close())
+	}
+	return errors.NewMultiErr(errs)
+}
+
 func (p *proxy) main(ctx context.Context) error {
+	// Disable the default logger to make sure nobody else uses it
+	err := p.run(ctx)
+	return errors.NewMultiErr([]error{err, p.Close()})
+}
+
+func (p *proxy) run(ctx context.Context) error {
 	p.logger.Log(logkey.ConfigFile, p.flags.configFileName, "Looking for config file")
 	p.logger.Log(logkey.Env, os.Environ(), "Looking for config file")
 
@@ -216,13 +245,13 @@ func (p *proxy) main(ctx context.Context) error {
 		p.logger.Log(log.Err, err, "Unable to load config")
 		return err
 	}
-	logger := log.NewContext(p.getLogger(loadedConfig)).With(logkey.Time, log.DefaultTimestamp, logkey.Caller, log.DefaultCaller)
-	p.logger = nil
-	// Disable the default logger to make sure nobody else uses it
-	log.DefaultLogger.Set(logger)
+	p.logger = log.NewContext(p.getLogger(loadedConfig)).With(logkey.Time, log.DefaultTimestamp, logkey.Caller, log.DefaultCaller)
+	logger := p.logger
+	log.DefaultLogger.Set(p.logger)
 	defer func() {
 		log.DefaultLogger.Set(log.Discard)
 	}()
+
 	pidFilename := *loadedConfig.PidFilename
 	if err := writePidFile(pidFilename); err != nil {
 		logger.Log(log.Err, err, logkey.Filename, pidFilename, "cannot store pid in pid file")
@@ -230,12 +259,7 @@ func (p *proxy) main(ctx context.Context) error {
 	defer os.Remove(pidFilename)
 	logger.Log(logkey.Config, loadedConfig, logkey.Env, strings.Join(os.Environ(), "-"), "config loaded")
 
-	if loadedConfig.NumProcs != nil {
-		runtime.GOMAXPROCS(*loadedConfig.NumProcs)
-	} else {
-		numProcs := runtime.NumCPU()
-		runtime.GOMAXPROCS(numProcs)
-	}
+	setupGoMaxProcs(loadedConfig.NumProcs)
 
 	loader := config.NewLoader(ctx, logger, versionString)
 	scheduler := sfxclient.NewScheduler()
@@ -245,14 +269,7 @@ func (p *proxy) main(ctx context.Context) error {
 	if err != nil {
 		return errors.Annotate(err, "unable to setup forwarders")
 	}
-	p.allDPForwarders = forwarders
-	defer func() {
-		for _, f := range forwarders {
-			if err := f.Close(); err != nil {
-				logger.Log(log.Err, err, "cannot close forwarder")
-			}
-		}
-	}()
+	p.forwarders = forwarders
 	dpSinks, eSinks := splitSinks(forwarders)
 
 	multiplexer := &demultiplexer.Demultiplexer{
@@ -264,14 +281,7 @@ func (p *proxy) main(ctx context.Context) error {
 	if err != nil {
 		return errors.Annotate(err, "cannot setup listeners from configuration")
 	}
-	p.allListeners = listeners
-	defer func() {
-		for _, l := range listeners {
-			if err := l.Close(); err != nil {
-				logger.Log(log.Err, err, "cannot close listener")
-			}
-		}
-	}()
+	p.listeners = listeners
 
 	// We still want to schedule stat collection so people can debug the server if they want
 	scheduler.Sink = dpsink.Discard
@@ -296,19 +306,12 @@ func (p *proxy) main(ctx context.Context) error {
 	if err := p.setupDebugServer(loadedConfig, logger, scheduler); err != nil {
 		return err
 	}
-
 	logger.Log("Setup done.  Blocking!")
 	if p.setupDoneSignal != nil {
 		close(p.setupDoneSignal)
 	}
 	<-ctx.Done()
 	cancelFunc()
-	if p.debugServer != nil {
-		err := p.debugServer.Close()
-		if err != nil {
-			logger.Log(log.Err, err, "cannot close debug server cleanly")
-		}
-	}
 	wg.Wait()
 	return nil
 }
