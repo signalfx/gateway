@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"runtime"
 )
 
 var errDeadline = errors.New("nope")
@@ -65,6 +66,7 @@ func TestCarbonForwarderNormal(t *testing.T) {
 				for err == nil {
 					// Eventually this should timeout b/c of the above context
 					err = forwarder.AddDatapoints(ctx, []*datapoint.Datapoint{dptest.DP()})
+					time.Sleep(time.Millisecond)
 				}
 
 				tailErr := errors.Tail(err).(net.Error)
