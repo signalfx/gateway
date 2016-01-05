@@ -41,8 +41,8 @@ type stats struct {
 // BufferedForwarder abstracts out datapoint buffering.  Points put on its channel are buffered
 // and sent in large groups to a waiting sink
 type BufferedForwarder struct {
-	dpChan                      (chan []*datapoint.Datapoint)
-	eChan                       (chan []*event.Event)
+	dpChan                      chan []*datapoint.Datapoint
+	eChan                       chan []*event.Event
 	config                      *Config
 	stats                       stats
 	threadsWaitingToDie         sync.WaitGroup

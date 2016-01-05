@@ -124,6 +124,21 @@ outer:
 	assert.Equal(t, context.Canceled, bf.AddDatapoints(canceledContext, datas), "Should escape when passed context canceled")
 }
 
+func TestBufferedForwarderBlockingDrain(t *testing.T) {
+	f := BufferedForwarder{
+		eChan: make(chan []*event.Event, 3),
+		config: &Config{
+			MaxDrainSize: pointer.Int64(1000),
+		},
+		stopContext: context.Background(),
+	}
+	f.eChan <- []*event.Event{dptest.E()}
+	f.eChan <- []*event.Event{dptest.E(), dptest.E()}
+
+	evs := f.blockingDrainEventsUpTo()
+	assert.True(t, len(evs) == 3)
+}
+
 func TestBufferedForwarderContextsEvent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	config := &Config{
