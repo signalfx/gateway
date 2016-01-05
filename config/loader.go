@@ -183,5 +183,7 @@ func (s *carbonLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) {
 		IdleConnectionPoolSize: conf.DrainingThreads,
 	}
 	f, err := carbon.NewForwarder(*conf.Host, &sfConf)
-	return &protocol.UneventfulForwarder{f}, err
+	return &protocol.UneventfulForwarder{
+		DatapointForwarder: f,
+	}, err
 }
