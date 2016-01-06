@@ -141,6 +141,7 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 		groupName := fmt.Sprintf("%s_f_%d", name, idx)
 
 		scheduler.AddGroupedCallback(groupName, forwarder)
+		scheduler.AddGroupedCallback(groupName, bf)
 		scheduler.GroupedDefaultDimensions(groupName, map[string]string{
 			"name":      name,
 			"direction": "forwarder",
