@@ -415,7 +415,7 @@ func setupNotFoundHandler(r *mux.Router, ctx context.Context) sfxclient.Collecto
 	metricTracking := web.RequestCounter{}
 	r.NotFoundHandler = web.NewHandler(ctx, web.FromHTTP(http.NotFoundHandler())).Add(web.NextHTTP(metricTracking.ServeHTTP))
 	return &sfxclient.WithDimensions{
-		Dimensions: map[string]string{"type": "http404"},
+		Dimensions: map[string]string{"http_endpoint": "http404"},
 		Collector:  &metricTracking,
 	}
 }
@@ -436,7 +436,7 @@ func setupChain(ctx context.Context, sink dpsink.Sink, chainType string, getRead
 			counter,
 		),
 		Dimensions: map[string]string{
-			"type": "sfx_" + chainType,
+			"http_endpoint": "sfx_" + chainType,
 		},
 	}
 	return handler, st
