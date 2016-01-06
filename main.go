@@ -32,7 +32,12 @@ import (
 	"time"
 )
 
-const versionString = "0.9.2"
+var (
+	// Version is set by a build flag to the built version
+	Version = "0.9.3"
+	// BuildDate is set by a build flag to the date of the build
+	BuildDate = ""
+)
 
 func writePidFile(pidFileName string) error {
 	pid := os.Getpid()
@@ -220,7 +225,13 @@ func (p *proxy) setupDebugServer(conf *config.ProxyConfig, logger log.Logger, sc
 		return runtime.Version()
 	})
 	p.debugServer.Exp2.Exported["proxy_version"] = expvar.Func(func() interface{} {
-		return versionString
+		return Version
+	})
+	p.debugServer.Exp2.Exported["build_date"] = expvar.Func(func() interface{} {
+		return BuildDate
+	})
+	p.debugServer.Exp2.Exported["source"] = expvar.Func(func() interface{} {
+		return fmt.Sprintf("https://github.com/signalfx/metricproxy/tree/%s", Version)
 	})
 	return nil
 }
@@ -280,7 +291,7 @@ func (p *proxy) run(ctx context.Context) error {
 
 	setupGoMaxProcs(loadedConfig.NumProcs, p.gomaxprocs)
 
-	loader := config.NewLoader(ctx, logger, versionString)
+	loader := config.NewLoader(ctx, logger, Version)
 	scheduler := sfxclient.NewScheduler()
 	scheduler.AddCallback(sfxclient.GoMetricsSource)
 	scheduler.DefaultDimensions(map[string]string{

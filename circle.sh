@@ -41,7 +41,7 @@ function do_cache() {
   (
     cd "$SRC_PATH"
     load_docker_images
-    GOPATH="$GOPATH:$(godep path)" CGO_ENABLED=0 go build -v -installsuffix .
+    GOPATH="$GOPATH:$(godep path)" CGO_ENABLED=0 go build -ldflags "-X main.Version $(git describe --tags HEAD) main.BuildDate $(date)" -v -installsuffix .
     docker build -t "$(docker_url)" .
     cache_docker_image "$(docker_url)" metricproxy
   )
