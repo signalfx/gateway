@@ -99,7 +99,15 @@ func forwarderName(f *config.ForwardTo) string {
 	return f.Type
 }
 
-func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Forwarder, error) {
+func getHostname(osHostname func() (string, error)) string {
+	name, err := osHostname()
+	if err != nil {
+		return "unknown"
+	}
+	return name
+}
+
+func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, forwardConfig.Type, logkey.Direction, "forwarder")
@@ -136,13 +144,15 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 		scheduler.GroupedDefaultDimensions(groupName, map[string]string{
 			"name":      name,
 			"direction": "forwarder",
+			"source":    "proxy",
+			"host":      hostname,
 			"type":      forwardConfig.Type,
 		})
 	}
 	return allForwarders, nil
 }
 
-func setupListeners(tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, multiplexer dpsink.Sink, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Listener, error) {
+func setupListeners(tk timekeeper.TimeKeeper, hostname string, loader *config.Loader, loadedConfig *config.ProxyConfig, multiplexer dpsink.Sink, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Listener, error) {
 	listeners := make([]protocol.Listener, 0, len(loadedConfig.ListenFrom))
 	for idx, listenConfig := range loadedConfig.ListenFrom {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, listenConfig.Type, logkey.Direction, "listener")
@@ -174,6 +184,8 @@ func setupListeners(tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfi
 		scheduler.GroupedDefaultDimensions(groupName, map[string]string{
 			"name":      name,
 			"direction": "listener",
+			"source":    "proxy",
+			"host":      hostname,
 			"type":      listenConfig.Type,
 		})
 	}
@@ -242,6 +254,7 @@ func (p *proxy) main(ctx context.Context) error {
 }
 
 func (p *proxy) run(ctx context.Context) error {
+	hostname := getHostname(os.Hostname)
 	p.logger.Log(logkey.ConfigFile, p.flags.configFileName, "Looking for config file")
 	p.logger.Log(logkey.Env, os.Environ(), "Looking for config file")
 
@@ -269,8 +282,12 @@ func (p *proxy) run(ctx context.Context) error {
 	loader := config.NewLoader(ctx, logger, versionString)
 	scheduler := sfxclient.NewScheduler()
 	scheduler.AddCallback(sfxclient.GoMetricsSource)
+	scheduler.DefaultDimensions(map[string]string{
+		"source": "proxy",
+		"host":   hostname,
+	})
 
-	forwarders, err := setupForwarders(ctx, p.tk, loader, loadedConfig, logger, scheduler)
+	forwarders, err := setupForwarders(ctx, hostname, p.tk, loader, loadedConfig, logger, scheduler)
 	if err != nil {
 		return errors.Annotate(err, "unable to setup forwarders")
 	}
@@ -282,7 +299,7 @@ func (p *proxy) run(ctx context.Context) error {
 		EventSinks:     eSinks,
 	}
 
-	listeners, err := setupListeners(p.tk, loader, loadedConfig, multiplexer, logger, scheduler)
+	listeners, err := setupListeners(p.tk, hostname, loader, loadedConfig, multiplexer, logger, scheduler)
 	if err != nil {
 		return errors.Annotate(err, "cannot setup listeners from configuration")
 	}

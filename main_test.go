@@ -122,6 +122,17 @@ func (g *goMaxProcs) Set(i int) int {
 	return int(atomic.SwapInt64(&g.lastVal, int64(i)))
 }
 
+func TestOsHostname(t *testing.T) {
+	Convey("failing config test", t, func() {
+		So(getHostname(func() (string, error) {
+			return "", errors.New("nope")
+		}), ShouldEqual, "unknown")
+		So(getHostname(func() (string, error) {
+			return "bob", nil
+		}), ShouldEqual, "bob")
+	})
+}
+
 func TestMainInstance(t *testing.T) {
 	flagParse = func() {}
 	s := mainInstance.flags.configFileName
