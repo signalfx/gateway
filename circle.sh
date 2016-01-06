@@ -38,10 +38,12 @@ function do_cache() {
   install_shellcheck "$GOPATH_INTO"
   gem install mdl
   copy_local_to_path "$SRC_PATH"
+  BUILD_VERSION=$(git describe --tags HEAD)
   (
     cd "$SRC_PATH"
     load_docker_images
-    GOPATH="$GOPATH:$(godep path)" CGO_ENABLED=0 go build -ldflags "-X main.Version $(git describe --tags HEAD) main.BuildDate $(date)" -v -installsuffix .
+    LD_FLAGS="-X main.Version=$BUILD_VERSION -X main.BuildDate=$(date --rfc-3339=seconds | sed 's/ /T/')"
+    GOPATH="$GOPATH:$(godep path)" CGO_ENABLED=0 go build -ldflags "$LD_FLAGS" -v -installsuffix .
     docker build -t "$(docker_url)" .
     cache_docker_image "$(docker_url)" metricproxy
   )
