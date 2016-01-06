@@ -69,41 +69,6 @@ var defaultForwarderConfig = &ForwarderConfig{
 	JSONMarshal:  json.Marshal,
 }
 
-//// ForwarderLoader loads a json forwarder forwarding points from proxy to SignalFx
-//func ForwarderLoader(ctx context.Context, forwardTo *config.ForwardTo, logger log.Logger) (protocol.Forwarder, error) {
-//	f, _, err := ForwarderLoader1(ctx, forwardTo, logger)
-//	return f, err
-//}
-//
-//// ForwarderLoader1 is a more strictly typed version of ForwarderLoader
-//func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo, logger log.Logger) (protocol.Forwarder, *Forwarder, error) {
-//	proxyVersion, ok := ctx.Value("version").(string)
-//	if !ok || proxyVersion == "" {
-//		proxyVersion = "UNKNOWN_VERSION"
-//	}
-//	if forwardTo.FormatVersion == nil {
-//		forwardTo.FormatVersion = workarounds.GolangDoesnotAllowPointerToUintLiteral(3)
-//	}
-//	if *forwardTo.FormatVersion != 3 {
-//		return nil, nil, errors.New("old formats not supported in signalfxforwarder: update config to use format 3")
-//	}
-//	structdefaults.FillDefaultFrom(forwardTo, defaultConfigV2)
-//	logger = log.NewContext(logger).With(logkey.Name, *forwardTo.Name).With(logkey.Protocol, "signalfx")
-//	logger.Log(logkey.ForwardTo, forwardTo, "Creating signalfx forwarder using final config")
-//	fwd := NewSignalfxJSONForwarder(*forwardTo.URL, *forwardTo.TimeoutDuration,
-//		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads,
-//		*forwardTo.DefaultSource, *forwardTo.SourceDimensions, proxyVersion)
-//	fwd.eventURL = *forwardTo.EventURL
-//	counter := &dpsink.Counter{}
-//	dims := protocol.ForwarderDims(*forwardTo.Name, "sfx_protobuf_v2")
-//	buffer := dpbuffered.NewBufferedForwarder(ctx, *(&dpbuffered.Config{}).FromConfig(forwardTo), fwd, logger)
-//	return &protocol.CompositeForwarder{
-//		Sink:   dpsink.FromChain(buffer, dpsink.NextWrap(counter)),
-//		Keeper: stats.ToKeeperMany(dims, counter, buffer),
-//		Closer: protocol.CompositeCloser(protocol.OkCloser(buffer.Close)),
-//	}, fwd, nil
-//}
-
 // NewForwarder creates a new JSON forwarder
 func NewForwarder(conf *ForwarderConfig) *Forwarder {
 	conf = pointer.FillDefaultFrom(conf, defaultForwarderConfig).(*ForwarderConfig)
