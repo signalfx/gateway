@@ -32,7 +32,7 @@ import (
 	"time"
 )
 
-const versionString = "0.9.0"
+const versionString = "0.9.2"
 
 func writePidFile(pidFileName string) error {
 	pid := os.Getpid()
