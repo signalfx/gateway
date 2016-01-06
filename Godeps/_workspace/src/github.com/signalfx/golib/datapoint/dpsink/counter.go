@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dplocal"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
+	"github.com/signalfx/golib/sfxclient"
 	"golang.org/x/net/context"
 )
 
@@ -26,52 +26,17 @@ type Counter struct {
 	Logger             log.Logger
 }
 
-// Stats related to this c, including errors processing datapoints
-func (c *Counter) Stats(dimensions map[string]string) []*datapoint.Datapoint {
-	ret := make([]*datapoint.Datapoint, 0, 6)
-
-	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
-		"total_process_errors",
-		datapoint.NewIntValue(atomic.LoadInt64(&c.TotalProcessErrors)),
-		datapoint.Counter,
-		dimensions))
-
-	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
-		"total_datapoints",
-		datapoint.NewIntValue(atomic.LoadInt64(&c.TotalDatapoints)),
-		datapoint.Counter,
-		dimensions))
-
-	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
-		"total_events",
-		datapoint.NewIntValue(atomic.LoadInt64(&c.TotalEvents)),
-		datapoint.Counter,
-		dimensions))
-
-	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
-		"total_process_calls",
-		datapoint.NewIntValue(atomic.LoadInt64(&c.TotalProcessCalls)),
-		datapoint.Counter,
-		dimensions))
-
-	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
-		"dropped_points",
-		datapoint.NewIntValue(atomic.LoadInt64(&c.ProcessErrorPoints)),
-		datapoint.Counter,
-		dimensions))
-
-	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
-		"process_time_ns",
-		datapoint.NewIntValue(atomic.LoadInt64(&c.TotalProcessTimeNs)),
-		datapoint.Counter,
-		dimensions))
-
-	ret = append(ret, dplocal.NewOnHostDatapointDimensions(
-		"calls_in_flight",
-		datapoint.NewIntValue(atomic.LoadInt64(&c.CallsInFlight)),
-		datapoint.Gauge,
-		dimensions))
-	return ret
+// Datapoints returns counter stats
+func (c *Counter) Datapoints() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{
+		sfxclient.Cumulative("total_process_errors", nil, atomic.LoadInt64(&c.TotalProcessErrors)),
+		sfxclient.Cumulative("total_datapoints", nil, atomic.LoadInt64(&c.TotalDatapoints)),
+		sfxclient.Cumulative("total_events", nil, atomic.LoadInt64(&c.TotalEvents)),
+		sfxclient.Cumulative("total_process_calls", nil, atomic.LoadInt64(&c.TotalProcessCalls)),
+		sfxclient.Cumulative("dropped_points", nil, atomic.LoadInt64(&c.ProcessErrorPoints)),
+		sfxclient.Cumulative("process_time_ns", nil, atomic.LoadInt64(&c.TotalProcessTimeNs)),
+		sfxclient.Gauge("calls_in_flight", nil, atomic.LoadInt64(&c.CallsInFlight)),
+	}
 }
 
 // AddDatapoints will send points to the next sink and track points send to the next sink

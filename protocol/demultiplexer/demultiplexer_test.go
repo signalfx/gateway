@@ -9,7 +9,6 @@ import (
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/event"
-	"github.com/signalfx/golib/log"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
@@ -18,7 +17,10 @@ func TestNew(t *testing.T) {
 	ctx := context.Background()
 	sendTo1 := dptest.NewBasicSink()
 	sendTo2 := dptest.NewBasicSink()
-	demux := New([]dpsink.Sink{sendTo1, sendTo2}, log.Discard)
+	demux := Demultiplexer{
+		DatapointSinks: []dpsink.DSink{sendTo1},
+		EventSinks:     []dpsink.ESink{sendTo2},
+	}
 
 	pts := []*datapoint.Datapoint{dptest.DP(), dptest.DP()}
 	es := []*event.Event{dptest.E(), dptest.E()}

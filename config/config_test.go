@@ -52,6 +52,8 @@ func TestParseForwardOrdering(t *testing.T) {
 	assert.Equal(t, *config.ForwardTo[0].TimeoutDuration, time.Second*3)
 	assert.Equal(t, config.ForwardTo[0].DimensionsOrder[0], "hi")
 	assert.Equal(t, 1, len(config.ForwardTo[0].DimensionsOrder))
+	assert.Contains(t, config.Var().String(), "DimensionsOrder")
+	assert.Contains(t, config.String(), "<config object>")
 }
 
 func TestParseListenFromTimeout(t *testing.T) {

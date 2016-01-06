@@ -10,6 +10,7 @@ import (
 
 	"sync/atomic"
 
+	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
@@ -34,6 +35,17 @@ func (i *IncrHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request, next ht
 func (i *IncrHandler) makeHTTP(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		i.ServeHTTP(rw, r, next)
+	})
+}
+
+func TestInvalidContentType(t *testing.T) {
+	Convey("Invalid content type should work", t, func() {
+		rec := httptest.NewRecorder()
+		req, err := http.NewRequest("", "", nil)
+		So(err, ShouldBeNil)
+		req.Header.Add("Content-Type", "bob")
+		InvalidContentType(rec, req)
+		So(rec.Code, ShouldEqual, http.StatusBadRequest)
 	})
 }
 

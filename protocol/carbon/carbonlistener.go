@@ -10,39 +10,29 @@ import (
 
 	"sync"
 
-	"github.com/cep21/gohelpers/structdefaults"
-	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dplocal"
 	"github.com/signalfx/golib/datapoint/dpsink"
+	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
-	"github.com/signalfx/metricproxy/config"
+	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
-	"github.com/signalfx/metricproxy/stats"
 	"golang.org/x/net/context"
 )
 
-type listenerConfig struct {
-	serverAcceptDeadline time.Duration
-	connectionTimeout    time.Duration
-	name                 string
-}
-
 // Listener once setup will listen for carbon protocol points to forward on
 type Listener struct {
-	psocket             net.Listener
-	sink                dpsink.Sink
-	metricDeconstructor metricdeconstructor.MetricDeconstructor
-
-	st stats.Keeper
+	psocket              net.Listener
+	sink                 dpsink.Sink
+	metricDeconstructor  metricdeconstructor.MetricDeconstructor
+	serverAcceptDeadline time.Duration
+	connectionTimeout    time.Duration
 
 	logger log.Logger
 	stats  listenerStats
-	conf   listenerConfig
 	wg     sync.WaitGroup
-	ctx    context.Context
 }
 
 var _ protocol.Listener = &Listener{}
@@ -57,30 +47,15 @@ type listenerStats struct {
 	activeConnections   int64
 }
 
-// Stats reports information about the total points seen by carbon
-func (listener *Listener) Stats() []*datapoint.Datapoint {
-	ret := []*datapoint.Datapoint{}
-	stats := map[string]int64{
-		"invalid_datapoints": atomic.LoadInt64(&listener.stats.invalidDatapoints),
-		"total_connections":  atomic.LoadInt64(&listener.stats.totalConnections),
-		"active_connections": atomic.LoadInt64(&listener.stats.activeConnections),
+// Datapoints reports information about the total points seen by carbon
+func (listener *Listener) Datapoints() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{
+		sfxclient.Cumulative("invalid_datapoints", nil, atomic.LoadInt64(&listener.stats.invalidDatapoints)),
+		sfxclient.Cumulative("total_connections", nil, atomic.LoadInt64(&listener.stats.totalConnections)),
+		sfxclient.Gauge("active_connections", nil, atomic.LoadInt64(&listener.stats.activeConnections)),
+		sfxclient.Cumulative("idle_timeouts", nil, atomic.LoadInt64(&listener.stats.idleTimeouts)),
+		sfxclient.Cumulative("retry_listen_errors", nil, atomic.LoadInt64(&listener.stats.retriedListenErrors)),
 	}
-	for k, v := range stats {
-		var t datapoint.MetricType
-		if k == "active_connections" {
-			t = datapoint.Gauge
-		} else {
-			t = datapoint.Counter
-		}
-		ret = append(
-			ret,
-			dplocal.NewOnHostDatapointDimensions(
-				k,
-				datapoint.NewIntValue(v),
-				t,
-				map[string]string{"listener": listener.conf.name}))
-	}
-	return append(ret, listener.st.Stats()...)
 }
 
 // Close the exposed carbon port
@@ -97,15 +72,15 @@ type carbonListenConn interface {
 	RemoteAddr() net.Addr
 }
 
-func (listener *Listener) handleConnection(conn carbonListenConn) error {
+func (listener *Listener) handleConnection(ctx context.Context, conn carbonListenConn) error {
+	defer conn.Close()
 	reader := bufio.NewReader(conn)
 	atomic.AddInt64(&listener.stats.totalConnections, 1)
 	atomic.AddInt64(&listener.stats.activeConnections, 1)
-	connLogger := log.NewContext(listener.logger).With(logkey.RemoteAddr, conn.RemoteAddr())
-	defer conn.Close()
 	defer atomic.AddInt64(&listener.stats.activeConnections, -1)
+	connLogger := log.NewContext(listener.logger).With(logkey.RemoteAddr, conn.RemoteAddr())
 	for {
-		conn.SetDeadline(time.Now().Add(listener.conf.connectionTimeout))
+		conn.SetDeadline(time.Now().Add(listener.connectionTimeout))
 		bytes, err := reader.ReadBytes((byte)('\n'))
 		if err != nil && err != io.EOF {
 			atomic.AddInt64(&listener.stats.idleTimeouts, 1)
@@ -120,7 +95,7 @@ func (listener *Listener) handleConnection(conn carbonListenConn) error {
 				connLogger.Log(logkey.CarbonLine, line, log.Err, err, "Received data on a carbon port, but it doesn't look like carbon data")
 				return err
 			}
-			listener.sink.AddDatapoints(listener.ctx, []*datapoint.Datapoint{dp})
+			listener.sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp})
 			atomic.AddInt64(&listener.stats.totalDatapoints, 1)
 		}
 
@@ -137,7 +112,7 @@ func (listener *Listener) startListening() {
 	for {
 		deadlineable, ok := listener.psocket.(*net.TCPListener)
 		if ok {
-			deadlineable.SetDeadline(time.Now().Add(listener.conf.serverAcceptDeadline))
+			deadlineable.SetDeadline(time.Now().Add(listener.serverAcceptDeadline))
 		}
 		conn, err := listener.psocket.Accept()
 		if err != nil {
@@ -150,60 +125,48 @@ func (listener *Listener) startListening() {
 			listener.logger.Log(log.Err, err, "Unable to accept a socket connection")
 			return
 		}
-		go listener.handleConnection(conn)
+		go func() {
+			listener.handleConnection(context.Background(), conn)
+		}()
 	}
 }
 
-var defaultListenerConfig = &config.ListenFrom{
-	ListenAddr:                 workarounds.GolangDoesnotAllowPointerToStringLiteral("127.0.0.1:2003"),
-	Name:                       workarounds.GolangDoesnotAllowPointerToStringLiteral("carbonlistener"),
-	TimeoutDuration:            workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 30),
-	MetricDeconstructor:        workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
-	MetricDeconstructorOptions: workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
-	ServerAcceptDeadline:       workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second),
+// ListenerConfig controls optional parameters for carbon listeners
+type ListenerConfig struct {
+	ServerAcceptDeadline *time.Duration
+	ConnectionTimeout    *time.Duration
+	ListenAddr           *string
+	MetricDeconstructor  metricdeconstructor.MetricDeconstructor
+	Logger               log.Logger
 }
 
-// ListenerLoader loads a listener for the carbon/graphite protocol from config
-func ListenerLoader(ctx context.Context, sink dpsink.Sink, listenFrom *config.ListenFrom, logger log.Logger) (*Listener, error) {
-	structdefaults.FillDefaultFrom(listenFrom, defaultListenerConfig)
-	conf := listenerConfig{
-		serverAcceptDeadline: *listenFrom.ServerAcceptDeadline,
-		connectionTimeout:    *listenFrom.TimeoutDuration,
-		name:                 *listenFrom.Name,
-	}
-	//  *listenFrom.Name
-	return NewListener(
-		ctx, sink, conf, *listenFrom.ListenAddr,
-		*listenFrom.MetricDeconstructor, *listenFrom.MetricDeconstructorOptions, listenFrom.MetricDeconstructorOptionsJSON, logger)
+var defaultListenerConfig = &ListenerConfig{
+	ServerAcceptDeadline: pointer.Duration(time.Second),
+	ConnectionTimeout:    pointer.Duration(time.Second * 30),
+	ListenAddr:           pointer.String("127.0.0.1:2003"),
+	MetricDeconstructor:  &metricdeconstructor.IdentityMetricDeconstructor{},
+}
+
+// Addr returns the listening address of this carbon listener
+func (listener *Listener) Addr() net.Addr {
+	return listener.psocket.Addr()
 }
 
 // NewListener creates a new listener for carbon datapoints
-func NewListener(ctx context.Context, sink dpsink.Sink, conf listenerConfig, listenAddr string,
-	metricDeconstructor string, metricDeconstructorOptions string, metricDeconstructorJSON map[string]interface{}, logger log.Logger) (*Listener, error) {
-	psocket, err := net.Listen("tcp", listenAddr)
+func NewListener(sendTo dpsink.Sink, passedConf *ListenerConfig) (*Listener, error) {
+	conf := pointer.FillDefaultFrom(passedConf, defaultListenerConfig).(*ListenerConfig)
+	psocket, err := net.Listen("tcp", *conf.ListenAddr)
 	if err != nil {
-		return nil, err
+		return nil, errors.Annotatef(err, "cannot listen to addr %s", *conf.ListenAddr)
 	}
-
-	deconstructor, err := metricdeconstructor.Load(metricDeconstructor, metricDeconstructorOptions)
-	if err != nil {
-		deconstructor, err = metricdeconstructor.LoadJSON(metricDeconstructor, metricDeconstructorJSON)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	counter := &dpsink.Counter{}
-	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
 
 	receiver := Listener{
-		sink:                finalSink,
-		psocket:             psocket,
-		conf:                conf,
-		metricDeconstructor: deconstructor,
-		ctx:                 ctx,
-		st:                  stats.ToKeeperMany(protocol.ListenerDims(conf.name, "carbon"), counter),
-		logger:              log.NewContext(logger).With(logkey.Protocol, "carbon", logkey.Direction, "listener", logkey.Name, conf.name),
+		sink:                 sendTo,
+		psocket:              psocket,
+		metricDeconstructor:  conf.MetricDeconstructor,
+		serverAcceptDeadline: *conf.ServerAcceptDeadline,
+		connectionTimeout:    *conf.ConnectionTimeout,
+		logger:               log.NewContext(conf.Logger).With(logkey.Protocol, "carbon", logkey.Direction, "listener"),
 	}
 	receiver.wg.Add(1)
 

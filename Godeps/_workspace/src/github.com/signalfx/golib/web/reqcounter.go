@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/sfxclient"
 )
 
 // RequestCounter is a negroni handler that tracks connection stats
@@ -36,30 +37,11 @@ func (m *RequestCounter) ServeHTTP(rw http.ResponseWriter, r *http.Request, next
 	atomic.AddInt64(&m.TotalProcessingTimeNs, reqDuration.Nanoseconds())
 }
 
-// Stats returns stats on total connections, active connections, and total processing time
-func (m *RequestCounter) Stats(dimensions map[string]string) []*datapoint.Datapoint {
-	ret := []*datapoint.Datapoint{}
-	stats := map[string]int64{
-		"total_connections": atomic.LoadInt64(&m.TotalConnections),
-		"total_time_ns":     atomic.LoadInt64(&m.TotalProcessingTimeNs),
+// Datapoints returns stats on total connections, active connections, and total processing time
+func (m *RequestCounter) Datapoints() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{
+		sfxclient.Cumulative("total_connections", nil, atomic.LoadInt64(&m.TotalConnections)),
+		sfxclient.Cumulative("total_time_ns", nil, atomic.LoadInt64(&m.TotalProcessingTimeNs)),
+		sfxclient.Gauge("active_connections", nil, atomic.LoadInt64(&m.ActiveConnections)),
 	}
-	for k, v := range stats {
-		ret = append(
-			ret,
-			datapoint.New(
-				k,
-				dimensions,
-				datapoint.NewIntValue(v),
-				datapoint.Counter,
-				time.Now()))
-	}
-	ret = append(
-		ret,
-		datapoint.New(
-			"active_connections",
-			dimensions,
-			datapoint.NewIntValue(atomic.LoadInt64(&m.ActiveConnections)),
-			datapoint.Gauge,
-			time.Now()))
-	return ret
 }

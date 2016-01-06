@@ -7,53 +7,25 @@ import (
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	. "github.com/smartystreets/goconvey/convey"
 
+	"errors"
 	"github.com/signalfx/golib/datapoint"
-	"github.com/stretchr/testify/assert"
+	"github.com/signalfx/golib/pointer"
 )
 
-func TestNewProtobufDataPoint(t *testing.T) {
-	protoDatapoint := &com_signalfx_metrics_protobuf.DataPoint{
-		Source: workarounds.GolangDoesnotAllowPointerToStringLiteral("asource"),
-		Metric: workarounds.GolangDoesnotAllowPointerToStringLiteral("ametric"),
-		Value:  &com_signalfx_metrics_protobuf.Datum{IntValue: workarounds.GolangDoesnotAllowPointerToIntLiteral(2)},
-		Dimensions: []*com_signalfx_metrics_protobuf.Dimension{{
-			Key:   workarounds.GolangDoesnotAllowPointerToStringLiteral("key"),
-			Value: workarounds.GolangDoesnotAllowPointerToStringLiteral("value"),
-		}},
-	}
-	dp, err := NewProtobufDataPointWithType(protoDatapoint, com_signalfx_metrics_protobuf.MetricType_COUNTER)
-	assert.Equal(t, "asource", dp.Dimensions["sf_source"], "Line should be invalid")
-	assert.NoError(t, err)
-	assert.Equal(t, datapoint.Count, dp.MetricType, "Line should be invalid")
-
-	v := com_signalfx_metrics_protobuf.MetricType_CUMULATIVE_COUNTER
-	protoDatapoint.MetricType = &v
-	dp, err = NewProtobufDataPointWithType(protoDatapoint, com_signalfx_metrics_protobuf.MetricType_COUNTER)
-	assert.NoError(t, err)
-	assert.Equal(t, datapoint.Counter, dp.MetricType, "Line should be invalid")
-
-	item := &BodySendFormatV2{
-		Metric: "ametric",
-		Value:  3.0,
-	}
-	assert.Contains(t, item.String(), "ametric", "Should get metric name back")
-	f, _ := ValueToValue(item.Value)
-	assert.Equal(t, datapoint.NewFloatValue(3.0), f, "Should get value 3 back")
-
-	item.Value = 3
-	i, _ := ValueToValue(item.Value)
-	assert.Equal(t, datapoint.NewIntValue(3), i, "Should get value 3 back")
-
-	item.Value = int64(3)
-	ValueToValue(item.Value)
-
-	item.Value = "abc"
-	s, _ := ValueToValue(item.Value)
-	assert.Equal(t, datapoint.NewStringValue("abc"), s, "Should get value abc back")
-
-	item.Value = struct{}{}
-	_, err = ValueToValue(item.Value)
-	assert.Error(t, err)
+func TestValueToValue(t *testing.T) {
+	Convey("v2v conversion", t, func() {
+		testVal := func(toSend interface{}, expected string) {
+			dv, err := ValueToValue(toSend)
+			So(err, ShouldBeNil)
+			So(expected, ShouldEqual, dv.String())
+		}
+		testVal(int64(1), "1")
+		testVal(float64(.2), "0.2")
+		testVal(int(3), "3")
+		testVal("4", "4")
+		_, err := ValueToValue(errors.New("testing"))
+		So(err, ShouldNotBeNil)
+	})
 }
 
 func TestNewProtobufDataPointWithType(t *testing.T) {
@@ -63,6 +35,24 @@ func TestNewProtobufDataPointWithType(t *testing.T) {
 			_, err := NewProtobufDataPointWithType(&dp, com_signalfx_metrics_protobuf.MetricType_COUNTER)
 			So(err, ShouldEqual, errDatapointValueNotSet)
 		})
+		Convey("source should set", func() {
+			dp.Source = pointer.String("hello")
+			dp.Value = &com_signalfx_metrics_protobuf.Datum{
+				IntValue: pointer.Int64(1),
+			}
+			dp2, err := NewProtobufDataPointWithType(&dp, com_signalfx_metrics_protobuf.MetricType_COUNTER)
+			So(err, ShouldBeNil)
+			So(dp2.Dimensions["sf_source"], ShouldEqual, "hello")
+		})
+	})
+}
+
+func TestBodySendFormatV2(t *testing.T) {
+	Convey("BodySendFormatV2 should String()-ify", t, func() {
+		x := BodySendFormatV2{
+			Metric: "hi",
+		}
+		So(x.String(), ShouldContainSubstring, "hi")
 	})
 }
 
@@ -86,17 +76,27 @@ func TestNewProtobufEvent(t *testing.T) {
 	})
 }
 
-func TestConver(t *testing.T) {
-	assert.Panics(t, func() {
-		fromMT(com_signalfx_metrics_protobuf.MetricType(1001))
+func TestFromMT(t *testing.T) {
+	Convey("invalid fromMT types should panic", t, func() {
+		So(func() {
+			fromMT(com_signalfx_metrics_protobuf.MetricType(1001))
+		}, ShouldPanic)
 	})
 }
 
 func TestNewDatumValue(t *testing.T) {
-	s1 := "abc"
-	f1 := 1.2
-	i1 := int64(3)
-	assert.Equal(t, s1, NewDatumValue(&com_signalfx_metrics_protobuf.Datum{StrValue: &s1}).(datapoint.StringValue).String())
-	assert.Equal(t, i1, NewDatumValue(&com_signalfx_metrics_protobuf.Datum{IntValue: &i1}).(datapoint.IntValue).Int())
-	assert.Equal(t, f1, NewDatumValue(&com_signalfx_metrics_protobuf.Datum{DoubleValue: &f1}).(datapoint.FloatValue).Float())
+	Convey("datum values should convert", t, func() {
+		Convey("string should convert", func() {
+			s1 := "abc"
+			So(s1, ShouldEqual, NewDatumValue(&com_signalfx_metrics_protobuf.Datum{StrValue: &s1}).(datapoint.StringValue).String())
+		})
+		Convey("floats should convert", func() {
+			f1 := 1.2
+			So(f1, ShouldEqual, NewDatumValue(&com_signalfx_metrics_protobuf.Datum{DoubleValue: &f1}).(datapoint.FloatValue).Float())
+		})
+		Convey("int should convert", func() {
+			i1 := int64(3)
+			So(i1, ShouldEqual, NewDatumValue(&com_signalfx_metrics_protobuf.Datum{IntValue: &i1}).(datapoint.IntValue).Int())
+		})
+	})
 }

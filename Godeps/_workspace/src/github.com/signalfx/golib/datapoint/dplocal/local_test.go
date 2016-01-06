@@ -16,7 +16,7 @@ func TestNewOnHostDatapoint(t *testing.T) {
 
 	dp1 := NewOnHostDatapoint("metrica", nil, datapoint.Counter)
 	assert.Equal(t, "metrica", dp1.Metric)
-	dp := Wrap(datapoint.New("metric", map[string]string{}, datapoint.NewFloatValue(3.0), datapoint.Counter, time.Now()))
+	dp := Wrap(datapoint.New("metric", nil, datapoint.NewFloatValue(3.0), datapoint.Counter, time.Now()))
 	assert.Equal(t, hostname, dp.Dimensions["host"], "Should get source back")
 
 	osXXXHostname = func() (string, error) { return "", errors.New("unable to get hostname") }

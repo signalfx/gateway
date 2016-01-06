@@ -4,30 +4,39 @@ import (
 	"io"
 
 	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/metricproxy/stats"
+	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/sfxclient"
+	"golang.org/x/net/context"
 )
+
+// DatapointForwarder can send datapoints and not events
+type DatapointForwarder interface {
+	sfxclient.Collector
+	io.Closer
+	dpsink.DSink
+}
 
 // Forwarder is the basic interface endpoints must support for the proxy to forward to them
 type Forwarder interface {
 	dpsink.Sink
-	stats.Keeper
+	sfxclient.Collector
 	io.Closer
 }
-
-// CompositeForwarder is a helper struct that expects users to inject their own versions of each
-// type
-type CompositeForwarder struct {
-	dpsink.Sink
-	stats.Keeper
-	io.Closer
-}
-
-var _ Forwarder = &CompositeForwarder{}
 
 // Listener is the basic interface anything that listens for new metrics must implement
 type Listener interface {
-	stats.Keeper
+	sfxclient.Collector
 	io.Closer
+}
+
+// UneventfulForwarder converts a datapoint only forwarder into a datapoint/event forwarder
+type UneventfulForwarder struct {
+	DatapointForwarder
+}
+
+// AddEvents does nothing and returns nil
+func (u *UneventfulForwarder) AddEvents(ctx context.Context, events []*event.Event) error {
+	return nil
 }
 
 // ListenerDims are the common stat dimensions we expect on listener protocols
@@ -51,7 +60,7 @@ func ForwarderDims(name string, typ string) map[string]string {
 // CompositeListener is a helper struct that expects users to inject their own versions of each
 // type
 type CompositeListener struct {
-	stats.Keeper
+	sfxclient.Collector
 	io.Closer
 }
 

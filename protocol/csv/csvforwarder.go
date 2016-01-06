@@ -1,102 +1,91 @@
 package csv
 
 import (
-	"io/ioutil"
 	"os"
 
 	"sync"
 
-	"github.com/cep21/gohelpers/structdefaults"
-	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
+	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/logkey"
-	"github.com/signalfx/metricproxy/protocol"
+	"github.com/signalfx/golib/pointer"
 	"golang.org/x/net/context"
 )
 
-var csvDefaultConfig = &config.ForwardTo{
-	Filename: workarounds.GolangDoesnotAllowPointerToStringLiteral("datapoints.csv"),
-	Name:     workarounds.GolangDoesnotAllowPointerToStringLiteral("filename-drainer"),
+// Config controls the optional configuration of the csv forwarder
+type Config struct {
+	Filename    *string
+	WriteString func(f *os.File, s string) (ret int, err error)
 }
 
-// ForwarderLoader loads a CSV forwarder forwarding points from proxy to a file
-func ForwarderLoader(forwardTo *config.ForwardTo, logger log.Logger) (*FilenameForwarder, error) {
-	structdefaults.FillDefaultFrom(forwardTo, csvDefaultConfig)
-	return NewForwarder(*forwardTo.Name, *forwardTo.Filename, logger)
+var defaultConfig = &Config{
+	Filename:    pointer.String("datapoints.csv"),
+	WriteString: func(f *os.File, s string) (ret int, err error) { return f.WriteString(s) },
 }
 
-var _ protocol.Forwarder = &FilenameForwarder{}
-
-// FilenameForwarder prints datapoints to a file
-type FilenameForwarder struct {
-	writeLock   sync.Mutex
-	filename    string
+// Forwarder prints datapoints to a file
+type Forwarder struct {
+	mu          sync.Mutex
+	file        *os.File
 	writeString func(f *os.File, s string) (ret int, err error)
-	logger      log.Logger
 }
 
-var _ dpsink.Sink = &FilenameForwarder{}
+var _ dpsink.Sink = &Forwarder{}
 
-// Stats returns an empty list
-func (connector *FilenameForwarder) Stats() []*datapoint.Datapoint {
-	return []*datapoint.Datapoint{}
+// Datapoints returns nothing and exists to satisfy the protocol.Forwarder interface
+func (f *Forwarder) Datapoints() []*datapoint.Datapoint {
+	return nil
 }
 
 // AddDatapoints writes the points to a file
-func (connector *FilenameForwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
-	connector.writeLock.Lock()
-	defer connector.writeLock.Unlock()
-	file, err := os.OpenFile(connector.filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.FileMode(0666))
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+func (f *Forwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	for _, dp := range points {
-		_, err := connector.writeString(file, dp.String()+"\n")
-		if err != nil {
-			return err
+		if _, err := f.writeString(f.file, dp.String()+"\n"); err != nil {
+			return errors.Annotate(err, "cannot write datapoint to string")
 		}
 	}
-	return nil
+	return f.file.Sync()
 }
 
 // AddEvents writes the events to a file
-func (connector *FilenameForwarder) AddEvents(ctx context.Context, events []*event.Event) error {
-	connector.writeLock.Lock()
-	defer connector.writeLock.Unlock()
-	file, err := os.OpenFile(connector.filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, os.FileMode(0666))
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+func (f *Forwarder) AddEvents(ctx context.Context, events []*event.Event) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	for _, e := range events {
-		_, err := connector.writeString(file, e.String()+"\n")
-		if err != nil {
-			return err
+		if _, err := f.writeString(f.file, e.String()+"\n"); err != nil {
+			return errors.Annotate(err, "cannot write event to string")
 		}
 	}
-	return nil
+	return f.file.Sync()
 }
 
-// Close does nothing.  We foolishly reopen the file on each AddDatapoints
-func (connector *FilenameForwarder) Close() error {
-	return nil
+// Close the file we write to
+func (f *Forwarder) Close() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.file.Close()
 }
+
+//// ForwarderLoader loads a CSV forwarder forwarding points from proxy to a file
+//func ForwarderLoader(forwardTo *config.ForwardTo) (*Forwarder, error) {
+//	structdefaults.FillDefaultFrom(forwardTo, csvDefaultConfig)
+//	return NewForwarder(*forwardTo.Name, *forwardTo.Filename)
+//}
 
 // NewForwarder creates a new filename forwarder
-func NewForwarder(name string, filename string, logger log.Logger) (*FilenameForwarder, error) {
-	ret := &FilenameForwarder{
-		writeString: func(f *os.File, s string) (ret int, err error) { return f.WriteString(s) },
-		filename:    filename,
-		logger:      log.NewContext(logger).With(logkey.Filename, filename),
+func NewForwarder(config *Config) (*Forwarder, error) {
+	config = pointer.FillDefaultFrom(config, defaultConfig).(*Config)
+	file, err := os.OpenFile(*config.Filename, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, os.FileMode(0600))
+	if err != nil {
+		return nil, errors.Annotatef(err, "cannot open file %s", *config.Filename)
 	}
-	if err := ioutil.WriteFile(filename, []byte{}, os.FileMode(0666)); err != nil {
-		ret.logger.Log("Unable to verify write for file")
-		return nil, err
+
+	ret := &Forwarder{
+		writeString: config.WriteString,
+		file:        file,
 	}
 	return ret, nil
 }

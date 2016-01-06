@@ -38,7 +38,7 @@ func TestCounterSink(t *testing.T) {
 	middleSink.AddDatapoints(ctx, dps)
 	assert.Equal(t, int64(0), atomic.LoadInt64(&count.CallsInFlight), "Call is finished")
 	assert.Equal(t, int64(0), atomic.LoadInt64(&count.TotalProcessErrors), "No errors so far (see above)")
-	assert.Equal(t, numTests, len(count.Stats(map[string]string{})), "Just checking stats len()")
+	assert.Equal(t, numTests, len(count.Datapoints()), "Just checking stats len()")
 
 	bs.RetError(errors.New("nope"))
 	middleSink.AddDatapoints(ctx, dps)
@@ -64,7 +64,7 @@ func TestCounterSinkEvent(t *testing.T) {
 	middleSink.AddEvents(ctx, es)
 	assert.Equal(t, int64(0), atomic.LoadInt64(&count.CallsInFlight), "Call is finished")
 	assert.Equal(t, int64(0), atomic.LoadInt64(&count.TotalProcessErrors), "No errors so far (see above)")
-	assert.Equal(t, numTests, len(count.Stats(map[string]string{})), "Just checking stats len()")
+	assert.Equal(t, numTests, len(count.Datapoints()), "Just checking stats len()")
 
 	bs.RetError(errors.New("nope"))
 	middleSink.AddEvents(ctx, es)

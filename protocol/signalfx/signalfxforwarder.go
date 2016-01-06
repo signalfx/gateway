@@ -15,36 +15,26 @@ import (
 
 	"sync"
 
-	"errors"
-
-	"github.com/cep21/gohelpers/structdefaults"
-	"github.com/cep21/gohelpers/workarounds"
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
+	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
+	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/dp/dpbuffered"
-	"github.com/signalfx/metricproxy/logkey"
-	"github.com/signalfx/metricproxy/protocol"
-	"github.com/signalfx/metricproxy/stats"
 	"golang.org/x/net/context"
 )
 
 // Forwarder controls forwarding datapoints to SignalFx
 type Forwarder struct {
 	propertyLock          sync.Mutex
-	url                   string
 	eventURL              string
 	defaultAuthToken      string
 	tr                    *http.Transport
 	client                *http.Client
 	userAgent             string
-	defaultSource         string
-	dimensionSources      []string
 	emptyMetricNameFilter dpsink.EmptyMetricFilter
 
 	datapointSink dpsink.DSink
@@ -53,88 +43,61 @@ type Forwarder struct {
 	jsonMarshal  func(v interface{}) ([]byte, error)
 }
 
-var defaultConfigV2 = &config.ForwardTo{
-	URL:               workarounds.GolangDoesnotAllowPointerToStringLiteral("https://ingest.signalfx.com/v2/datapoint"),
-	EventURL:          workarounds.GolangDoesnotAllowPointerToStringLiteral("https://ingest.signalfx.com/v2/event"),
-	DefaultSource:     workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
-	MetricCreationURL: workarounds.GolangDoesnotAllowPointerToStringLiteral(""), // Not used
-	TimeoutDuration:   workarounds.GolangDoesnotAllowPointerToTimeLiteral(time.Second * 60),
-	BufferSize:        workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(1000000)),
-	DrainingThreads:   workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(10)),
-	Name:              workarounds.GolangDoesnotAllowPointerToStringLiteral("signalfx-forwarder"),
-	MaxDrainSize:      workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(3000)),
-	SourceDimensions:  workarounds.GolangDoesnotAllowPointerToStringLiteral(""),
-	FormatVersion:     workarounds.GolangDoesnotAllowPointerToUintLiteral(uint32(3)),
+// ForwarderConfig controls optional parameters for a signalfx forwarder
+type ForwarderConfig struct {
+	DatapointURL     *string
+	EventURL         *string
+	Timeout          *time.Duration
+	SourceDimensions *string
+	Logger           log.Logger
+	ProxyVersion     *string
+	MaxIdleConns     *int64
+	AuthToken        *string
+	ProtoMarshal     func(pb proto.Message) ([]byte, error)
+	JSONMarshal      func(v interface{}) ([]byte, error)
 }
 
-// ForwarderLoader loads a json forwarder forwarding points from proxy to SignalFx
-func ForwarderLoader(ctx context.Context, forwardTo *config.ForwardTo, logger log.Logger) (protocol.Forwarder, error) {
-	f, _, err := ForwarderLoader1(ctx, forwardTo, logger)
-	return f, err
+var defaultForwarderConfig = &ForwarderConfig{
+	DatapointURL: pointer.String("https://ingest.signalfx.com/v2/datapoint"),
+	EventURL:     pointer.String("https://ingest.signalfx.com/v2/event"),
+	AuthToken:    pointer.String(""),
+	Timeout:      pointer.Duration(time.Second * 30),
+	Logger:       log.Discard,
+	ProxyVersion: pointer.String("UNKNOWN_VERSION"),
+	MaxIdleConns: pointer.Int64(20),
+	ProtoMarshal: proto.Marshal,
+	JSONMarshal:  json.Marshal,
 }
 
-// ForwarderLoader1 is a more strictly typed version of ForwarderLoader
-func ForwarderLoader1(ctx context.Context, forwardTo *config.ForwardTo, logger log.Logger) (protocol.Forwarder, *Forwarder, error) {
-	proxyVersion, ok := ctx.Value("version").(string)
-	if !ok || proxyVersion == "" {
-		proxyVersion = "UNKNOWN_VERSION"
-	}
-	if forwardTo.FormatVersion == nil {
-		forwardTo.FormatVersion = workarounds.GolangDoesnotAllowPointerToUintLiteral(3)
-	}
-	if *forwardTo.FormatVersion != 3 {
-		return nil, nil, errors.New("old formats not supported in signalfxforwarder: update config to use format 3")
-	}
-	structdefaults.FillDefaultFrom(forwardTo, defaultConfigV2)
-	logger = log.NewContext(logger).With(logkey.Name, *forwardTo.Name).With(logkey.Protocol, "signalfx")
-	logger.Log(logkey.ForwardTo, forwardTo, "Creating signalfx forwarder using final config")
-	fwd := NewSignalfxJSONForwarder(*forwardTo.URL, *forwardTo.TimeoutDuration,
-		*forwardTo.DefaultAuthToken, *forwardTo.DrainingThreads,
-		*forwardTo.DefaultSource, *forwardTo.SourceDimensions, proxyVersion)
-	fwd.eventURL = *forwardTo.EventURL
-	counter := &dpsink.Counter{}
-	dims := protocol.ForwarderDims(*forwardTo.Name, "sfx_protobuf_v2")
-	buffer := dpbuffered.NewBufferedForwarder(ctx, *(&dpbuffered.Config{}).FromConfig(forwardTo), fwd, logger)
-	return &protocol.CompositeForwarder{
-		Sink:   dpsink.FromChain(buffer, dpsink.NextWrap(counter)),
-		Keeper: stats.ToKeeperMany(dims, counter, buffer),
-		Closer: protocol.CompositeCloser(protocol.OkCloser(buffer.Close)),
-	}, fwd, nil
-}
-
-// NewSignalfxJSONForwarder creates a new JSON forwarder
-func NewSignalfxJSONForwarder(url string, timeout time.Duration,
-	defaultAuthToken string, drainingThreads uint32,
-	defaultSource string, sourceDimensions string, proxyVersion string) *Forwarder {
+// NewForwarder creates a new JSON forwarder
+func NewForwarder(conf *ForwarderConfig) *Forwarder {
+	conf = pointer.FillDefaultFrom(conf, defaultForwarderConfig).(*ForwarderConfig)
 	tr := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
-		MaxIdleConnsPerHost:   int(drainingThreads) * 2,
-		ResponseHeaderTimeout: timeout,
+		MaxIdleConnsPerHost:   int(*conf.MaxIdleConns * 2),
+		ResponseHeaderTimeout: *conf.Timeout,
 		Dial: func(network, addr string) (net.Conn, error) {
-			return net.DialTimeout(network, addr, timeout)
+			return net.DialTimeout(network, addr, *conf.Timeout)
 		},
-		TLSHandshakeTimeout: timeout,
+		TLSHandshakeTimeout: *conf.Timeout,
 	}
 	datapointSendingSink := sfxclient.NewHTTPDatapointSink()
-	datapointSendingSink.Client.Timeout = timeout
 	datapointSendingSink.Client = http.Client{
 		Transport: tr,
+		Timeout:   *conf.Timeout,
 	}
-	datapointSendingSink.AuthToken = defaultAuthToken
-	datapointSendingSink.UserAgent = fmt.Sprintf("SignalfxProxy/%s (gover %s)", proxyVersion, runtime.Version())
-	datapointSendingSink.Endpoint = url
+	datapointSendingSink.AuthToken = *conf.AuthToken
+	datapointSendingSink.UserAgent = fmt.Sprintf("SignalfxProxy/%s (gover %s)", *conf.ProxyVersion, runtime.Version())
+	datapointSendingSink.Endpoint = *conf.DatapointURL
 	ret := &Forwarder{
-		url:              url,
 		defaultAuthToken: datapointSendingSink.AuthToken,
 		userAgent:        datapointSendingSink.UserAgent,
 		tr:               tr,
 		client:           &datapointSendingSink.Client,
-		protoMarshal:     proto.Marshal,
-		jsonMarshal:      json.Marshal,
+		protoMarshal:     conf.ProtoMarshal,
+		eventURL:         *conf.EventURL,
+		jsonMarshal:      conf.JSONMarshal,
 		datapointSink:    datapointSendingSink,
-		defaultSource:    defaultSource,
-		// sf_source is always a dimension that can be a source
-		dimensionSources: append([]string{"sf_source"}, strings.Split(sourceDimensions, ",")...),
 	}
 	return ret
 }
@@ -151,6 +114,17 @@ func (connector *Forwarder) encodeEventPostBodyProtobufV2(events []*event.Event)
 
 	// Now we can send events
 	return protobytes, "application/x-protobuf", err
+}
+
+// Datapoints returns nothing.
+func (connector *Forwarder) Datapoints() []*datapoint.Datapoint {
+	return nil
+}
+
+// Close will terminate idle HTTP client connections
+func (connector *Forwarder) Close() error {
+	connector.tr.CloseIdleConnections()
+	return nil
 }
 
 func (connector *Forwarder) coreEventToProtobuf(e *event.Event) *com_signalfx_metrics_protobuf.Event {
@@ -228,26 +202,8 @@ func runeFilterMap(r rune) rune {
 	return '_'
 }
 
-// EventEndpoint sets where events are sent
-func (connector *Forwarder) EventEndpoint(endpoint string) {
-	connector.propertyLock.Lock()
-	defer connector.propertyLock.Unlock()
-	connector.eventURL = endpoint
-}
-
 // TokenHeaderName is the header key for the auth token in the HTTP request
 const TokenHeaderName = "X-SF-TOKEN"
-
-type forwardError struct {
-	originalError error
-	message       string
-}
-
-func (f *forwardError) Error() string {
-	return fmt.Sprintf("%s: %s", f.message, f.originalError.Error())
-}
-
-var _ error = &forwardError{}
 
 // AddDatapoints forwards datapoints to SignalFx
 func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*datapoint.Datapoint) error {
@@ -273,17 +229,33 @@ func (connector *Forwarder) AddEvents(ctx context.Context, events []*event.Event
 	}
 	protoBytes, bodyType, err := connector.encodeEventPostBodyProtobufV2(events)
 	if err != nil {
-		return &forwardError{
-			originalError: err,
-			message:       "Unable to marshal object",
-		}
+		return errors.Annotate(err, "unable to marshal object")
 	}
 	return connector.sendBytes(endpoint, bodyType, defaultAuthToken, userAgent, protoBytes)
 }
 
+func checkResp(resp *http.Response) error {
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return errors.Annotate(err, "unable to verify response body")
+	}
+	if resp.StatusCode != 200 {
+		return errors.Errorf("invalid status code: %d", resp.StatusCode)
+	}
+	var body string
+	err = json.Unmarshal(respBody, &body)
+	if err != nil {
+		return errors.Annotate(err, string(respBody))
+	}
+	if body != "OK" {
+		return errors.Errorf("Resp body not ok: %s", respBody)
+	}
+	return nil
+}
+
 // TODO(mwp): Move event adds to sfxclient
 func (connector *Forwarder) sendBytes(endpoint string, bodyType string, defaultAuthToken string, userAgent string, jsonBytes []byte) error {
-	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBytes))
+	req, _ := http.NewRequest("POST", endpoint, bytes.NewReader(jsonBytes))
 	req.Header.Set("Content-Type", bodyType)
 	req.Header.Set(TokenHeaderName, defaultAuthToken)
 	req.Header.Set("User-Agent", userAgent)
@@ -294,39 +266,9 @@ func (connector *Forwarder) sendBytes(endpoint string, bodyType string, defaultA
 	resp, err := connector.client.Do(req)
 
 	if err != nil {
-		return &forwardError{
-			originalError: err,
-			message:       "Unable to POST request",
-		}
+		return errors.Annotate(err, "unable to POST request")
 	}
 
 	defer resp.Body.Close()
-	respBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return &forwardError{
-			originalError: err,
-			message:       "Unable to verify response body",
-		}
-	}
-	if resp.StatusCode != 200 {
-		return &forwardError{
-			originalError: fmt.Errorf("invalid status code: %d", resp.StatusCode),
-			message:       string(respBody),
-		}
-	}
-	var body string
-	err = json.Unmarshal(respBody, &body)
-	if err != nil {
-		return &forwardError{
-			originalError: err,
-			message:       string(respBody),
-		}
-	}
-	if body != "OK" {
-		return &forwardError{
-			originalError: errors.New("body decode error"),
-			message:       body,
-		}
-	}
-	return nil
+	return checkResp(resp)
 }

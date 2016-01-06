@@ -14,7 +14,7 @@ func (p *panicError) Error() string {
 	panic("failure?")
 }
 
-func TestJSONLogger(t *testing.T) {
+func TestJSONLoggerInternal(t *testing.T) {
 	Convey("JSON logger to a buffer", t, func() {
 		b := &bytes.Buffer{}
 		l := NewJSONLogger(b, Panic)

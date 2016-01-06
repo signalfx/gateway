@@ -24,6 +24,11 @@ func (c *errCloser) Close() error {
 	return errClose
 }
 
+func TestUneventfulForwarder(t *testing.T) {
+	u := UneventfulForwarder{nil}
+	assert.Equal(t, u.AddEvents(nil, nil), nil)
+}
+
 func TestCompositeCloser(t *testing.T) {
 	t1 := &testCloser{}
 	t2 := &errCloser{}
