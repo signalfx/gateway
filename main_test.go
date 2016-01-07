@@ -251,7 +251,7 @@ func TestProxy1(t *testing.T) {
 		So(gmp.lastVal, ShouldEqual, int64(4))
 
 		Convey("should have debug values", func() {
-			listenPort := nettest.TCPPort(p.debugServer)
+			listenPort := nettest.TCPPort(p.debugServerListener)
 			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/debug/vars", listenPort))
 			So(err, ShouldBeNil)
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)

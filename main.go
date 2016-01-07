@@ -22,11 +22,12 @@ import (
 	"expvar"
 	"fmt"
 	"github.com/signalfx/golib/eventcounter"
-	"github.com/signalfx/metricproxy/debug"
+	"github.com/signalfx/golib/httpdebug"
 	"github.com/signalfx/metricproxy/dp/dpbuffered"
 	"github.com/signalfx/metricproxy/protocol/demultiplexer"
 	"golang.org/x/net/context"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -34,7 +35,7 @@ import (
 
 var (
 	// Version is set by a build flag to the built version
-	Version = "0.9.3"
+	Version = "0.9.5"
 	// BuildDate is set by a build flag to the date of the build
 	BuildDate = ""
 )
@@ -49,15 +50,16 @@ type proxyFlags struct {
 }
 
 type proxy struct {
-	flags           proxyFlags
-	listeners       []protocol.Listener
-	forwarders      []protocol.Forwarder
-	logger          log.Logger
-	setupDoneSignal chan struct{}
-	tk              timekeeper.TimeKeeper
-	debugServer     *debug.Server
-	stdout          io.Writer
-	gomaxprocs      func(int) int
+	flags               proxyFlags
+	listeners           []protocol.Listener
+	forwarders          []protocol.Forwarder
+	logger              log.Logger
+	setupDoneSignal     chan struct{}
+	tk                  timekeeper.TimeKeeper
+	debugServer         *httpdebug.Server
+	debugServerListener net.Listener
+	stdout              io.Writer
+	gomaxprocs          func(int) int
 }
 
 var mainInstance = proxy{
@@ -212,13 +214,16 @@ func (p *proxy) setupDebugServer(conf *config.ProxyConfig, logger log.Logger, sc
 	if conf.LocalDebugServer == nil {
 		return nil
 	}
-	debugServer, err := debug.New(*conf.LocalDebugServer, p, &debug.Config{
-		Logger: log.NewContext(logger).With(logkey.Protocol, "debugserver"),
-	})
+	listener, err := net.Listen("tcp", *conf.LocalDebugServer)
 	if err != nil {
 		return errors.Annotate(err, "cannot setup debug server")
 	}
-	p.debugServer = debugServer
+	p.debugServerListener = listener
+	p.debugServer = httpdebug.New(&httpdebug.Config{
+		Logger:        log.NewContext(logger).With(logkey.Protocol, "debugserver"),
+		ExplorableObj: p,
+	})
+
 	p.debugServer.Exp2.Exported["config"] = conf.Var()
 	p.debugServer.Exp2.Exported["datapoints"] = scheduler.Var()
 	p.debugServer.Exp2.Exported["goruntime"] = expvar.Func(func() interface{} {
@@ -233,6 +238,11 @@ func (p *proxy) setupDebugServer(conf *config.ProxyConfig, logger log.Logger, sc
 	p.debugServer.Exp2.Exported["source"] = expvar.Func(func() interface{} {
 		return fmt.Sprintf("https://github.com/signalfx/metricproxy/tree/%s", Version)
 	})
+
+	go func() {
+		err := p.debugServer.Serve(listener)
+		logger.Log(log.Err, err, "Finished serving debug server")
+	}()
 	return nil
 }
 
@@ -254,7 +264,7 @@ func (p *proxy) Close() error {
 		errs = append(errs, l.Close())
 	}
 	if p.debugServer != nil {
-		errs = append(errs, p.debugServer.Close())
+		errs = append(errs, p.debugServerListener.Close())
 	}
 	return errors.NewMultiErr(errs)
 }

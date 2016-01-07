@@ -1,11 +1,11 @@
 // +build !go1.5
 
-package debug
+package httpdebug
 
 import (
-	"github.com/gorilla/mux"
+	"net/http"
 )
 
-func setupTrace(m *mux.Router) {
+func setupTrace(m *http.ServeMux) {
 	// Ignored.  Trace not supported in < 1.5
 }
