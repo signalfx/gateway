@@ -61,6 +61,18 @@ function do_test() {
     cat /tmp/ignore_header.md README.md | grep -av curl | grep -av 'Circle CI' | mdl --warnings
     python -m json.tool < exampleSfdbproxy.conf > /dev/null
   )
+  install_go_version "$GO_COMPILER_PATH" "$DEFAULT_GOLANG_VERSION"
+  (
+    (
+      # Fixes https://github.com/openshift/vagrant-openshift/pull/322/files
+      go get golang.org/x/tools/cmd/vet
+      cd "$GOPATH/src/golang.org/x/tools/cmd/vet"
+      git checkout c262de870b618eed648983aa994b03bc04641c72
+      go get github.com/opennota/check/cmd/aligncheck github.com/opennota/check/cmd/structcheck github.com/opennota/check/cmd/varcheck
+    )
+    cd "$SRC_PATH"
+    gobuild -verbose install
+  )
   for GO_VERSION in $GO_TESTED_VERSIONS; do
     install_go_version "$GO_COMPILER_PATH" "$GO_VERSION"
     rm -rf "$GOPATH/pkg"
