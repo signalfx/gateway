@@ -61,6 +61,8 @@ function do_test() {
     cat /tmp/ignore_header.md README.md | grep -av curl | grep -av 'Circle CI' | mdl --warnings
     python -m json.tool < exampleSfdbproxy.conf > /dev/null
   )
+  install_go_version "$GO_COMPILER_PATH" "$DEFAULT_GOLANG_VERSION"
+  gobuild -verbose install
   for GO_VERSION in $GO_TESTED_VERSIONS; do
     install_go_version "$GO_COMPILER_PATH" "$GO_VERSION"
     rm -rf "$GOPATH/pkg"
