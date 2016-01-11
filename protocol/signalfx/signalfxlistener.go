@@ -311,7 +311,7 @@ type ListenerConfig struct {
 
 var defaultListenerConfig = &ListenerConfig{
 	ListenAddr:  pointer.String("127.0.0.1:12345"),
-	Timeout:     pointer.Duration(time.Second),
+	Timeout:     pointer.Duration(time.Second) * 30,
 	Logger:      log.Discard,
 	RootContext: context.Background(),
 	JSONMarshal: json.Marshal,
