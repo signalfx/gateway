@@ -35,7 +35,7 @@ import (
 
 var (
 	// Version is set by a build flag to the built version
-	Version = "0.9.5"
+	Version = "0.9.7"
 	// BuildDate is set by a build flag to the date of the build
 	BuildDate = ""
 )
