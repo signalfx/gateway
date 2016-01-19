@@ -33,7 +33,7 @@ func NewCarbonDatapoint(line string, metricDeconstructor metricdeconstructor.Met
 		carbonNative: line,
 	}
 	if len(parts) != 3 {
-		return nil, errors.Errorf("invalid carbon input line: %s", line)
+		return nil, errors.Errorf("Note: Proxy does not support pickle format: invalid carbon input line: %s", line)
 	}
 	originalMetricName := parts[0]
 	metricName, mtype, dimensions, err := metricDeconstructor.Parse(originalMetricName)
