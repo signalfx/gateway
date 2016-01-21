@@ -56,6 +56,17 @@ func TestDatapointInvalidJSONDecode(t *testing.T) {
 	})
 }
 
+func TestAddDatapoints(t *testing.T) {
+	Convey("Adding datapoints", t, func() {
+		m1 := map[string]string{"name": "jack"}
+		m2 := map[string]string{"name": "john"}
+		So(len(AddMaps(nil, nil)), ShouldEqual, 0)
+		So(AddMaps(m1, nil), ShouldEqual, m1)
+		So(AddMaps(nil, m2), ShouldEqual, m2)
+		So(AddMaps(m1, m2)["name"], ShouldEqual, "john")
+	})
+}
+
 func TestDatapointProperties(t *testing.T) {
 	Convey("Given a datapoint", t, func() {
 		dp := New("datapoint", map[string]string{}, NewIntValue(10), Gauge, time.Now())

@@ -139,3 +139,26 @@ func NewWithMeta(metric string, dimensions map[string]string, meta map[interface
 		Timestamp:  timestamp,
 	}
 }
+
+// AddMaps adds two maps of dimensions and returns a new map of dimensions that is a + b.  Note that
+// b takes precedent.  Works with nil or empty a/b maps.  Does not modify either map, but may return
+// a or b if the other is empty.
+func AddMaps(a, b map[string]string) map[string]string {
+	if len(a) == 0 {
+		if len(b) == 0 {
+			return map[string]string{}
+		}
+		return b
+	}
+	if len(b) == 0 {
+		return a
+	}
+	r := make(map[string]string, len(a)+len(b))
+	for k, v := range a {
+		r[k] = v
+	}
+	for k, v := range b {
+		r[k] = v
+	}
+	return r
+}

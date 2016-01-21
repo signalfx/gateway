@@ -167,8 +167,7 @@ func TestCollectDListener(t *testing.T) {
 	})
 	Convey("a basic collectd listener", t, func() {
 		conf := &ListenerConfig{
-			ListenAddr:        pointer.String("127.0.0.1:0"),
-			DefaultDimensions: map[string]string{"hello": "world"},
+			ListenAddr: pointer.String("127.0.0.1:0"),
 		}
 		sendTo := dptest.NewBasicSink()
 
@@ -193,14 +192,14 @@ func TestCollectDListener(t *testing.T) {
 			Convey("with default dimensions", func() {
 				baseURL = baseURL + "?" + sfxDimQueryParamPrefix + "default=dim"
 				sendRecvData()
-				expectedDims := map[string]string{"hello": "world", "dsname": "value", "plugin": "dogstatsd", "env": "dev", "k1": "v1", "host": "some-host", "default": "dim"}
+				expectedDims := map[string]string{"dsname": "value", "plugin": "dogstatsd", "env": "dev", "k1": "v1", "host": "some-host", "default": "dim"}
 				So(dptest.ExactlyOne(datapoints, "gauge.page.loadtime").Dimensions, ShouldResemble, expectedDims)
 			})
 			Convey("with empty default dimensions", func() {
 				baseURL = baseURL + "?" + sfxDimQueryParamPrefix + "default="
 				So(dptest.ExactlyOne(listener.Datapoints(), "total_blank_dims").Value.String(), ShouldEqual, "0")
 				sendRecvData()
-				expectedDims := map[string]string{"hello": "world", "dsname": "value", "plugin": "dogstatsd", "env": "dev", "k1": "v1", "host": "some-host"}
+				expectedDims := map[string]string{"dsname": "value", "plugin": "dogstatsd", "env": "dev", "k1": "v1", "host": "some-host"}
 				So(dptest.ExactlyOne(datapoints, "gauge.page.loadtime").Dimensions, ShouldResemble, expectedDims)
 
 				So(dptest.ExactlyOne(listener.Datapoints(), "total_blank_dims").Value.String(), ShouldEqual, "1")
@@ -208,7 +207,7 @@ func TestCollectDListener(t *testing.T) {
 			})
 			Convey("without default dimensions", func() {
 				sendRecvData()
-				expectedDims := map[string]string{"hello": "world", "dsname": "value", "plugin": "dogstatsd", "env": "dev", "k1": "v1", "host": "some-host"}
+				expectedDims := map[string]string{"dsname": "value", "plugin": "dogstatsd", "env": "dev", "k1": "v1", "host": "some-host"}
 				So(dptest.ExactlyOne(datapoints, "gauge.page.loadtime").Dimensions, ShouldResemble, expectedDims)
 			})
 		})

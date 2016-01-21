@@ -67,7 +67,7 @@ func (c *callbackPair) getDatapoints(now time.Time, sendZeroTime bool) []*datapo
 	for _, dp := range ret {
 		// It's a bit dangerous to modify the map (we don't know how it was passed in) so
 		// make a copy to be safe
-		dp.Dimensions = AddMaps(c.defaultDimensions, dp.Dimensions)
+		dp.Dimensions = datapoint.AddMaps(c.defaultDimensions, dp.Dimensions)
 		if !sendZeroTime && dp.Timestamp.IsZero() {
 			dp.Timestamp = now
 		}

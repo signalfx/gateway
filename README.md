@@ -115,6 +115,17 @@ this, you will need to specify the port to bind to.  An example config:
         }
 ```
 
+#### common properties
+
+All listeners support a "Dimensions" property which is expected to be a
+map(string => string) and adds the dimensions to all points sent.  For example:
+
+        {
+            "ListenAddr": "0.0.0.0:18080",
+            "Dimensions": { "env": "prod" },
+            "Type": "signalfx"
+        }
+
 ### ForwardTo
 
 ForwardTo is where you define where the proxy should send datapoints.  Each datapoint

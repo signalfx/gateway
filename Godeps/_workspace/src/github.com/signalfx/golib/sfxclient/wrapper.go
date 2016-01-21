@@ -1,6 +1,8 @@
 package sfxclient
 
-import "github.com/signalfx/golib/datapoint"
+import (
+	"github.com/signalfx/golib/datapoint"
+)
 
 // MultiCollector acts like a datapoint collector over multiple collectors
 type MultiCollector []Collector
@@ -34,9 +36,15 @@ var _ Collector = &WithDimensions{}
 
 // Datapoints calls datapoints and adds on Dimensions
 func (w *WithDimensions) Datapoints() []*datapoint.Datapoint {
-	dps := w.Collector.Datapoints()
+	return w.appendDimensions(w.Collector.Datapoints())
+}
+
+func (w *WithDimensions) appendDimensions(dps []*datapoint.Datapoint) []*datapoint.Datapoint {
+	if len(w.Dimensions) == 0 {
+		return dps
+	}
 	for _, dp := range dps {
-		dp.Dimensions = AddMaps(dp.Dimensions, w.Dimensions)
+		dp.Dimensions = datapoint.AddMaps(dp.Dimensions, w.Dimensions)
 	}
 	return dps
 }

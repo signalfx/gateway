@@ -21,6 +21,10 @@ type listenerLoader interface {
 	Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error)
 }
 
+type listenSinkWrapper interface {
+	WrapSink(sink dpsink.Sink, conf *ListenFrom) dpsink.Sink
+}
+
 // NewLoader creates the default loader for proxy protocols
 func NewLoader(ctx context.Context, logger log.Logger, version string) *Loader {
 	sfxL := &signalFxLoader{
@@ -50,13 +54,17 @@ func NewLoader(ctx context.Context, logger log.Logger, version string) *Loader {
 				rootContext: ctx,
 			},
 		},
+		listenWrappers: []listenSinkWrapper{
+			&dimensionListenerSink{},
+		},
 	}
 }
 
 // Loader is able to load forwarders and listeners from config type strings
 type Loader struct {
-	forwarders map[string]forwarderLoader
-	listeners  map[string]listenerLoader
+	forwarders     map[string]forwarderLoader
+	listeners      map[string]listenerLoader
+	listenWrappers []listenSinkWrapper
 }
 
 // Forwarder loads a forwarder based upon config, finding the right forwarder first
@@ -75,10 +83,24 @@ func (l *Loader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener
 	if conf.Type == "" {
 		return nil, errors.New("type required to load config")
 	}
+	wrappedSink := sink
+	for _, w := range l.listenWrappers {
+		wrappedSink = w.WrapSink(wrappedSink, conf)
+	}
 	if l, exists := l.listeners[conf.Type]; exists {
-		return l.Listener(sink, conf)
+		return l.Listener(wrappedSink, conf)
 	}
 	return nil, errors.Errorf("cannot find config %s", conf.Type)
+}
+
+type dimensionListenerSink struct {
+}
+
+func (d *dimensionListenerSink) WrapSink(sink dpsink.Sink, conf *ListenFrom) dpsink.Sink {
+	if len(conf.Dimensions) == 0 {
+		return sink
+	}
+	return dpsink.IncludingDimensions(conf.Dimensions, sink)
 }
 
 type csvLoader struct {
@@ -97,11 +119,10 @@ type collectdLoader struct {
 
 func (s *collectdLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
 	sfConf := collectd.ListenerConfig{
-		ListenAddr:        conf.ListenAddr,
-		ListenPath:        conf.ListenPath,
-		Timeout:           conf.TimeoutDuration,
-		DefaultDimensions: conf.Dimensions,
-		StartingContext:   s.rootContext,
+		ListenAddr:      conf.ListenAddr,
+		ListenPath:      conf.ListenPath,
+		Timeout:         conf.TimeoutDuration,
+		StartingContext: s.rootContext,
 	}
 	return collectd.NewListener(sink, &sfConf)
 }

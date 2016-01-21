@@ -28,5 +28,9 @@ func TestWithDimensions(t *testing.T) {
 		}
 		dp0 := c2.Datapoints()[0]
 		So(dp0.Dimensions["name"], ShouldEqual, "jack")
+
+		c2.Dimensions = nil
+		dp0 = c2.Datapoints()[0]
+		So(dp0.Dimensions["name"], ShouldNotEqual, "jack")
 	})
 }

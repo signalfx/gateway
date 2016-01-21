@@ -57,6 +57,17 @@ func (n *nextWrapped) AddEvents(ctx context.Context, events []*event.Event) erro
 	return n.wrapping.AddEvents(ctx, events, n.forwardTo)
 }
 
+// IncludingDimensions returns a sink that wraps another sink adding dims to each datapoint and
+// event
+func IncludingDimensions(dims map[string]string, sink Sink) Sink {
+	if len(dims) == 0 {
+		return sink
+	}
+	return NextWrap(&WithDimensions{
+		Dimensions: dims,
+	})(sink)
+}
+
 // NextWrap wraps a NextSink to make it usable by MiddlewareConstructor
 func NextWrap(wrapping NextSink) MiddlewareConstructor {
 	return func(sendTo Sink) Sink {
@@ -65,4 +76,39 @@ func NextWrap(wrapping NextSink) MiddlewareConstructor {
 			wrapping:  wrapping,
 		}
 	}
+}
+
+// WithDimensions adds dimensions on top of the datapoints of a collector
+type WithDimensions struct {
+	Dimensions map[string]string
+}
+
+func (w *WithDimensions) appendDimensions(dps []*datapoint.Datapoint) []*datapoint.Datapoint {
+	if len(w.Dimensions) == 0 {
+		return dps
+	}
+	for _, dp := range dps {
+		dp.Dimensions = datapoint.AddMaps(dp.Dimensions, w.Dimensions)
+	}
+	return dps
+}
+
+func (w *WithDimensions) appendDimensionsEvents(events []*event.Event) []*event.Event {
+	if len(w.Dimensions) == 0 {
+		return events
+	}
+	for _, e := range events {
+		e.Dimensions = datapoint.AddMaps(e.Dimensions, w.Dimensions)
+	}
+	return events
+}
+
+// AddDatapoints calls next() including the wrapped dimensions on each point
+func (w *WithDimensions) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint, next Sink) error {
+	return next.AddDatapoints(ctx, w.appendDimensions(points))
+}
+
+// AddEvents calls next() including the wrapped dimensions on each point
+func (w *WithDimensions) AddEvents(ctx context.Context, events []*event.Event, next Sink) error {
+	return next.AddEvents(ctx, w.appendDimensionsEvents(events))
 }

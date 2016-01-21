@@ -1,6 +1,8 @@
 package config
 
 import (
+	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
@@ -16,6 +18,8 @@ func TestConfigLoader(t *testing.T) {
 		ctx := context.Background()
 		logger := log.Discard
 		version := "123"
+		sink := dptest.NewBasicSink()
+		sink.Resize(1)
 
 		l := NewLoader(ctx, logger, version)
 		Convey("should fail empty forwarders", func() {
@@ -71,13 +75,23 @@ func TestConfigLoader(t *testing.T) {
 			So(f.Close(), ShouldBeNil)
 		})
 		Convey("should load carbon listener", func() {
-			f, err := l.Listener(nil, &ListenFrom{Type: "carbon", MetricDeconstructor: pointer.String(""), MetricDeconstructorOptions: pointer.String(""), ListenAddr: pointer.String("127.0.0.1:0")})
+			f, err := l.Listener(sink, &ListenFrom{Dimensions: map[string]string{"name": "john"}, Type: "carbon", MetricDeconstructor: pointer.String(""), MetricDeconstructorOptions: pointer.String(""), ListenAddr: pointer.String("127.0.0.1:0")})
 			So(err, ShouldBeNil)
 			carbonPort := nettest.TCPPort(f.(*carbon.Listener))
 			Convey("should load carbon forwarder", func() {
 				f, err := l.Forwarder(&ForwardTo{Type: "carbon", Host: pointer.String("127.0.0.1"), Port: pointer.Uint16(carbonPort)})
 				So(err, ShouldBeNil)
-				So(f.Close(), ShouldBeNil)
+
+				Convey("should add dimensions to the listener", func() {
+					dp := dptest.DP()
+					dp.Dimensions = nil
+					So(f.AddDatapoints(ctx, []*datapoint.Datapoint{dp}), ShouldBeNil)
+					dpOut := sink.Next()
+					So(dpOut.Dimensions, ShouldResemble, map[string]string{"name": "john"})
+				})
+				Reset(func() {
+					So(f.Close(), ShouldBeNil)
+				})
 			})
 			Reset(func() {
 				So(f.Close(), ShouldBeNil)

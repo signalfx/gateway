@@ -46,8 +46,7 @@ func (s *ListenerServer) Datapoints() []*datapoint.Datapoint {
 
 // JSONDecoder can decode collectd's native JSON datapoint format
 type JSONDecoder struct {
-	SendTo      dpsink.Sink
-	DefaultDims map[string]string
+	SendTo dpsink.Sink
 
 	TotalErrors    int64
 	TotalBlankDims int64
@@ -113,7 +112,7 @@ func (decoder *JSONDecoder) Read(ctx context.Context, req *http.Request) error {
 
 func (decoder *JSONDecoder) defaultDims(req *http.Request) map[string]string {
 	params := req.URL.Query()
-	defaultDims := make(map[string]string, len(decoder.DefaultDims))
+	defaultDims := make(map[string]string, 0)
 	for key := range params {
 		if strings.HasPrefix(key, sfxDimQueryParamPrefix) {
 			value := params.Get(key)
@@ -124,9 +123,6 @@ func (decoder *JSONDecoder) defaultDims(req *http.Request) map[string]string {
 			key = key[len(sfxDimQueryParamPrefix):]
 			defaultDims[key] = value
 		}
-	}
-	for k, v := range decoder.DefaultDims {
-		defaultDims[k] = v
 	}
 	return defaultDims
 }
@@ -141,11 +137,10 @@ func (decoder *JSONDecoder) Datapoints() []*datapoint.Datapoint {
 
 // ListenerConfig controls optional parameters for collectd listeners
 type ListenerConfig struct {
-	ListenAddr        *string
-	ListenPath        *string
-	Timeout           *time.Duration
-	DefaultDimensions map[string]string
-	StartingContext   context.Context
+	ListenAddr      *string
+	ListenPath      *string
+	Timeout         *time.Duration
+	StartingContext context.Context
 }
 
 var defaultListenerConfig = &ListenerConfig{
@@ -174,8 +169,7 @@ func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer,
 			WriteTimeout: *conf.Timeout,
 		},
 		decoder: JSONDecoder{
-			SendTo:      sink,
-			DefaultDims: passedConf.DefaultDimensions,
+			SendTo: sink,
 		},
 	}
 	httpHandler := web.NewHandler(conf.StartingContext, &listenServer.decoder)

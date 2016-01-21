@@ -42,6 +42,7 @@ func (l *Hierarchy) setupFromEnv(getEnv func(string) string) {
 
 // Log calls log of the wrapped logger
 func (l *Hierarchy) Log(kvs ...interface{}) {
+	// Note: Log here messes up "caller" :/
 	if logger := l.loadLogger(); logger != nil {
 		logger.Log(kvs...)
 	}
