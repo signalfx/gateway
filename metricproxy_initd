@@ -12,7 +12,6 @@
 dir="/opt/sfproxy"
 user="root"
 configfile="/etc/sfdbconfig.conf"
-logdir="/var/log/sfproxy"
 binary="/opt/sfproxy/bin/metricproxy"
 
 name="metricproxy"
@@ -49,10 +48,7 @@ case "$1" in
         echo "Already started"
     else
         echo "Starting $name"
-        cd "$dir"
-        if [ ! -d "$logdir" ]; then
-            mkdir -p $logdir
-        fi
+        cd "$dir" || exit 1
 	if [ ! -e "$pid_file" ]; then
             touch "$pid_file" > /dev/null 2> /dev/null
         fi
@@ -60,7 +56,7 @@ case "$1" in
             echo "Unable to start proxy: pid file $pid_file is not writable"
             exit 1
         fi
-        nohup "$binary" "-configfile" "$configfile" "-logdir" "$logdir" > "$stdout_log" 2> "$stderr_log" &
+        nohup "$binary" "-configfile" "$configfile" > "$stdout_log" 2> "$stderr_log" &
         echo "$!" > "$pid_file"
         sleep 1 # Give it time to try to open ports and connect
         if ! is_running; then
@@ -119,7 +115,7 @@ case "$1" in
     echo "Stdout log:    $stdout_log"
     echo "Stderr log:    $stderr_log"
     echo "Binary:        $binary"
-    echo "Log directory: $logdir"
+    echo "Log directory: (Controlled by config file at $configfile)"
     ;;
     *)
     echo "Usage: $0 {start|stop|restart|status|locations}"
