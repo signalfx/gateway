@@ -183,6 +183,7 @@ to signalfx at 1s intervals
 ```
 {
   "StatsDelay": "1s",
+  "LogDir": "/var/log/sfproxy",
   "ListenFrom": [
     {
       "Type": "carbon",
