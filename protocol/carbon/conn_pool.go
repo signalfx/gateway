@@ -7,13 +7,11 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 // connPool pools connections for reuse
 type connPool struct {
-	conns             []net.Conn
-	connectionTimeout time.Duration
+	conns []net.Conn
 
 	mu sync.Mutex
 

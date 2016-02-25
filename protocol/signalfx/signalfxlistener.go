@@ -354,7 +354,7 @@ func (handler *metricHandler) ServeHTTP(writter http.ResponseWriter, req *http.R
 		return
 	}
 	writter.WriteHeader(http.StatusOK)
-	writter.Write([]byte(toWrite))
+	writter.Write(toWrite)
 }
 
 func (handler *metricHandler) GetMetricTypeFromMap(metricName string) com_signalfx_metrics_protobuf.MetricType {

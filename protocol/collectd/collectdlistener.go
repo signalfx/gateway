@@ -26,7 +26,6 @@ import (
 
 // ListenerServer will listen for collectd datapoint connections
 type ListenerServer struct {
-	name     string
 	listener net.Listener
 	server   http.Server
 	decoder  JSONDecoder

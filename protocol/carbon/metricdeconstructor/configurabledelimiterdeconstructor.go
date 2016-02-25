@@ -344,7 +344,7 @@ func delimiterJSONLoader(config map[string]interface{}) (MetricDeconstructor, er
 	var metrics configurableDelimiterMetricDeconstructor
 	// a wee bit of a hack, but at least we know it's valid json and it makes the config easier
 	jsonString, _ := json.Marshal(config)
-	err := json.Unmarshal([]byte(jsonString), &metrics)
+	err := json.Unmarshal(jsonString, &metrics)
 	if err != nil {
 		return nil, err
 	}
