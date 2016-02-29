@@ -3,7 +3,7 @@ set -ex
 
 CIRCLEUTIL_TAG="v1.40"
 DEFAULT_GOLANG_VERSION="1.6"
-GO_TESTED_VERSIONS="1.6"
+GO_TESTED_VERSIONS="1.4.3 1.5.1 1.6"
 
 export GOLANG_VERSION="1.5.1"
 export GOROOT="$HOME/go_circle"
@@ -72,9 +72,15 @@ function do_test() {
     (
       cd "$SRC_PATH"
       go clean -x ./...
-      env GOPATH="$GOPATH:$(godep path)" gobuild -verbose -verbosefile "$CIRCLE_ARTIFACTS/gobuildout.txt"
+      env GOPATH="$GOPATH:$(godep path)" go test -race ./...
     )
   done
+  install_go_version "$GO_COMPILER_PATH" "$GO_VERSION"
+  (
+    cd "$SRC_PATH"
+    go clean -x ./...
+    gobuild -verbose -verbosefile "$CIRCLE_ARTIFACTS/gobuildout.txt"
+  )
 }
 
 # Deploy phase of circleci
