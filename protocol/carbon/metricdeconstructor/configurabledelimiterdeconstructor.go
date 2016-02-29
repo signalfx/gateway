@@ -11,6 +11,10 @@ import (
 )
 
 func split(path string, delimiter string) []string {
+	if path == "" {
+		return []string{}
+	}
+
 	return strings.Split(path, delimiter)
 }
 
@@ -160,7 +164,7 @@ func (m *configurableDelimiterMetricRule) String() string {
 func (m *configurableDelimiterMetricRule) verify() error {
 	m.DimensionsPathParts = split(m.DimensionsMap, m.P.Delimiter)
 	m.parseMetricPath()
-	if len(m.MetricPathParts) != len(m.DimensionsPathParts) {
+	if len(m.DimensionsPathParts) > 0 && len(m.MetricPathParts) != len(m.DimensionsPathParts) {
 		return fmt.Errorf("the MetricPath %s has %d terms but DimensionsMap %s has %d", m.MetricPath, len(m.MetricPathParts), m.DimensionsMap, len(m.DimensionsPathParts))
 	}
 	found := false
@@ -170,7 +174,7 @@ func (m *configurableDelimiterMetricRule) verify() error {
 			break
 		}
 	}
-	if !found && m.MetricName == "" {
+	if !found && len(m.DimensionsPathParts) > 0 && m.MetricName == "" {
 		return fmt.Errorf("the DimensionsMap does not have a metric specified; use %s to specify the metric name override MetricName", m.P.MetricIdentifier)
 	}
 	err := m.verifyType()
@@ -188,9 +192,11 @@ func (m *configurableDelimiterMetricRule) extract(metricPieces []string) ([]stri
 		metric = append(metric, m.MetricName)
 	}
 
-	for i := 0; i < len(metricPieces); i++ {
+	for i := 0; i < len(m.MetricPathParts); i++ {
 		if m.MetricPathParts[i].match(metricPieces[i]) {
-			if m.DimensionsPathParts[i] == m.P.Ignore {
+			if len(m.DimensionsPathParts) == 0 {
+				continue
+			} else if m.DimensionsPathParts[i] == m.P.Ignore {
 				continue
 			} else if m.DimensionsPathParts[i] == m.P.MetricIdentifier {
 				metric = append(metric, metricPieces[i])
@@ -204,6 +210,9 @@ func (m *configurableDelimiterMetricRule) extract(metricPieces []string) ([]stri
 		} else {
 			return nil, nil
 		}
+	}
+	if len(m.DimensionsPathParts) == 0 {
+		metric = metricPieces
 	}
 	return metric, dims
 }
@@ -287,7 +296,7 @@ func (m *configurableDelimiterMetricDeconstructor) verify() error {
 		if err != nil {
 			return err
 		}
-		length := len(metric.MetricPathParts)
+		length := len(metric.DimensionsPathParts)
 		maplist, ok := m.MetricsMap[length]
 		if !ok {
 			maplist = make([]*configurableDelimiterMetricRule, 0)
@@ -326,10 +335,10 @@ func (m *configurableDelimiterMetricDeconstructor) getMetricType(metric *configu
 func (m *configurableDelimiterMetricDeconstructor) Parse(originalMetric string) (string, datapoint.MetricType, map[string]string, error) {
 	metricPieces := m.split(originalMetric)
 	length := len(metricPieces)
-	metrics, ok := m.MetricsMap[length]
-	if !ok {
-		return m.FallBackDeconstructor.Parse(originalMetric)
-	}
+
+	metrics, _ := m.MetricsMap[length]
+	metricsZero, _ := m.MetricsMap[0]
+	metrics = append(metrics, metricsZero...)
 
 	for _, metric := range metrics {
 		metricName, dimensions := metric.extractDimensions(metricPieces)
@@ -337,6 +346,7 @@ func (m *configurableDelimiterMetricDeconstructor) Parse(originalMetric string) 
 			return metricName, m.getMetricType(metric, &originalMetric), dimensions, nil
 		}
 	}
+
 	return m.FallBackDeconstructor.Parse(originalMetric)
 }
 

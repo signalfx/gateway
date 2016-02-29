@@ -10,7 +10,8 @@ is already receiving datapoints, such as graphite's carbon database.
 ## Install and upgrade
 
 ```
-  curl -s https://raw.githubusercontent.com/signalfx/metricproxy/master/install.sh | sudo sh
+  curl -s \
+https://raw.githubusercontent.com/signalfx/metricproxy/master/install.sh | sudo sh
   # Config at    /etc/sfdbconfig.conf
   # Binary at    /opt/sfproxy/bin/metricproxy
   # Logs at      /var/log/sfproxy
@@ -289,6 +290,10 @@ The simplest rule contains only a DimensionsMap with the same number of terms
 and separated by the same delimiter as the incoming metrics. In the following
 example, the configuration contains two rules: one that matches all metrics
 with four terms, and one that matches all metrics with six terms.
+
+Another simple rule contains only a MetricMap.  This will match that metric,
+but without a DimensionMap will not chop things up.  This can be used to
+just apply types and/or dimensions to things.
 
 If the following example config were used to process a graphite metric called
 `cassandra.cassandra23.production.thread_count`, it would output the following:

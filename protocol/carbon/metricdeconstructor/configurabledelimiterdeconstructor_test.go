@@ -46,6 +46,12 @@ var validConfig = `{
 	},
 	{
 	  "DimensionsMap": "service.instance.%"
+	},
+	{
+	  "MetricPath": "counter.stuff",
+	  "Dimensions": {
+		"key": "value"
+	  }
 	}
   ]
 }`
@@ -65,6 +71,7 @@ func getDeconstructor(t *testing.T) MetricDeconstructor {
 
 // this tests many things in one
 // - joined metric names
+// - missing dimensionsmap
 // - joined dimensions
 // - extra dimensions
 // - changing metric type from default
@@ -73,6 +80,22 @@ func getDeconstructor(t *testing.T) MetricDeconstructor {
 func TestParser(t *testing.T) {
 	Convey("Given the valid config", t, func() {
 		m := getDeconstructor(t)
+		Convey("line with five terms starting with cassandra", func() {
+			metric, metricType, dimensions, err := m.Parse("cassandra.cassandra23.invalid_logins.rate.ignored")
+			Convey("should parse without error", func() {
+				So(err, ShouldBeNil)
+			})
+			Convey("should have fallen through to identify graphite deconstructor", func() {
+				So(metric, ShouldEqual, "cassandra.cassandra23.invalid_logins.rate.ignored")
+			})
+			Convey("should be a gauge", func() {
+				So(metricType, ShouldEqual, datapoint.Gauge)
+			})
+			Convey("hould have no dimensions", func() {
+				So(len(dimensions), ShouldEqual, 0)
+			})
+		})
+
 		Convey("seven term line starting with email.account", func() {
 			metric, metricType, dimensions, err := m.Parse("email.account.welcome_new.click.it-IT.gmail.count")
 			Convey("should parse without error", func() {
@@ -141,21 +164,7 @@ func TestParser(t *testing.T) {
 				So(dimensions, ShouldResemble, dims)
 			})
 		})
-		Convey("line with five terms starting with cassandra", func() {
-			metric, metricType, dimensions, err := m.Parse("cassandra.cassandra23.invalid_logins.rate.ignored")
-			Convey("should parse without error", func() {
-				So(err, ShouldBeNil)
-			})
-			Convey("should have fallen through to identify graphite deconstructor", func() {
-				So(metric, ShouldEqual, "cassandra.cassandra23.invalid_logins.rate.ignored")
-			})
-			Convey("should be a gauge", func() {
-				So(metricType, ShouldEqual, datapoint.Gauge)
-			})
-			Convey("hould have no dimensions", func() {
-				So(len(dimensions), ShouldEqual, 0)
-			})
-		})
+
 		Convey("line with five terms not starting with cassandra", func() {
 			metric, metricType, dimensions, err := m.Parse("notcassandra.cassandra23.invalid_logins.rate.ignored")
 			Convey("should parse without error", func() {
@@ -234,6 +243,22 @@ func TestParser(t *testing.T) {
 			})
 			Convey("should have no dimensions", func() {
 				So(len(dimensions), ShouldEqual, 0)
+			})
+		})
+		Convey("lines that start with counter.stuff should pass thorugh unmollested but acquire dimensions and type", func() {
+			metric, metricType, dimensions, err := m.Parse("counter.stuff.imacounter.one.two.three")
+			Convey("should parse without error", func() {
+				So(err, ShouldBeNil)
+			})
+			Convey("should parse with the original metric name ", func() {
+				So(metric, ShouldEqual, "counter.stuff.imacounter.one.two.three")
+			})
+			Convey("should be a counter", func() {
+				So(metricType, ShouldEqual, datapoint.Count)
+			})
+			dims := map[string]string{"key": "value"}
+			Convey("action and object should be joined and supplemental dimensions were added", func() {
+				So(dimensions, ShouldResemble, dims)
 			})
 		})
 	})
