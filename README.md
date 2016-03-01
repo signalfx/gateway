@@ -268,6 +268,74 @@ seconds.
 }
 ```
 
+### Graphite Dimensions using Regular Expressions
+
+You can use MetricRules to extract dimensions and metric names from the dot-
+separated names of graphite metrics using regular expressions.
+
+A metric will be matched to the first rule that matches the regular expression.
+If no groups are specified the entire metric will be used as the metric name
+and no dimensions will be parsed out. All groups should be named. If the named
+group starts with sf_metric it will be appended together to form the metric
+name, otherwise it will become a dimension with the name of the group name,
+and the value of what it matches.
+
+For each rule, you can define the following:
+
+1. Regex - REQUIRED - regular expression with optionally named matching groups
+1. AdditionalDimensions - used to add static dimensions to every metric that
+   matches this rule
+1. MetricType - to set the specific type of metric this is; default is gauge
+1. MetricName - if present this will be the first part of the metricName.  If
+   no named groups starting with sf_metric are specified, this will be the
+   entire metric name.
+
+e.g.
+
+```
+  "FallbackDeconstructor": nil,
+  "MetricRules": [
+    {
+      "Regex": "(?P<sf_metric_0>foo.*)\\.(?P<middle>.*)(?P<sf_metric_1>\\.baz)",
+      "AdditionalDimensions": {
+        "key": "value"
+      }
+    },
+    {
+      "Regex": "(?P<sf_metric>counter.*)",
+      "MetricType": "cumulative_counter"
+    },
+    {
+      "Regex": "madeup.*",
+      "MetricName": "synthetic.metric"
+    },
+    {
+      "Regex": "common.*"
+    }
+  ]
+```
+
+In the above example, if you sent in the metric foo.bar.baz it would match the
+first rule and the metric name would become foo.baz with a dimensions of
+"middle":"bar", and then an additional metric with "key":"value" added and the
+type would be the default of gauge.
+
+If you sent in the metric "counter.page_views" the resulting metric name would
+continue to be "counter.page_views" (because you named it sf_metric)_but have
+the type of cumulative counter.  No dimensions are being extracted or added in
+this example.
+
+If you sent in the metric "madeup.page_faults" the resulting metric name would
+be "synthetic.metric" with type gauge.
+
+If you sent in the metric "common.page_load_max", the resulting metric name
+would continue to be "common.page_load_max" (because no groups were specified)
+of type gauge.
+
+If you sent in the metric "albatros.cpu.idle", this would fall through and go
+to the FallbackDeconstructor and in this case since we're using the nil
+deconstructor, be rejected and won't be passed on to SignalFx.
+
 ### Graphite Dimensions using Delimiters
 
 You can use MetricRules to extract dimensions from the dot-separated names of

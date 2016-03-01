@@ -34,6 +34,7 @@ func Load(name string, options string) (MetricDeconstructor, error) {
 
 var knownJSONLoaders = map[string]loadJSON{
 	"delimiter": delimiterJSONLoader,
+	"regex":     regexJSONLoader,
 }
 
 // LoadJSON will load a MetricDeconstructor of the given name, with the given JSON object
