@@ -645,7 +645,7 @@ Setup a debug config
 Then, send a request with the debug header set to secretdebug.
 
 ```
-curl -H "X-Debug-Id:secretdebug2" -H "Content-Type: application/json" -XPOST \
+curl -H "X-Debug-Id:secretdebug" -H "Content-Type: application/json" -XPOST \
    -d '{"gauge": [{"metric":"bob", "dimensions": {"org":"dev"}, "value": 3}]}' localhost:8080/v2/datapoint
 ```
 
@@ -676,4 +676,4 @@ Then set which dimensions to debug via a POST.
 curl -XPOST -d '{"org":"dev"}' localhost:6060/debug/dims
 ```
 
-Then, any datapoints with the "org" dimension if "dev" will be logged.
+Then, any datapoints with the "org" dimension of "dev" will be logged.
