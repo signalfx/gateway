@@ -140,6 +140,7 @@ type ListenerConfig struct {
 	ListenPath      *string
 	Timeout         *time.Duration
 	StartingContext context.Context
+	DebugContext    *web.HeaderCtxFlag
 }
 
 var defaultListenerConfig = &ListenerConfig{
@@ -172,6 +173,9 @@ func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer,
 		},
 	}
 	httpHandler := web.NewHandler(conf.StartingContext, &listenServer.decoder)
+	if conf.DebugContext != nil {
+		httpHandler.Add(conf.DebugContext)
+	}
 	SetupCollectdPaths(r, httpHandler, *conf.ListenPath)
 
 	go listenServer.server.Serve(listener)

@@ -21,7 +21,6 @@ import (
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
-	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/sfxclient"
 	"golang.org/x/net/context"
@@ -49,7 +48,6 @@ type ForwarderConfig struct {
 	EventURL         *string
 	Timeout          *time.Duration
 	SourceDimensions *string
-	Logger           log.Logger
 	ProxyVersion     *string
 	MaxIdleConns     *int64
 	AuthToken        *string
@@ -62,7 +60,6 @@ var defaultForwarderConfig = &ForwarderConfig{
 	EventURL:     pointer.String("https://ingest.signalfx.com/v2/event"),
 	AuthToken:    pointer.String(""),
 	Timeout:      pointer.Duration(time.Second * 30),
-	Logger:       log.Discard,
 	ProxyVersion: pointer.String("UNKNOWN_VERSION"),
 	MaxIdleConns: pointer.Int64(20),
 	ProtoMarshal: proto.Marshal,
@@ -207,7 +204,6 @@ const TokenHeaderName = "X-SF-TOKEN"
 
 // AddDatapoints forwards datapoints to SignalFx
 func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*datapoint.Datapoint) error {
-
 	datapoints = connector.emptyMetricNameFilter.FilterDatapoints(datapoints)
 	if len(datapoints) == 0 {
 		return nil

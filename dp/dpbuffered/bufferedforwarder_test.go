@@ -6,29 +6,60 @@ import (
 
 	"fmt"
 
+	"bytes"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
+	"io"
+	"sync"
 )
 
 const numStats = 4
 
+type boolChecker bool
+
+func (b *boolChecker) HasFlag(ctx context.Context) bool {
+	return bool(*b)
+}
+
+type threadSafeWriter struct {
+	io.Writer
+	mu sync.Mutex
+}
+
+func (t *threadSafeWriter) Write(p []byte) (n int, err error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.Writer.Write(p)
+}
+
 // TODO figure out why this test is flaky, should be > 2, but change to >= 2 so it passes
 func TestBufferedForwarderBasic(t *testing.T) {
 	ctx := context.Background()
+	flagCheck := boolChecker(false)
+	checker := &dpsink.ItemFlagger{
+		CtxFlagCheck:        &flagCheck,
+		EventMetaName:       "meta_event",
+		MetricDimensionName: "sf_metric",
+	}
 	config := &Config{
 		BufferSize:         pointer.Int64(210),
 		MaxTotalDatapoints: pointer.Int64(1000),
 		MaxTotalEvents:     pointer.Int64(1000),
 		NumDrainingThreads: pointer.Int64(1),
 		MaxDrainSize:       pointer.Int64(1000),
+		Checker:            checker,
 	}
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
+	buf := &bytes.Buffer{}
+	threadWriter := &threadSafeWriter{Writer: buf}
+	l := log.NewLogfmtLogger(threadWriter, log.Panic)
+	bf := NewBufferedForwarder(ctx, config, sendTo, l)
 	defer bf.Close()
 	assert.NoError(t, bf.AddDatapoints(ctx, []*datapoint.Datapoint{}))
 	time.Sleep(time.Millisecond * 10)
@@ -36,6 +67,7 @@ func TestBufferedForwarderBasic(t *testing.T) {
 		dptest.DP(),
 		dptest.DP(),
 	}
+	checker.SetDatapointFlag(datas[0])
 	for i := 0; i < 100; i++ {
 		assert.NoError(t, bf.AddDatapoints(ctx, datas))
 		if i == 0 {
@@ -47,20 +79,33 @@ func TestBufferedForwarderBasic(t *testing.T) {
 	seen := <-sendTo.PointsChan
 	assert.True(t, len(seen) >= 2, fmt.Sprintf("Points should buffer: %d", len(seen)))
 	assert.Equal(t, numStats, len(bf.Datapoints()), "Checking returned stats size")
+	threadWriter.mu.Lock()
+	assert.Contains(t, buf.String(), "about to send datapoint")
+	threadWriter.mu.Unlock()
 }
 
 // TODO figure out why this test is flaky, should be > 2, but change to >= 2 so it passes
 func TestBufferedForwarderBasicEvent(t *testing.T) {
 	ctx := context.Background()
+	flagCheck := boolChecker(false)
+	checker := &dpsink.ItemFlagger{
+		CtxFlagCheck:        &flagCheck,
+		EventMetaName:       "meta_event",
+		MetricDimensionName: "sf_metric",
+	}
 	config := &Config{
 		BufferSize:         pointer.Int64(2000),
 		MaxTotalDatapoints: pointer.Int64(1000),
 		MaxTotalEvents:     pointer.Int64(1000),
 		NumDrainingThreads: pointer.Int64(1),
 		MaxDrainSize:       pointer.Int64(1000),
+		Checker:            checker,
 	}
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
+	buf := &bytes.Buffer{}
+	threadWriter := &threadSafeWriter{Writer: buf}
+	l := log.NewLogfmtLogger(threadWriter, log.Panic)
+	bf := NewBufferedForwarder(ctx, config, sendTo, l)
 	defer bf.Close()
 	assert.NoError(t, bf.AddEvents(ctx, []*event.Event{}))
 	time.Sleep(time.Millisecond * 5)
@@ -68,6 +113,7 @@ func TestBufferedForwarderBasicEvent(t *testing.T) {
 		dptest.E(),
 		dptest.E(),
 	}
+	checker.SetEventFlag(datas[0])
 	for i := 0; i < 100; i++ {
 		assert.NoError(t, bf.AddEvents(ctx, datas))
 		if i == 0 {
@@ -79,6 +125,9 @@ func TestBufferedForwarderBasicEvent(t *testing.T) {
 	seen := <-sendTo.EventsChan
 	assert.True(t, len(seen) >= 2, fmt.Sprintf("Events should buffer: %d", len(seen)))
 	assert.Equal(t, numStats, len(bf.Datapoints()), "Checking returned stats size")
+	threadWriter.mu.Lock()
+	assert.Contains(t, buf.String(), "about to send event")
+	threadWriter.mu.Unlock()
 }
 
 func TestBufferedForwarderContexts(t *testing.T) {

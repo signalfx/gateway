@@ -12,6 +12,7 @@ import (
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/web"
 	. "github.com/smartystreets/goconvey/convey"
 	"golang.org/x/net/context"
 	"io"
@@ -208,9 +209,13 @@ func TestSignalfxListener(t *testing.T) {
 		ctx := context.Background()
 		logBuf := &bytes.Buffer{}
 		logger := log.NewLogfmtLogger(logBuf, log.Panic)
+		debugContext := &web.HeaderCtxFlag{
+			HeaderName: "X-Debug",
+		}
 		listenConf := &ListenerConfig{
-			ListenAddr: pointer.String("127.0.0.1:0"),
-			Logger:     logger,
+			ListenAddr:   pointer.String("127.0.0.1:0"),
+			Logger:       logger,
+			DebugContext: debugContext,
 		}
 		listener, err := NewListener(sendTo, listenConf)
 		So(err, ShouldBeNil)
@@ -219,7 +224,6 @@ func TestSignalfxListener(t *testing.T) {
 			forwardConfig := &ForwarderConfig{
 				DatapointURL: pointer.String(fmt.Sprintf("%s/v2/datapoint", baseURI)),
 				EventURL:     pointer.String(fmt.Sprintf("%s/v2/event", baseURI)),
-				Logger:       logger,
 			}
 			forwarder := NewForwarder(forwardConfig)
 			So(forwarder.Datapoints(), ShouldEqual, nil)

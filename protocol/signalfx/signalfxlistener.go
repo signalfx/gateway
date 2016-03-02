@@ -302,11 +302,12 @@ func (decoder *JSONEventDecoderV2) Read(ctx context.Context, req *http.Request) 
 
 // ListenerConfig controls optional parameters for the listener
 type ListenerConfig struct {
-	ListenAddr  *string
-	Timeout     *time.Duration
-	Logger      log.Logger
-	RootContext context.Context
-	JSONMarshal func(v interface{}) ([]byte, error)
+	ListenAddr   *string
+	Timeout      *time.Duration
+	Logger       log.Logger
+	RootContext  context.Context
+	JSONMarshal  func(v interface{}) ([]byte, error)
+	DebugContext *web.HeaderCtxFlag
 }
 
 var defaultListenerConfig = &ListenerConfig{
@@ -400,11 +401,11 @@ func NewListener(sink dpsink.Sink, conf *ListenerConfig) (*ListenerServer, error
 		setupNotFoundHandler(r, conf.RootContext),
 		setupProtobufV1(r, conf.RootContext, sink, &listenServer.metricHandler, conf.Logger),
 		setupJSONV1(r, conf.RootContext, sink, &listenServer.metricHandler, conf.Logger),
-		setupProtobufV2(r, conf.RootContext, sink, conf.Logger),
-		setupProtobufEventV2(r, conf.RootContext, sink, conf.Logger),
-		setupJSONV2(r, conf.RootContext, sink, conf.Logger),
-		setupJSONEventV2(r, conf.RootContext, sink, conf.Logger),
-		setupCollectd(r, conf.RootContext, sink),
+		setupProtobufV2(r, conf.RootContext, sink, conf.Logger, conf.DebugContext),
+		setupProtobufEventV2(r, conf.RootContext, sink, conf.Logger, conf.DebugContext),
+		setupJSONV2(r, conf.RootContext, sink, conf.Logger, conf.DebugContext),
+		setupJSONEventV2(r, conf.RootContext, sink, conf.Logger, conf.DebugContext),
+		setupCollectd(r, conf.RootContext, sink, conf.DebugContext),
 	)
 
 	go server.Serve(listener)
@@ -472,19 +473,25 @@ func SetupJSONV1Paths(r *mux.Router, handler http.Handler) {
 	SetupJSONByPaths(r, handler, "/v1/datapoint")
 }
 
-func setupProtobufV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger) sfxclient.Collector {
+func setupProtobufV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag) sfxclient.Collector {
 	handler, st := setupChain(ctx, sink, "protobuf_v2", func(s dpsink.Sink) ErrorReader {
 		return &ProtobufDecoderV2{Sink: s, Logger: logger}
 	})
+	if debugContext != nil {
+		handler = handler.Add(debugContext)
+	}
 	SetupProtobufV2DatapointPaths(r, handler)
 
 	return st
 }
 
-func setupProtobufEventV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger) sfxclient.Collector {
+func setupProtobufEventV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag) sfxclient.Collector {
 	handler, st := setupChain(ctx, sink, "protobuf_event_v2", func(s dpsink.Sink) ErrorReader {
 		return &ProtobufEventDecoderV2{Sink: s, Logger: logger}
 	})
+	if debugContext != nil {
+		handler = handler.Add(debugContext)
+	}
 	SetupProtobufV2EventPaths(r, handler)
 
 	return st
@@ -505,18 +512,24 @@ func SetupProtobufV2ByPaths(r *mux.Router, handler http.Handler, path string) {
 	r.Path(path).Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
 }
 
-func setupJSONV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger) sfxclient.Collector {
+func setupJSONV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag) sfxclient.Collector {
 	handler, st := setupChain(ctx, sink, "json_v2", func(s dpsink.Sink) ErrorReader {
 		return &JSONDecoderV2{Sink: s, Logger: logger}
 	})
+	if debugContext != nil {
+		handler = handler.Add(debugContext)
+	}
 	SetupJSONV2DatapointPaths(r, handler)
 	return st
 }
 
-func setupJSONEventV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger) sfxclient.Collector {
+func setupJSONEventV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag) sfxclient.Collector {
 	handler, st := setupChain(ctx, sink, "json_event_v2", func(s dpsink.Sink) ErrorReader {
 		return &JSONEventDecoderV2{Sink: s, Logger: logger}
 	})
+	if debugContext != nil {
+		handler = handler.Add(debugContext)
+	}
 	SetupJSONV2EventPaths(r, handler)
 	return st
 }
@@ -539,14 +552,14 @@ func SetupJSONByPaths(r *mux.Router, handler http.Handler, endpoint string) {
 	r.Path(endpoint).Methods("POST").Handler(handler)
 }
 
-func setupCollectd(r *mux.Router, ctx context.Context, sink dpsink.Sink) sfxclient.Collector {
+func setupCollectd(r *mux.Router, ctx context.Context, sink dpsink.Sink, debugContext *web.HeaderCtxFlag) sfxclient.Collector {
 	counter := &dpsink.Counter{}
 	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
 	decoder := collectd.JSONDecoder{
 		SendTo: finalSink,
 	}
 	metricTracking := &web.RequestCounter{}
-	httpHandler := web.NewHandler(ctx, &decoder).Add(web.NextHTTP(metricTracking.ServeHTTP))
+	httpHandler := web.NewHandler(ctx, &decoder).Add(web.NextHTTP(metricTracking.ServeHTTP), debugContext)
 	collectd.SetupCollectdPaths(r, httpHandler, "/v1/collectd")
 	return &sfxclient.WithDimensions{
 		Collector: sfxclient.NewMultiCollector(

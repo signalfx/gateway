@@ -76,6 +76,7 @@ type ProxyConfig struct {
 	LogMaxBackups      *int           `json:",omitempty"`
 	LogFormat          *string        `json:",omitempty"`
 	PprofAddr          *string        `json:",omitempty"`
+	DebugFlag          *string        `json:",omitempty"`
 }
 
 // DefaultProxyConfig is default values for the proxy config

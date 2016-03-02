@@ -36,7 +36,7 @@ func regexJSONLoader(config map[string]interface{}) (MetricDeconstructor, error)
 		return nil, err
 	}
 
-	err = json.Unmarshal([]byte(jsonString), &metrics)
+	err = json.Unmarshal(jsonString, &metrics)
 	if err != nil {
 		return nil, err
 	}
