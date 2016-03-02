@@ -1,3 +1,49 @@
+// Package sfxclient creates convenient go functions and wrappers to send metrics to SignalFx.
+//
+// The core of the library is HTTPDatapointSink which allows users to send metrics to SignalFx
+// ad-hoc.  A Scheduler is built on top of this to facility easy management of metrics for multiple
+// SignalFx reporters at once in more complex libraries.
+//
+// HTTPDatapointSink
+//
+// The simplest way to send metrics to SignalFx is with HTTPDatapointSink.  The only struct
+// parameter that needs to be configured is AuthToken.  To make it easier to create common
+// Datapoint objects, wrappers exist for Gauge and Cumulative.  An example of sending a hello
+// world metric would look like this:
+//     func SendHelloWorld() {
+//         client := NewHTTPDatapointSink()
+//         client.AuthToken = "ABCDXYZ"
+//         ctx := context.Background()
+//         client.AddDatapoints(ctx, []*datapoint.Datapoint{
+//             GaugeF("hello.world", nil, 1.0),
+//         })
+//     }
+//
+// Scheduler
+//
+// To facilitate periodic sending of datapoints to SignalFx, a Scheduler abstraction exists.  You
+// can use this to report custom metrics to SignalFx at some periodic interval.
+//     type CustomApplication struct {
+//         queue chan int64
+//     }
+//     func (c *CustomApplication) Datapoints() []*datapoint.Datapoint {
+//         return []*datapoint.Datapoint {
+//           sfxclient.Gauge("queue.size", nil, len(queue)),
+//         }
+//     }
+//     func main() {
+//         scheduler := sfxclient.NewScheduler()
+//         scheduler.Sink.(*HTTPDatapointSink).AuthToken = "ABCD-XYZ"
+//         app := &CustomApplication{}
+//         scheduler.AddCallback(app)
+//         go scheduler.Schedule(context.Background())
+//     }
+//
+// RollingBucket and CumulativeBucket
+//
+// Because counting things and calculating percentiles like p99 or median are common operations,
+// RollingBucket and CumulativeBucket exist to make this easier.  They implement the Collector
+// interface which allows users to add them to an existing Scheduler.
 package sfxclient
 
 import (
@@ -15,7 +61,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-// DefaultReportingDelay is the default interval between new SignalFx schedulers
+// DefaultReportingDelay is the default interval Scheduler users to report metrics to SignalFx
 const DefaultReportingDelay = time.Second * 20
 
 // DefaultErrorHandler is the default way to handle errors by a scheduler.  It simply prints them to stdout
@@ -24,29 +70,31 @@ var DefaultErrorHandler = func(err error) error {
 	return nil
 }
 
-// Sink is anything that can receive points collected by a Scheduler
+// Sink is anything that can receive points collected by a Scheduler.  This can be useful for
+// stubbing out your collector to test the points that will be sent to SignalFx.
 type Sink interface {
 	AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) (err error)
 }
 
-// Collector is anything scheduler can track that emits points
+// Collector is anything Scheduler can track that emits points
 type Collector interface {
 	Datapoints() []*datapoint.Datapoint
 }
 
-// HashableCollector is a Collector function that can be inserted into a hashmap
+// HashableCollector is a Collector function that can be inserted into a hashmap.  You can use it
+// to wrap a functional callback and insert it into a Scheduler.
 type HashableCollector struct {
 	Callback func() []*datapoint.Datapoint
 }
 
-// CollectorFunc wraps a function to make it a Collector
+// CollectorFunc wraps a function to make it a Collector.
 func CollectorFunc(callback func() []*datapoint.Datapoint) *HashableCollector {
 	return &HashableCollector{
 		Callback: callback,
 	}
 }
 
-// Datapoints calls the wrapped function
+// Datapoints calls the wrapped function.
 func (h *HashableCollector) Datapoints() []*datapoint.Datapoint {
 	return h.Callback()
 }
@@ -76,7 +124,7 @@ func (c *callbackPair) getDatapoints(now time.Time, sendZeroTime bool) []*datapo
 	return ret
 }
 
-// A Scheduler reports metrics to SignalFx
+// A Scheduler reports metrics to SignalFx at some timely manner.
 type Scheduler struct {
 	Sink             Sink
 	Timer            timekeeper.TimeKeeper
@@ -93,7 +141,8 @@ type Scheduler struct {
 	}
 }
 
-// NewScheduler creates a default SignalFx scheduler that can report metrics to signalfx at some interval
+// NewScheduler creates a default SignalFx scheduler that can report metrics to SignalFx at some
+// interval.
 func NewScheduler() *Scheduler {
 	return &Scheduler{
 		Sink:             NewHTTPDatapointSink(),
@@ -104,7 +153,7 @@ func NewScheduler() *Scheduler {
 	}
 }
 
-// Var returns an expvar variable that prints the values of the previously reported datapoints
+// Var returns an expvar variable that prints the values of the previously reported datapoints.
 func (s *Scheduler) Var() expvar.Var {
 	return expvar.Func(func() interface{} {
 		s.callbackMutex.Lock()
@@ -122,17 +171,17 @@ func (s *Scheduler) collectDatapoints() []*datapoint.Datapoint {
 	return ret
 }
 
-// AddCallback adds a collector to the default group
+// AddCallback adds a collector to the default group.
 func (s *Scheduler) AddCallback(db Collector) {
 	s.AddGroupedCallback("", db)
 }
 
-// DefaultDimensions adds a dimension map that are appended to all metrics in the default group
+// DefaultDimensions adds a dimension map that are appended to all metrics in the default group.
 func (s *Scheduler) DefaultDimensions(dims map[string]string) {
 	s.GroupedDefaultDimensions("", dims)
 }
 
-// GroupedDefaultDimensions adds default dimensions to a specific group
+// GroupedDefaultDimensions adds default dimensions to a specific group.
 func (s *Scheduler) GroupedDefaultDimensions(group string, dims map[string]string) {
 	s.callbackMutex.Lock()
 	defer s.callbackMutex.Unlock()
@@ -147,7 +196,7 @@ func (s *Scheduler) GroupedDefaultDimensions(group string, dims map[string]strin
 	subgroup.defaultDimensions = dims
 }
 
-// AddGroupedCallback adds a collector to a specific group
+// AddGroupedCallback adds a collector to a specific group.
 func (s *Scheduler) AddGroupedCallback(group string, db Collector) {
 	s.callbackMutex.Lock()
 	defer s.callbackMutex.Unlock()
@@ -162,12 +211,12 @@ func (s *Scheduler) AddGroupedCallback(group string, db Collector) {
 	subgroup.callbacks[db] = struct{}{}
 }
 
-// RemoveCallback removes a collector from the default group
+// RemoveCallback removes a collector from the default group.
 func (s *Scheduler) RemoveCallback(db Collector) {
 	s.RemoveGroupedCallback("", db)
 }
 
-// RemoveGroupedCallback removes a collector from a specific group
+// RemoveGroupedCallback removes a collector from a specific group.
 func (s *Scheduler) RemoveGroupedCallback(group string, db Collector) {
 	s.callbackMutex.Lock()
 	defer s.callbackMutex.Unlock()
@@ -192,7 +241,7 @@ func (s *Scheduler) ReportOnce(ctx context.Context) error {
 	return s.Sink.AddDatapoints(ctx, datapoints)
 }
 
-// ReportingDelay sets the interval metrics are reported to SignalFx
+// ReportingDelay sets the interval metrics are reported to SignalFx.
 func (s *Scheduler) ReportingDelay(delay time.Duration) {
 	atomic.StoreInt64(&s.ReportingDelayNs, delay.Nanoseconds())
 }

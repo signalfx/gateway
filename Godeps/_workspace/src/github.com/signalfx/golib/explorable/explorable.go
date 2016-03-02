@@ -82,7 +82,8 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	</body>
 </html>`, html.EscapeString(o.Desc), parent, childTable)
 
-	rw.Write([]byte(s))
+	_, err := rw.Write([]byte(s))
+	log.IfErr(h.Logger, err)
 }
 
 func checkConsts(t reflect.Value) *Result {

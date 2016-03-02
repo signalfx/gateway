@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/log"
 	. "github.com/smartystreets/goconvey/convey"
+	"golang.org/x/net/context"
 )
 
 func dpNamed(name string, dps []*datapoint.Datapoint) *datapoint.Datapoint {
@@ -114,4 +116,17 @@ func benchCB(b *testing.B, numGoroutine int) {
 
 func BenchmarkCumulativeBucket100(b *testing.B) {
 	benchCB(b, 100)
+}
+
+func ExampleCumulativeBucket() {
+	cb := &CumulativeBucket{
+		MetricName: "mname",
+		Dimensions: map[string]string{"type": "dev"},
+	}
+	cb.Add(1)
+	cb.Add(3)
+	client := NewHTTPDatapointSink()
+	ctx := context.Background()
+	// Will expect it to send count=2, sum=4, sumofsquare=10
+	log.IfErr(log.Panic, client.AddDatapoints(ctx, cb.Datapoints()))
 }

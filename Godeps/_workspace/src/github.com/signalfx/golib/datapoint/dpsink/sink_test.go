@@ -4,6 +4,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	. "github.com/smartystreets/goconvey/convey"
 	"golang.org/x/net/context"
 	"testing"
@@ -20,7 +21,7 @@ func (e *expect) AddEvents(ctx context.Context, events []*event.Event) error {
 	}
 	if e.forwardTo != nil {
 		events = append(events, nil)
-		e.forwardTo.AddEvents(ctx, events)
+		log.IfErr(log.Panic, e.forwardTo.AddEvents(ctx, events))
 	}
 	return nil
 }
@@ -31,7 +32,7 @@ func (e *expect) AddDatapoints(ctx context.Context, points []*datapoint.Datapoin
 	}
 	if e.forwardTo != nil {
 		points = append(points, nil)
-		e.forwardTo.AddDatapoints(ctx, points)
+		log.IfErr(log.Panic, e.forwardTo.AddDatapoints(ctx, points))
 	}
 	return nil
 }
@@ -49,8 +50,8 @@ func TestFromChain(t *testing.T) {
 	e0 := expect{count: 0}
 
 	chain := FromChain(&e2, e0.next, e1.next)
-	chain.AddDatapoints(nil, []*datapoint.Datapoint{})
-	chain.AddEvents(nil, []*event.Event{})
+	log.IfErr(log.Panic, chain.AddDatapoints(nil, []*datapoint.Datapoint{}))
+	log.IfErr(log.Panic, chain.AddEvents(nil, []*event.Event{}))
 }
 
 func TestIncludingDimensions(t *testing.T) {

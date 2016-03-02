@@ -134,3 +134,10 @@ type LoggerFunc func(...interface{})
 func (f LoggerFunc) Log(keyvals ...interface{}) {
 	f(keyvals...)
 }
+
+// IfErr is a shorthand that will log an error if err is not nil
+func IfErr(l Logger, err error) {
+	if err != nil {
+		l.Log(Err, err)
+	}
+}

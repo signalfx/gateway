@@ -36,3 +36,10 @@ func PanicIfErr(err error, msg string, args ...interface{}) {
 		panic(fmt.Sprintf("%s: %s", err.Error(), fmt.Sprintf(msg, args...)))
 	}
 }
+
+// PanicIfErrWrite is similar to PanicIfErr, but works well with io results that return integer+err
+func PanicIfErrWrite(numWritten int, err error) {
+	if err != nil {
+		panic(fmt.Sprintf("Write err: %s", err.Error()))
+	}
+}

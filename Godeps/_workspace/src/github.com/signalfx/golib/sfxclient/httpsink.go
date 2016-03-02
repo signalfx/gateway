@@ -31,7 +31,7 @@ var DefaultUserAgent = fmt.Sprintf("golib-sfxclient/%s (gover %s)", ClientVersio
 // DefaultTimeout is the default time to fail signalfx datapoint requests if they don't succeed
 const DefaultTimeout = time.Second * 5
 
-// HTTPDatapointSink will accept signalfx datapoints and forward them to signalfx via HTTP
+// HTTPDatapointSink will accept signalfx datapoints and forward them to SignalFx via HTTP.
 type HTTPDatapointSink struct {
 	AuthToken      string
 	UserAgent      string
@@ -49,7 +49,9 @@ var _ Sink = &HTTPDatapointSink{}
 // TokenHeaderName is the header key for the auth token in the HTTP request
 const TokenHeaderName = "X-Sf-Token"
 
-// NewHTTPDatapointSink creates a default NewHTTPDatapointSink using package level constants
+// NewHTTPDatapointSink creates a default NewHTTPDatapointSink using package level constants as
+// defaults, including an empty auth token.  If sending directly to SiganlFx, you will be required
+// to explicitly set the AuthToken
 func NewHTTPDatapointSink() *HTTPDatapointSink {
 	return &HTTPDatapointSink{
 		UserAgent: DefaultUserAgent,
@@ -62,7 +64,7 @@ func NewHTTPDatapointSink() *HTTPDatapointSink {
 	}
 }
 
-// AddDatapoints forwards the datapoints to signalfx
+// AddDatapoints forwards the datapoints to SignalFx.
 func (h *HTTPDatapointSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) (err error) {
 	if len(points) == 0 {
 		return nil

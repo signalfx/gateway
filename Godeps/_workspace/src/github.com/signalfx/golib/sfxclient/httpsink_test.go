@@ -12,6 +12,7 @@ import (
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/errors"
+	"github.com/signalfx/golib/log"
 	. "github.com/smartystreets/goconvey/convey"
 	"golang.org/x/net/context"
 	"net"
@@ -79,11 +80,12 @@ func TestHTTPDatapointSink(t *testing.T) {
 			seenBodyPoints := &com_signalfx_metrics_protobuf.DataPointUploadMessage{}
 			handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 				bodyBytes := bytes.Buffer{}
-				io.Copy(&bodyBytes, req.Body)
-				req.Body.Close()
-				proto.Unmarshal(bodyBytes.Bytes(), seenBodyPoints)
+				_, err := io.Copy(&bodyBytes, req.Body)
+				log.IfErr(log.Panic, err)
+				log.IfErr(log.Panic, req.Body.Close())
+				log.IfErr(log.Panic, proto.Unmarshal(bodyBytes.Bytes(), seenBodyPoints))
 				rw.WriteHeader(retCode)
-				io.WriteString(rw, retString)
+				errors.PanicIfErrWrite(io.WriteString(rw, retString))
 				if blockResponse != nil {
 					if cancelCallback != nil {
 						cancelCallback()
@@ -104,7 +106,9 @@ func TestHTTPDatapointSink(t *testing.T) {
 			}
 			serverDone := make(chan struct{})
 			go func() {
-				server.Serve(l)
+				if err := server.Serve(l); err == nil {
+					panic("I expect serve to eventually error")
+				}
 				close(serverDone)
 			}()
 			s.Endpoint = "http://" + l.Addr().String()
@@ -146,7 +150,7 @@ func TestHTTPDatapointSink(t *testing.T) {
 			})
 			Convey("Invalid datapoints should panic", func() {
 				dps[0].MetricType = datapoint.MetricType(1001)
-				So(func() { s.AddDatapoints(ctx, dps) }, ShouldPanic)
+				So(func() { log.IfErr(log.Panic, s.AddDatapoints(ctx, dps)) }, ShouldPanic)
 			})
 			Convey("return code should be checked", func() {
 				retCode = http.StatusNotAcceptable
@@ -177,4 +181,19 @@ func TestHTTPDatapointSink(t *testing.T) {
 			})
 		})
 	})
+}
+
+func ExampleHTTPDatapointSink() {
+	sink := NewHTTPDatapointSink()
+	sink.AuthToken = "ABCDEFG"
+	ctx := context.Background()
+	err := sink.AddDatapoints(ctx, []*datapoint.Datapoint{
+		// Sending a gauge with the value 1.2
+		GaugeF("a.gauge", nil, 1.2),
+		// Sending a cumulative counter with dimensions
+		Cumulative("a.counter", map[string]string{"type": "dev"}, 100),
+	})
+	if err != nil {
+		panic(err)
+	}
 }

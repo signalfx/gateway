@@ -4,10 +4,11 @@ import (
 	"github.com/signalfx/golib/datapoint"
 )
 
-// MultiCollector acts like a datapoint collector over multiple collectors
+// MultiCollector acts like a datapoint collector over multiple collectors.
 type MultiCollector []Collector
 
-// NewMultiCollector returns a collector that is the aggregate of every given collector
+// NewMultiCollector returns a collector that is the aggregate of every given collector.  It can be
+// used to turn multiple collectors into a single collector.
 func NewMultiCollector(collectors ...Collector) Collector {
 	if len(collectors) == 1 {
 		return collectors[0]
@@ -15,7 +16,7 @@ func NewMultiCollector(collectors ...Collector) Collector {
 	return MultiCollector(collectors)
 }
 
-// Datapoints returns the datapoints from every collector
+// Datapoints returns the datapoints from every collector.
 func (m MultiCollector) Datapoints() []*datapoint.Datapoint {
 	var ret []*datapoint.Datapoint
 	for _, col := range m {
@@ -26,7 +27,8 @@ func (m MultiCollector) Datapoints() []*datapoint.Datapoint {
 
 var _ Collector = MultiCollector(nil)
 
-// WithDimensions adds dimensions on top of the datapoints of a collector
+// WithDimensions adds dimensions on top of the datapoints of a collector.  This can be used to take
+// an existing Collector and include extra dimensions.
 type WithDimensions struct {
 	Dimensions map[string]string
 	Collector  Collector

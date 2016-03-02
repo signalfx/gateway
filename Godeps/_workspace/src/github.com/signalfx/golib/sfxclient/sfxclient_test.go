@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/timekeeper/timekeepertest"
@@ -25,7 +26,7 @@ func (t *testSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapo
 
 func TestNewScheduler(t *testing.T) {
 	Convey("Default error handler should not panic", t, func() {
-		So(func() { DefaultErrorHandler(errors.New("test")) }, ShouldNotPanic)
+		So(func() { errors.PanicIfErr(DefaultErrorHandler(errors.New("test")), "unexpected") }, ShouldNotPanic)
 	})
 
 	Convey("with a testing scheduler", t, func() {
@@ -181,4 +182,17 @@ func TestNewScheduler(t *testing.T) {
 			close(sink.lastDatapoints)
 		})
 	})
+}
+
+func ExampleScheduler() {
+	s := NewScheduler()
+	s.Sink.(*HTTPDatapointSink).AuthToken = "ABCD-XYZ"
+	s.AddCallback(GoMetricsSource)
+	bucket := NewRollingBucket("req.time", map[string]string{"env": "test"})
+	s.AddCallback(bucket)
+	bucket.Add(1.2)
+	bucket.Add(3)
+	ctx := context.Background()
+	err := s.Schedule(ctx)
+	fmt.Println("Schedule result: ", err)
 }

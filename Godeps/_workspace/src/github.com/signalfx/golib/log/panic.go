@@ -1,5 +1,7 @@
 package log
 
+import "bytes"
+
 type panicLogger struct {
 	err error
 }
@@ -13,7 +15,15 @@ func (n *panicLogger) Log(keyvals ...interface{}) {
 	if n.err != nil {
 		r = append(r[0:len(r):len(r)], n.err)
 	}
-	panic(r)
+	buf := &bytes.Buffer{}
+	f := LogfmtLogger{
+		Out:             buf,
+		MissingValueKey: Msg,
+	}
+	if err := f.Log(r...); err != nil {
+		panic(r)
+	}
+	panic(buf.String())
 }
 
 // ErrorLogger returns the wrapped logger

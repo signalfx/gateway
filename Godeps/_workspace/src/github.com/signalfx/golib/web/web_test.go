@@ -10,6 +10,7 @@ import (
 
 	"sync/atomic"
 
+	"github.com/signalfx/golib/errors"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
@@ -77,7 +78,7 @@ func TestHandler(t *testing.T) {
 	assert.EqualValues(t, 4, i.after)
 
 	bodyTest := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		rw.Write([]byte("test"))
+		errors.PanicIfErrWrite(rw.Write([]byte("test")))
 	})
 
 	ToHTTP(ctx, FromHTTP(bodyTest)).ServeHTTP(rw, req)
@@ -92,7 +93,7 @@ func TestMany(t *testing.T) {
 	incrHandler := IncrHandler{}
 
 	destination := HandlerFunc(func(ctx context.Context, rw http.ResponseWriter, r *http.Request) {
-		rw.Write(ctx.Value("towrite").([]byte))
+		errors.PanicIfErrWrite(rw.Write(ctx.Value("towrite").([]byte)))
 	})
 
 	ctx := context.Background()
@@ -120,7 +121,7 @@ func TestMany(t *testing.T) {
 
 func TestNoMiddleware(t *testing.T) {
 	destination := HandlerFunc(func(ctx context.Context, rw http.ResponseWriter, r *http.Request) {
-		rw.Write([]byte("Hello"))
+		errors.PanicIfErrWrite(rw.Write([]byte("Hello")))
 	})
 
 	ctx := context.Background()
@@ -154,7 +155,7 @@ func BenchmarkSendWithContext(b *testing.B) {
 
 	destination := HandlerFunc(func(ctx context.Context, rw http.ResponseWriter, r *http.Request) {
 		b.StopTimer()
-		rw.Write(ctx.Value("towrite").([]byte))
+		errors.PanicIfErrWrite(rw.Write(ctx.Value("towrite").([]byte)))
 		b.StartTimer()
 	})
 

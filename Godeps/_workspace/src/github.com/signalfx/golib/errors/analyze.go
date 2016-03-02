@@ -51,15 +51,15 @@ func Message(err error) string {
 // Details are an easy to read concat of all the error strings in a chain
 func Details(err error) string {
 	b := bytes.Buffer{}
-	b.WriteByte('[')
+	PanicIfErr(b.WriteByte('['), "unexpected")
 	first := true
 	for ; err != nil; err = Next(err) {
 		if !first {
-			b.WriteString(" | ")
+			PanicIfErrWrite(b.WriteString(" | "))
 		}
-		b.WriteString(Message(err))
+		PanicIfErrWrite(b.WriteString(Message(err)))
 		first = false
 	}
-	b.WriteByte(']')
+	PanicIfErr(b.WriteByte(']'), "unexpected")
 	return b.String()
 }
