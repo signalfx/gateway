@@ -625,3 +625,55 @@ on [the pprof help page](http://golang.org/pkg/net/http/pprof/).
   "LocalDebugServer": "0.0.0.0:6009"
 }
 ```
+
+### Debugging connections via headers
+
+Setup a debug config
+
+```
+{
+  "DebugFlag": "secretdebug",
+  "ForwardTo": [
+    {
+      "type": "signalfx-json",
+      "DefaultAuthToken": "ABCD",
+      "Name": "signalfxforwarder",
+    }
+}
+```
+
+Then, send a request with the debug header set to secretdebug.
+
+```
+curl -H "X-Debug-Id:secretdebug2" -H "Content-Type: application/json" -XPOST \
+   -d '{"gauge": [{"metric":"bob", "dimensions": {"org":"dev"}, "value": 3}]}' localhost:8080/v2/datapoint
+```
+
+The config will tell the HTTP request to debug each datapoint sent with X-Debug-Id
+set to secretdebug and log statements will show when each item is through the
+proxy pipeline.
+
+### Debugging connections via debug dimensions
+
+Setup a local debug server, then you can configure which dimensions are
+logged out.
+
+```
+{
+  "LocalDebugServer": "0.0.0.0:6060",
+  "ForwardTo": [
+    {
+      "type": "signalfx-json",
+      "DefaultAuthToken": "ABCD",
+      "Name": "signalfxforwarder",
+    }
+}
+```
+
+Then set which dimensions to debug via a POST.
+
+```
+curl -XPOST -d '{"org":"dev"}' localhost:6060/debug/dims
+```
+
+Then, any datapoints with the "org" dimension if "dev" will be logged.

@@ -9,6 +9,7 @@ import (
 
 	"net/http"
 
+	"github.com/signalfx/golib/log"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 )
@@ -64,7 +65,7 @@ func TestExpvarHandler(t *testing.T) {
 }
 
 func TestEnviromentalVariables(t *testing.T) {
-	os.Setenv("TestEnviromentalVariables", "abcdefg")
+	log.IfErr(log.Panic, os.Setenv("TestEnviromentalVariables", "abcdefg"))
 	s := EnviromentalVariables().String()
 	assert.Contains(t, s, "TestEnviromentalVariables")
 	assert.Contains(t, s, "abcdefg")

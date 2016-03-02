@@ -34,18 +34,23 @@ func NewJSONLogger(w io.Writer, ErrHandler ErrorHandler) Logger {
 
 // Log will format a JSON map and write it to Out
 func (j *JSONLogger) Log(keyvals ...interface{}) error {
+	m := mapFromKeyvals(j.MissingValueKey, keyvals...)
+	return errors.Annotate(json.NewEncoder(j.Out).Encode(m), "cannot JSON encode log")
+}
+
+func mapFromKeyvals(missingValueKey Key, keyvals ...interface{}) map[string]interface{} {
 	n := (len(keyvals) + 1) / 2 // +1 to handle case when len is odd
 	m := make(map[string]interface{}, n)
 	for i := 0; i < len(keyvals); i += 2 {
 		var k, v interface{}
 		if i == len(keyvals)-1 {
-			k, v = j.MissingValueKey, keyvals[i]
+			k, v = missingValueKey, keyvals[i]
 		} else {
 			k, v = keyvals[i], keyvals[i+1]
 		}
 		m[mapKey(k)] = mapValue(v)
 	}
-	return errors.Annotate(json.NewEncoder(j.Out).Encode(m), "cannot JSON encode log")
+	return m
 }
 
 // Different from go-kit.  People just shouldn't pass nil values and should know if they do

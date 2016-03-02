@@ -9,7 +9,9 @@ import (
 
 var startTime = time.Now()
 
-// GoMetricsSource is a singleton that collects basic go system stats
+// GoMetricsSource is a singleton Collector that collects basic go system stats.  It currently
+// collects from runtime.ReadMemStats and adds a few extra metrics like uptime of the process
+// and other runtime package functions.
 var GoMetricsSource Collector = &goMetrics{}
 
 type goMetrics struct{}

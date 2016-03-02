@@ -6,6 +6,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/web"
 	. "github.com/smartystreets/goconvey/convey"
 	"golang.org/x/net/context"
 	"net/http"
@@ -166,8 +167,12 @@ func TestCollectDListener(t *testing.T) {
 		So(err, ShouldNotBeNil)
 	})
 	Convey("a basic collectd listener", t, func() {
+		debugContext := &web.HeaderCtxFlag{
+			HeaderName: "X-Test",
+		}
 		conf := &ListenerConfig{
-			ListenAddr: pointer.String("127.0.0.1:0"),
+			ListenAddr:   pointer.String("127.0.0.1:0"),
+			DebugContext: debugContext,
 		}
 		sendTo := dptest.NewBasicSink()
 

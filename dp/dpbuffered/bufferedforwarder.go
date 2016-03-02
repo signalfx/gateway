@@ -22,6 +22,7 @@ type Config struct {
 	MaxTotalEvents     *int64
 	MaxDrainSize       *int64
 	NumDrainingThreads *int64
+	Checker            *dpsink.ItemFlagger
 }
 
 // DefaultConfig are default values for buffered forwarders
@@ -49,6 +50,7 @@ type BufferedForwarder struct {
 	blockingDrainWaitMutex      sync.Mutex
 	blockingEventDrainWaitMutex sync.Mutex
 	logger                      log.Logger
+	checker                     *dpsink.ItemFlagger
 
 	sendTo      dpsink.Sink
 	stopContext context.Context
@@ -167,35 +169,62 @@ func (forwarder *BufferedForwarder) Close() error {
 }
 
 func (forwarder *BufferedForwarder) start() {
+	forwarder.threadsWaitingToDie.Add(int(*forwarder.config.NumDrainingThreads) * 2)
 	for i := int64(0); i < *forwarder.config.NumDrainingThreads; i++ {
-		forwarder.threadsWaitingToDie.Add(1)
-		go func() {
+		go func(drainIndex int64) {
 			defer forwarder.threadsWaitingToDie.Done()
+			logger := log.NewContext(forwarder.logger).With("draining_index", drainIndex)
 			for forwarder.stopContext.Err() == nil {
 				datapoints := forwarder.blockingDrainUpTo()
 				if len(datapoints) == 0 {
 					continue
 				}
+				logDpIfFlag(logger, forwarder.checker, datapoints, "about to send datapoint")
 				err := forwarder.sendTo.AddDatapoints(forwarder.stopContext, datapoints)
 				if err != nil {
-					forwarder.logger.Log(log.Err, err, "error sending datapoints")
+					logger.Log(log.Err, err, "error sending datapoints")
 				}
+				logDpIfFlag(logger, forwarder.checker, datapoints, "Finished sending datapoint")
 			}
-		}()
-		forwarder.threadsWaitingToDie.Add(1)
-		go func() {
+		}(i)
+		go func(drainIndex int64) {
 			defer forwarder.threadsWaitingToDie.Done()
+			logger := log.NewContext(forwarder.logger).With("draining_index", drainIndex)
 			for forwarder.stopContext.Err() == nil {
 				events := forwarder.blockingDrainEventsUpTo()
 				if len(events) == 0 {
 					continue
 				}
+				logEvIfFlag(logger, forwarder.checker, events, "about to send event")
 				err := forwarder.sendTo.AddEvents(forwarder.stopContext, events)
 				if err != nil {
-					forwarder.logger.Log(log.Err, err, "error sending events")
+					logger.Log(log.Err, err, "error sending events")
 				}
+				logEvIfFlag(logger, forwarder.checker, events, "Finished sending event")
 			}
-		}()
+		}(i)
+	}
+}
+
+func logDpIfFlag(l log.Logger, checker *dpsink.ItemFlagger, dps []*datapoint.Datapoint, msg string) {
+	if log.IsDisabled(l) {
+		return
+	}
+	for _, dp := range dps {
+		if checker.HasDatapointFlag(dp) {
+			l.Log("dp", dp, msg)
+		}
+	}
+}
+
+func logEvIfFlag(l log.Logger, checker *dpsink.ItemFlagger, ev []*event.Event, msg string) {
+	if log.IsDisabled(l) {
+		return
+	}
+	for _, dp := range ev {
+		if checker.HasEventFlag(dp) {
+			l.Log("ev", dp, msg)
+		}
 	}
 }
 
@@ -214,6 +243,7 @@ func NewBufferedForwarder(ctx context.Context, config *Config, sendTo dpsink.Sin
 		config:      config,
 		sendTo:      sendTo,
 		logger:      logCtx,
+		checker:     config.Checker,
 	}
 	ret.start()
 	return ret

@@ -31,6 +31,7 @@ const config1 = `
     "LogFormat": "logfmt",
     "LogDir": "-",
     "NumProcs":4,
+    "DebugFlag": "debugme",
     "ListenFrom":[
       {
       	"Type":"carbon",

@@ -35,13 +35,15 @@ func TestCounterSink(t *testing.T) {
 		datas := <-bs.PointsChan
 		assert.Equal(t, 2, len(datas), "Original datas should be sent")
 	}()
-	middleSink.AddDatapoints(ctx, dps)
+	log.IfErr(log.Panic, middleSink.AddDatapoints(ctx, dps))
 	assert.Equal(t, int64(0), atomic.LoadInt64(&count.CallsInFlight), "Call is finished")
 	assert.Equal(t, int64(0), atomic.LoadInt64(&count.TotalProcessErrors), "No errors so far (see above)")
 	assert.Equal(t, numTests, len(count.Datapoints()), "Just checking stats len()")
 
 	bs.RetError(errors.New("nope"))
-	middleSink.AddDatapoints(ctx, dps)
+	if err := middleSink.AddDatapoints(ctx, dps); err == nil {
+		t.Fatal("Expected an error!")
+	}
 	assert.Equal(t, int64(1), atomic.LoadInt64(&count.TotalProcessErrors), "Error should be sent through")
 }
 
@@ -61,12 +63,14 @@ func TestCounterSinkEvent(t *testing.T) {
 		datas := <-bs.EventsChan
 		assert.Equal(t, 2, len(datas), "Original datas should be sent")
 	}()
-	middleSink.AddEvents(ctx, es)
+	log.IfErr(log.Panic, middleSink.AddEvents(ctx, es))
 	assert.Equal(t, int64(0), atomic.LoadInt64(&count.CallsInFlight), "Call is finished")
 	assert.Equal(t, int64(0), atomic.LoadInt64(&count.TotalProcessErrors), "No errors so far (see above)")
 	assert.Equal(t, numTests, len(count.Datapoints()), "Just checking stats len()")
 
 	bs.RetError(errors.New("nope"))
-	middleSink.AddEvents(ctx, es)
+	if err := middleSink.AddEvents(ctx, es); err == nil {
+		t.Fatal("Expected an error!")
+	}
 	assert.Equal(t, int64(1), atomic.LoadInt64(&count.TotalProcessErrors), "Error should be sent through")
 }

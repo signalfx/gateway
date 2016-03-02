@@ -1,7 +1,10 @@
 package sfxclient
 
 import (
+	"github.com/signalfx/golib/datapoint"
 	. "github.com/smartystreets/goconvey/convey"
+	"golang.org/x/net/context"
+	"sync/atomic"
 	"testing"
 )
 
@@ -32,5 +35,36 @@ func TestWithDimensions(t *testing.T) {
 		c2.Dimensions = nil
 		dp0 = c2.Datapoints()[0]
 		So(dp0.Dimensions["name"], ShouldNotEqual, "jack")
+	})
+}
+
+func ExampleNewMultiCollector() {
+	var a Collector
+	var b Collector
+	c := NewMultiCollector(a, b)
+	c.Datapoints()
+}
+
+func ExampleCumulativeP() {
+	client := NewHTTPDatapointSink()
+	ctx := context.Background()
+	var countThing int64
+	go func() {
+		atomic.AddInt64(&countThing, 1)
+	}()
+	if err := client.AddDatapoints(ctx, []*datapoint.Datapoint{
+		CumulativeP("server.request_count", nil, &countThing),
+	}); err != nil {
+		panic("Could not send datapoints")
+	}
+}
+
+func ExampleWithDimensions() {
+	sched := NewScheduler()
+	sched.AddCallback(&WithDimensions{
+		Collector: GoMetricsSource,
+		Dimensions: map[string]string{
+			"extra": "dimension",
+		},
 	})
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"github.com/signalfx/golib/log"
 	"io"
 	"net/http"
 	"os"
@@ -16,12 +17,14 @@ import (
 // Exported
 type Handler struct {
 	Exported map[string]expvar.Var
+	Logger   log.Logger
 }
 
 // New creates and returns a new handler
 func New() *Handler {
 	e := Handler{
 		Exported: make(map[string]expvar.Var),
+		Logger:   log.Discard,
 	}
 	return &e
 }
@@ -105,9 +108,10 @@ func (e *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		tmp := &bytes.Buffer{}
 		e.initialDump(tmp, onlyFetch)
 		buf := &bytes.Buffer{}
-		json.Indent(buf, tmp.Bytes(), "", "\t")
+		log.IfErr(log.Panic, json.Indent(buf, tmp.Bytes(), "", "\t"))
 		w.Header().Set("Content-Length", strconv.FormatInt(int64(buf.Len()), 10))
-		w.Write(buf.Bytes())
+		_, err := w.Write(buf.Bytes())
+		log.IfErr(e.Logger, err)
 		return
 	}
 	e.initialDump(w, onlyFetch)

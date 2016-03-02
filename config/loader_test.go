@@ -2,10 +2,12 @@ package config
 
 import (
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/protocol/carbon"
 	. "github.com/smartystreets/goconvey/convey"
 	"golang.org/x/net/context"
@@ -21,7 +23,10 @@ func TestConfigLoader(t *testing.T) {
 		sink := dptest.NewBasicSink()
 		sink.Resize(1)
 
-		l := NewLoader(ctx, logger, version)
+		debugContext := web.HeaderCtxFlag{}
+		itemFlagger := dpsink.ItemFlagger{}
+
+		l := NewLoader(ctx, logger, version, &debugContext, &itemFlagger)
 		Convey("should fail empty forwarders", func() {
 			_, err := l.Forwarder(&ForwardTo{})
 			So(err, ShouldNotBeNil)

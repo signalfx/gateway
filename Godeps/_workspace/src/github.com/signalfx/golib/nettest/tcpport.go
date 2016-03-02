@@ -1,6 +1,9 @@
 package nettest
 
-import "net"
+import (
+	"github.com/signalfx/golib/log"
+	"net"
+)
 
 // A NetworkListener is a listener that looks for data on a network address.  It is sometimes
 // useful in testing to get this address so you can talk to it directly.
@@ -17,6 +20,6 @@ func TCPPort(l NetworkListener) uint16 {
 func FreeTCPPort() uint16 {
 	l, _ := net.Listen("tcp", "localhost:0")
 	ret := TCPPort(l)
-	l.Close()
+	log.IfErr(log.Panic, l.Close())
 	return ret
 }

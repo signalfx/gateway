@@ -4,6 +4,7 @@ import (
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
+	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/carbon"
 	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
@@ -26,11 +27,12 @@ type listenSinkWrapper interface {
 }
 
 // NewLoader creates the default loader for proxy protocols
-func NewLoader(ctx context.Context, logger log.Logger, version string) *Loader {
+func NewLoader(ctx context.Context, logger log.Logger, version string, debugContext *web.HeaderCtxFlag, itemFlagger *dpsink.ItemFlagger) *Loader {
 	sfxL := &signalFxLoader{
 		logger:        logger,
 		rootContext:   ctx,
 		versionString: version,
+		itemFlagger:   itemFlagger,
 	}
 	return &Loader{
 		forwarders: map[string]forwarderLoader{
@@ -46,12 +48,14 @@ func NewLoader(ctx context.Context, logger log.Logger, version string) *Loader {
 				logger:        logger,
 				rootContext:   ctx,
 				versionString: version,
+				debugContext:  debugContext,
 			},
 			"carbon": &carbonLoader{
 				logger: logger,
 			},
 			"collectd": &collectdLoader{
-				rootContext: ctx,
+				rootContext:  ctx,
+				debugContext: debugContext,
 			},
 		},
 		listenWrappers: []listenSinkWrapper{
@@ -114,7 +118,8 @@ func (s *csvLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) {
 }
 
 type collectdLoader struct {
-	rootContext context.Context
+	rootContext  context.Context
+	debugContext *web.HeaderCtxFlag
 }
 
 func (s *collectdLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
@@ -123,6 +128,7 @@ func (s *collectdLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.
 		ListenPath:      conf.ListenPath,
 		Timeout:         conf.TimeoutDuration,
 		StartingContext: s.rootContext,
+		DebugContext:    s.debugContext,
 	}
 	return collectd.NewListener(sink, &sfConf)
 }
@@ -130,15 +136,18 @@ func (s *collectdLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.
 type signalFxLoader struct {
 	logger        log.Logger
 	rootContext   context.Context
+	debugContext  *web.HeaderCtxFlag
 	versionString string
+	itemFlagger   *dpsink.ItemFlagger
 }
 
 func (s *signalFxLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
 	sfConf := signalfx.ListenerConfig{
-		ListenAddr:  conf.ListenAddr,
-		Timeout:     conf.TimeoutDuration,
-		Logger:      s.logger,
-		RootContext: s.rootContext,
+		ListenAddr:   conf.ListenAddr,
+		Timeout:      conf.TimeoutDuration,
+		Logger:       s.logger,
+		RootContext:  s.rootContext,
+		DebugContext: s.debugContext,
 	}
 	return signalfx.NewListener(sink, &sfConf)
 }
@@ -149,7 +158,6 @@ func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) 
 		EventURL:         conf.EventURL,
 		Timeout:          conf.TimeoutDuration,
 		SourceDimensions: conf.SourceDimensions,
-		Logger:           s.logger,
 		ProxyVersion:     &s.versionString,
 		MaxIdleConns:     conf.DrainingThreads,
 		AuthToken:        conf.DefaultAuthToken,

@@ -2,7 +2,7 @@ package metricdeconstructor
 
 import (
 	"encoding/json"
-	"github.com/signalfx/metricproxy/Godeps/_workspace/src/github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/datapoint"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"testing"

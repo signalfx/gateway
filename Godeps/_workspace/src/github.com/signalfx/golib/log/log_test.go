@@ -2,6 +2,7 @@ package log
 
 import (
 	"bytes"
+	"errors"
 	"github.com/signalfx/golib/eventcounter"
 	. "github.com/smartystreets/goconvey/convey"
 	"io"
@@ -328,6 +329,19 @@ func TestRateLimitedLoggerRace(t *testing.T) {
 		}
 		return l, nil
 	})
+}
+
+func TestIfErr(t *testing.T) {
+	b := &bytes.Buffer{}
+	l := NewLogfmtLogger(b, Panic)
+	IfErr(l, nil)
+	if b.String() != "" {
+		t.Error("Expected empty string")
+	}
+	IfErr(l, errors.New("nope"))
+	if b.String() == "" {
+		t.Error("Expected error result")
+	}
 }
 
 func TestChannelLoggerRace(t *testing.T) {

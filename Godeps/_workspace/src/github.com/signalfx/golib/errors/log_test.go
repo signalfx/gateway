@@ -45,6 +45,9 @@ func TestPanics(t *testing.T) {
 			So(func() {
 				PanicIfErr(New("Err string"), "hello %s", "world")
 			}, ShouldPanicWith, "Err string: hello world")
+			So(func() {
+				PanicIfErrWrite(10, New("Err string"))
+			}, ShouldPanicWith, "Write err: Err string")
 		})
 	})
 }

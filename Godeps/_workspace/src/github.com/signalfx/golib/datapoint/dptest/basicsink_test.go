@@ -6,6 +6,7 @@ import (
 
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
@@ -64,11 +65,15 @@ func TestNext(t *testing.T) {
 	ctx := context.Background()
 	b := NewBasicSink()
 	dp := DP()
-	go b.AddDatapoints(ctx, []*datapoint.Datapoint{dp})
+	go func() {
+		log.IfErr(log.Panic, b.AddDatapoints(ctx, []*datapoint.Datapoint{dp}))
+	}()
 	dpSeen := b.Next()
 	assert.Equal(t, dpSeen, dp)
 
-	go b.AddDatapoints(ctx, []*datapoint.Datapoint{dp, dp})
+	go func() {
+		log.IfErr(log.Panic, b.AddDatapoints(ctx, []*datapoint.Datapoint{dp, dp}))
+	}()
 	assert.Panics(t, func() {
 		b.Next()
 	})
@@ -78,11 +83,15 @@ func TestNextEvent(t *testing.T) {
 	ctx := context.Background()
 	b := NewBasicSink()
 	e := E()
-	go b.AddEvents(ctx, []*event.Event{e})
+	go func() {
+		log.IfErr(log.Panic, b.AddEvents(ctx, []*event.Event{e}))
+	}()
 	eSeen := b.NextEvent()
 	assert.Equal(t, eSeen, e)
 
-	go b.AddEvents(ctx, []*event.Event{e, e})
+	go func() {
+		log.IfErr(log.Panic, b.AddEvents(ctx, []*event.Event{e, e}))
+	}()
 	assert.Panics(t, func() {
 		b.NextEvent()
 	})

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/signalfx/golib/eventcounter"
 	"github.com/signalfx/golib/httpdebug"
+	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/dp/dpbuffered"
 	"github.com/signalfx/metricproxy/protocol/demultiplexer"
 	"golang.org/x/net/context"
@@ -60,6 +61,8 @@ type proxy struct {
 	debugServerListener net.Listener
 	stdout              io.Writer
 	gomaxprocs          func(int) int
+	debugContext        web.HeaderCtxFlag
+	debugSink           dpsink.ItemFlagger
 }
 
 var mainInstance = proxy{
@@ -67,6 +70,13 @@ var mainInstance = proxy{
 	logger:     log.DefaultLogger.CreateChild(),
 	stdout:     os.Stdout,
 	gomaxprocs: runtime.GOMAXPROCS,
+	debugContext: web.HeaderCtxFlag{
+		HeaderName: "X-Debug-Id",
+	},
+	debugSink: dpsink.ItemFlagger{
+		EventMetaName:       "dbg_events",
+		MetricDimensionName: "sf_metric",
+	},
 }
 
 func init() {
@@ -114,7 +124,7 @@ func getHostname(osHostname func() (string, error)) string {
 	return name
 }
 
-func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Forwarder, error) {
+func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, forwardConfig.Type, logkey.Direction, "forwarder")
@@ -124,6 +134,7 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 			return nil, err
 		}
 		name := forwarderName(forwardConfig)
+		logCtx = logCtx.With(logkey.Name, name)
 		// Buffering -> counting -> (forwarder)
 		limitedLogger := &log.RateLimitedLogger{
 			EventCounter: eventcounter.New(tk.Now(), time.Second),
@@ -136,6 +147,7 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 		}
 		endingSink := dpsink.FromChain(forwarder, dpsink.NextWrap(count))
 		bconf := &dpbuffered.Config{
+			Checker:            Checker,
 			BufferSize:         forwardConfig.BufferSize,
 			MaxTotalDatapoints: forwardConfig.BufferSize,
 			MaxTotalEvents:     forwardConfig.BufferSize,
@@ -223,12 +235,14 @@ func (p *proxy) setupDebugServer(conf *config.ProxyConfig, logger log.Logger, sc
 		Logger:        log.NewContext(logger).With(logkey.Protocol, "debugserver"),
 		ExplorableObj: p,
 	})
+	p.debugServer.Mux.Handle("/debug/dims", &p.debugSink)
 
 	p.debugServer.Exp2.Exported["config"] = conf.Var()
 	p.debugServer.Exp2.Exported["datapoints"] = scheduler.Var()
 	p.debugServer.Exp2.Exported["goruntime"] = expvar.Func(func() interface{} {
 		return runtime.Version()
 	})
+	p.debugServer.Exp2.Exported["debugdims"] = p.debugSink.Var()
 	p.debugServer.Exp2.Exported["proxy_version"] = expvar.Func(func() interface{} {
 		return Version
 	})
@@ -275,7 +289,14 @@ func (p *proxy) main(ctx context.Context) error {
 	return errors.NewMultiErr([]error{err, p.Close()})
 }
 
+func (p *proxy) setup(loadedConfig *config.ProxyConfig) {
+	if loadedConfig.DebugFlag != nil && *loadedConfig.DebugFlag != "" {
+		p.debugContext.SetFlagStr(*loadedConfig.DebugFlag)
+	}
+}
+
 func (p *proxy) run(ctx context.Context) error {
+	p.debugSink.CtxFlagCheck = &p.debugContext
 	hostname := getHostname(os.Hostname)
 	p.logger.Log(logkey.ConfigFile, p.flags.configFileName, "Looking for config file")
 	p.logger.Log(logkey.Env, os.Environ(), "Looking for config file")
@@ -285,7 +306,9 @@ func (p *proxy) run(ctx context.Context) error {
 		p.logger.Log(log.Err, err, "Unable to load config")
 		return err
 	}
+	p.setup(loadedConfig)
 	p.logger = log.NewContext(p.getLogger(loadedConfig)).With(logkey.Time, log.DefaultTimestamp, logkey.Caller, log.DefaultCaller)
+	p.debugSink.Logger = p.logger
 	logger := p.logger
 	log.DefaultLogger.Set(p.logger)
 	defer func() {
@@ -301,7 +324,7 @@ func (p *proxy) run(ctx context.Context) error {
 
 	setupGoMaxProcs(loadedConfig.NumProcs, p.gomaxprocs)
 
-	loader := config.NewLoader(ctx, logger, Version)
+	loader := config.NewLoader(ctx, logger, Version, &p.debugContext, &p.debugSink)
 	scheduler := sfxclient.NewScheduler()
 	scheduler.AddCallback(sfxclient.GoMetricsSource)
 	scheduler.DefaultDimensions(map[string]string{
@@ -309,17 +332,17 @@ func (p *proxy) run(ctx context.Context) error {
 		"host":   hostname,
 	})
 
-	forwarders, err := setupForwarders(ctx, hostname, p.tk, loader, loadedConfig, logger, scheduler)
+	forwarders, err := setupForwarders(ctx, hostname, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink)
 	if err != nil {
 		return errors.Annotate(err, "unable to setup forwarders")
 	}
 	p.forwarders = forwarders
 	dpSinks, eSinks := splitSinks(forwarders)
 
-	multiplexer := &demultiplexer.Demultiplexer{
+	multiplexer := dpsink.FromChain(&demultiplexer.Demultiplexer{
 		DatapointSinks: dpSinks,
 		EventSinks:     eSinks,
-	}
+	}, dpsink.NextWrap(&p.debugSink))
 
 	listeners, err := setupListeners(p.tk, hostname, loader, loadedConfig, multiplexer, logger, scheduler)
 	if err != nil {
