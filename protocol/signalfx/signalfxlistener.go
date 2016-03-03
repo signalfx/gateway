@@ -303,6 +303,7 @@ func (decoder *JSONEventDecoderV2) Read(ctx context.Context, req *http.Request) 
 // ListenerConfig controls optional parameters for the listener
 type ListenerConfig struct {
 	ListenAddr   *string
+	HealthCheck  *string
 	Timeout      *time.Duration
 	Logger       log.Logger
 	RootContext  context.Context
@@ -312,6 +313,7 @@ type ListenerConfig struct {
 
 var defaultListenerConfig = &ListenerConfig{
 	ListenAddr:  pointer.String("127.0.0.1:12345"),
+	HealthCheck: pointer.String("/healthz"),
 	Timeout:     pointer.Duration(time.Second * 30),
 	Logger:      log.Discard,
 	RootContext: context.Background(),
@@ -377,6 +379,9 @@ func NewListener(sink dpsink.Sink, conf *ListenerConfig) (*ListenerServer, error
 		return nil, errors.Annotatef(err, "cannot open listening address %s", *conf.ListenAddr)
 	}
 	r := mux.NewRouter()
+	r.Handle(*conf.HealthCheck, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.Write([]byte("OK"))
+	}))
 
 	server := http.Server{
 		Handler:      r,

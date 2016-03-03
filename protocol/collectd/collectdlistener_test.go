@@ -180,6 +180,13 @@ func TestCollectDListener(t *testing.T) {
 		So(err, ShouldBeNil)
 		client := &http.Client{}
 		baseURL := fmt.Sprintf("http://%s/post-collectd", listener.server.Addr)
+		Convey("Should expose health check", func() {
+			req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/healthz", listener.server.Addr), nil)
+			So(err, ShouldBeNil)
+			resp, err := client.Do(req)
+			So(err, ShouldBeNil)
+			So(resp.StatusCode, ShouldEqual, http.StatusOK)
+		})
 		Convey("Should be able to recv collecd data", func() {
 			var datapoints []*datapoint.Datapoint
 			sendRecvData := func() {

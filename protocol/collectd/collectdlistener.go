@@ -141,12 +141,14 @@ type ListenerConfig struct {
 	Timeout         *time.Duration
 	StartingContext context.Context
 	DebugContext    *web.HeaderCtxFlag
+	HealthCheck     *string
 }
 
 var defaultListenerConfig = &ListenerConfig{
 	ListenAddr:      pointer.String("127.0.0.1:8081"),
 	ListenPath:      pointer.String("/post-collectd"),
 	Timeout:         pointer.Duration(time.Second * 30),
+	HealthCheck:     pointer.String("/healthz"),
 	StartingContext: context.Background(),
 }
 
@@ -160,6 +162,9 @@ func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer,
 	}
 
 	r := mux.NewRouter()
+	r.Handle(*conf.HealthCheck, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.Write([]byte("OK"))
+	}))
 	listenServer := ListenerServer{
 		listener: listener,
 		server: http.Server{

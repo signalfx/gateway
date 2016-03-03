@@ -220,6 +220,14 @@ func TestSignalfxListener(t *testing.T) {
 		listener, err := NewListener(sendTo, listenConf)
 		So(err, ShouldBeNil)
 		baseURI := fmt.Sprintf("http://127.0.0.1:%d", nettest.TCPPort(listener.listener))
+		Convey("Should expose health check", func() {
+			client := http.Client{}
+			req, err := http.NewRequest("GET", baseURI+"/healthz", nil)
+			So(err, ShouldBeNil)
+			resp, err := client.Do(req)
+			So(err, ShouldBeNil)
+			So(resp.StatusCode, ShouldEqual, http.StatusOK)
+		})
 		Convey("And a signalfx forwarder", func() {
 			forwardConfig := &ForwarderConfig{
 				DatapointURL: pointer.String(fmt.Sprintf("%s/v2/datapoint", baseURI)),
