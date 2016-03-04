@@ -155,7 +155,6 @@ func TestNewScheduler(t *testing.T) {
 					}
 					firstPoints := <-sink.lastDatapoints
 					So(len(firstPoints), ShouldEqual, 1)
-					So(len(sink.lastDatapoints), ShouldEqual, 0)
 					Convey("and should skip an interval if we sleep too long", func() {
 						// Should eventually end
 						for atomic.LoadInt64(&s.stats.resetIntervalCounts) == 0 {

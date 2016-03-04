@@ -57,8 +57,7 @@ func NewHTTPDatapointSink() *HTTPDatapointSink {
 		UserAgent: DefaultUserAgent,
 		Endpoint:  IngestEndpointV2,
 		Client: http.Client{
-			Timeout:   DefaultTimeout,
-			Transport: http.DefaultTransport,
+			Timeout: DefaultTimeout,
 		},
 		protoMarshaler: proto.Marshal,
 	}

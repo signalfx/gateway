@@ -1,8 +1,11 @@
 package web
 
 import (
+	"github.com/signalfx/golib/log"
 	"golang.org/x/net/context"
+	"math/rand"
 	"net/http"
+	"strconv"
 	"sync"
 )
 
@@ -59,4 +62,47 @@ func (m *HeaderCtxFlag) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, 
 		}
 	}
 	next.ServeHTTPC(ctx, rw, r)
+}
+
+// HeadersInRequest adds headers to any context with a flag set
+type HeadersInRequest struct {
+	Headers map[string]string
+}
+
+// ServeHTTPC will add headers to rw if ctx has the flag set
+func (m *HeadersInRequest) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, r *http.Request, next ContextHandler) {
+	for k, v := range m.Headers {
+		rw.Header().Add(k, v)
+	}
+	next.ServeHTTPC(ctx, rw, r)
+}
+
+// CreateMiddleware creates a handler that calls next as the next in the chain
+func (m *HeadersInRequest) CreateMiddleware(next ContextHandler) ContextHandler {
+	return HandlerFunc(func(ctx context.Context, rw http.ResponseWriter, r *http.Request) {
+		m.ServeHTTPC(ctx, rw, r, next)
+	})
+}
+
+// CtxWithFlag adds useful request parameters to the logging context, as well as a random request_id
+// to the request
+type CtxWithFlag struct {
+	CtxFlagger *log.CtxDimensions
+	RandSrc    *rand.Rand
+	HeaderName string
+}
+
+// ServeHTTPC adds useful request dims to the next context
+func (m *CtxWithFlag) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, r *http.Request, next ContextHandler) {
+	headerid := m.RandSrc.Int63()
+	rw.Header().Add(m.HeaderName, strconv.FormatInt(headerid, 10))
+	ctx = m.CtxFlagger.Append(ctx, "header_id", headerid, "http_remote_addr", r.RemoteAddr, "http_method", r.Method, "http_url", r.URL.String())
+	next.ServeHTTPC(ctx, rw, r)
+}
+
+// CreateMiddleware creates a handler that calls next as the next in the chain
+func (m *CtxWithFlag) CreateMiddleware(next ContextHandler) ContextHandler {
+	return HandlerFunc(func(ctx context.Context, rw http.ResponseWriter, r *http.Request) {
+		m.ServeHTTPC(ctx, rw, r, next)
+	})
 }
