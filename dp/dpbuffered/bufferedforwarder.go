@@ -23,6 +23,7 @@ type Config struct {
 	MaxDrainSize       *int64
 	NumDrainingThreads *int64
 	Checker            *dpsink.ItemFlagger
+	Cdim               *log.CtxDimensions
 }
 
 // DefaultConfig are default values for buffered forwarders
@@ -51,6 +52,7 @@ type BufferedForwarder struct {
 	blockingEventDrainWaitMutex sync.Mutex
 	logger                      log.Logger
 	checker                     *dpsink.ItemFlagger
+	cdim                        *log.CtxDimensions
 
 	sendTo      dpsink.Sink
 	stopContext context.Context
@@ -64,6 +66,10 @@ var ErrDPBufferFull = errors.New("unable to send more datapoints.  Buffer full")
 
 // AddDatapoints sends the datapoints to a chan buffer that eventually is flushed in big groups
 func (forwarder *BufferedForwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
+	if forwarder.checker.CtxFlagCheck.HasFlag(ctx) {
+		forwarder.cdim.With(ctx, forwarder.logger).Log("Datapoint call recieved in buffered forwarder")
+	}
+
 	atomic.AddInt64(&forwarder.stats.totalDatapointsBuffered, int64(len(points)))
 	if *forwarder.config.MaxTotalDatapoints <= atomic.LoadInt64(&forwarder.stats.totalDatapointsBuffered) {
 		atomic.AddInt64(&forwarder.stats.totalDatapointsBuffered, int64(-len(points)))
@@ -84,6 +90,9 @@ var ErrEBufferFull = errors.New("unable to send more events.  Buffer full")
 
 // AddEvents sends the events to a chan buffer that eventually is flushed in big groups
 func (forwarder *BufferedForwarder) AddEvents(ctx context.Context, events []*event.Event) error {
+	if forwarder.checker.CtxFlagCheck.HasFlag(ctx) {
+		forwarder.cdim.With(ctx, forwarder.logger).Log("Events call recieved in buffered forwarder")
+	}
 	atomic.AddInt64(&forwarder.stats.totalEventsBuffered, int64(len(events)))
 	if *forwarder.config.MaxTotalEvents <= atomic.LoadInt64(&forwarder.stats.totalEventsBuffered) {
 		atomic.AddInt64(&forwarder.stats.totalEventsBuffered, int64(-len(events)))
@@ -244,6 +253,7 @@ func NewBufferedForwarder(ctx context.Context, config *Config, sendTo dpsink.Sin
 		sendTo:      sendTo,
 		logger:      logCtx,
 		checker:     config.Checker,
+		cdim:        config.Cdim,
 	}
 	ret.start()
 	return ret

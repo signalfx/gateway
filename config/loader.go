@@ -27,12 +27,15 @@ type listenSinkWrapper interface {
 }
 
 // NewLoader creates the default loader for proxy protocols
-func NewLoader(ctx context.Context, logger log.Logger, version string, debugContext *web.HeaderCtxFlag, itemFlagger *dpsink.ItemFlagger) *Loader {
+func NewLoader(ctx context.Context, logger log.Logger, version string, debugContext *web.HeaderCtxFlag, itemFlagger *dpsink.ItemFlagger, ctxdims *log.CtxDimensions, next web.NextConstructor) *Loader {
 	sfxL := &signalFxLoader{
 		logger:        logger,
 		rootContext:   ctx,
 		versionString: version,
 		itemFlagger:   itemFlagger,
+		ctxdims:       ctxdims,
+		httpChain:     next,
+		debugContext:  debugContext,
 	}
 	return &Loader{
 		forwarders: map[string]forwarderLoader{
@@ -44,18 +47,14 @@ func NewLoader(ctx context.Context, logger log.Logger, version string, debugCont
 			"csv": &csvLoader{},
 		},
 		listeners: map[string]listenerLoader{
-			"signalfx": &signalFxLoader{
-				logger:        logger,
-				rootContext:   ctx,
-				versionString: version,
-				debugContext:  debugContext,
-			},
+			"signalfx": sfxL,
 			"carbon": &carbonLoader{
 				logger: logger,
 			},
 			"collectd": &collectdLoader{
 				rootContext:  ctx,
 				debugContext: debugContext,
+				httpChain:    next,
 			},
 		},
 		listenWrappers: []listenSinkWrapper{
@@ -120,6 +119,7 @@ func (s *csvLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) {
 type collectdLoader struct {
 	rootContext  context.Context
 	debugContext *web.HeaderCtxFlag
+	httpChain    web.NextConstructor
 }
 
 func (s *collectdLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
@@ -129,6 +129,7 @@ func (s *collectdLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.
 		Timeout:         conf.TimeoutDuration,
 		StartingContext: s.rootContext,
 		DebugContext:    s.debugContext,
+		HTTPChain:       s.httpChain,
 	}
 	return collectd.NewListener(sink, &sfConf)
 }
@@ -139,6 +140,8 @@ type signalFxLoader struct {
 	debugContext  *web.HeaderCtxFlag
 	versionString string
 	itemFlagger   *dpsink.ItemFlagger
+	ctxdims       *log.CtxDimensions
+	httpChain     web.NextConstructor
 }
 
 func (s *signalFxLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
@@ -148,6 +151,7 @@ func (s *signalFxLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.
 		Logger:       s.logger,
 		RootContext:  s.rootContext,
 		DebugContext: s.debugContext,
+		HTTPChain:    s.httpChain,
 	}
 	return signalfx.NewListener(sink, &sfConf)
 }

@@ -31,6 +31,14 @@ func TestBadDecode(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestGetDefaultName(t *testing.T) {
+	u := getDefaultName(func() (string, error) {
+		return "", errors.New("")
+	})
+	assert.Equal(t, u, "unknown")
+
+}
+
 func TestParseStatsDelay(t *testing.T) {
 	config, _ := decodeConfig([]byte(`{"StatsDelay":"3s"}`))
 	assert.Equal(t, *config.StatsDelayDuration, time.Second*3)

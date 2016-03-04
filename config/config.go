@@ -77,6 +77,7 @@ type ProxyConfig struct {
 	LogFormat          *string        `json:",omitempty"`
 	PprofAddr          *string        `json:",omitempty"`
 	DebugFlag          *string        `json:",omitempty"`
+	ServerName         *string        `json:",omitempty"`
 }
 
 // DefaultProxyConfig is default values for the proxy config
@@ -86,6 +87,15 @@ var DefaultProxyConfig = &ProxyConfig{
 	LogMaxSize:    pointer.Int(100),
 	LogMaxBackups: pointer.Int(10),
 	LogFormat:     pointer.String(""),
+	ServerName:    pointer.String(getDefaultName(os.Hostname)),
+}
+
+func getDefaultName(osHostname func() (string, error)) string {
+	hostname, err := osHostname()
+	if err == nil {
+		return hostname
+	}
+	return "unknown"
 }
 
 func decodeConfig(configBytes []byte) (*ProxyConfig, error) {
