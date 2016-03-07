@@ -16,6 +16,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	"golang.org/x/net/context"
 	"net"
+	"strings"
 )
 
 type errReader struct {
@@ -165,7 +166,10 @@ func TestHTTPDatapointSink(t *testing.T) {
 			Convey("context cancel should work", func() {
 				blockResponse = make(chan struct{})
 				ctx, cancelCallback = context.WithCancel(ctx)
-				So(errors.Details(s.AddDatapoints(ctx, dps)), ShouldContainSubstring, "canceled")
+				s := errors.Details(s.AddDatapoints(ctx, dps))
+				if !strings.Contains(s, "canceled") && !strings.Contains(s, "closed") {
+					t.Errorf("Bad error string %s", s)
+				}
 			})
 			Convey("timeouts should work", func() {
 				blockResponse = make(chan struct{})

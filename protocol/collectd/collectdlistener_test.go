@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -170,9 +171,14 @@ func TestCollectDListener(t *testing.T) {
 		debugContext := &web.HeaderCtxFlag{
 			HeaderName: "X-Test",
 		}
+		callCount := int64(0)
 		conf := &ListenerConfig{
 			ListenAddr:   pointer.String("127.0.0.1:0"),
 			DebugContext: debugContext,
+			HTTPChain: func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
+				atomic.AddInt64(&callCount, 1)
+				next.ServeHTTPC(ctx, rw, r)
+			},
 		}
 		sendTo := dptest.NewBasicSink()
 
@@ -186,6 +192,7 @@ func TestCollectDListener(t *testing.T) {
 			resp, err := client.Do(req)
 			So(err, ShouldBeNil)
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)
+			So(atomic.LoadInt64(&callCount), ShouldEqual, 1)
 		})
 		Convey("Should be able to recv collecd data", func() {
 			var datapoints []*datapoint.Datapoint

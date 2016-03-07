@@ -42,6 +42,11 @@ func (streamer *ListenerServer) Close() error {
 	return streamer.listener.Close()
 }
 
+// Addr returns the currently listening address
+func (streamer *ListenerServer) Addr() net.Addr {
+	return streamer.listener.Addr()
+}
+
 // Datapoints returns the datapoints about various internal endpoints
 func (streamer *ListenerServer) Datapoints() []*datapoint.Datapoint {
 	return streamer.internalCollectors.Datapoints()
@@ -309,6 +314,7 @@ type ListenerConfig struct {
 	RootContext  context.Context
 	JSONMarshal  func(v interface{}) ([]byte, error)
 	DebugContext *web.HeaderCtxFlag
+	HTTPChain    web.NextConstructor
 }
 
 var defaultListenerConfig = &ListenerConfig{
@@ -382,7 +388,6 @@ func NewListener(sink dpsink.Sink, conf *ListenerConfig) (*ListenerServer, error
 	r.Handle(*conf.HealthCheck, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		rw.Write([]byte("OK"))
 	}))
-
 	server := http.Server{
 		Handler:      r,
 		Addr:         *conf.ListenAddr,
@@ -404,13 +409,13 @@ func NewListener(sink dpsink.Sink, conf *ListenerConfig) (*ListenerServer, error
 
 	listenServer.internalCollectors = sfxclient.NewMultiCollector(
 		setupNotFoundHandler(r, conf.RootContext),
-		setupProtobufV1(r, conf.RootContext, sink, &listenServer.metricHandler, conf.Logger),
-		setupJSONV1(r, conf.RootContext, sink, &listenServer.metricHandler, conf.Logger),
-		setupProtobufV2(r, conf.RootContext, sink, conf.Logger, conf.DebugContext),
-		setupProtobufEventV2(r, conf.RootContext, sink, conf.Logger, conf.DebugContext),
-		setupJSONV2(r, conf.RootContext, sink, conf.Logger, conf.DebugContext),
-		setupJSONEventV2(r, conf.RootContext, sink, conf.Logger, conf.DebugContext),
-		setupCollectd(r, conf.RootContext, sink, conf.DebugContext),
+		setupProtobufV1(r, conf.RootContext, sink, &listenServer.metricHandler, conf.Logger, conf.HTTPChain),
+		setupJSONV1(r, conf.RootContext, sink, &listenServer.metricHandler, conf.Logger, conf.HTTPChain),
+		setupProtobufV2(r, conf.RootContext, sink, conf.Logger, conf.DebugContext, conf.HTTPChain),
+		setupProtobufEventV2(r, conf.RootContext, sink, conf.Logger, conf.DebugContext, conf.HTTPChain),
+		setupJSONV2(r, conf.RootContext, sink, conf.Logger, conf.DebugContext, conf.HTTPChain),
+		setupJSONEventV2(r, conf.RootContext, sink, conf.Logger, conf.DebugContext, conf.HTTPChain),
+		setupCollectd(r, conf.RootContext, sink, conf.DebugContext, conf.HTTPChain),
 	)
 
 	go server.Serve(listener)
@@ -426,7 +431,7 @@ func setupNotFoundHandler(r *mux.Router, ctx context.Context) sfxclient.Collecto
 	}
 }
 
-func setupChain(ctx context.Context, sink dpsink.Sink, chainType string, getReader func(dpsink.Sink) ErrorReader) (*web.Handler, sfxclient.Collector) {
+func setupChain(ctx context.Context, sink dpsink.Sink, chainType string, getReader func(dpsink.Sink) ErrorReader, httpChain web.NextConstructor) (*web.Handler, sfxclient.Collector) {
 	counter := &dpsink.Counter{}
 	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
 	errReader := getReader(finalSink)
@@ -434,7 +439,7 @@ func setupChain(ctx context.Context, sink dpsink.Sink, chainType string, getRead
 		reader: errReader,
 	}
 	metricTracking := web.RequestCounter{}
-	handler := web.NewHandler(ctx, &errorTracker).Add(web.NextHTTP(metricTracking.ServeHTTP))
+	handler := web.NewHandler(ctx, &errorTracker).Add(web.NextHTTP(metricTracking.ServeHTTP)).Add(httpChain)
 	st := &sfxclient.WithDimensions{
 		Collector: sfxclient.NewMultiCollector(
 			&metricTracking,
@@ -448,10 +453,10 @@ func setupChain(ctx context.Context, sink dpsink.Sink, chainType string, getRead
 	return handler, st
 }
 
-func setupProtobufV1(r *mux.Router, ctx context.Context, sink dpsink.Sink, typeGetter MericTypeGetter, logger log.Logger) sfxclient.Collector {
+func setupProtobufV1(r *mux.Router, ctx context.Context, sink dpsink.Sink, typeGetter MericTypeGetter, logger log.Logger, httpChain web.NextConstructor) sfxclient.Collector {
 	handler, st := setupChain(ctx, sink, "protobuf_v1", func(s dpsink.Sink) ErrorReader {
 		return &ProtobufDecoderV1{Sink: s, TypeGetter: typeGetter, Logger: logger}
-	})
+	}, httpChain)
 
 	SetupProtobufV1Paths(r, handler)
 	return st
@@ -463,10 +468,10 @@ func SetupProtobufV1Paths(r *mux.Router, handler http.Handler) {
 	r.Path("/v1/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
 }
 
-func setupJSONV1(r *mux.Router, ctx context.Context, sink dpsink.Sink, typeGetter MericTypeGetter, logger log.Logger) sfxclient.Collector {
+func setupJSONV1(r *mux.Router, ctx context.Context, sink dpsink.Sink, typeGetter MericTypeGetter, logger log.Logger, httpChain web.NextConstructor) sfxclient.Collector {
 	handler, st := setupChain(ctx, sink, "json_v1", func(s dpsink.Sink) ErrorReader {
 		return &JSONDecoderV1{Sink: s, TypeGetter: typeGetter, Logger: logger}
-	})
+	}, httpChain)
 	SetupJSONV1Paths(r, handler)
 
 	return st
@@ -478,10 +483,10 @@ func SetupJSONV1Paths(r *mux.Router, handler http.Handler) {
 	SetupJSONByPaths(r, handler, "/v1/datapoint")
 }
 
-func setupProtobufV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag) sfxclient.Collector {
+func setupProtobufV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor) sfxclient.Collector {
 	handler, st := setupChain(ctx, sink, "protobuf_v2", func(s dpsink.Sink) ErrorReader {
 		return &ProtobufDecoderV2{Sink: s, Logger: logger}
-	})
+	}, httpChain)
 	if debugContext != nil {
 		handler = handler.Add(debugContext)
 	}
@@ -490,10 +495,10 @@ func setupProtobufV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logge
 	return st
 }
 
-func setupProtobufEventV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag) sfxclient.Collector {
+func setupProtobufEventV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor) sfxclient.Collector {
 	handler, st := setupChain(ctx, sink, "protobuf_event_v2", func(s dpsink.Sink) ErrorReader {
 		return &ProtobufEventDecoderV2{Sink: s, Logger: logger}
-	})
+	}, httpChain)
 	if debugContext != nil {
 		handler = handler.Add(debugContext)
 	}
@@ -517,10 +522,10 @@ func SetupProtobufV2ByPaths(r *mux.Router, handler http.Handler, path string) {
 	r.Path(path).Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
 }
 
-func setupJSONV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag) sfxclient.Collector {
+func setupJSONV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor) sfxclient.Collector {
 	handler, st := setupChain(ctx, sink, "json_v2", func(s dpsink.Sink) ErrorReader {
 		return &JSONDecoderV2{Sink: s, Logger: logger}
-	})
+	}, httpChain)
 	if debugContext != nil {
 		handler = handler.Add(debugContext)
 	}
@@ -528,10 +533,10 @@ func setupJSONV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger lo
 	return st
 }
 
-func setupJSONEventV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag) sfxclient.Collector {
+func setupJSONEventV2(r *mux.Router, ctx context.Context, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor) sfxclient.Collector {
 	handler, st := setupChain(ctx, sink, "json_event_v2", func(s dpsink.Sink) ErrorReader {
 		return &JSONEventDecoderV2{Sink: s, Logger: logger}
-	})
+	}, httpChain)
 	if debugContext != nil {
 		handler = handler.Add(debugContext)
 	}
@@ -557,14 +562,14 @@ func SetupJSONByPaths(r *mux.Router, handler http.Handler, endpoint string) {
 	r.Path(endpoint).Methods("POST").Handler(handler)
 }
 
-func setupCollectd(r *mux.Router, ctx context.Context, sink dpsink.Sink, debugContext *web.HeaderCtxFlag) sfxclient.Collector {
+func setupCollectd(r *mux.Router, ctx context.Context, sink dpsink.Sink, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor) sfxclient.Collector {
 	counter := &dpsink.Counter{}
 	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
 	decoder := collectd.JSONDecoder{
 		SendTo: finalSink,
 	}
 	metricTracking := &web.RequestCounter{}
-	httpHandler := web.NewHandler(ctx, &decoder).Add(web.NextHTTP(metricTracking.ServeHTTP), debugContext)
+	httpHandler := web.NewHandler(ctx, &decoder).Add(web.NextHTTP(metricTracking.ServeHTTP), debugContext, httpChain)
 	collectd.SetupCollectdPaths(r, httpHandler, "/v1/collectd")
 	return &sfxclient.WithDimensions{
 		Collector: sfxclient.NewMultiCollector(

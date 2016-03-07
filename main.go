@@ -28,7 +28,9 @@ import (
 	"github.com/signalfx/metricproxy/protocol/demultiplexer"
 	"golang.org/x/net/context"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
+	"math/rand"
 	"net"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -63,6 +65,7 @@ type proxy struct {
 	gomaxprocs          func(int) int
 	debugContext        web.HeaderCtxFlag
 	debugSink           dpsink.ItemFlagger
+	ctxDims             log.CtxDimensions
 }
 
 var mainInstance = proxy{
@@ -124,7 +127,7 @@ func getHostname(osHostname func() (string, error)) string {
 	return name
 }
 
-func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger) ([]protocol.Forwarder, error) {
+func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, forwardConfig.Type, logkey.Direction, "forwarder")
@@ -153,6 +156,7 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 			MaxTotalEvents:     forwardConfig.BufferSize,
 			MaxDrainSize:       forwardConfig.MaxDrainSize,
 			NumDrainingThreads: forwardConfig.DrainingThreads,
+			Cdim:               cdim,
 		}
 		bf := dpbuffered.NewBufferedForwarder(ctx, bconf, endingSink, limitedLogger)
 		allForwarders = append(allForwarders, bf)
@@ -295,6 +299,22 @@ func (p *proxy) setup(loadedConfig *config.ProxyConfig) {
 	}
 }
 
+func (p *proxy) createCommonHTTPChain(loadedConfig *config.ProxyConfig) web.NextConstructor {
+	h := web.HeadersInRequest{
+		Headers: map[string]string{
+			"X-Proxy-Name": *loadedConfig.ServerName,
+		},
+	}
+	cf := &web.CtxWithFlag{
+		CtxFlagger: &p.ctxDims,
+		RandSrc:    rand.New(rand.NewSource(time.Now().UnixNano())),
+		HeaderName: "X-Response-Id",
+	}
+	return web.NextConstructor(func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
+		cf.ServeHTTPC(ctx, rw, r, h.CreateMiddleware(next))
+	})
+}
+
 func (p *proxy) run(ctx context.Context) error {
 	p.debugSink.CtxFlagCheck = &p.debugContext
 	hostname := getHostname(os.Hostname)
@@ -324,7 +344,8 @@ func (p *proxy) run(ctx context.Context) error {
 
 	setupGoMaxProcs(loadedConfig.NumProcs, p.gomaxprocs)
 
-	loader := config.NewLoader(ctx, logger, Version, &p.debugContext, &p.debugSink)
+	chain := p.createCommonHTTPChain(loadedConfig)
+	loader := config.NewLoader(ctx, logger, Version, &p.debugContext, &p.debugSink, &p.ctxDims, chain)
 	scheduler := sfxclient.NewScheduler()
 	scheduler.AddCallback(sfxclient.GoMetricsSource)
 	scheduler.DefaultDimensions(map[string]string{
@@ -332,7 +353,7 @@ func (p *proxy) run(ctx context.Context) error {
 		"host":   hostname,
 	})
 
-	forwarders, err := setupForwarders(ctx, hostname, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink)
+	forwarders, err := setupForwarders(ctx, hostname, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims)
 	if err != nil {
 		return errors.Annotate(err, "unable to setup forwarders")
 	}

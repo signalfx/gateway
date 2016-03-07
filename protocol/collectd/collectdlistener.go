@@ -142,6 +142,7 @@ type ListenerConfig struct {
 	StartingContext context.Context
 	DebugContext    *web.HeaderCtxFlag
 	HealthCheck     *string
+	HTTPChain       web.NextConstructor
 }
 
 var defaultListenerConfig = &ListenerConfig{
@@ -162,13 +163,17 @@ func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer,
 	}
 
 	r := mux.NewRouter()
+	fullHandler := web.NewHandler(conf.StartingContext, web.FromHTTP(r))
+	if conf.HTTPChain != nil {
+		fullHandler.Add(conf.HTTPChain)
+	}
 	r.Handle(*conf.HealthCheck, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		rw.Write([]byte("OK"))
 	}))
 	listenServer := ListenerServer{
 		listener: listener,
 		server: http.Server{
-			Handler:      r,
+			Handler:      fullHandler,
 			Addr:         listener.Addr().String(),
 			ReadTimeout:  *conf.Timeout,
 			WriteTimeout: *conf.Timeout,

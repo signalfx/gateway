@@ -26,7 +26,7 @@ func TestConfigLoader(t *testing.T) {
 		debugContext := web.HeaderCtxFlag{}
 		itemFlagger := dpsink.ItemFlagger{}
 
-		l := NewLoader(ctx, logger, version, &debugContext, &itemFlagger)
+		l := NewLoader(ctx, logger, version, &debugContext, &itemFlagger, nil, nil)
 		Convey("should fail empty forwarders", func() {
 			_, err := l.Forwarder(&ForwardTo{})
 			So(err, ShouldNotBeNil)

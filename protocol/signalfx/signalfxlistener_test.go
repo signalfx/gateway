@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -212,14 +213,20 @@ func TestSignalfxListener(t *testing.T) {
 		debugContext := &web.HeaderCtxFlag{
 			HeaderName: "X-Debug",
 		}
+		callCount := int64(0)
 		listenConf := &ListenerConfig{
 			ListenAddr:   pointer.String("127.0.0.1:0"),
 			Logger:       logger,
 			DebugContext: debugContext,
+			HTTPChain: func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
+				atomic.AddInt64(&callCount, 1)
+				next.ServeHTTPC(ctx, rw, r)
+			},
 		}
 		listener, err := NewListener(sendTo, listenConf)
 		So(err, ShouldBeNil)
 		baseURI := fmt.Sprintf("http://127.0.0.1:%d", nettest.TCPPort(listener.listener))
+		So(listener.Addr(), ShouldNotBeNil)
 		Convey("Should expose health check", func() {
 			client := http.Client{}
 			req, err := http.NewRequest("GET", baseURI+"/healthz", nil)
@@ -245,6 +252,7 @@ func TestSignalfxListener(t *testing.T) {
 				So(forwarder.AddDatapoints(ctx, []*datapoint.Datapoint{dpSent}), ShouldBeNil)
 				dpSeen := sendTo.Next()
 				So(dpSent.String(), ShouldEqual, dpSeen.String())
+				So(atomic.LoadInt64(&callCount), ShouldEqual, 1)
 			})
 			Convey("Should be able to send zero len events", func() {
 				So(forwarder.AddEvents(ctx, []*event.Event{}), ShouldBeNil)

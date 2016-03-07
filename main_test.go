@@ -13,6 +13,7 @@ import (
 	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/protocol/carbon"
+	"github.com/signalfx/metricproxy/protocol/signalfx"
 	. "github.com/smartystreets/goconvey/convey"
 	"golang.org/x/net/context"
 	"io"
@@ -36,14 +37,18 @@ const config1 = `
       {
       	"Type":"carbon",
       	"ListenAddr": "127.0.0.1:0"
-	  },
+      },
       {
       	"Type":"carbon",
       	"Name": "duplicate listener",
       	"ListenAddr": "127.0.0.1:0",
         "MetricDeconstructor": "commakeys",
         "MetricDeconstructorOptions": "mtypedim:metrictype"
-	  }
+      },
+      {
+      	"Type":"signalfx",
+      	"ListenAddr": "127.0.0.1:0"
+      }
     ],
     "LocalDebugServer": "127.0.0.1:0",
     "ForwardTo":[
@@ -250,6 +255,14 @@ func TestProxy1(t *testing.T) {
 		<-p.setupDoneSignal
 		listeningCarbonProxyPort := nettest.TCPPort(p.listeners[0].(*carbon.Listener))
 		So(gmp.lastVal, ShouldEqual, int64(4))
+
+		Convey("should have signalfx listener too", func() {
+			sfxListenPort := nettest.TCPPort(p.listeners[2].(*signalfx.ListenerServer))
+			resp, err := http.Post(fmt.Sprintf("http://127.0.0.1:%d/v2/datapoint", sfxListenPort), "application/json", strings.NewReader("{}"))
+			So(err, ShouldBeNil)
+			So(resp.StatusCode, ShouldEqual, http.StatusOK)
+			So(resp.Header.Get("X-Response-Id"), ShouldNotEqual, "")
+		})
 
 		Convey("should have debug values", func() {
 			listenPort := nettest.TCPPort(p.debugServerListener)

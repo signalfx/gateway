@@ -1,8 +1,10 @@
 package web
 
 import (
+	"github.com/signalfx/golib/log"
 	. "github.com/smartystreets/goconvey/convey"
 	"golang.org/x/net/context"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,6 +20,66 @@ type handleStack []handleCall
 
 func (h *handleStack) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, r *http.Request) {
 	*h = append(*h, handleCall{ctx, rw, r})
+}
+
+func TestHeadersInReq(t *testing.T) {
+	Convey("When setup,", t, func() {
+		h := HeadersInRequest{
+			Headers: map[string]string{
+				"X-Hello": "world",
+			},
+		}
+		ctx := context.Background()
+		r := &Recorder{
+			Queue: make(chan Request, 10),
+		}
+		chain := NewHandler(ctx, r.AsHandler()).Add(&h)
+		rw := httptest.NewRecorder()
+		chain.ServeHTTPC(ctx, rw, nil)
+		So(rw.Header().Get("X-Hello"), ShouldEqual, "world")
+	})
+}
+
+func TestCtxWithFlag(t *testing.T) {
+	Convey("When setup,", t, func() {
+		d := log.CtxDimensions{}
+		c := CtxWithFlag{
+			CtxFlagger: &d,
+			RandSrc:    rand.New(rand.NewSource(0)),
+			HeaderName: "X-Test",
+		}
+		ctx := context.Background()
+		r := &Recorder{
+			Queue: make(chan Request, 10),
+		}
+		chain := NewHandler(ctx, r.AsHandler()).Add(&c)
+		rw := httptest.NewRecorder()
+		req, err := http.NewRequest("POST", "", nil)
+		So(err, ShouldBeNil)
+		chain.ServeHTTPC(ctx, rw, req)
+		So(rw.Header().Get("X-Test"), ShouldNotEqual, "")
+	})
+}
+
+func TestRecorder(t *testing.T) {
+	Convey("When setup,", t, func() {
+		r := &Recorder{
+			Queue: make(chan Request, 10),
+		}
+		Convey("Should add with ServeHTTP,", func() {
+			r.ServeHTTP(nil, nil)
+			So(len(r.Queue), ShouldEqual, 1)
+		})
+		Convey("Should call next,", func() {
+			i := 0
+			c := HandlerFunc(func(ctx context.Context, rw http.ResponseWriter, r *http.Request) {
+				i++
+			})
+			r.ServeHTTPC(context.Background(), nil, nil, c)
+			So(len(r.Queue), ShouldEqual, 1)
+			So(i, ShouldEqual, 1)
+		})
+	})
 }
 
 func TestHeaderCtxFlag(t *testing.T) {
