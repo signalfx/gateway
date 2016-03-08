@@ -339,7 +339,9 @@ func (p *proxy) run(ctx context.Context) error {
 	if err := writePidFile(pidFilename); err != nil {
 		logger.Log(log.Err, err, logkey.Filename, pidFilename, "cannot store pid in pid file")
 	}
-	defer os.Remove(pidFilename)
+	defer func() {
+		log.IfErr(logger, os.Remove(pidFilename))
+	}()
 	logger.Log(logkey.Config, loadedConfig, logkey.Env, strings.Join(os.Environ(), "-"), "config loaded")
 
 	setupGoMaxProcs(loadedConfig.NumProcs, p.gomaxprocs)
@@ -408,5 +410,5 @@ var flagParse = flag.Parse
 
 func main() {
 	flagParse()
-	mainInstance.main(context.Background())
+	log.IfErr(log.DefaultLogger, mainInstance.main(context.Background()))
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/sfxclient"
 	"golang.org/x/net/context"
@@ -40,6 +41,7 @@ type Forwarder struct {
 
 	protoMarshal func(pb proto.Message) ([]byte, error)
 	jsonMarshal  func(v interface{}) ([]byte, error)
+	Logger       log.Logger
 }
 
 // ForwarderConfig controls optional parameters for a signalfx forwarder
@@ -53,6 +55,7 @@ type ForwarderConfig struct {
 	AuthToken        *string
 	ProtoMarshal     func(pb proto.Message) ([]byte, error)
 	JSONMarshal      func(v interface{}) ([]byte, error)
+	Logger           log.Logger
 }
 
 var defaultForwarderConfig = &ForwarderConfig{
@@ -64,6 +67,7 @@ var defaultForwarderConfig = &ForwarderConfig{
 	MaxIdleConns: pointer.Int64(20),
 	ProtoMarshal: proto.Marshal,
 	JSONMarshal:  json.Marshal,
+	Logger:       log.Discard,
 }
 
 // NewForwarder creates a new JSON forwarder
@@ -95,6 +99,7 @@ func NewForwarder(conf *ForwarderConfig) *Forwarder {
 		eventURL:         *conf.EventURL,
 		jsonMarshal:      conf.JSONMarshal,
 		datapointSink:    datapointSendingSink,
+		Logger:           conf.Logger,
 	}
 	return ret
 }
@@ -265,6 +270,8 @@ func (connector *Forwarder) sendBytes(endpoint string, bodyType string, defaultA
 		return errors.Annotate(err, "unable to POST request")
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		log.IfErr(connector.Logger, resp.Body.Close())
+	}()
 	return checkResp(resp)
 }

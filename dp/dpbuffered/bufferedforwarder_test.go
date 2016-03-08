@@ -164,13 +164,13 @@ func TestBufferedForwarderContexts(t *testing.T) {
 
 	sendTo := dptest.NewBasicSink()
 	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
-	bf.AddDatapoints(ctx, datas)
+	assert.NoError(t, bf.AddDatapoints(ctx, datas))
 	canceledContext, cancelFunc := context.WithCancel(ctx)
 	waiter := make(chan struct{})
 	go func() {
 		cancelFunc()
 		<-canceledContext.Done()
-		bf.Close()
+		assert.NoError(t, bf.Close())
 		close(waiter)
 		sendTo.Next()
 	}()
@@ -226,13 +226,13 @@ func TestBufferedForwarderContextsEvent(t *testing.T) {
 
 	sendTo := dptest.NewBasicSink()
 	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
-	bf.AddEvents(ctx, datas)
+	assert.NoError(t, bf.AddEvents(ctx, datas))
 	canceledContext, cancelFunc := context.WithCancel(ctx)
 	waiter := make(chan struct{})
 	go func() {
 		cancelFunc()
 		<-canceledContext.Done()
-		bf.Close()
+		assert.NoError(t, bf.Close())
 		close(waiter)
 		sendTo.Next()
 	}()
@@ -268,16 +268,22 @@ func TestBufferedForwarderMaxTotalDatapoints(t *testing.T) {
 	ctx := context.Background()
 	sendTo := dptest.NewBasicSink()
 	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
-	defer bf.Close()
+	defer func() {
+		assert.NoError(t, bf.Close())
+	}()
 
 	datas := []*datapoint.Datapoint{
 		{},
 		{},
 	}
+	found := false
 	for i := 0; i < 100; i++ {
-		bf.AddDatapoints(ctx, datas)
+		if bf.AddDatapoints(ctx, datas) == ErrDPBufferFull {
+			found = true
+			break
+		}
 	}
-	assert.Equal(t, ErrDPBufferFull, bf.AddDatapoints(ctx, datas), "With small buffer size, I should error out with a full buffer")
+	assert.True(t, found, "With small buffer size, I should error out with a full buffer")
 }
 
 func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
@@ -294,14 +300,20 @@ func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
 	ctx := context.Background()
 	sendTo := dptest.NewBasicSink()
 	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
-	defer bf.Close()
+	defer func() {
+		assert.NoError(t, bf.Close())
+	}()
 
 	events := []*event.Event{
 		{},
 		{},
 	}
+	found := false
 	for i := 0; i < 100; i++ {
-		bf.AddEvents(ctx, events)
+		if bf.AddEvents(ctx, events) == ErrEBufferFull {
+			found = true
+			break
+		}
 	}
-	assert.Equal(t, ErrEBufferFull, bf.AddEvents(ctx, events), "With small buffer size, I should error out with a full buffer")
+	assert.True(t, found, "With small buffer size, I should error out with a full buffer")
 }

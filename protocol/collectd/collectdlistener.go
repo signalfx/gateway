@@ -17,6 +17,7 @@ import (
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/web"
@@ -46,6 +47,7 @@ func (s *ListenerServer) Datapoints() []*datapoint.Datapoint {
 // JSONDecoder can decode collectd's native JSON datapoint format
 type JSONDecoder struct {
 	SendTo dpsink.Sink
+	Logger log.Logger
 
 	TotalErrors    int64
 	TotalBlankDims int64
@@ -59,10 +61,12 @@ func (decoder *JSONDecoder) ServeHTTPC(ctx context.Context, rw http.ResponseWrit
 	if err != nil {
 		atomic.AddInt64(&decoder.TotalErrors, 1)
 		rw.WriteHeader(http.StatusBadRequest)
-		rw.Write([]byte(fmt.Sprintf("Unable to decode json: %s", err.Error())))
+		_, err = rw.Write([]byte(fmt.Sprintf("Unable to decode json: %s", err.Error())))
+		log.IfErr(decoder.Logger, err)
 		return
 	}
-	rw.Write([]byte(`"OK"`))
+	_, err = rw.Write([]byte(`"OK"`))
+	log.IfErr(decoder.Logger, err)
 }
 
 func newDataPoints(f *JSONWriteFormat, defaultDims map[string]string) []*datapoint.Datapoint {
@@ -143,6 +147,7 @@ type ListenerConfig struct {
 	DebugContext    *web.HeaderCtxFlag
 	HealthCheck     *string
 	HTTPChain       web.NextConstructor
+	Logger          log.Logger
 }
 
 var defaultListenerConfig = &ListenerConfig{
@@ -150,6 +155,7 @@ var defaultListenerConfig = &ListenerConfig{
 	ListenPath:      pointer.String("/post-collectd"),
 	Timeout:         pointer.Duration(time.Second * 30),
 	HealthCheck:     pointer.String("/healthz"),
+	Logger:          log.Discard,
 	StartingContext: context.Background(),
 }
 
@@ -168,7 +174,8 @@ func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer,
 		fullHandler.Add(conf.HTTPChain)
 	}
 	r.Handle(*conf.HealthCheck, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		rw.Write([]byte("OK"))
+		_, err := rw.Write([]byte("OK"))
+		log.IfErr(conf.Logger, err)
 	}))
 	listenServer := ListenerServer{
 		listener: listener,
@@ -180,6 +187,7 @@ func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer,
 		},
 		decoder: JSONDecoder{
 			SendTo: sink,
+			Logger: conf.Logger,
 		},
 	}
 	httpHandler := web.NewHandler(conf.StartingContext, &listenServer.decoder)
@@ -188,7 +196,9 @@ func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer,
 	}
 	SetupCollectdPaths(r, httpHandler, *conf.ListenPath)
 
-	go listenServer.server.Serve(listener)
+	go func() {
+		log.IfErr(conf.Logger, listenServer.server.Serve(listener))
+	}()
 	return &listenServer, nil
 }
 

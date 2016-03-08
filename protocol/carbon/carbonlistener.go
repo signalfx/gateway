@@ -73,14 +73,16 @@ type carbonListenConn interface {
 }
 
 func (listener *Listener) handleConnection(ctx context.Context, conn carbonListenConn) error {
-	defer conn.Close()
+	connLogger := log.NewContext(listener.logger).With(logkey.RemoteAddr, conn.RemoteAddr())
+	defer func() {
+		log.IfErr(connLogger, conn.Close())
+	}()
 	reader := bufio.NewReader(conn)
 	atomic.AddInt64(&listener.stats.totalConnections, 1)
 	atomic.AddInt64(&listener.stats.activeConnections, 1)
 	defer atomic.AddInt64(&listener.stats.activeConnections, -1)
-	connLogger := log.NewContext(listener.logger).With(logkey.RemoteAddr, conn.RemoteAddr())
 	for {
-		conn.SetDeadline(time.Now().Add(listener.connectionTimeout))
+		log.IfErr(connLogger, conn.SetDeadline(time.Now().Add(listener.connectionTimeout)))
 		bytes, err := reader.ReadBytes((byte)('\n'))
 		if err != nil && err != io.EOF {
 			atomic.AddInt64(&listener.stats.idleTimeouts, 1)
@@ -95,7 +97,7 @@ func (listener *Listener) handleConnection(ctx context.Context, conn carbonListe
 				connLogger.Log(logkey.CarbonLine, line, log.Err, err, "Received data on a carbon port, but it doesn't look like carbon data")
 				return err
 			}
-			listener.sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp})
+			log.IfErr(connLogger, listener.sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp}))
 			atomic.AddInt64(&listener.stats.totalDatapoints, 1)
 		}
 
@@ -112,7 +114,7 @@ func (listener *Listener) startListening() {
 	for {
 		deadlineable, ok := listener.psocket.(*net.TCPListener)
 		if ok {
-			deadlineable.SetDeadline(time.Now().Add(listener.serverAcceptDeadline))
+			log.IfErr(listener.logger, deadlineable.SetDeadline(time.Now().Add(listener.serverAcceptDeadline)))
 		}
 		conn, err := listener.psocket.Accept()
 		if err != nil {
@@ -126,7 +128,7 @@ func (listener *Listener) startListening() {
 			return
 		}
 		go func() {
-			listener.handleConnection(context.Background(), conn)
+			log.IfErr(listener.logger, listener.handleConnection(context.Background(), conn))
 		}()
 	}
 }

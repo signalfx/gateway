@@ -247,9 +247,9 @@ func TestProxy1(t *testing.T) {
 			setupDoneSignal: make(chan struct{}),
 			gomaxprocs:      gmp.Set,
 		}
-		mainDoneChan := make(chan struct{})
+		mainDoneChan := make(chan error)
 		go func() {
-			p.main(ctx)
+			mainDoneChan <- p.main(ctx)
 			close(mainDoneChan)
 		}()
 		<-p.setupDoneSignal
@@ -302,7 +302,8 @@ func TestProxy1(t *testing.T) {
 
 		Reset(func() {
 			canceler()
-			<-mainDoneChan
+			err := <-mainDoneChan
+			So(err, ShouldBeNil)
 			So(os.Remove(filename), ShouldBeNil)
 			So(cl.Close(), ShouldBeNil)
 		})

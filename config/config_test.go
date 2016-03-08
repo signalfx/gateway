@@ -75,11 +75,12 @@ func TestParseListenFromTimeout(t *testing.T) {
 func TestFileLoading(t *testing.T) {
 	fileObj, _ := ioutil.TempFile("", "gotest")
 	filename := fileObj.Name()
-	defer os.Remove(filename)
 
 	err := ioutil.WriteFile(filename, []byte(`{"ListenFrom":[{"Timeout":"3s"}]}`), os.FileMode(0644))
 	assert.Nil(t, err)
-	defer os.Remove(filename)
+	defer func() {
+		assert.NoError(t, os.Remove(filename))
+	}()
 	_, err = loadConfig(filename)
 	assert.Nil(t, err)
 
@@ -88,10 +89,12 @@ func TestFileLoading(t *testing.T) {
 func TestLoad(t *testing.T) {
 	fileObj, _ := ioutil.TempFile("", "gotest")
 	filename := fileObj.Name()
-	defer os.Remove(filename)
+	defer func() {
+		assert.NoError(t, os.Remove(filename))
+	}()
 
 	err := ioutil.WriteFile(filename, []byte(`{"ListenFrom":[{"Timeout":"3s"}]}`), os.FileMode(0644))
-	defer os.Remove(filename)
+
 	_, err = Load(filename, log.Discard)
 	prev := xdgbasedirGetConfigFileLocation
 	xdgbasedirGetConfigFileLocation = func(string) (string, error) { return "", errors.New("bad") }

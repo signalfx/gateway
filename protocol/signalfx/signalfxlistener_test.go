@@ -415,8 +415,10 @@ func TestSignalfxListener(t *testing.T) {
 			dpBytes, err := proto.Marshal(dp)
 			So(err, ShouldBeNil)
 			body := bytes.Buffer{}
-			body.Write(proto.EncodeVarint(uint64(len(dpBytes))))
-			body.Write(dpBytes)
+			_, err = body.Write(proto.EncodeVarint(uint64(len(dpBytes))))
+			So(err, ShouldBeNil)
+			_, err = body.Write(dpBytes)
+			So(err, ShouldBeNil)
 			trySend(body.String(), "application/x-protobuf", "/v1/datapoint")
 			datapointSeen := sendTo.Next()
 			datapointSent.Timestamp = datapointSeen.Timestamp

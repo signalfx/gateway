@@ -56,7 +56,7 @@ func TestConfigLoader(t *testing.T) {
 			f, err := l.Forwarder(&ForwardTo{Type: "csv", Filename: pointer.String("datapoints.csv")})
 			So(err, ShouldBeNil)
 			So(f.Close(), ShouldBeNil)
-			os.Remove("datapoints.csv")
+			So(os.Remove("datapoints.csv"), ShouldBeNil)
 		})
 
 		Convey("should load CollectD listener", func() {

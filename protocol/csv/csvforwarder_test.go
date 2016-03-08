@@ -19,12 +19,16 @@ func TestFilenameForwarder(t *testing.T) {
 	ctx := context.Background()
 	fileObj, _ := ioutil.TempFile("", "gotest")
 	filename := fileObj.Name()
-	defer os.Remove(filename)
+	defer func() {
+		assert.NoError(t, os.Remove(filename))
+	}()
 	conf := &Config{
 		Filename: pointer.String(fileObj.Name()),
 	}
 	f, err := NewForwarder(conf)
-	defer f.Close()
+	defer func() {
+		assert.NoError(t, f.Close())
+	}()
 	assert.NoError(t, err)
 	assert.Nil(t, f.Datapoints())
 	assert.NoError(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dptest.DP()}))
@@ -41,7 +45,9 @@ func TestFilenameForwarderBadFilename(t *testing.T) {
 
 func TestFilenameForwarderBadWrite(t *testing.T) {
 	fileObj, _ := ioutil.TempFile("", "gotest")
-	defer os.Remove(fileObj.Name())
+	defer func() {
+		assert.NoError(t, os.Remove(fileObj.Name()))
+	}()
 	conf := &Config{
 		Filename: pointer.String(fileObj.Name()),
 		WriteString: func(f *os.File, s string) (ret int, err error) {

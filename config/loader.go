@@ -54,6 +54,7 @@ func NewLoader(ctx context.Context, logger log.Logger, version string, debugCont
 			"collectd": &collectdLoader{
 				rootContext:  ctx,
 				debugContext: debugContext,
+				logger:       logger,
 				httpChain:    next,
 			},
 		},
@@ -120,6 +121,7 @@ type collectdLoader struct {
 	rootContext  context.Context
 	debugContext *web.HeaderCtxFlag
 	httpChain    web.NextConstructor
+	logger       log.Logger
 }
 
 func (s *collectdLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
@@ -130,6 +132,7 @@ func (s *collectdLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.
 		StartingContext: s.rootContext,
 		DebugContext:    s.debugContext,
 		HTTPChain:       s.httpChain,
+		Logger:          s.logger,
 	}
 	return collectd.NewListener(sink, &sfConf)
 }
@@ -165,6 +168,7 @@ func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) 
 		ProxyVersion:     &s.versionString,
 		MaxIdleConns:     conf.DrainingThreads,
 		AuthToken:        conf.DefaultAuthToken,
+		Logger:           s.logger,
 	}
 	return signalfx.NewForwarder(&sfConf), nil
 }
