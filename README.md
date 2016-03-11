@@ -12,11 +12,11 @@ brief: SignalFx Metricproxy for aggregation and translation of metrics for sendi
 - [Usage](#usage)
 - [License](#license)
 
-### DESCRIPTION
+## DESCRIPTION
 
 This SignalFx Metricproxy  to aggregate metrics and send then to SignalFx. The proxy is a multilingual datapoint demultiplexer that can accept time series data from the statsd, carbon, dogstatsd, or signalfx protocols and emit those datapoints to a series of servers on the statsd, carbon, or signalfx protocol. The proxy is ideally placed on the same server as either another aggregator, such as statsd, or on a central server that is already receiving datapoints, such as graphite's carbon database.
 
-#### Code layout
+### Code layout
 
 You only need to read this if you want to develop the proxy or understand
 the proxy's code.
@@ -45,7 +45,7 @@ carbon database exactly as we received it.
 All message passing between forwarders, multiplexer, and listeners
 happen on golang's built in channel abstraction.
 
-#### Development
+### Development
 
 If you want to submit patches for the proxy, make sure your code passes
 [travis_check.sh](travis_check.sh) with exit code 0.  For help setting
@@ -53,15 +53,14 @@ up your development enviroment, it should be enough to mirror the install
 steps of [.travis.yml](.travis.yml).  You may need to make sure your GOPATH
 env variable is set correctly.
 
-#### Docker
+### Docker
 
 The proxy comes with a [docker image](Dockerfile) that is built and deployed
 to [quay.io](https://quay.io/repository/signalfx/metricproxy).  It assumes
 you will have a sfdbconfig.json file cross mounted to
 /var/config/sfproxy/sfdbconfig.json for the docker container.
 
-
-### REQUIREMENTS AND DEPENDENCIES
+## REQUIREMENTS AND DEPENDENCIES
 
 This service has no requirements or dependencies. However, the service is limited in usefulness if there is not data being sent to it. The following data types are supported:
 
@@ -72,7 +71,7 @@ This service has no requirements or dependencies. However, the service is limite
 | signalfx | JSON or Protobuff |
 | DogstatsD | DogstatsD |
 
-### INSTALLATION
+## INSTALLATION
 
 1. To install the SignalFx Metricproxy you can use the [install script](https://github.com/signalfx/metricproxy/blob/master/install.sh). The same script should be used to upgrade the service.
 
@@ -84,21 +83,20 @@ This service has no requirements or dependencies. However, the service is limite
   # PID file at  /var/run/metricproxy.pid
  ```
 
+## CONFIGURATION
 
-### CONFIGURATION
-
-#### Config file format
+### Config file format
 
 See the [example config](exampleSfdbproxy.conf) file for an example of how
 configuration looks.  Configuration is a JSON file with two important fields:
 ListenFrom and ForwardTo.
 
-##### ListenFrom
+#### ListenFrom
 
 ListenFrom is where you define what services the proxy will pretend to be and
 what ports to listen for those services on.
 
-##### signalfx
+#### signalfx
 
 You can pretend to be a signalfx endpoint with the signalfx type.  For this,
 you will need to specify which port to bind to.  An example config:
@@ -110,7 +108,7 @@ you will need to specify which port to bind to.  An example config:
         },
 ```
 
-##### carbon (for read)
+#### carbon (for read)
 
 You can pretend to be carbon (the graphite database) with this type.  For
 this, you will need to specify the port to bind to.  An example config:
@@ -122,7 +120,7 @@ this, you will need to specify the port to bind to.  An example config:
         }
 ```
 
-##### common properties
+#### common properties
 
 All listeners support a "Dimensions" property which is expected to be a
 map(string => string) and adds the dimensions to all points sent.  For example:
@@ -133,12 +131,12 @@ map(string => string) and adds the dimensions to all points sent.  For example:
             "Type": "signalfx"
         }
 
-#### ForwardTo
+### ForwardTo
 
 ForwardTo is where you define where the proxy should send datapoints.  Each datapoint
 that comes from a ListenFrom definition will be send to each of these.
 
-##### csv
+#### csv
 
 You can write datapoints to a CSV file for debugging with this config.  You
 will need to specify the filename.
@@ -151,7 +149,7 @@ will need to specify the filename.
         }
 ```
 
-##### carbon (for write)
+#### carbon (for write)
 
 You can write datapoints to a carbon server.  If the point came from a carbon
 listener, it will write the same way the proxy saw it.  Host/Port define where
@@ -166,7 +164,7 @@ the carbon server is.
         },
 ```
 
-##### signalfx-json
+#### signalfx-json
 
 You can write datapoints to SignalFx with this endpoint.  You will need to
 configure your auth token inside DefaultAuthToken.
@@ -179,9 +177,9 @@ configure your auth token inside DefaultAuthToken.
         },
 ```
 
-#### Example configs
+### Example configs
 
-##### Basic
+#### Basic
 
 This config will listen for graphite metrics on port 2003 and forward them
 to signalfx with the token ABCD.  It will also report local stats
@@ -209,7 +207,7 @@ to signalfx at 1s intervals
 }
 ```
 
-##### Graphite Options
+#### Graphite Options
 
 This config will listen using CollectD's HTTP protocol and forward
 all those metrics to a single graphite listener.  It will collect
@@ -240,7 +238,7 @@ dot delimited name.
 }
 ```
 
-##### Graphite Dimensions
+#### Graphite Dimensions
 
 This config will pull dimensions out of graphite metrics if they fit the commakeys
 format.  That format is "\_METRIC_NAME\_\[KEY:VALUE,KEY:VALUE]".  For example,
@@ -275,7 +273,7 @@ seconds.
 }
 ```
 
-##### Graphite Dimensions using Regular Expressions
+#### Graphite Dimensions using Regular Expressions
 
 You can use MetricRules to extract dimensions and metric names from the dot-
 separated names of graphite metrics using regular expressions.
@@ -343,7 +341,7 @@ If you sent in the metric "albatros.cpu.idle", this would fall through and go
 to the FallbackDeconstructor and in this case since we're using the nil
 deconstructor, be rejected and won't be passed on to SignalFx.
 
-#### Graphite Dimensions using Delimiters
+### Graphite Dimensions using Delimiters
 
 You can use MetricRules to extract dimensions from the dot-separated names of
 graphite metrics.
@@ -534,7 +532,7 @@ The following is a full list of overridable options and their defaults:
 }
 ```
 
-#### SignalFx perf options
+### SignalFx perf options
 
 This config listens for carbon data on port 2003 and forwards it to SignalFx
 using an internal datapoint buffer size of 1,000,000 and sending with 50 threads
@@ -566,7 +564,7 @@ messages.  Only use debug logging temporarily.
 }
 ```
 
-#### CollectD listener dimensions
+### CollectD listener dimensions
 
 The CollectD listener supports setting dimensions on all recieved metrics with
 the Dimensions attribute which expects a map of string => string.
@@ -594,7 +592,7 @@ the Dimensions attribute which expects a map of string => string.
 }
 ```
 
-#### SignalFx to SignalFx
+### SignalFx to SignalFx
 
 This config listens using the signalfx protocol, buffers, then forwards
 points to signalfx.
@@ -619,7 +617,7 @@ points to signalfx.
 }
 ```
 
-#### Status Page and profiling
+### Status Page and profiling
 
 This config only loads a status page.  You can see status information at
 `http://localhost:6009/status`, a health check page (useful for load balances) at
@@ -633,7 +631,7 @@ on [the pprof help page](http://golang.org/pkg/net/http/pprof/).
 }
 ```
 
-#### Debugging connections via headers
+### Debugging connections via headers
 
 Setup a debug config
 
@@ -685,26 +683,26 @@ curl -XPOST -d '{"org":"dev"}' localhost:6060/debug/dims
 
 Then, any datapoints with the "org" dimension of "dev" will be logged.
 
-### USAGE
+## USAGE
 
-#### Start the service
+### Start the service
 
  ```
    /etc/init.d/metricproxy start
  ```
 
-#### Stop the service.
+### Stop the service.
 
  ```
    /etc/init.d/metricproxy stop
  ```
-#### Debug the service
+### Debug the service
 
  ```
   cd /var/log/sfproxy
   tail -F *
  ```
 
-### LICENSE
+## LICENSE
 
 This plugin is released under the Apache 2.0 license. See [LICENSE](https://github.com/signalfx/metricproxy/blob/master/LICENSE) for more details.
