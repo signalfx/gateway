@@ -334,8 +334,7 @@ In the example below, the MetricPath `kafka|cassandra.*.*.*.!database` matches m
 1. And the metric contains exactly 10 terms
 1. And the fifth term des not match the string 'database'
 
-The MetricPath is followed by a DimensionsMap:
-`component.identifier.instance.-.type.tier.item.item.%.%`
+The MetricPath is followed by a DimensionsMap: `component.identifier.instance.-.type.tier.item.item.%.%`
 
 1. The first three terms in the metric will be mapped to dimensions as indicated in the DimensionsMap: 'component', 'identifier', and 'instance', respectively.
 1. The fourth term in the metric will be ignored, since it's specified in the DimensionsMap as the default ignore character '-'.
