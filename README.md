@@ -1,15 +1,88 @@
-# metricproxy [![Circle CI](https://circleci.com/gh/signalfx/metricproxy.svg?style=svg)](https://circleci.com/gh/signalfx/metricproxy)
 
-The proxy is a multilingual datapoint demultiplexer that can accept time
-series data from the statsd, carbon, or signalfx protocols and emit
-those datapoints to a series of servers on the statsd, carbon, or
-signalfx protocol.  The proxy is ideally placed on the same server as
-either another aggregator, such as statsd, or on a central server that
-is already receiving datapoints, such as graphite's carbon database.
+# SignalFx Metricproxy
 
-## Install and upgrade
+- [Description](#description)
+- [Requirements and Dependencies](#requirements-and-dependencies)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [License](#license)
 
-```
+## DESCRIPTION
+
+This SignalFx Metricproxy  to aggregate metrics and send then to SignalFx. The
+proxy is a multilingual datapoint demultiplexer that can accept time series
+data from the statsd, carbon, dogstatsd, or signalfx protocols and emit those
+ datapoints to a series of servers on the statsd, carbon, or signalfx protocol.
+  The proxy is ideally placed on the same server as either another aggregator,
+  such as statsd, or on a central server that is already receiving datapoints,
+  such as graphite's carbon database.
+
+### Code layout
+
+You only need to read this if you want to develop the proxy or understand the
+proxy's code.
+
+The proxy is divided into two main components:
+[forwarder](protocol/carbon/carbonforwarder.go)
+and [listener](protocol/carbon/carbonlistener.go).  The forwarder and listener
+are glued together by the
+[demultiplexer](protocol/demultiplexer/demultiplexer.go).
+
+When a listener receives a datapoint, it converts the datapoint into a basic
+[datapoint type](datapoint/datapoint.go).  This core datapoint type is then
+sent to the multiplexer that will send a pointer to that datapoint to each
+ forwarder.
+
+Sometimes there is a loss of fidelity during transmission if a listener and
+forwarder don't support the same options.  While it's impossible to make
+something understand an option it does not, we don't want to forget support for
+this option when we translate a datapoint through the multiplexer.  We work
+around this by sometimes encoding the raw representation of the datapoint into
+the Datapoint object we forward. For example, points from carbon are not only
+translated into our core datapoint format, but also support
+[ToCarbonLine](protocol/carbon/carbon.go) which allows us to directly convert
+the abstract datapoint into what it looked like for carbon, which allows us to
+forward the point to another carbon database exactly as we received it.
+
+All message passing between forwarders, multiplexer, and listeners happen on
+golang's built in channel abstraction.
+
+### Development
+
+If you want to submit patches for the proxy, make sure your code passes
+ [travis_check.sh](travis_check.sh) with exit code 0.  For help setting up your
+development enviroment, it should be enough to mirror the install steps of
+ [.travis.yml](.travis.yml).  You may need to make sure your GOPATH env
+ variable is set correctly.
+
+### Docker
+
+The proxy comes with a [docker image](Dockerfile) that is built and deployed to
+[quay.io](https://quay.io/repository/signalfx/metricproxy).  It assumes you
+will have a sfdbconfig.json file cross mounted to
+ `/var/config/sfproxy/sfdbconfig.json` for the docker container.
+
+## REQUIREMENTS AND DEPENDENCIES
+
+This service has no requirements or dependencies. However, the service is
+limited in usefulness if there is not data being sent to it. The following data
+types are supported:
+
+| Data type | Format |
+|---------|---------|
+| carbon | plain text protocol |
+| statsD | statsD |
+| signalfx | JSON or Protobuff |
+| DogstatsD | DogstatsD |
+
+## INSTALLATION
+
+1. To install the SignalFx Metricproxy you can use the
+[install script](https://github.com/signalfx/metricproxy/blob/master/install.sh).
+The same script should be used to upgrade the service.
+
+ ```
   curl -s https://raw.githubusercontent.com/signalfx/metricproxy/master/install.sh | sudo sh
   # Config at    /etc/sfdbconfig.conf
   # Binary at    /opt/sfproxy/bin/metricproxy
@@ -17,76 +90,15 @@ is already receiving datapoints, such as graphite's carbon database.
   # PID file at  /var/run/metricproxy.pid
  ```
 
-## Running
+## CONFIGURATION
 
-```
-   /etc/init.d/metricproxy start
- ```
-
-## Stopping the daemon
-
-```
-   /etc/init.d/metricproxy stop
- ```
-
-## Debugging
-
-```
-  cd /var/log/sfproxy
-  tail -F *
-```
-
-## Code layout
-
-You only need to read this if you want to develop the proxy or understand
-the proxy's code.
-
-The proxy is divided into two main components: [forwarder](protocol/carbon/carbonforwarder.go)
-and [listener](protocol/carbon/carbonlistener.go).  The forwarder and listener
-are glued together by the [demultiplexer](protocol/demultiplexer/demultiplexer.go).
-
-When a listener receives a datapoint, it converts the datapoint into a
-basic [datapoint type](datapoint/datapoint.go).  This core datapoint type is
-then sent to the multiplexer that will send a pointer to that datapoint
-to each forwarder.
-
-Sometimes there is a loss of fidelity during transmission if a listener
-and forwarder don't support the same options.  While it's impossible
-to make something understand an option it does not, we don't want to
-forget support for this option when we translate a datapoint through
-the multiplexer.  We work around this by sometimes encoding the raw
-representation of the datapoint into the Datapoint object we forward.
-For example, points from carbon are not only translated into our core
-datapoint format, but also support [ToCarbonLine](protocol/carbon/carbon.go)
-which allows us to directly convert the abstract datapoint into what it
-looked like for carbon, which allows us to forward the point to another
-carbon database exactly as we received it.
-
-All message passing between forwarders, multiplexer, and listeners
-happen on golang's built in channel abstraction.
-
-## Development
-
-If you want to submit patches for the proxy, make sure your code passes
-[travis_check.sh](travis_check.sh) with exit code 0.  For help setting
-up your development enviroment, it should be enough to mirror the install
-steps of [.travis.yml](.travis.yml).  You may need to make sure your GOPATH
-env variable is set correctly.
-
-## Docker
-
-The proxy comes with a [docker image](Dockerfile) that is built and deployed
-to [quay.io](https://quay.io/repository/signalfx/metricproxy).  It assumes
-you will have a sfdbconfig.json file cross mounted to
-/var/config/sfproxy/sfdbconfig.json for the docker container.
-
-## Config file format
+### Config file format
 
 See the [example config](exampleSfdbproxy.conf) file for an example of how
 configuration looks.  Configuration is a JSON file with two important fields:
-ListenFrom and ForwardTo.
+`ListenFrom` and `ForwardTo`.
 
-### ListenFrom
+#### ListenFrom
 
 ListenFrom is where you define what services the proxy will pretend to be and
 what ports to listen for those services on.
@@ -105,8 +117,8 @@ you will need to specify which port to bind to.  An example config:
 
 #### carbon (for read)
 
-You can pretend to be carbon (the graphite database) with this type.  For
-this, you will need to specify the port to bind to.  An example config:
+You can pretend to be carbon (the graphite database) with this type.  For this,
+you will need to specify the port to bind to.  An example config:
 
 ```
         {
@@ -120,16 +132,19 @@ this, you will need to specify the port to bind to.  An example config:
 All listeners support a "Dimensions" property which is expected to be a
 map(string => string) and adds the dimensions to all points sent.  For example:
 
+```
         {
             "ListenAddr": "0.0.0.0:18080",
             "Dimensions": { "env": "prod" },
             "Type": "signalfx"
         }
+```
 
 ### ForwardTo
 
-ForwardTo is where you define where the proxy should send datapoints.  Each datapoint
-that comes from a ListenFrom definition will be send to each of these.
+ForwardTo is where you define where the proxy should send datapoints.  Each
+datapoint that comes from a ListenFrom definition will be send to each of
+these.
 
 #### csv
 
@@ -172,13 +187,13 @@ configure your auth token inside DefaultAuthToken.
         },
 ```
 
-## Example configs
+### Example configs
 
-### Basic
+#### Basic
 
-This config will listen for graphite metrics on port 2003 and forward them
-to signalfx with the token ABCD.  It will also report local stats
-to signalfx at 1s intervals
+This config will listen for graphite metrics on port 2003 and forward them to
+SignalFx with the token ABCD.  It will also report local stats to SignalFx at
+1s intervals
 
 ```
 {
@@ -202,14 +217,13 @@ to signalfx at 1s intervals
 }
 ```
 
-### Graphite Options
+#### Graphite Options
 
-This config will listen using CollectD's HTTP protocol and forward
-all those metrics to a single graphite listener.  It will collect
-stats at 1s intervals.  It also signals to graphite that when it creates
-a graphite name for a metric, it should put the 'source' (which is usually
-proxy) and 'forwarder' (in this case 'graphite-west') first in the graphite
-dot delimited name.
+This config will listen using CollectD's HTTP protocol and forward all those
+metrics to a single graphite listener.  It will collect stats at 1s intervals.  
+It also signals to graphite that when it creates a graphite name for a metric,
+it should put the 'source' (which is usually proxy) and 'forwarder' (in this
+  case 'graphite-west') first in the graphite dot delimited name.
 
 ```
 {
@@ -233,17 +247,17 @@ dot delimited name.
 }
 ```
 
-### Graphite Dimensions
+#### Graphite Dimensions
 
-This config will pull dimensions out of graphite metrics if they fit the commakeys
-format.  That format is "\_METRIC_NAME\_\[KEY:VALUE,KEY:VALUE]".  For example,
-"user.hit_rate\[host:server1,type:production]".  It also has the extra option
-of adding a metric type to the datapoints.  For example, if one of the
+This config will pull dimensions out of graphite metrics if they fit the
+commakeys format.  That format is "\_METRIC_NAME\_\[KEY:VALUE,KEY:VALUE]".  For
+example, "user.hit_rate\[host:server1,type:production]".  It also has the extra
+option of adding a metric type to the datapoints.  For example, if one of the
 dimensions is "metrictype" in this config and the dimension's value is "count",
 then the value is sent upstream as a datapoint.Count.
 
-It also sets the timeout on idle connections to 1 minute, from the default of 30
-seconds.
+It also sets the timeout on idle connections to 1 minute, from the default of
+30 seconds.
 
 ```
 {
@@ -268,27 +282,27 @@ seconds.
 }
 ```
 
-### Graphite Dimensions using Regular Expressions
+#### Graphite Dimensions using Regular Expressions
 
-You can use MetricRules to extract dimensions and metric names from the dot-
-separated names of graphite metrics using regular expressions.
+You can use MetricRules to extract dimensions and metric names from the
+dot-separated names of graphite metrics using regular expressions.
 
 A metric will be matched to the first rule that matches the regular expression.
 If no groups are specified the entire metric will be used as the metric name
 and no dimensions will be parsed out. All groups should be named. If the named
 group starts with sf_metric it will be appended together to form the metric
-name, otherwise it will become a dimension with the name of the group name,
-and the value of what it matches.
+name, otherwise it will become a dimension with the name of the group name, and
+the value of what it matches.
 
 For each rule, you can define the following:
 
 1. Regex - REQUIRED - regular expression with optionally named matching groups
 1. AdditionalDimensions - used to add static dimensions to every metric that
-   matches this rule
+matches this rule
 1. MetricType - to set the specific type of metric this is; default is gauge
 1. MetricName - if present this will be the first part of the metricName.  If
-   no named groups starting with sf_metric are specified, this will be the
-   entire metric name.
+no named groups starting with sf_metric are specified, this will be the entire
+metric name.
 
 e.g.
 
@@ -321,7 +335,7 @@ first rule and the metric name would become foo.baz with a dimensions of
 type would be the default of gauge.
 
 If you sent in the metric "counter.page_views" the resulting metric name would
-continue to be "counter.page_views" (because you named it sf_metric)_but have
+continue to be "counter.page_views" (because you named it sf_metric) but have
 the type of cumulative counter.  No dimensions are being extracted or added in
 this example.
 
@@ -345,21 +359,22 @@ A metric will be matched to only one matching rule. When multiple rules are
 provided, they are evaluated for a match to a metric in the following order:
 
 1. The rule must contain the same number of terms as the name of the metric to
-  be matched.
+be matched.
 1. If there is more than one rule with the same number of terms as the metric
-  name, then matches will be evaluated in the order in which they are defined in
-  the config.
+name, then matches will be evaluated in the order in which they are defined in
+the config.
 1. If there are no rules that match the metric name, the FallbackDeconstructor
-  is applied. By default this is "identity": all metrics are emitted as gauges
-  with unmodified names.
+is applied. By default this is "identity": all metrics are emitted as gauges
+with unmodified names.
 
 The simplest rule contains only a DimensionsMap with the same number of terms
 and separated by the same delimiter as the incoming metrics. In the following
 example, the configuration contains two rules: one that matches all metrics
 with four terms, and one that matches all metrics with six terms.
 
-If the following example config were used to process a graphite metric called
-`cassandra.cassandra23.production.thread_count`, it would output the following:
+If the following example config were used to process a graphite metric
+called `cassandra.cassandra23.production.thread_count`, it would output the
+following:
 
 ```
 metricName = thread_count
@@ -405,11 +420,11 @@ gauges (anything that ends with 'counter.count' or starts with 'counter').
 Define a MetricPath separately from the DimensionsMap to match only certain
 metrics.
 
-In the example below, the MetricPath `kafka|cassandra.*.*.*.!database`
-matches metrics under the following conditions:
+In the example below, the MetricPath `kafka|cassandra.*.*.*.!database` matches
+metrics under the following conditions:
 
-1. If the first term of the metric name separated by '.' matches either
-  'kafka' or 'cassandra'
+1. If the first term of the metric name separated by '.' matches either 'kafka'
+or 'cassandra'
 1. And the metric contains exactly 10 terms
 1. And the fifth term des not match the string 'database'
 
@@ -417,24 +432,24 @@ The MetricPath is followed by a DimensionsMap:
 `component.identifier.instance.-.type.tier.item.item.%.%`
 
 1. The first three terms in the metric will be mapped to dimensions as
-  indicated in the DimensionsMap: 'component', 'identifier', and 'instance',
-  respectively.
+indicated in the DimensionsMap: 'component', 'identifier', and 'instance',
+respectively.
 1. The fourth term in the metric will be ignored, since it's specified in the
-  DimensionsMap as the default ignore character '-'.
+DimensionsMap as the default ignore character '-'.
 1. The fifth and sixth terms will be mapped to dimensions 'type' and 'tier',
-  respectively.
-1. The seventh and eighth terms will be concatenated together delimited by
-  the default separator character '.', because they are both mapped to the
-  dimension called 'item'.
+respectively.
+1. The seventh and eighth terms will be concatenated together delimited by the
+default separator character '.', because they are both mapped to the dimension
+called 'item'.
 1. The ninth and tenth terms are '%', the default metric character, which
-  indicates that they should be used for the metric name.
+indicates that they should be used for the metric name.
 
 This config also contains MetricName, the value of which will be prefixed onto
 the name of every metric emitted.
 
 Finally, note that the MetricPath contains five terms, but the DimensionsMap
 contains ten. This means that the MetricPath implicitly contains five
-additional metric terms that are '*' (match anything).
+additional metric terms that are `*` (match anything).
 
 If this config were used to process a metric named
 `cassandra.bbac.23.foo.primary.prod.nodefactory.node.counter.count`, it would
@@ -493,7 +508,7 @@ dimensions = {customer=Acme, component=cassandra, identifier=bbac,
 }
 ```
 
-The following is a full list of overrideable options and their defaults:
+The following is a full list of overridable options and their defaults:
 
 ```
 // For the top level
@@ -529,11 +544,11 @@ The following is a full list of overrideable options and their defaults:
 
 ### SignalFx perf options
 
-This config listens for carbon data on port 2003 and forwards it to signalfx
-using an internal datapoint buffer size of 1,000,000 and sending with 50 threads
-simultaniously with each thread sending no more than 5,000 points in a single
-call.  It also turns on debug logging, which will spew a large number of log
-messages.  Only use debug logging temporarily.
+This config listens for carbon data on port 2003 and forwards it to SignalFx
+using an internal datapoint buffer size of 1,000,000 and sending with 50
+threads simultaneously with each thread sending no more than 5,000 points in a
+single call.  It also turns on debug logging, which will spew a large number of
+log messages.  Only use debug logging temporarily.
 
 ```
 {
@@ -589,8 +604,8 @@ the Dimensions attribute which expects a map of string => string.
 
 ### SignalFx to SignalFx
 
-This config listens using the signalfx protocol, buffers, then forwards
-points to signalfx.
+This config listens using the signalfx protocol, buffers, then forwards points
+to signalfx.
 
 ```
 {
@@ -615,10 +630,10 @@ points to signalfx.
 ### Status Page and profiling
 
 This config only loads a status page.  You can see status information at
-`http://localhost:6009/status`, a health check page (useful for load balances) at
-`http://localhost:6009/health`, and pprof information at
-`http://localhost:6009/debug/pprof/`.  You can learn more about pprof for golang
-on [the pprof help page](http://golang.org/pkg/net/http/pprof/).
+`http://localhost:6009/status`, a health check page (useful for load balances)
+at `http://localhost:6009/health`, and pprof information at
+`http://localhost:6009/debug/pprof/`.  You can learn more about pprof for
+golang on [the pprof help page](http://golang.org/pkg/net/http/pprof/).
 
 ```
 {
@@ -649,14 +664,14 @@ curl -H "X-Debug-Id:secretdebug" -H "Content-Type: application/json" -XPOST \
    -d '{"gauge": [{"metric":"bob", "dimensions": {"org":"dev"}, "value": 3}]}' localhost:8080/v2/datapoint
 ```
 
-The config will tell the HTTP request to debug each datapoint sent with X-Debug-Id
-set to secretdebug and log statements will show when each item is through the
-proxy pipeline.
+The config will tell the HTTP request to debug each datapoint sent with
+X-Debug-Id set to secretdebug and log statements will show when each item is
+through the proxy pipeline.
 
 ### Debugging connections via debug dimensions
 
-Setup a local debug server, then you can configure which dimensions are
-logged out.
+Setup a local debug server, then you can configure which dimensions are logged
+out.
 
 ```
 {
@@ -677,3 +692,30 @@ curl -XPOST -d '{"org":"dev"}' localhost:6060/debug/dims
 ```
 
 Then, any datapoints with the "org" dimension of "dev" will be logged.
+
+## USAGE
+
+### Start the service
+
+ ```
+   /etc/init.d/metricproxy start
+ ```
+
+### Stop the service
+
+ ```
+   /etc/init.d/metricproxy stop
+ ```
+
+### Debug the service
+
+ ```
+  cd /var/log/sfproxy
+  tail -F *
+ ```
+
+## LICENSE
+
+This plugin is released under the Apache 2.0 license. See
+ [LICENSE](https://github.com/signalfx/metricproxy/blob/master/LICENSE) for
+ more details.
