@@ -238,8 +238,8 @@ For each rule, you can define the following:
 1. Regex - REQUIRED - regular expression with optionally named matching groups
 1. AdditionalDimensions - used to add static dimensions to every metric that matches this rule
 1. MetricType - to set the specific type of metric this is; default is gauge
-1. MetricName - if present this will be the first part of the metricName.  If no named groups starting with sf_metric are specified, this will be the entire metric name. 
- 
+1. MetricName - if present this will be the first part of the metricName.  If no named groups starting with sf_metric are specified, this will be the entire metric name.
+
 e.g.
 
 ```
