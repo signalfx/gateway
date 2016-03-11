@@ -1,11 +1,3 @@
----
-
-title: Metricproxy
-brief: SignalFx Metricproxy for aggregation and translation of metrics for sending to SignalFx.
----
-
-![](https://github.com/signalfx/Integrations/blob/master/metricproxy/img/integrations_metricproxy.png)
-
 # SignalFx Metricproxy
 
 - [Description](#description)
@@ -88,7 +80,6 @@ types are supported:
 1. To install the SignalFx Metricproxy you can use the
 [install script](https://github.com/signalfx/metricproxy/blob/master/install.sh).
 The same script should be used to upgrade the service.
-
 
  ```
   curl -s https://raw.githubusercontent.com/signalfx/metricproxy/master/install.sh | sudo sh
@@ -304,7 +295,6 @@ the value of what it matches.
 
 For each rule, you can define the following:
 
-
 1. Regex - REQUIRED - regular expression with optionally named matching groups
 1. AdditionalDimensions - used to add static dimensions to every metric that
 matches this rule
@@ -312,7 +302,6 @@ matches this rule
 1. MetricName - if present this will be the first part of the metricName.  If
 no named groups starting with sf_metric are specified, this will be the entire
 metric name.
-
 
 e.g.
 
@@ -368,7 +357,6 @@ graphite metrics.
 A metric will be matched to only one matching rule. When multiple rules are
 provided, they are evaluated for a match to a metric in the following order:
 
-
 1. The rule must contain the same number of terms as the name of the metric to
 be matched.
 1. If there is more than one rule with the same number of terms as the metric
@@ -377,7 +365,6 @@ the config.
 1. If there are no rules that match the metric name, the FallbackDeconstructor
 is applied. By default this is "identity": all metrics are emitted as gauges
 with unmodified names.
-
 
 The simplest rule contains only a DimensionsMap with the same number of terms
 and separated by the same delimiter as the incoming metrics. In the following
@@ -435,16 +422,13 @@ metrics.
 In the example below, the MetricPath `kafka|cassandra.*.*.*.!database` matches
 metrics under the following conditions:
 
-
 1. If the first term of the metric name separated by '.' matches either 'kafka'
 or 'cassandra'
 1. And the metric contains exactly 10 terms
 1. And the fifth term des not match the string 'database'
 
-
 The MetricPath is followed by a DimensionsMap:
 `component.identifier.instance.-.type.tier.item.item.%.%`
-
 
 1. The first three terms in the metric will be mapped to dimensions as
 indicated in the DimensionsMap: 'component', 'identifier', and 'instance',
@@ -458,7 +442,6 @@ default separator character '.', because they are both mapped to the dimension
 called 'item'.
 1. The ninth and tenth terms are '%', the default metric character, which
 indicates that they should be used for the metric name.
-
 
 This config also contains MetricName, the value of which will be prefixed onto
 the name of every metric emitted.
