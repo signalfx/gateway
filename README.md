@@ -1,11 +1,12 @@
 # metricproxy [![Circle CI](https://circleci.com/gh/signalfx/metricproxy.svg?style=svg)](https://circleci.com/gh/signalfx/metricproxy)
 
-The proxy is a multilingual datapoint demultiplexer that can accept time
+The SignalFx Metricproxy lets you aggregate metrics and send them to SignalFx.
+It is a multilingual datapoint demultiplexer that can accept time
 series data from the statsd, carbon, or signalfx protocols and emit
 those datapoints to a series of servers on the statsd, carbon, or
-signalfx protocol.  The proxy is ideally placed on the same server as
-either another aggregator, such as statsd, or on a central server that
-is already receiving datapoints, such as graphite's carbon database.
+signalfx protocol. We recommend placing the proxy either on the same server
+as another aggregator, such as statsd, or on a central server that is
+already receiving datapoints, such as graphite's carbon database.
 
 ## Install and upgrade
 
