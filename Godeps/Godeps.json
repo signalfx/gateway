@@ -1,6 +1,7 @@
 {
 	"ImportPath": "github.com/signalfx/metricproxy",
 	"GoVersion": "go1.6",
+	"GodepVersion": "v60",
 	"Packages": [
 		"./..."
 	],
@@ -43,7 +44,7 @@
 		},
 		{
 			"ImportPath": "github.com/signalfx/com_signalfx_metrics_protobuf",
-			"Rev": "4ee27186f23ce032939bb7363a04c653c333139c"
+			"Rev": "1477d7f5730360be99fcaf7e7d7c56e03be2eabc"
 		},
 		{
 			"ImportPath": "github.com/signalfx/gohistogram",
