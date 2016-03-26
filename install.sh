@@ -6,13 +6,12 @@ YUM_CMD=$(which yum)
 APT_GET_CMD=$(which apt-get)
 GO_CMD=$(which go)
 GIT_CMD=$(which git)
+set -e
 if [ ! -z "$GO_CMD" ] && [ ! -z "$GIT_CMD" ]; then
-  set -e
+  echo "Both go and git already installed, continuing"
 elif [ ! -z "$APT_GET_CMD" ]; then
-  set -e
   apt-get install -y golang git
 elif [ ! -z "$YUM_CMD" ]; then
-  set -e
   yum install -y golang git
 else
   echo "Unable to find package manager"
