@@ -5,15 +5,15 @@ set -x
 YUM_CMD=$(which yum)
 APT_GET_CMD=$(which apt-get)
 GO_CMD=$(which go)
-HG_CMD=$(which hg)
-if [ ! -z "$GO_CMD" ] && [ ! -z "$HG_CMD" ]; then
+GIT_CMD=$(which git)
+if [ ! -z "$GO_CMD" ] && [ ! -z "$GIT_CMD" ]; then
   set -e
 elif [ ! -z "$APT_GET_CMD" ]; then
   set -e
-  apt-get install -y golang git mercurial
+  apt-get install -y golang git
 elif [ ! -z "$YUM_CMD" ]; then
   set -e
-  yum install -y golang git mercurial
+  yum install -y golang git
 else
   echo "Unable to find package manager"
   exit 1
