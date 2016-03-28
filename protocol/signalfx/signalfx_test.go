@@ -8,6 +8,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 
 	"errors"
+	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/pointer"
 )
@@ -35,15 +36,125 @@ func TestNewProtobufDataPointWithType(t *testing.T) {
 			_, err := NewProtobufDataPointWithType(&dp, com_signalfx_metrics_protobuf.MetricType_COUNTER)
 			So(err, ShouldEqual, errDatapointValueNotSet)
 		})
-		Convey("source should set", func() {
-			dp.Source = pointer.String("hello")
+		Convey("with a value", func() {
 			dp.Value = &com_signalfx_metrics_protobuf.Datum{
 				IntValue: pointer.Int64(1),
 			}
-			dp2, err := NewProtobufDataPointWithType(&dp, com_signalfx_metrics_protobuf.MetricType_COUNTER)
-			So(err, ShouldBeNil)
-			So(dp2.Dimensions["sf_source"], ShouldEqual, "hello")
+			Convey("source should set", func() {
+				dp.Source = pointer.String("hello")
+				dp2, err := NewProtobufDataPointWithType(&dp, com_signalfx_metrics_protobuf.MetricType_COUNTER)
+				So(err, ShouldBeNil)
+				So(dp2.Dimensions["sf_source"], ShouldEqual, "hello")
+			})
+			Convey("properties should set", func() {
+				dp.Properties = []*com_signalfx_metrics_protobuf.Property{
+					{
+						Key: proto.String("name"),
+						Value: &com_signalfx_metrics_protobuf.PropertyValue{
+							StrValue: proto.String("jack"),
+						},
+					},
+					{
+						Key:   proto.String("missing"),
+						Value: &com_signalfx_metrics_protobuf.PropertyValue{},
+					},
+					{
+						Key: proto.String(""),
+						Value: &com_signalfx_metrics_protobuf.PropertyValue{
+							StrValue: proto.String("notset"),
+						},
+					},
+				}
+				dp2, err := NewProtobufDataPointWithType(&dp, com_signalfx_metrics_protobuf.MetricType_COUNTER)
+				So(err, ShouldBeNil)
+				So(dp2.GetProperties()["name"], ShouldEqual, "jack")
+				So(len(dp2.GetProperties()), ShouldEqual, 1)
+			})
 		})
+	})
+}
+
+func TestValueToRaw(t *testing.T) {
+	Convey("With value raw test valueToRaw", t, func() {
+		type testCase struct {
+			v   ValueToSend
+			exp interface{}
+		}
+		cases := []testCase{
+			{
+				v:   ValueToSend(1.0),
+				exp: 1.0,
+			},
+			{
+				v:   ValueToSend(int64(1)),
+				exp: int64(1),
+			},
+			{
+				v:   ValueToSend(1),
+				exp: 1,
+			},
+			{
+				v:   ValueToSend("hi"),
+				exp: "hi",
+			},
+			{
+				v:   ValueToSend(true),
+				exp: true,
+			},
+			{
+				v:   ValueToSend(func() {}),
+				exp: nil,
+			},
+		}
+		for _, c := range cases {
+			So(valueToRaw(c.v), ShouldEqual, c.exp)
+		}
+	})
+}
+
+func TestPropertyAsRawType(t *testing.T) {
+	Convey("With value raw test PropertyAsRawType", t, func() {
+		type testCase struct {
+			v   *com_signalfx_metrics_protobuf.PropertyValue
+			exp interface{}
+		}
+		cases := []testCase{
+			{
+				v:   nil,
+				exp: nil,
+			},
+			{
+				v: &com_signalfx_metrics_protobuf.PropertyValue{
+					BoolValue: proto.Bool(false),
+				},
+				exp: false,
+			},
+			{
+				v: &com_signalfx_metrics_protobuf.PropertyValue{
+					IntValue: proto.Int64(123),
+				},
+				exp: 123,
+			},
+			{
+				v: &com_signalfx_metrics_protobuf.PropertyValue{
+					DoubleValue: proto.Float64(2.0),
+				},
+				exp: 2.0,
+			},
+			{
+				v: &com_signalfx_metrics_protobuf.PropertyValue{
+					StrValue: proto.String("hello"),
+				},
+				exp: "hello",
+			},
+			{
+				v:   &com_signalfx_metrics_protobuf.PropertyValue{},
+				exp: nil,
+			},
+		}
+		for _, c := range cases {
+			So(PropertyAsRawType(c.v), ShouldEqual, c.exp)
+		}
 	})
 }
 

@@ -254,6 +254,16 @@ type JSONDecoderV2 struct {
 	Logger log.Logger
 }
 
+func appendProperties(dp *datapoint.Datapoint, Properties map[string]ValueToSend) {
+	for name, p := range Properties {
+		v := valueToRaw(p)
+		if v == nil {
+			continue
+		}
+		dp.SetProperty(name, p)
+	}
+}
+
 func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error {
 	dec := json.NewDecoder(req.Body)
 	var d JSONDatapointV2
@@ -271,10 +281,11 @@ func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error
 			v, err := ValueToValue(jsonDatapoint.Value)
 			if err != nil {
 				decoder.Logger.Log(log.Err, err, "Unable to get value for datapoint")
-			} else {
-				dp := datapoint.New(jsonDatapoint.Metric, jsonDatapoint.Dimensions, v, fromMT(com_signalfx_metrics_protobuf.MetricType(mt)), fromTs(jsonDatapoint.Timestamp))
-				dps = append(dps, dp)
+				continue
 			}
+			dp := datapoint.New(jsonDatapoint.Metric, jsonDatapoint.Dimensions, v, fromMT(com_signalfx_metrics_protobuf.MetricType(mt)), fromTs(jsonDatapoint.Timestamp))
+			appendProperties(dp, jsonDatapoint.Properties)
+			dps = append(dps, dp)
 		}
 	}
 	if len(dps) == 0 {

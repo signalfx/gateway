@@ -254,6 +254,19 @@ func TestSignalfxListener(t *testing.T) {
 				So(dpSent.String(), ShouldEqual, dpSeen.String())
 				So(atomic.LoadInt64(&callCount), ShouldEqual, 1)
 			})
+			Convey("points with properties should send", func() {
+				dpSent := dptest.DP()
+				dpSent.SetProperty("name", "jack")
+				dpSent.SetProperty("awesome", true)
+				dpSent.Timestamp = dpSent.Timestamp.Round(time.Millisecond)
+				So(forwarder.AddDatapoints(ctx, []*datapoint.Datapoint{dpSent}), ShouldBeNil)
+				dpSeen := sendTo.Next()
+				So(dpSent.String(), ShouldEqual, dpSeen.String())
+				So(atomic.LoadInt64(&callCount), ShouldEqual, 1)
+				So(len(dpSeen.GetProperties()), ShouldEqual, 2)
+				So(dpSeen.GetProperties()["name"], ShouldEqual, "jack")
+				So(dpSeen.GetProperties()["awesome"], ShouldEqual, true)
+			})
 			Convey("Should be able to send zero len events", func() {
 				So(forwarder.AddEvents(ctx, []*event.Event{}), ShouldBeNil)
 			})
@@ -339,6 +352,23 @@ func TestSignalfxListener(t *testing.T) {
 			}
 			datapointSeen := sendTo.Next()
 			So(datapointSent.String(), ShouldEqual, datapointSeen.String())
+		})
+		Convey("Should be able to send a v2 JSON point with properties", func() {
+			now := time.Now().Round(time.Second)
+			v1Body := fmt.Sprintf(`{"gauge": [{"metric":"bob", "value": 3, "timestamp": %d, "properties": {"name":"jack", "age": 33, "awesome": true, "unknown": []}}]}`, now.UnixNano()/time.Millisecond.Nanoseconds())
+			trySend(v1Body, "application/json", "/v2/datapoint")
+			datapointSent := datapoint.Datapoint{
+				Metric:    "bob",
+				Value:     datapoint.NewIntValue(3),
+				Timestamp: now,
+			}
+			datapointSeen := sendTo.Next()
+			So(datapointSent.String(), ShouldEqual, datapointSeen.String())
+
+			So(datapointSeen.GetProperties()["name"], ShouldEqual, "jack")
+			So(datapointSeen.GetProperties()["age"], ShouldEqual, 33)
+			So(datapointSeen.GetProperties()["awesome"], ShouldEqual, true)
+			So(datapointSeen.GetProperties()["unknown"], ShouldBeNil)
 		})
 		Convey("invalid requests should error", func() {
 			verifyStatusCode("INVALID_JSON", "application/json", "/v1/datapoint", http.StatusBadRequest)

@@ -174,6 +174,32 @@ func runeFilterMap(r rune) rune {
 	return '_'
 }
 
+func rawToProtobuf(raw interface{}) *com_signalfx_metrics_protobuf.PropertyValue {
+	switch t := raw.(type) {
+	case int64:
+		return &com_signalfx_metrics_protobuf.PropertyValue{
+			IntValue: &t,
+		}
+	case int:
+		return &com_signalfx_metrics_protobuf.PropertyValue{
+			IntValue: proto.Int64(int64(t)),
+		}
+	case float64:
+		return &com_signalfx_metrics_protobuf.PropertyValue{
+			DoubleValue: &t,
+		}
+	case bool:
+		return &com_signalfx_metrics_protobuf.PropertyValue{
+			BoolValue: &t,
+		}
+	case string:
+		return &com_signalfx_metrics_protobuf.PropertyValue{
+			StrValue: &t,
+		}
+	}
+	return nil
+}
+
 func (h *HTTPDatapointSink) coreDatapointToProtobuf(point *datapoint.Datapoint) *com_signalfx_metrics_protobuf.DataPoint {
 	m := point.Metric
 	var ts int64
@@ -183,14 +209,24 @@ func (h *HTTPDatapointSink) coreDatapointToProtobuf(point *datapoint.Datapoint) 
 		ts = point.Timestamp.UnixNano() / time.Millisecond.Nanoseconds()
 	}
 	mt := toMT(point.MetricType)
-	v := &com_signalfx_metrics_protobuf.DataPoint{
+	dp := &com_signalfx_metrics_protobuf.DataPoint{
 		Metric:     &m,
 		Timestamp:  &ts,
 		Value:      datumForPoint(point.Value),
 		MetricType: &mt,
 		Dimensions: mapToDimensions(point.Dimensions),
 	}
-	return v
+	for k, v := range point.GetProperties() {
+		kv := k
+		pv := rawToProtobuf(v)
+		if pv != nil && k != "" {
+			dp.Properties = append(dp.Properties, &com_signalfx_metrics_protobuf.Property{
+				Key:   &kv,
+				Value: pv,
+			})
+		}
+	}
+	return dp
 }
 
 func (h *HTTPDatapointSink) encodePostBodyProtobufV2(datapoints []*datapoint.Datapoint) ([]byte, error) {

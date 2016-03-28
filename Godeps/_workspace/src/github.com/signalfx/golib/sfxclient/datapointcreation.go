@@ -31,3 +31,9 @@ func CumulativeF(metricName string, dimensions map[string]string, val float64) *
 func CumulativeP(metricName string, dimensions map[string]string, val *int64) *datapoint.Datapoint {
 	return datapoint.New(metricName, dimensions, datapoint.NewIntValue(atomic.LoadInt64(val)), datapoint.Counter, time.Time{})
 }
+
+// Counter creates a SignalFx counter for integer values, incrementing by a set value.  Generally,
+// it is preferable to use Cumulative Counters when possible.
+func Counter(metricName string, dimensions map[string]string, val int64) *datapoint.Datapoint {
+	return datapoint.New(metricName, dimensions, datapoint.NewIntValue(val), datapoint.Count, time.Time{})
+}

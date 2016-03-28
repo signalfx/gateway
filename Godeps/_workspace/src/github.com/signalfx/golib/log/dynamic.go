@@ -81,6 +81,26 @@ func (t *TimeDynamic) LogValue() interface{} {
 	return now.Format(t.Layout)
 }
 
+// TimeSince logs the time since the start of the program
+type TimeSince struct {
+	Start      time.Time
+	TimeKeeper timekeeper.TimeKeeper
+}
+
+var defaultStartTime = time.Now()
+
+// LogValue returs the time since Start time
+func (c *TimeSince) LogValue() interface{} {
+	nowFunc := time.Now
+	if c.TimeKeeper != nil {
+		nowFunc = c.TimeKeeper.Now
+	}
+	if c.Start.IsZero() {
+		return nowFunc().Sub(defaultStartTime)
+	}
+	return nowFunc().Sub(c.Start)
+}
+
 var (
 	// DefaultTimestamp returns the local time as a string
 	DefaultTimestamp = &TimeDynamic{AsString: true}

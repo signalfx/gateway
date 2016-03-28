@@ -91,6 +91,8 @@ func TestBufferedForwarderBasic(t *testing.T) {
 				}
 			}
 			So(bf.AddDatapoints(ctx, datas), ShouldBeNil)
+			seen := <-sendTo.PointsChan
+			So(len(seen), ShouldBeGreaterThan, 1)
 		})
 		Convey("Should buffer events", func() {
 			time.Sleep(time.Millisecond * 10)

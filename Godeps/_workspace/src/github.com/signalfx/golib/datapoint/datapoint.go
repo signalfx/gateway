@@ -93,30 +93,30 @@ func (dp *Datapoint) String() string {
 type metadata int
 
 const (
-	stringProperties metadata = iota
+	tsProperty metadata = iota
 )
 
 //SetProperty sets a property to be used when the time series associated with the datapoint is created
-func (dp *Datapoint) SetProperty(key string, value string) {
-	if dp.Meta[stringProperties] == nil {
-		dp.Meta[stringProperties] = make(map[string]string, 1)
+func (dp *Datapoint) SetProperty(key string, value interface{}) {
+	if dp.Meta[tsProperty] == nil {
+		dp.Meta[tsProperty] = make(map[string]interface{}, 1)
 	}
 	dp.GetProperties()[key] = value
 }
 
 //RemoveProperty removes a property from the map of properties to be used when the time series associated with the datapoint is created
 func (dp *Datapoint) RemoveProperty(key string) {
-	if dp.Meta[stringProperties] != nil {
+	if dp.Meta[tsProperty] != nil {
 		delete(dp.GetProperties(), key)
 		if len(dp.GetProperties()) == 0 {
-			delete(dp.Meta, stringProperties)
+			delete(dp.Meta, tsProperty)
 		}
 	}
 }
 
 //GetProperties gets the map of properties to set when creating the time series associated with the datapoint. nil if no properties are set.
-func (dp *Datapoint) GetProperties() map[string]string {
-	m, ok := dp.Meta[stringProperties].(map[string]string)
+func (dp *Datapoint) GetProperties() map[string]interface{} {
+	m, ok := dp.Meta[tsProperty].(map[string]interface{})
 	if !ok {
 		return nil
 	}

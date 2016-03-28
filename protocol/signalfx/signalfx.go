@@ -55,19 +55,44 @@ func ValueToValue(v ValueToSend) (datapoint.Value, error) {
 	return nil, fmt.Errorf("unable to convert value: %s", v)
 }
 
+func valueToRaw(v ValueToSend) interface{} {
+	f, ok := v.(float64)
+	if ok {
+		return f
+	}
+	i, ok := v.(int64)
+	if ok {
+		return i
+	}
+	i2, ok := v.(int)
+	if ok {
+		return int64(i2)
+	}
+	s, ok := v.(string)
+	if ok {
+		return s
+	}
+	b, ok := v.(bool)
+	if ok {
+		return b
+	}
+	return nil
+}
+
 // JSONDatapointV2 is the V2 json datapoint sending format
 type JSONDatapointV2 map[string][]*BodySendFormatV2
 
 // BodySendFormatV2 is the JSON format signalfx datapoints are expected to be in
 type BodySendFormatV2 struct {
-	Metric     string            `json:"metric"`
-	Timestamp  int64             `json:"timestamp"`
-	Value      ValueToSend       `json:"value"`
-	Dimensions map[string]string `json:"dimensions"`
+	Metric     string                 `json:"metric"`
+	Timestamp  int64                  `json:"timestamp"`
+	Value      ValueToSend            `json:"value"`
+	Dimensions map[string]string      `json:"dimensions"`
+	Properties map[string]ValueToSend `json:"properties"`
 }
 
 func (bodySendFormat *BodySendFormatV2) String() string {
-	return fmt.Sprintf("DP[metric=%s|time=%d|val=%s|dimensions=%s]", bodySendFormat.Metric, bodySendFormat.Timestamp, bodySendFormat.Value, bodySendFormat.Dimensions)
+	return fmt.Sprintf("DP[metric=%s|time=%d|val=%s|dimensions=%s|props=%s]", bodySendFormat.Metric, bodySendFormat.Timestamp, bodySendFormat.Value, bodySendFormat.Dimensions, bodySendFormat.Properties)
 }
 
 // MetricCreationStruct is the API format for /v1/metric POST
@@ -129,7 +154,40 @@ func NewProtobufDataPointWithType(dp *com_signalfx_metrics_protobuf.DataPoint, m
 		dims[dpdim.GetKey()] = dpdim.GetValue()
 	}
 
-	return datapoint.New(dp.GetMetric(), dims, NewDatumValue(dp.GetValue()), fromMT(mt), fromTs(dp.GetTimestamp())), nil
+	dpToRet := datapoint.New(dp.GetMetric(), dims, NewDatumValue(dp.GetValue()), fromMT(mt), fromTs(dp.GetTimestamp()))
+
+	for _, p := range dp.Properties {
+		key := p.GetKey()
+		if key == "" {
+			continue
+		}
+		val := PropertyAsRawType(p.GetValue())
+		if val == nil {
+			continue
+		}
+		dpToRet.SetProperty(key, val)
+	}
+	return dpToRet, nil
+}
+
+// PropertyAsRawType converts a protobuf property to a native Go type
+func PropertyAsRawType(p *com_signalfx_metrics_protobuf.PropertyValue) interface{} {
+	if p == nil {
+		return nil
+	}
+	if p.BoolValue != nil {
+		return *p.BoolValue
+	}
+	if p.DoubleValue != nil {
+		return *p.DoubleValue
+	}
+	if p.StrValue != nil {
+		return *p.StrValue
+	}
+	if p.IntValue != nil {
+		return *p.IntValue
+	}
+	return nil
 }
 
 var errPropertyValueNotSet = errors.New("property value not set")

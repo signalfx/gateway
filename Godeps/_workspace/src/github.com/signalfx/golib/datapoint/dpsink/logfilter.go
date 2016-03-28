@@ -76,18 +76,17 @@ func (f *ItemFlagger) GetDimensions() map[string]string {
 	return ret
 }
 
-// AddDatapoints adds a signal to each datapoint if the signal is inside the context
-func (f *ItemFlagger) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint, next Sink) error {
+// SetDatapointFlags sets the log flag for every datapoint if the signal is inside the context
+func (f *ItemFlagger) SetDatapointFlags(ctx context.Context, points []*datapoint.Datapoint) {
 	if f.CtxFlagCheck.HasFlag(ctx) {
 		atomic.AddInt64(&f.stats.totalDpCtxSignals, 1)
 		for _, dp := range points {
 			f.SetDatapointFlag(dp)
 		}
-		return next.AddDatapoints(ctx, points)
 	}
 	dims := f.GetDimensions()
 	if len(dims) == 0 {
-		return next.AddDatapoints(ctx, points)
+		return
 	}
 	for _, dp := range points {
 		if dpMatches(dp, f.MetricDimensionName, dims) {
@@ -95,6 +94,11 @@ func (f *ItemFlagger) AddDatapoints(ctx context.Context, points []*datapoint.Dat
 			f.SetDatapointFlag(dp)
 		}
 	}
+}
+
+// AddDatapoints adds a signal to each datapoint if the signal is inside the context
+func (f *ItemFlagger) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint, next Sink) error {
+	f.SetDatapointFlags(ctx, points)
 	return next.AddDatapoints(ctx, points)
 }
 

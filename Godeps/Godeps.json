@@ -52,67 +52,67 @@
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/datapoint",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/datapoint/dpsink",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/datapoint/dptest",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/errors",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/event",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/eventcounter",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/explorable",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/expvar2",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/httpdebug",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/log",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/logkey",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/nettest",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/pointer",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/sfxclient",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/timekeeper",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/signalfx/golib/web",
-			"Rev": "0ec7586c6b34167e1f569f57af62cf513c1bfe96"
+			"Rev": "4f23751e94f286097fed0778aae3b8f84048d9de"
 		},
 		{
 			"ImportPath": "github.com/smartystreets/assertions",
