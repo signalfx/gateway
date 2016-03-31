@@ -78,8 +78,8 @@ env variable is set correctly.
 
 The proxy comes with a [docker image](Dockerfile) that is built and deployed
 to [quay.io](https://quay.io/repository/signalfx/metricproxy).  It assumes
-you will have a sfdbconfig.json file cross mounted to
-/var/config/sfproxy/sfdbconfig.json for the docker container.
+you will have a sfdbproxy.conf file cross mounted to
+/var/config/sfproxy/sfdbproxy.conf for the docker container.
 
 ## Config file format
 
