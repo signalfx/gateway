@@ -141,7 +141,7 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 		// Buffering -> counting -> (forwarder)
 		limitedLogger := &log.RateLimitedLogger{
 			EventCounter: eventcounter.New(tk.Now(), time.Second),
-			Limit:        2, // Only 1 a second
+			Limit:        16,
 			Logger:       logCtx,
 			Now:          tk.Now,
 		}
@@ -189,7 +189,7 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loader *config.Lo
 		count := &dpsink.Counter{
 			Logger: &log.RateLimitedLogger{
 				EventCounter: eventcounter.New(tk.Now(), time.Second),
-				Limit:        1, // Only 1 a second
+				Limit:        16,
 				Logger:       logCtx,
 				Now:          tk.Now,
 			},
