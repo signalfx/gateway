@@ -3,8 +3,8 @@ package signalfx
 import (
 	"testing"
 
-	"github.com/cep21/gohelpers/workarounds"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
+	"github.com/signalfx/gohelpers/workarounds"
 	. "github.com/smartystreets/goconvey/convey"
 
 	"errors"

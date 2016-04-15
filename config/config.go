@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"expvar"
-	"github.com/cep21/gohelpers/stringhelper"
-	"github.com/cep21/xdgbasedir"
+	"github.com/signalfx/gohelpers/stringhelper"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/metricproxy/logkey"
+	"github.com/signalfx/xdgbasedir"
 	"os"
 )
 

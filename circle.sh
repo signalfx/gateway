@@ -33,7 +33,7 @@ function do_cache() {
   mkdir -p "$GO_COMPILER_PATH"
   install_all_go_versions "$GO_COMPILER_PATH"
   install_go_version "$GO_COMPILER_PATH" "$DEFAULT_GOLANG_VERSION"
-  versioned_goget "github.com/cep21/gobuild:v1.5" "github.com/tools/godep:master"
+  versioned_goget "github.com/signalfx/gobuild:v1.6" "github.com/tools/godep:master"
   mkdir -p "$GOPATH_INTO"
   install_shellcheck "$GOPATH_INTO"
   gem install mdl

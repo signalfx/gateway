@@ -10,9 +10,9 @@ before_install:
   - dpkg -x shellcheck_0.3.7-5_amd64.deb $HOME
   - export PATH=$HOME/usr/bin:$PATH
   - go get github.com/tools/godep
-  - go get github.com/cep21/goverify
-  - go get github.com/cep21/gobuild
-  - go get github.com/cep21/gocoverdir
+  - go get github.com/signalfx/goverify
+  - go get github.com/signalfx/gobuild
+  - go get github.com/signalfx/gocoverdir
   - go get github.com/axw/gocov/gocov
   - go get github.com/mattn/goveralls
   - gem install mdl

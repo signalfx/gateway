@@ -377,7 +377,7 @@ func (p *proxy) run(ctx context.Context) error {
 	scheduler.Sink = dpsink.Discard
 	scheduler.ReportingDelayNs = (time.Second * 30).Nanoseconds()
 	wg := sync.WaitGroup{}
-	finisehdContext, cancelFunc := context.WithCancel(ctx)
+	finishedContext, cancelFunc := context.WithCancel(ctx)
 	defer cancelFunc()
 	if loadedConfig.StatsDelayDuration != nil && *loadedConfig.StatsDelayDuration != 0 {
 		scheduler.Sink = multiplexer
@@ -389,7 +389,7 @@ func (p *proxy) run(ctx context.Context) error {
 	// Schedule datapoint collection to a Discard sink so we can get the stats in Expvar()
 	wg.Add(1)
 	go func() {
-		err := scheduler.Schedule(finisehdContext)
+		err := scheduler.Schedule(finishedContext)
 		logger.Log(log.Err, err, logkey.Struct, "scheduler", "Schedule finished")
 		wg.Done()
 	}()

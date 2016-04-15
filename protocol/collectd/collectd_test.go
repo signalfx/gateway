@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/cep21/gohelpers/workarounds"
+	"github.com/signalfx/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/stretchr/testify/assert"
 )

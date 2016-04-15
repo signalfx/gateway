@@ -1,4 +1,5 @@
 [vars]
+  ignoreDirs = [".git", "Godeps"]
   duplLimit = "300"
   testCoverage = 100.0
 
