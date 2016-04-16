@@ -112,9 +112,15 @@ func getInEnvOrJoinWithHome(envName string, directory string) (string, error) {
 }
 
 func joinWithHome(dir string) (string, error) {
-	usr, err := userCurrent()
-	if err != nil {
-		return "", err
+        homeDir := os.Getenv("HOME")
+
+	if homeDir == "" {
+		usr, err := userCurrent()
+		if err != nil {
+		   return "", err
+		}
+		homeDir = usr.HomeDir
 	}
-	return path.Join(usr.HomeDir, dir), nil
+
+	return path.Join(homeDir, dir), nil
 }
