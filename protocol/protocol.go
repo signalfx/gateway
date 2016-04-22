@@ -19,6 +19,7 @@ type DatapointForwarder interface {
 // Forwarder is the basic interface endpoints must support for the proxy to forward to them
 type Forwarder interface {
 	dpsink.Sink
+	Pipeline
 	sfxclient.Collector
 	io.Closer
 }
@@ -27,6 +28,17 @@ type Forwarder interface {
 type Listener interface {
 	sfxclient.Collector
 	io.Closer
+	HealthChecker
+}
+
+// HealthChecker interface is anything that exports a healthcheck that would need to be invalidated on graceful shutdown
+type HealthChecker interface {
+	CloseHealthCheck()
+}
+
+// Pipeline returns the number of items still in flight that need to be drained
+type Pipeline interface {
+	Pipeline() int64
 }
 
 // UneventfulForwarder converts a datapoint only forwarder into a datapoint/event forwarder
@@ -37,6 +49,11 @@ type UneventfulForwarder struct {
 // AddEvents does nothing and returns nil
 func (u *UneventfulForwarder) AddEvents(ctx context.Context, events []*event.Event) error {
 	return nil
+}
+
+// Pipeline returns zero since UneventfulForwarder doesn't have it's own buffer
+func (u *UneventfulForwarder) Pipeline() int64 {
+	return 0
 }
 
 // ListenerDims are the common stat dimensions we expect on listener protocols
@@ -55,40 +72,4 @@ func ForwarderDims(name string, typ string) map[string]string {
 		"name":     name,
 		"type":     typ,
 	}
-}
-
-// CompositeListener is a helper struct that expects users to inject their own versions of each
-// type
-type CompositeListener struct {
-	sfxclient.Collector
-	io.Closer
-}
-
-var _ Listener = &CompositeListener{}
-
-type compositeCloser []io.Closer
-
-// CompositeCloser creates a new io.Closer whos Close() method calls close of each of the closers
-func CompositeCloser(closers ...io.Closer) io.Closer {
-	return compositeCloser(closers)
-}
-
-func (c compositeCloser) Close() error {
-	var e error
-	for _, closable := range c {
-		err := closable.Close()
-		if err != nil {
-			e = err
-		}
-	}
-	return e
-}
-
-// OkCloser allows any function to become a io.Closer that returns nil and calls itself on close
-type OkCloser func()
-
-// Close calls the wrapped function and returns nil
-func (o OkCloser) Close() error {
-	o()
-	return nil
 }

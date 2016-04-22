@@ -27,9 +27,11 @@ import (
 
 // ListenerServer will listen for collectd datapoint connections
 type ListenerServer struct {
-	listener net.Listener
-	server   http.Server
-	decoder  JSONDecoder
+	protocol.CloseableHealthCheck
+	listener  net.Listener
+	server    http.Server
+	decoder   *JSONDecoder
+	collector sfxclient.Collector
 }
 
 var _ protocol.Listener = &ListenerServer{}
@@ -41,7 +43,7 @@ func (s *ListenerServer) Close() error {
 
 // Datapoints returns JSON decoder datapoints
 func (s *ListenerServer) Datapoints() []*datapoint.Datapoint {
-	return s.decoder.Datapoints()
+	return append(s.collector.Datapoints(), s.HealthDatapoints()...)
 }
 
 // JSONDecoder can decode collectd's native JSON datapoint format
@@ -169,14 +171,16 @@ func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer,
 	}
 
 	r := mux.NewRouter()
+	metricTracking := &web.RequestCounter{}
 	fullHandler := web.NewHandler(conf.StartingContext, web.FromHTTP(r))
 	if conf.HTTPChain != nil {
+		fullHandler.Add(web.NextHTTP(metricTracking.ServeHTTP))
 		fullHandler.Add(conf.HTTPChain)
 	}
-	r.Handle(*conf.HealthCheck, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		_, err := rw.Write([]byte("OK"))
-		log.IfErr(conf.Logger, err)
-	}))
+	decoder := JSONDecoder{
+		SendTo: sink,
+		Logger: conf.Logger,
+	}
 	listenServer := ListenerServer{
 		listener: listener,
 		server: http.Server{
@@ -185,12 +189,13 @@ func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer,
 			ReadTimeout:  *conf.Timeout,
 			WriteTimeout: *conf.Timeout,
 		},
-		decoder: JSONDecoder{
-			SendTo: sink,
-			Logger: conf.Logger,
-		},
+		decoder: &decoder,
+		collector: sfxclient.NewMultiCollector(
+			metricTracking,
+			&decoder),
 	}
-	httpHandler := web.NewHandler(conf.StartingContext, &listenServer.decoder)
+	listenServer.SetupHealthCheck(conf.HealthCheck, r, conf.Logger)
+	httpHandler := web.NewHandler(conf.StartingContext, listenServer.decoder)
 	if conf.DebugContext != nil {
 		httpHandler.Add(conf.DebugContext)
 	}

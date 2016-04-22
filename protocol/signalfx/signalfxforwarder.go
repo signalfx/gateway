@@ -26,6 +26,7 @@ import (
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/metricproxy/protocol/filtering"
 	"golang.org/x/net/context"
+	"sync/atomic"
 )
 
 // Forwarder controls forwarding datapoints to SignalFx
@@ -44,6 +45,12 @@ type Forwarder struct {
 	protoMarshal func(pb proto.Message) ([]byte, error)
 	jsonMarshal  func(v interface{}) ([]byte, error)
 	Logger       log.Logger
+	stats        stats
+}
+
+type stats struct {
+	totalDatapointsForwarded int64
+	totalEventsForwarded     int64
 }
 
 // ForwarderConfig controls optional parameters for a signalfx forwarder
@@ -214,6 +221,7 @@ const TokenHeaderName = "X-SF-TOKEN"
 
 // AddDatapoints forwards datapoints to SignalFx
 func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*datapoint.Datapoint) error {
+	atomic.AddInt64(&connector.stats.totalDatapointsForwarded, int64(len(datapoints)))
 	datapoints = connector.emptyMetricNameFilter.FilterDatapoints(datapoints)
 	datapoints = connector.FilterDatapoints(datapoints)
 	if len(datapoints) == 0 {
@@ -230,6 +238,7 @@ func (connector *Forwarder) AddEvents(ctx context.Context, events []*event.Event
 	defaultAuthToken := connector.defaultAuthToken
 	connector.propertyLock.Unlock()
 
+	atomic.AddInt64(&connector.stats.totalEventsForwarded, int64(len(events)))
 	// could filter here
 	if len(events) == 0 {
 		return nil
@@ -258,6 +267,11 @@ func checkResp(resp *http.Response) error {
 		return errors.Errorf("Resp body not ok: %s", respBody)
 	}
 	return nil
+}
+
+// Pipeline returns the total of all things forwarded
+func (connector *Forwarder) Pipeline() int64 {
+	return atomic.LoadInt64(&connector.stats.totalDatapointsForwarded) + atomic.LoadInt64(&connector.stats.totalEventsForwarded)
 }
 
 // TODO(mwp): Move event adds to sfxclient

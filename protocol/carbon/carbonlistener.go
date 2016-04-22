@@ -24,6 +24,7 @@ import (
 
 // Listener once setup will listen for carbon protocol points to forward on
 type Listener struct {
+	protocol.CloseableHealthCheck
 	psocket              net.Listener
 	sink                 dpsink.Sink
 	metricDeconstructor  metricdeconstructor.MetricDeconstructor
@@ -171,7 +172,6 @@ func NewListener(sendTo dpsink.Sink, passedConf *ListenerConfig) (*Listener, err
 		logger:               log.NewContext(conf.Logger).With(logkey.Protocol, "carbon", logkey.Direction, "listener"),
 	}
 	receiver.wg.Add(1)
-
 	go receiver.startListening()
 	return &receiver, nil
 }
