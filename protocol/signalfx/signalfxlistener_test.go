@@ -153,7 +153,7 @@ func verifyEventRequest(baseURI string, contentType string, path string, body io
 						So(dimensions, ShouldResemble, eOut.Dimensions)
 					}
 					if properties != nil {
-						So(properties, ShouldResemble, eOut.Meta)
+						So(properties, ShouldResemble, eOut.Properties)
 					}
 					So(eOut.Timestamp.Nanosecond(), ShouldBeGreaterThan, 0)
 				})
@@ -288,22 +288,22 @@ func TestSignalfxListener(t *testing.T) {
 				eventSent.Dimensions["___"] = "testing" // dots should turn into _
 				delete(eventSent.Dimensions, "...")
 				So(eventSeen.Dimensions, ShouldResemble, eventSent.Dimensions)
-				So(eventSeen.Meta, ShouldResemble, eventSent.Meta)
+				So(eventSeen.Properties, ShouldResemble, eventSent.Properties)
 				eventSeen.Dimensions = nil
 				eventSent.Dimensions = nil
-				eventSeen.Meta = nil
-				eventSent.Meta = nil
+				eventSeen.Properties = nil
+				eventSent.Properties = nil
 				So(eventSeen.String(), ShouldEqual, eventSent.String())
 			})
 			Convey("Should filter event properties/dimensions that are empty", func() {
 				eventSent := dptest.E()
 				eventSent.Dimensions = map[string]string{"": "test"}
-				eventSent.Meta = map[string]interface{}{"": "test"}
+				eventSent.Properties = map[string]interface{}{"": "test"}
 				eventSent.Timestamp = eventSent.Timestamp.Round(time.Millisecond)
 				So(forwarder.AddEvents(ctx, []*event.Event{eventSent}), ShouldBeNil)
 				eventSeen := sendTo.NextEvent()
 				eventSent.Dimensions = nil
-				eventSent.Meta = nil
+				eventSent.Properties = nil
 				So(eventSeen.String(), ShouldEqual, eventSent.String())
 			})
 			Reset(func() {

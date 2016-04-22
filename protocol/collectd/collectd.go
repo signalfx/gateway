@@ -172,19 +172,19 @@ func NewEvent(e *JSONWriteFormat, defaultDimensions map[string]string) *event.Ev
 
 	_, usedInMetricName := usedParts["type"]
 	addIfNotNullOrEmpty(dimensions, "type", !usedInMetricName, e.TypeS)
-	meta := make(map[string]interface{}, len(e.Meta)+2)
+	properties := make(map[string]interface{}, len(e.Meta)+2)
 	for k, v := range e.Meta {
-		meta[k] = v
+		properties[k] = v
 	}
 	_, exists := e.Meta["severity"]
 	if !exists && e.Severity != nil {
-		meta["severity"] = *e.Severity
+		properties["severity"] = *e.Severity
 	}
 	_, exists = e.Meta["message"]
 	if !exists && e.Message != nil {
-		meta["message"] = *e.Message
+		properties["message"] = *e.Message
 	}
 
 	timestamp := time.Unix(0, int64(float64(time.Second)**e.Time))
-	return event.NewWithMeta(eventType, "COLLECTD", dimensions, meta, timestamp)
+	return event.NewWithProperties(eventType, "COLLECTD", dimensions, properties, timestamp)
 }

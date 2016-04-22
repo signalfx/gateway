@@ -140,7 +140,7 @@ func (connector *Forwarder) coreEventToProtobuf(e *event.Event) *com_signalfx_me
 	v := &com_signalfx_metrics_protobuf.Event{
 		EventType:  &et,
 		Timestamp:  &ts,
-		Properties: mapToProperties(e.Meta),
+		Properties: mapToProperties(e.Properties),
 		Dimensions: mapToDimensions(e.Dimensions),
 		Category:   &cat,
 	}

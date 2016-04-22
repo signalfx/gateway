@@ -44,6 +44,15 @@
 // Because counting things and calculating percentiles like p99 or median are common operations,
 // RollingBucket and CumulativeBucket exist to make this easier.  They implement the Collector
 // interface which allows users to add them to an existing Scheduler.
+//
+// To run integration tests, testing sending to SignalFx with an actual token, create a file named
+// authinfo.json that has your auth Token, similar to the following
+//     {
+//       "AuthToken": "abcdefg"
+//     }
+//
+// Then execute the following:
+//     go test -v --tags=integration -run TestDatapointSending ./sfxclient/
 package sfxclient
 
 import (

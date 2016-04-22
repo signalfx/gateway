@@ -49,7 +49,7 @@ func (f *ItemFlagger) HasDatapointFlag(dp *datapoint.Datapoint) bool {
 
 // SetEventFlag flags the event as connected to this flagger
 func (f *ItemFlagger) SetEventFlag(ev *event.Event) {
-	ev.Meta[f.EventMetaName] = f
+	ev.Properties[f.EventMetaName] = f
 }
 
 // HasEventFlag return true if the event is connected to this item
@@ -57,7 +57,7 @@ func (f *ItemFlagger) HasEventFlag(ev *event.Event) bool {
 	if f == nil {
 		return false
 	}
-	setTo, exists := ev.Meta[f.EventMetaName]
+	setTo, exists := ev.Properties[f.EventMetaName]
 	return exists && setTo == f
 }
 

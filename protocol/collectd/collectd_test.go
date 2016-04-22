@@ -178,19 +178,19 @@ func TestCollectdEventJsonDecoding(t *testing.T) {
 	emptyMap := map[string]string{}
 	e := NewEvent((*postFormat)[0], emptyMap)
 	assert.Equal(t, "imanotify.notify_instance", e.EventType, "event type not named correctly")
-	assert.Equal(t, 3, len(e.Meta), "size of meta not corect")
-	metaExists := func(name string, expected string) {
-		value, exists := e.Meta[name]
-		assert.True(t, exists, "should have "+name+" in meta")
+	assert.Equal(t, 3, len(e.Properties), "size of property not corect")
+	propertyExists := func(name string, expected string) {
+		value, exists := e.Properties[name]
+		assert.True(t, exists, "should have "+name+" in property")
 		assert.Equal(t, expected, value.(string), name+" should be value "+expected)
 	}
-	metaExists("severity", "OKAY")
-	metaExists("message", "my message")
-	metaExists("key", "value")
+	propertyExists("severity", "OKAY")
+	propertyExists("message", "my message")
+	propertyExists("key", "value")
 	assert.Equal(t, 6, len(e.Dimensions), "size of dimensions not corect")
 	dimExists := func(name string, expected string) {
 		value, exists := e.Dimensions[name]
-		assert.True(t, exists, "should have "+name+" in meta")
+		assert.True(t, exists, "should have "+name+" in property")
 		assert.Equal(t, expected, value, name+" should be value "+expected)
 	}
 	dimExists("host", "mwp-signalbox")
@@ -224,19 +224,19 @@ func TestCollectdDimensonalizedPrecedence(t *testing.T) {
 	emptyMap := map[string]string{}
 	e := NewEvent((*postFormat)[0], emptyMap)
 	assert.Equal(t, "imanotify.notify_instance", e.EventType, "event type not named correctly")
-	assert.Equal(t, 3, len(e.Meta), "size of meta not corect")
-	metaExists := func(name string, expected string) {
-		value, exists := e.Meta[name]
-		assert.True(t, exists, "should have "+name+" in meta")
+	assert.Equal(t, 3, len(e.Properties), "size of properties not corect")
+	propertyExists := func(name string, expected string) {
+		value, exists := e.Properties[name]
+		assert.True(t, exists, "should have "+name+" in property")
 		assert.Equal(t, expected, value.(string), name+" should be value "+expected)
 	}
-	metaExists("severity", "OKAY")
-	metaExists("message", "my message")
-	metaExists("key", "value")
+	propertyExists("severity", "OKAY")
+	propertyExists("message", "my message")
+	propertyExists("key", "value")
 	assert.Equal(t, 7, len(e.Dimensions), "size of dimensions not corect")
 	dimExists := func(name string, expected string) {
 		value, exists := e.Dimensions[name]
-		assert.True(t, exists, "should have "+name+" in meta")
+		assert.True(t, exists, "should have "+name+" in property")
 		assert.Equal(t, expected, value, name+" should be value "+expected)
 	}
 	dimExists("host", "mwp-signalbox")

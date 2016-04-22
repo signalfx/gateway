@@ -219,7 +219,7 @@ func NewProtobufEvent(e *com_signalfx_metrics_protobuf.Event) (*event.Event, err
 		}
 	}
 
-	return event.NewWithMeta(e.GetEventType(), e.GetCategory().String(), dims, props, fromTs(e.GetTimestamp())), nil
+	return event.NewWithProperties(e.GetEventType(), e.GetCategory().String(), dims, props, fromTs(e.GetTimestamp())), nil
 }
 
 // JSONEventV2 is the V2 json event sending format

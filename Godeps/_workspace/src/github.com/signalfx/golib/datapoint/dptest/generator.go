@@ -72,7 +72,7 @@ func (d *EventSource) Next() *event.Event {
 	}
 	dims["index"] = strconv.FormatInt(atomic.AddInt64(&d.CurrentIndex, 1), 10)
 
-	return event.NewWithMeta(d.EventType, d.EventCategory, d.Dims, d.Meta, d.TimeSource())
+	return event.NewWithProperties(d.EventType, d.EventCategory, d.Dims, d.Meta, d.TimeSource())
 }
 
 // E generates and returns a unique event to use for testing purposes
