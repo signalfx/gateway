@@ -11,6 +11,7 @@ import (
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/pointer"
 	"golang.org/x/net/context"
+	"sync/atomic"
 )
 
 // Config controls the optional configuration of the csv forwarder
@@ -24,11 +25,17 @@ var defaultConfig = &Config{
 	WriteString: func(f *os.File, s string) (ret int, err error) { return f.WriteString(s) },
 }
 
+type stats struct {
+	totalDatapointsForwarded int64
+	totalEventsForwarded     int64
+}
+
 // Forwarder prints datapoints to a file
 type Forwarder struct {
 	mu          sync.Mutex
 	file        *os.File
 	writeString func(f *os.File, s string) (ret int, err error)
+	stats       stats
 }
 
 var _ dpsink.Sink = &Forwarder{}
@@ -42,6 +49,7 @@ func (f *Forwarder) Datapoints() []*datapoint.Datapoint {
 func (f *Forwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	atomic.AddInt64(&f.stats.totalDatapointsForwarded, int64(len(points)))
 	for _, dp := range points {
 		if _, err := f.writeString(f.file, dp.String()+"\n"); err != nil {
 			return errors.Annotate(err, "cannot write datapoint to string")
@@ -54,12 +62,18 @@ func (f *Forwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datap
 func (f *Forwarder) AddEvents(ctx context.Context, events []*event.Event) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	atomic.AddInt64(&f.stats.totalEventsForwarded, int64(len(events)))
 	for _, e := range events {
 		if _, err := f.writeString(f.file, e.String()+"\n"); err != nil {
 			return errors.Annotate(err, "cannot write event to string")
 		}
 	}
 	return f.file.Sync()
+}
+
+// BufferSize returns 0 because csvforwarder doesn't buffer
+func (f *Forwarder) BufferSize() int64 {
+	return 0
 }
 
 // Close the file we write to

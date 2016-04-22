@@ -33,6 +33,7 @@ func TestFilenameForwarder(t *testing.T) {
 	assert.Nil(t, f.Datapoints())
 	assert.NoError(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dptest.DP()}))
 	assert.NoError(t, f.AddEvents(ctx, []*event.Event{dptest.E()}))
+	assert.Equal(t, int64(0), f.BufferSize())
 }
 
 func TestFilenameForwarderBadFilename(t *testing.T) {
