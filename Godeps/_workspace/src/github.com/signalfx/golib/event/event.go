@@ -14,29 +14,29 @@ type Event struct {
 	// Dimensions of what is being measured.  They are intrinsic.  Contributes to the identity of
 	// the metric. If this changes, we get a new metric identifier
 	Dimensions map[string]string
-	// Meta is information that's not particularly important to the event, but may be important
-	// to the pipeline that uses the event.  They are extrinsic.  It provides additional
+	// Properties is information that's not particularly important to the event, but may be
+	// important to the pipeline that uses the event.  They are extrinsic.  It provides additional
 	// information about the metric. changes in this set doesn't change the metric identity
-	Meta      map[string]interface{}
-	Timestamp time.Time
+	Properties map[string]interface{}
+	Timestamp  time.Time
 }
 
 func (e *Event) String() string {
-	return fmt.Sprintf("E[%s\t%s\t%s\t%s\t%s]", e.EventType, e.Category, e.Dimensions, e.Meta, e.Timestamp.String())
+	return fmt.Sprintf("E[%s\t%s\t%s\t%s\t%s]", e.EventType, e.Category, e.Dimensions, e.Properties, e.Timestamp.String())
 }
 
 // New creates a new event with empty meta data
 func New(eventType string, category string, dimensions map[string]string, timestamp time.Time) *Event {
-	return NewWithMeta(eventType, category, dimensions, map[string]interface{}{}, timestamp)
+	return NewWithProperties(eventType, category, dimensions, map[string]interface{}{}, timestamp)
 }
 
-// NewWithMeta creates a new event with passed metadata
-func NewWithMeta(eventType string, category string, dimensions map[string]string, meta map[string]interface{}, timestamp time.Time) *Event {
+// NewWithProperties creates a new event with passed metadata
+func NewWithProperties(eventType string, category string, dimensions map[string]string, properties map[string]interface{}, timestamp time.Time) *Event {
 	return &Event{
 		EventType:  eventType,
 		Category:   category,
 		Dimensions: dimensions,
-		Meta:       meta,
+		Properties: properties,
 		Timestamp:  timestamp,
 	}
 }

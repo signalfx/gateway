@@ -314,7 +314,7 @@ func (decoder *JSONEventDecoderV2) Read(ctx context.Context, req *http.Request) 
 		if jsonEvent.Timestamp == nil {
 			jsonEvent.Timestamp = pointer.Int64(0)
 		}
-		evt := event.NewWithMeta(jsonEvent.EventType, *jsonEvent.Category, jsonEvent.Dimensions, jsonEvent.Properties, fromTs(*jsonEvent.Timestamp))
+		evt := event.NewWithProperties(jsonEvent.EventType, *jsonEvent.Category, jsonEvent.Dimensions, jsonEvent.Properties, fromTs(*jsonEvent.Timestamp))
 		evts = append(evts, evt)
 	}
 	return decoder.Sink.AddEvents(ctx, evts)
