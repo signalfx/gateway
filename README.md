@@ -566,7 +566,7 @@ messages.  Only use debug logging temporarily.
       "type": "signalfx-json",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder",
-      "BufferSize": 1000000,
+      "Pipeline": 1000000,
       "DrainingThreads": 50,
       "MaxDrainSize": 5000
     }

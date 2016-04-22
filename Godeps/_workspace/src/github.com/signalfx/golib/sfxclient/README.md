@@ -157,9 +157,9 @@ DefaultHistogramSize is the default number of windows RollingBucket uses for
 created histograms
 
 ```go
-var DefaultMaxBufferSize = 100
+var DefaultMaxPipeline = 100
 ```
-DefaultMaxBufferSize is the default number of past bucket Quantile values
+DefaultMaxPipeline is the default number of past bucket Quantile values
 RollingBucket saves until a Datapoints() call
 
 ```go
@@ -375,9 +375,9 @@ type RollingBucket struct {
 	BucketWidth time.Duration
 	// Hist is an efficient tracker of numeric values for a histogram
 	Hist *gohistogram.NumericHistogram
-	// MaxFlushBufferSize is the maximum size of a window to keep for the RollingBucket before
+	// MaxFlushPipeline is the maximum size of a window to keep for the RollingBucket before
 	// quantiles are dropped.  It is ideally close to len(quantiles) * 3 + 15
-	MaxFlushBufferSize int
+	MaxFlushPipeline int
 	// Timer is used to track time.Now() during default value add calls
 	Timer timekeeper.TimeKeeper
 }

@@ -145,6 +145,7 @@ type signalFxLoader struct {
 	itemFlagger   *dpsink.ItemFlagger
 	ctxdims       *log.CtxDimensions
 	httpChain     web.NextConstructor
+	closeHeader   web.CloseHeader
 }
 
 func (s *signalFxLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {

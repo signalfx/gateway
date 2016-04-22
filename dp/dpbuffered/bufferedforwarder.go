@@ -17,7 +17,7 @@ import (
 
 // Config controls BufferedForwarder limits
 type Config struct {
-	BufferSize         *int64
+	Pipeline           *int64
 	MaxTotalDatapoints *int64
 	MaxTotalEvents     *int64
 	MaxDrainSize       *int64
@@ -28,7 +28,7 @@ type Config struct {
 
 // DefaultConfig are default values for buffered forwarders
 var DefaultConfig = &Config{
-	BufferSize:         pointer.Int64(10000),
+	Pipeline:           pointer.Int64(10000),
 	MaxTotalDatapoints: pointer.Int64(10000),
 	MaxTotalEvents:     pointer.Int64(10000),
 	MaxDrainSize:       pointer.Int64(1000),
@@ -38,6 +38,8 @@ var DefaultConfig = &Config{
 type stats struct {
 	totalDatapointsBuffered int64
 	totalEventsBuffered     int64
+	datapointsInFlight      int64
+	eventsInFlight          int64
 }
 
 // BufferedForwarder abstracts out datapoint buffering.  Points put on its channel are buffered
@@ -69,7 +71,6 @@ func (forwarder *BufferedForwarder) AddDatapoints(ctx context.Context, points []
 	if forwarder.checker.CtxFlagCheck.HasFlag(ctx) {
 		forwarder.cdim.With(ctx, forwarder.logger).Log("Datapoint call recieved in buffered forwarder")
 	}
-
 	atomic.AddInt64(&forwarder.stats.totalDatapointsBuffered, int64(len(points)))
 	if *forwarder.config.MaxTotalDatapoints <= atomic.LoadInt64(&forwarder.stats.totalDatapointsBuffered) {
 		atomic.AddInt64(&forwarder.stats.totalDatapointsBuffered, int64(-len(points)))
@@ -116,6 +117,11 @@ func (forwarder *BufferedForwarder) Datapoints() []*datapoint.Datapoint {
 		sfxclient.Gauge("datapoint_backup_size", nil, atomic.LoadInt64(&forwarder.stats.totalDatapointsBuffered)),
 		sfxclient.Gauge("event_backup_size", nil, atomic.LoadInt64(&forwarder.stats.totalEventsBuffered)),
 	}
+}
+
+// Pipeline for a BufferedForwarder is the total of all buffers and what is in flight
+func (forwarder *BufferedForwarder) Pipeline() int64 {
+	return int64(len(forwarder.dpChan)) + int64(len(forwarder.eChan)) + atomic.LoadInt64(&forwarder.stats.datapointsInFlight) + atomic.LoadInt64(&forwarder.stats.eventsInFlight)
 }
 
 func (forwarder *BufferedForwarder) blockingDrainUpTo() []*datapoint.Datapoint {
@@ -189,7 +195,9 @@ func (forwarder *BufferedForwarder) start() {
 					continue
 				}
 				logDpIfFlag(logger, forwarder.checker, datapoints, "about to send datapoint")
+				atomic.AddInt64(&forwarder.stats.datapointsInFlight, int64(len(datapoints)))
 				err := forwarder.sendTo.AddDatapoints(forwarder.stopContext, datapoints)
+				atomic.AddInt64(&forwarder.stats.datapointsInFlight, -int64(len(datapoints)))
 				if err != nil {
 					logger.Log(log.Err, err, "error sending datapoints")
 				}
@@ -205,7 +213,9 @@ func (forwarder *BufferedForwarder) start() {
 					continue
 				}
 				logEvIfFlag(logger, forwarder.checker, events, "about to send event")
+				atomic.AddInt64(&forwarder.stats.eventsInFlight, int64(len(events)))
 				err := forwarder.sendTo.AddEvents(forwarder.stopContext, events)
+				atomic.AddInt64(&forwarder.stats.eventsInFlight, -int64(len(events)))
 				if err != nil {
 					logger.Log(log.Err, err, "error sending events")
 				}
@@ -247,8 +257,8 @@ func NewBufferedForwarder(ctx context.Context, config *Config, sendTo dpsink.Sin
 	ret := &BufferedForwarder{
 		stopFunc:    cancel,
 		stopContext: context,
-		dpChan:      make(chan []*datapoint.Datapoint, *config.BufferSize),
-		eChan:       make(chan []*event.Event, *config.BufferSize),
+		dpChan:      make(chan []*datapoint.Datapoint, *config.Pipeline),
+		eChan:       make(chan []*event.Event, *config.Pipeline),
 		config:      config,
 		sendTo:      sendTo,
 		logger:      logCtx,
