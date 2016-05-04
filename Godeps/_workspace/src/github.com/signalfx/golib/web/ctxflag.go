@@ -88,13 +88,12 @@ func (m *HeadersInRequest) CreateMiddleware(next ContextHandler) ContextHandler 
 // to the request
 type CtxWithFlag struct {
 	CtxFlagger *log.CtxDimensions
-	RandSrc    *rand.Rand
 	HeaderName string
 }
 
 // ServeHTTPC adds useful request dims to the next context
 func (m *CtxWithFlag) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, r *http.Request, next ContextHandler) {
-	headerid := m.RandSrc.Int63()
+	headerid := rand.Int63()
 	rw.Header().Add(m.HeaderName, strconv.FormatInt(headerid, 10))
 	ctx = m.CtxFlagger.Append(ctx, "header_id", headerid, "http_remote_addr", r.RemoteAddr, "http_method", r.Method, "http_url", r.URL.String())
 	next.ServeHTTPC(ctx, rw, r)

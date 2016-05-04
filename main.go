@@ -28,7 +28,6 @@ import (
 	"github.com/signalfx/metricproxy/protocol/demultiplexer"
 	"golang.org/x/net/context"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
-	"math/rand"
 	"net"
 	"net/http"
 	"strings"
@@ -307,7 +306,6 @@ func (p *proxy) createCommonHTTPChain(loadedConfig *config.ProxyConfig) web.Next
 	}
 	cf := &web.CtxWithFlag{
 		CtxFlagger: &p.ctxDims,
-		RandSrc:    rand.New(rand.NewSource(time.Now().UnixNano())),
 		HeaderName: "X-Response-Id",
 	}
 	return web.NextConstructor(func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
