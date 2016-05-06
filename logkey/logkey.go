@@ -23,6 +23,8 @@ var (
 	RemoteAddr = log.Key("remote_addr")
 	// CarbonLine is a direct line recieved from carbon protocol
 	CarbonLine = log.Key("carbon_line")
+	// TotalBuffered is the total number of things buffered for forwarders
+	TotalBuffered = log.Key("total_buffered")
 	// Protocol is the type of connection (signalfx/collectd/etc)
 	Protocol = log.Key("protocol")
 	// DebugAddr is the local address of a debug server

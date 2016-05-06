@@ -27,6 +27,7 @@ func (c *errCloser) Close() error {
 func TestUneventfulForwarder(t *testing.T) {
 	u := UneventfulForwarder{nil}
 	assert.Equal(t, u.AddEvents(nil, nil), nil)
+	assert.Equal(t, int64(0), u.BufferSize())
 }
 
 func TestCompositeCloser(t *testing.T) {

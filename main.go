@@ -28,11 +28,12 @@ import (
 	"github.com/signalfx/metricproxy/protocol/demultiplexer"
 	"golang.org/x/net/context"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
-	"math/rand"
 	"net"
 	"net/http"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -66,6 +67,8 @@ type proxy struct {
 	debugContext        web.HeaderCtxFlag
 	debugSink           dpsink.ItemFlagger
 	ctxDims             log.CtxDimensions
+	signalChan          chan os.Signal
+	config              *config.ProxyConfig
 }
 
 var mainInstance = proxy{
@@ -80,6 +83,7 @@ var mainInstance = proxy{
 		EventMetaName:       "dbg_events",
 		MetricDimensionName: "sf_metric",
 	},
+	signalChan: make(chan os.Signal, 1),
 }
 
 func init() {
@@ -273,13 +277,65 @@ func setupGoMaxProcs(numProcs *int, gomaxprocs func(int) int) {
 	}
 }
 
-func (p *proxy) Close() error {
-	errs := make([]error, len(p.forwarders)+len(p.listeners)+1)
-	for _, f := range p.forwarders {
-		errs = append(errs, f.Close())
-	}
+func (p *proxy) gracefulShutdown() (err error) {
+	p.logger.Log("Starting graceful shutdown")
+	totalWaitTime := p.tk.After(*p.config.MaxGracefulWaitTimeDuration)
+	errs := make([]error, len(p.listeners)+len(p.forwarders)+1)
+
+	// close listeners first
 	for _, l := range p.listeners {
 		errs = append(errs, l.Close())
+	}
+
+	// defer close of fowarders till we exit
+	defer func() {
+		for _, f := range p.forwarders {
+			errs = append(errs, f.Close())
+		}
+		errs = append(errs, p.Close())
+		err = errors.NewMultiErr(errs)
+		p.logger.Log("Graceful shutdown done")
+	}()
+
+	<-p.tk.After(*p.config.MinimalGracefulWaitTimeDuration)
+	p.logger.Log("Waiting for connections to drain")
+	startingTimeGood := p.tk.Now()
+	for {
+		select {
+		case <-totalWaitTime:
+			totalBuffered := p.BufferSize()
+			p.logger.Log(logkey.TotalBuffered, totalBuffered, "Connections never drained.  This could be bad ...")
+			return
+
+		case <-p.tk.After(*p.config.GracefulCheckIntervalDuration):
+			now := p.tk.Now()
+			totalBuffered := p.BufferSize()
+			p.logger.Log(logkey.TotalBuffered, totalBuffered, "Waking up for graceful shutdown")
+			if totalBuffered > 0 {
+				p.logger.Log(logkey.TotalBuffered, totalBuffered, "Items in the buffer are still draining")
+				startingTimeGood = now
+				continue
+			}
+			if now.Sub(startingTimeGood) >= *p.config.SilentGracefulTimeDuration {
+				p.logger.Log(logkey.TotalBuffered, totalBuffered, "I've been silent.  Graceful shutdown done")
+				return
+			}
+		}
+	}
+}
+
+func (p *proxy) BufferSize() int64 {
+	var totalForwarded int64
+	for _, f := range p.forwarders {
+		totalForwarded += f.BufferSize()
+	}
+	return totalForwarded
+}
+
+func (p *proxy) Close() error {
+	errs := make([]error, len(p.forwarders)+1)
+	for _, f := range p.forwarders {
+		errs = append(errs, f.Close())
 	}
 	if p.debugServer != nil {
 		errs = append(errs, p.debugServerListener.Close())
@@ -297,6 +353,20 @@ func (p *proxy) setup(loadedConfig *config.ProxyConfig) {
 	if loadedConfig.DebugFlag != nil && *loadedConfig.DebugFlag != "" {
 		p.debugContext.SetFlagStr(*loadedConfig.DebugFlag)
 	}
+	p.config = loadedConfig
+	p.logger = log.NewContext(p.getLogger(loadedConfig)).With(logkey.Time, log.DefaultTimestamp, logkey.Caller, log.DefaultCaller)
+	p.debugSink.Logger = p.logger
+	log.DefaultLogger.Set(p.logger)
+	pidFilename := *loadedConfig.PidFilename
+	if err := writePidFile(pidFilename); err != nil {
+		p.logger.Log(log.Err, err, logkey.Filename, pidFilename, "cannot store pid in pid file")
+	}
+	defer func() {
+		log.IfErr(p.logger, os.Remove(pidFilename))
+	}()
+	defer func() {
+		log.DefaultLogger.Set(log.Discard)
+	}()
 }
 
 func (p *proxy) createCommonHTTPChain(loadedConfig *config.ProxyConfig) web.NextConstructor {
@@ -307,7 +377,6 @@ func (p *proxy) createCommonHTTPChain(loadedConfig *config.ProxyConfig) web.Next
 	}
 	cf := &web.CtxWithFlag{
 		CtxFlagger: &p.ctxDims,
-		RandSrc:    rand.New(rand.NewSource(time.Now().UnixNano())),
 		HeaderName: "X-Response-Id",
 	}
 	return web.NextConstructor(func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
@@ -327,21 +396,8 @@ func (p *proxy) run(ctx context.Context) error {
 		return err
 	}
 	p.setup(loadedConfig)
-	p.logger = log.NewContext(p.getLogger(loadedConfig)).With(logkey.Time, log.DefaultTimestamp, logkey.Caller, log.DefaultCaller)
-	p.debugSink.Logger = p.logger
 	logger := p.logger
-	log.DefaultLogger.Set(p.logger)
-	defer func() {
-		log.DefaultLogger.Set(log.Discard)
-	}()
 
-	pidFilename := *loadedConfig.PidFilename
-	if err := writePidFile(pidFilename); err != nil {
-		logger.Log(log.Err, err, logkey.Filename, pidFilename, "cannot store pid in pid file")
-	}
-	defer func() {
-		log.IfErr(logger, os.Remove(pidFilename))
-	}()
 	logger.Log(logkey.Config, loadedConfig, logkey.Env, strings.Join(os.Environ(), "-"), "config loaded")
 
 	setupGoMaxProcs(loadedConfig.NumProcs, p.gomaxprocs)
@@ -400,15 +456,20 @@ func (p *proxy) run(ctx context.Context) error {
 	if p.setupDoneSignal != nil {
 		close(p.setupDoneSignal)
 	}
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+	case <-p.signalChan:
+		err = p.gracefulShutdown()
+	}
 	cancelFunc()
 	wg.Wait()
-	return nil
+	return err
 }
 
 var flagParse = flag.Parse
 
 func main() {
 	flagParse()
+	signal.Notify(mainInstance.signalChan, syscall.SIGTERM)
 	log.IfErr(log.DefaultLogger, mainInstance.main(context.Background()))
 }

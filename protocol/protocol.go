@@ -21,12 +21,18 @@ type Forwarder interface {
 	dpsink.Sink
 	sfxclient.Collector
 	io.Closer
+	BufferSizer
 }
 
 // Listener is the basic interface anything that listens for new metrics must implement
 type Listener interface {
 	sfxclient.Collector
 	io.Closer
+}
+
+// BufferSizer is the basic interface for anything that bufferes points, non-buffered will return 0
+type BufferSizer interface {
+	BufferSize() int64
 }
 
 // UneventfulForwarder converts a datapoint only forwarder into a datapoint/event forwarder
@@ -37,6 +43,11 @@ type UneventfulForwarder struct {
 // AddEvents does nothing and returns nil
 func (u *UneventfulForwarder) AddEvents(ctx context.Context, events []*event.Event) error {
 	return nil
+}
+
+// BufferSize returns zero since UneventfulForwarder doesn't have it's own buffer
+func (u *UneventfulForwarder) BufferSize() int64 {
+	return 0
 }
 
 // ListenerDims are the common stat dimensions we expect on listener protocols

@@ -69,7 +69,6 @@ func (forwarder *BufferedForwarder) AddDatapoints(ctx context.Context, points []
 	if forwarder.checker.CtxFlagCheck.HasFlag(ctx) {
 		forwarder.cdim.With(ctx, forwarder.logger).Log("Datapoint call recieved in buffered forwarder")
 	}
-
 	atomic.AddInt64(&forwarder.stats.totalDatapointsBuffered, int64(len(points)))
 	if *forwarder.config.MaxTotalDatapoints <= atomic.LoadInt64(&forwarder.stats.totalDatapointsBuffered) {
 		atomic.AddInt64(&forwarder.stats.totalDatapointsBuffered, int64(-len(points)))
@@ -116,6 +115,11 @@ func (forwarder *BufferedForwarder) Datapoints() []*datapoint.Datapoint {
 		sfxclient.Gauge("datapoint_backup_size", nil, atomic.LoadInt64(&forwarder.stats.totalDatapointsBuffered)),
 		sfxclient.Gauge("event_backup_size", nil, atomic.LoadInt64(&forwarder.stats.totalEventsBuffered)),
 	}
+}
+
+// BufferSize for a BufferedForwarder is the total of both buffers
+func (forwarder *BufferedForwarder) BufferSize() int64 {
+	return int64(len(forwarder.dpChan)) + int64(len(forwarder.eChan))
 }
 
 func (forwarder *BufferedForwarder) blockingDrainUpTo() []*datapoint.Datapoint {
