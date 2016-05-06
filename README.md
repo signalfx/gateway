@@ -92,9 +92,23 @@ ListenFrom and ForwardTo.
 ListenFrom is where you define what services the proxy will pretend to be and
 what ports to listen for those services on.
 
+#### collectd
+
+You can receive data sent by CollectD by setting up a `collectd` endpoint.
+For this, you will need to specify which port to bind to.  An example config:
+
+```
+        {
+            "ListenAddr": "0.0.0.0:18000",
+            "Type": "collectd"
+        },
+```
+
+When configuring CollectD, the target URL path will be `/post-collectd`.
+
 #### signalfx
 
-You can pretend to be a signalfx endpoint with the signalfx type.  For this,
+You can pretend to be a SignalFx endpoint with the `signalfx` type.  For this,
 you will need to specify which port to bind to.  An example config:
 
 ```
