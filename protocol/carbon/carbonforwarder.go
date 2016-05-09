@@ -13,11 +13,13 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/metricproxy/dp/dpdimsort"
+	"github.com/signalfx/metricproxy/protocol/filtering"
 	"golang.org/x/net/context"
 )
 
 // Forwarder is a sink that forwards points to a carbon endpoint
 type Forwarder struct {
+	filtering.FilteredForwarder
 	dimensionComparor dpdimsort.Ordering
 	connectionAddress string
 	connectionTimeout time.Duration
@@ -29,6 +31,7 @@ type Forwarder struct {
 
 // ForwarderConfig controls optional parameters for a carbon forwarder
 type ForwarderConfig struct {
+	Filters                *filtering.FilterObj
 	Port                   *uint16
 	Timeout                *time.Duration
 	DimensionOrder         []string
@@ -37,6 +40,7 @@ type ForwarderConfig struct {
 }
 
 var defaultForwarderConfig = &ForwarderConfig{
+	Filters: &filtering.FilterObj{},
 	Timeout: pointer.Duration(time.Second * 30),
 	Port:    pointer.Uint16(2003),
 	IdleConnectionPoolSize: pointer.Int64(5),
@@ -64,6 +68,8 @@ func NewForwarder(host string, passedConf *ForwarderConfig) (*Forwarder, error) 
 			conns: make([]net.Conn, 0, *conf.IdleConnectionPoolSize),
 		},
 	}
+	ret.Setup(passedConf.Filters)
+
 	ret.pool.Return(conn)
 	return ret, nil
 }
@@ -75,8 +81,9 @@ func (f *Forwarder) Close() error {
 
 // Datapoints returns connection pool datapoints
 func (f *Forwarder) Datapoints() []*datapoint.Datapoint {
-	connDp := f.pool.Datapoints()
-	return connDp
+	datapoints := f.pool.Datapoints()
+	datapoints = append(datapoints, f.GetFilteredDatapoints()...)
+	return datapoints
 }
 
 func (f *Forwarder) datapointToGraphite(dp *datapoint.Datapoint) string {
@@ -138,6 +145,11 @@ func (f *Forwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datap
 
 	if err := f.setMinTime(ctx, openConnection); err != nil {
 		return err
+	}
+
+	points = f.FilterDatapoints(points)
+	if len(points) == 0 {
+		return nil
 	}
 
 	var buf bytes.Buffer

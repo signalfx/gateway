@@ -10,22 +10,26 @@ import (
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/metricproxy/protocol/filtering"
 	"golang.org/x/net/context"
 )
 
 // Config controls the optional configuration of the csv forwarder
 type Config struct {
+	Filters     *filtering.FilterObj
 	Filename    *string
 	WriteString func(f *os.File, s string) (ret int, err error)
 }
 
 var defaultConfig = &Config{
+	Filters:     &filtering.FilterObj{},
 	Filename:    pointer.String("datapoints.csv"),
 	WriteString: func(f *os.File, s string) (ret int, err error) { return f.WriteString(s) },
 }
 
 // Forwarder prints datapoints to a file
 type Forwarder struct {
+	filtering.FilteredForwarder
 	mu          sync.Mutex
 	file        *os.File
 	writeString func(f *os.File, s string) (ret int, err error)
@@ -35,11 +39,12 @@ var _ dpsink.Sink = &Forwarder{}
 
 // Datapoints returns nothing and exists to satisfy the protocol.Forwarder interface
 func (f *Forwarder) Datapoints() []*datapoint.Datapoint {
-	return nil
+	return f.GetFilteredDatapoints()
 }
 
 // AddDatapoints writes the points to a file
 func (f *Forwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
+	points = f.FilterDatapoints(points)
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for _, dp := range points {
@@ -87,5 +92,6 @@ func NewForwarder(config *Config) (*Forwarder, error) {
 		writeString: config.WriteString,
 		file:        file,
 	}
+	ret.Setup(config.Filters)
 	return ret, nil
 }

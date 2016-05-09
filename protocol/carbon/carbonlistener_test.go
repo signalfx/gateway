@@ -7,6 +7,7 @@ import (
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/metricproxy/protocol/filtering"
 	. "github.com/smartystreets/goconvey/convey"
 	"golang.org/x/net/context"
 	"io"
@@ -56,6 +57,9 @@ func TestCarbonForwarderNormal(t *testing.T) {
 			forwarderConfig := ForwarderConfig{
 				Port:    pointer.Uint16(nettest.TCPPort(l)),
 				Timeout: pointer.Duration(time.Millisecond * 100),
+				Filters: &filtering.FilterObj{
+					Deny: []string{"blarg"},
+				},
 			}
 			forwarder, err := NewForwarder("127.0.0.1", &forwarderConfig)
 			So(err, ShouldBeNil)
@@ -155,11 +159,21 @@ func TestCarbonListenerNormal(t *testing.T) {
 		Convey("with a forwarder", func() {
 			forwarderConfig := ForwarderConfig{
 				Port: pointer.Uint16(nettest.TCPPort(listener)),
+				Filters: &filtering.FilterObj{
+					Deny: []string{"blarg"},
+				},
 			}
 			forwarder, err := NewForwarder("127.0.0.1", &forwarderConfig)
 			So(err, ShouldBeNil)
 			So(dptest.ExactlyOne(forwarder.Datapoints(), "returned_connections").Value.String(), ShouldEqual, "1")
 			ctx := context.Background()
+
+			Convey("all filtered metrics work", func() {
+				dp := dptest.DP()
+				dp.Metric = "blarg"
+				So(forwarder.AddDatapoints(ctx, []*datapoint.Datapoint{dp}), ShouldBeNil)
+				So(forwarder.FilteredDatapoints, ShouldEqual, 1)
+			})
 
 			trySendingDatpoints := func() {
 				dp := dptest.DP()
