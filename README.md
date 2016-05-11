@@ -676,9 +676,9 @@ would be denied and those that were not would be allowed.
 
 ### Status Page and profiling
 
-This config only loads a status page.  You can see status information at
-`http://localhost:6009/status`, a health check page (useful for load balances) at
-`http://localhost:6009/health`, and pprof information at
+This config only loads a status page.  You can see configuration information at
+`http://localhost:6009/debug/vars`, explore the objects in memory at
+`http://localhost:6009/debug/explorer/`, and pprof information at
 `http://localhost:6009/debug/pprof/`.  You can learn more about pprof for golang
 on [the pprof help page](http://golang.org/pkg/net/http/pprof/).
 
@@ -687,6 +687,13 @@ on [the pprof help page](http://golang.org/pkg/net/http/pprof/).
   "LocalDebugServer": "0.0.0.0:6009"
 }
 ```
+
+### Health checks
+
+Health checks are available on the listening port of any collectd or
+signalfx listener. E.g.  If you had a signalfx listener at 8080, the
+healthcheck would be located at `http://localhost:8080/healthz`.
+Healthchecks are useful when putting the proxy behind a loadbalancer.
 
 ### Debugging connections via headers
 
