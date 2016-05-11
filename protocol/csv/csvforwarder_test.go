@@ -30,7 +30,7 @@ func TestFilenameForwarder(t *testing.T) {
 		assert.NoError(t, f.Close())
 	}()
 	assert.NoError(t, err)
-	assert.Nil(t, f.Datapoints())
+	assert.Equal(t, len(f.Datapoints()), 1)
 	assert.NoError(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dptest.DP()}))
 	assert.NoError(t, f.AddEvents(ctx, []*event.Event{dptest.E()}))
 }

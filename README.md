@@ -627,6 +627,53 @@ points to signalfx.
 }
 ```
 
+### Teeing a subset of metrics to each place
+
+The config listens on signalfx and graphite, and forwards everything to
+graphite, and a smaller subset (excludes anything starting with cpu) to SignalFx.
+Below any metric starting with cpu will be denied, except for cpu.idle.
+If only allow was specificed, those that matched would be allowed, and those
+that failed, would be denied.  If only deny was provided those that matched
+would be denied and those that were not would be allowed.
+
+```
+{
+  "StatsDelay": "1s",
+  "LogDir": "\/tmp",
+  "ListenFrom": [
+    {
+      "Type": "carbon",
+      "ListenAddr": "0.0.0.0:2003",
+    },
+    {
+      "Type": "signalfx",
+      "ListenAddr": "0.0.0.0:8080"
+    }
+  ],
+  "ForwardTo": [
+    {
+      "type": "carbon",
+      "Name": "ourcarbon",
+      "Host": "example.com",
+      "Port": 2003
+    },
+    {
+      "type": "signalfx-json",
+      "DefaultAuthToken": "ABCD",
+      "Name": "signalfxforwarder",
+      "Filters": {
+        "Deny": [
+          "^cpu"
+        ],
+        "Allow": [
+          "^cpu.idle$"
+        ]
+      }
+    }
+  ]
+}
+```
+
 ### Status Page and profiling
 
 This config only loads a status page.  You can see status information at

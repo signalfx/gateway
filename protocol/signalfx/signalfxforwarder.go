@@ -24,11 +24,13 @@ import (
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/sfxclient"
+	"github.com/signalfx/metricproxy/protocol/filtering"
 	"golang.org/x/net/context"
 )
 
 // Forwarder controls forwarding datapoints to SignalFx
 type Forwarder struct {
+	filtering.FilteredForwarder
 	propertyLock          sync.Mutex
 	eventURL              string
 	defaultAuthToken      string
@@ -46,6 +48,7 @@ type Forwarder struct {
 
 // ForwarderConfig controls optional parameters for a signalfx forwarder
 type ForwarderConfig struct {
+	Filters          *filtering.FilterObj
 	DatapointURL     *string
 	EventURL         *string
 	Timeout          *time.Duration
@@ -59,6 +62,7 @@ type ForwarderConfig struct {
 }
 
 var defaultForwarderConfig = &ForwarderConfig{
+	Filters:      &filtering.FilterObj{},
 	DatapointURL: pointer.String("https://ingest.signalfx.com/v2/datapoint"),
 	EventURL:     pointer.String("https://ingest.signalfx.com/v2/event"),
 	AuthToken:    pointer.String(""),
@@ -101,6 +105,7 @@ func NewForwarder(conf *ForwarderConfig) *Forwarder {
 		datapointSink:    datapointSendingSink,
 		Logger:           conf.Logger,
 	}
+	ret.Setup(conf.Filters)
 	return ret
 }
 
@@ -120,7 +125,7 @@ func (connector *Forwarder) encodeEventPostBodyProtobufV2(events []*event.Event)
 
 // Datapoints returns nothing.
 func (connector *Forwarder) Datapoints() []*datapoint.Datapoint {
-	return nil
+	return connector.GetFilteredDatapoints()
 }
 
 // Close will terminate idle HTTP client connections
@@ -210,6 +215,7 @@ const TokenHeaderName = "X-SF-TOKEN"
 // AddDatapoints forwards datapoints to SignalFx
 func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*datapoint.Datapoint) error {
 	datapoints = connector.emptyMetricNameFilter.FilterDatapoints(datapoints)
+	datapoints = connector.FilterDatapoints(datapoints)
 	if len(datapoints) == 0 {
 		return nil
 	}

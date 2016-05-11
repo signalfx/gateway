@@ -11,6 +11,7 @@ import (
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/metricproxy/logkey"
+	"github.com/signalfx/metricproxy/protocol/filtering"
 	"github.com/signalfx/xdgbasedir"
 	"os"
 )
@@ -22,19 +23,20 @@ type ForwardTo struct {
 	Host              *string `json:",omitempty"`
 	Port              *uint16 `json:",omitempty"`
 	Type              string
-	TimeoutDuration   *time.Duration `json:"-"`
-	Timeout           *string        `json:",omitempty"`
-	DefaultSource     *string        `json:",omitempty"`
-	DefaultAuthToken  *string        `json:",omitempty"`
-	BufferSize        *int64         `json:",omitempty"`
-	Name              *string        `json:",omitempty"`
-	DrainingThreads   *int64         `json:",omitempty"`
-	MetricCreationURL *string        `json:",omitempty"`
-	MaxDrainSize      *int64         `json:",omitempty"`
-	Filename          *string        `json:",omitempty"`
-	SourceDimensions  *string        `json:",omitempty"`
-	FormatVersion     *uint32        `json:",omitempty"`
-	DimensionsOrder   []string       `json:",omitempty"`
+	TimeoutDuration   *time.Duration       `json:"-"`
+	Timeout           *string              `json:",omitempty"`
+	DefaultSource     *string              `json:",omitempty"`
+	DefaultAuthToken  *string              `json:",omitempty"`
+	BufferSize        *int64               `json:",omitempty"`
+	Name              *string              `json:",omitempty"`
+	DrainingThreads   *int64               `json:",omitempty"`
+	MetricCreationURL *string              `json:",omitempty"`
+	MaxDrainSize      *int64               `json:",omitempty"`
+	Filename          *string              `json:",omitempty"`
+	SourceDimensions  *string              `json:",omitempty"`
+	FormatVersion     *uint32              `json:",omitempty"`
+	DimensionsOrder   []string             `json:",omitempty"`
+	Filters           *filtering.FilterObj `json:",omitempty"`
 }
 
 // ListenFrom configures how we listen for datapoints to forward

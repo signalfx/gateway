@@ -241,7 +241,7 @@ func TestSignalfxListener(t *testing.T) {
 				EventURL:     pointer.String(fmt.Sprintf("%s/v2/event", baseURI)),
 			}
 			forwarder := NewForwarder(forwardConfig)
-			So(forwarder.Datapoints(), ShouldEqual, nil)
+			So(len(forwarder.Datapoints()), ShouldEqual, 1)
 			Convey("event post to nowhere should fail", func() {
 				forwarder.eventURL = "http://localhost:1"
 				So(forwarder.AddEvents(ctx, []*event.Event{dptest.E()}), ShouldNotBeNil)

@@ -169,6 +169,7 @@ func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) 
 		MaxIdleConns:     conf.DrainingThreads,
 		AuthToken:        conf.DefaultAuthToken,
 		Logger:           s.logger,
+		Filters:          conf.Filters,
 	}
 	return signalfx.NewForwarder(&sfConf), nil
 }
@@ -218,6 +219,7 @@ func (s *carbonLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) {
 		Timeout:                conf.TimeoutDuration,
 		DimensionOrder:         conf.DimensionsOrder,
 		IdleConnectionPoolSize: conf.DrainingThreads,
+		Filters:                conf.Filters,
 	}
 	f, err := carbon.NewForwarder(*conf.Host, &sfConf)
 	return &protocol.UneventfulForwarder{
