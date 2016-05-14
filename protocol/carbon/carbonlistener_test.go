@@ -7,7 +7,7 @@ import (
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/metricproxy/protocol/filtering"
+	"github.com/signalfx/metricproxy/protocol/common"
 	. "github.com/smartystreets/goconvey/convey"
 	"golang.org/x/net/context"
 	"io"

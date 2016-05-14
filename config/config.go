@@ -11,7 +11,7 @@ import (
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/metricproxy/logkey"
-	"github.com/signalfx/metricproxy/protocol/filtering"
+	"github.com/signalfx/metricproxy/protocol/common"
 	"github.com/signalfx/xdgbasedir"
 	"os"
 )
@@ -27,7 +27,7 @@ type ForwardTo struct {
 	Timeout           *string              `json:",omitempty"`
 	DefaultSource     *string              `json:",omitempty"`
 	DefaultAuthToken  *string              `json:",omitempty"`
-	BufferSize        *int64               `json:",omitempty"`
+	Pipeline          *int64               `json:",omitempty"`
 	Name              *string              `json:",omitempty"`
 	DrainingThreads   *int64               `json:",omitempty"`
 	MetricCreationURL *string              `json:",omitempty"`
@@ -66,30 +66,42 @@ func (forwardTo *ForwardTo) String() string {
 
 // ProxyConfig is the full config as presented inside the proxy config file
 type ProxyConfig struct {
-	ForwardTo          []*ForwardTo   `json:",omitempty"`
-	ListenFrom         []*ListenFrom  `json:",omitempty"`
-	StatsDelay         *string        `json:",omitempty"`
-	StatsDelayDuration *time.Duration `json:"-"`
-	NumProcs           *int           `json:",omitempty"`
-	LocalDebugServer   *string        `json:",omitempty"`
-	PidFilename        *string        `json:",omitempty"`
-	LogDir             *string        `json:",omitempty"`
-	LogMaxSize         *int           `json:",omitempty"`
-	LogMaxBackups      *int           `json:",omitempty"`
-	LogFormat          *string        `json:",omitempty"`
-	PprofAddr          *string        `json:",omitempty"`
-	DebugFlag          *string        `json:",omitempty"`
-	ServerName         *string        `json:",omitempty"`
+	ForwardTo                       []*ForwardTo   `json:",omitempty"`
+	ListenFrom                      []*ListenFrom  `json:",omitempty"`
+	StatsDelay                      *string        `json:",omitempty"`
+	StatsDelayDuration              *time.Duration `json:"-"`
+	NumProcs                        *int           `json:",omitempty"`
+	LocalDebugServer                *string        `json:",omitempty"`
+	PidFilename                     *string        `json:",omitempty"`
+	LogDir                          *string        `json:",omitempty"`
+	LogMaxSize                      *int           `json:",omitempty"`
+	LogMaxBackups                   *int           `json:",omitempty"`
+	LogFormat                       *string        `json:",omitempty"`
+	PprofAddr                       *string        `json:",omitempty"`
+	DebugFlag                       *string        `json:",omitempty"`
+	ServerName                      *string        `json:",omitempty"`
+	MaxGracefulWaitTime             *string        `json:",omitempty"`
+	GracefulCheckInterval           *string        `json:",omitempty"`
+	MinimalGracefulWaitTime         *string        `json:",omitempty"`
+	SilentGracefulTime              *string        `json:",omitempty"`
+	MaxGracefulWaitTimeDuration     *time.Duration `json:"-"`
+	GracefulCheckIntervalDuration   *time.Duration `json:"-"`
+	MinimalGracefulWaitTimeDuration *time.Duration `json:"-"`
+	SilentGracefulTimeDuration      *time.Duration `json:"-"`
 }
 
 // DefaultProxyConfig is default values for the proxy config
 var DefaultProxyConfig = &ProxyConfig{
-	PidFilename:   pointer.String("metricproxy.pid"),
-	LogDir:        pointer.String(os.TempDir()),
-	LogMaxSize:    pointer.Int(100),
-	LogMaxBackups: pointer.Int(10),
-	LogFormat:     pointer.String(""),
-	ServerName:    pointer.String(getDefaultName(os.Hostname)),
+	PidFilename:                     pointer.String("metricproxy.pid"),
+	LogDir:                          pointer.String(os.TempDir()),
+	LogMaxSize:                      pointer.Int(100),
+	LogMaxBackups:                   pointer.Int(10),
+	LogFormat:                       pointer.String(""),
+	ServerName:                      pointer.String(getDefaultName(os.Hostname)),
+	MaxGracefulWaitTimeDuration:     pointer.Duration(30 * time.Second),
+	GracefulCheckIntervalDuration:   pointer.Duration(time.Second),
+	MinimalGracefulWaitTimeDuration: pointer.Duration(3 * time.Second),
+	SilentGracefulTimeDuration:      pointer.Duration(2 * time.Second),
 }
 
 func getDefaultName(osHostname func() (string, error)) string {
@@ -112,25 +124,69 @@ func decodeConfig(configBytes []byte) (*ProxyConfig, error) {
 			return nil, errors.Annotatef(err, "cannot parse stats delay %s", *config.StatsDelay)
 		}
 	}
-	for _, f := range config.ForwardTo {
-		if f.Timeout != nil {
-			duration, err := time.ParseDuration(*f.Timeout)
-			f.TimeoutDuration = &duration
-			if err != nil {
-				return nil, errors.Annotatef(err, "cannot parse timeout %s", *f.Timeout)
-			}
-		}
+	err := config.decodeTimeouts()
+	if err != nil {
+		return nil, err
 	}
-	for _, f := range config.ListenFrom {
-		if f.Timeout != nil {
-			duration, err := time.ParseDuration(*f.Timeout)
-			f.TimeoutDuration = &duration
-			if err != nil {
-				return nil, errors.Annotatef(err, "cannot parse timeout %s", *f.Timeout)
-			}
-		}
+	err = config.decodeGracefulDurations()
+	if err != nil {
+		return nil, err
 	}
 	return &config, nil
+}
+
+func (p *ProxyConfig) decodeTimeouts() error {
+	for _, f := range p.ForwardTo {
+		if f.Timeout != nil {
+			duration, err := time.ParseDuration(*f.Timeout)
+			f.TimeoutDuration = &duration
+			if err != nil {
+				return errors.Annotatef(err, "cannot parse timeout %s", *f.Timeout)
+			}
+		}
+	}
+	for _, f := range p.ListenFrom {
+		if f.Timeout != nil {
+			duration, err := time.ParseDuration(*f.Timeout)
+			f.TimeoutDuration = &duration
+			if err != nil {
+				return errors.Annotatef(err, "cannot parse timeout %s", *f.Timeout)
+			}
+		}
+	}
+	return nil
+}
+
+func (p *ProxyConfig) decodeGracefulDurations() error {
+	if p.MinimalGracefulWaitTime != nil {
+		duration, err := time.ParseDuration(*p.MinimalGracefulWaitTime)
+		p.MinimalGracefulWaitTimeDuration = &duration
+		if err != nil {
+			return errors.Annotatef(err, "cannot parse minimal graceful wait time %s", *p.MinimalGracefulWaitTime)
+		}
+	}
+	if p.GracefulCheckInterval != nil {
+		duration, err := time.ParseDuration(*p.GracefulCheckInterval)
+		p.GracefulCheckIntervalDuration = &duration
+		if err != nil {
+			return errors.Annotatef(err, "cannot parse graceful check interval %s", *p.GracefulCheckInterval)
+		}
+	}
+	if p.MaxGracefulWaitTime != nil {
+		duration, err := time.ParseDuration(*p.MaxGracefulWaitTime)
+		p.MaxGracefulWaitTimeDuration = &duration
+		if err != nil {
+			return errors.Annotatef(err, "cannot parse max graceful wait time %s", *p.MaxGracefulWaitTime)
+		}
+	}
+	if p.SilentGracefulTime != nil {
+		duration, err := time.ParseDuration(*p.SilentGracefulTime)
+		p.SilentGracefulTimeDuration = &duration
+		if err != nil {
+			return errors.Annotatef(err, "cannot parse silent graceful wait time %s", *p.SilentGracefulTime)
+		}
+	}
+	return nil
 }
 
 func loadConfig(configFile string) (*ProxyConfig, error) {

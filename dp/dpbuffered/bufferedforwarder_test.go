@@ -49,7 +49,7 @@ func TestBufferedForwarderBasic(t *testing.T) {
 			MetricDimensionName: "sf_metric",
 		}
 		config := &Config{
-			BufferSize:         pointer.Int64(210),
+			Pipeline:           pointer.Int64(210),
 			MaxTotalDatapoints: pointer.Int64(1000),
 			MaxTotalEvents:     pointer.Int64(1000),
 			NumDrainingThreads: pointer.Int64(1),
@@ -80,6 +80,9 @@ func TestBufferedForwarderBasic(t *testing.T) {
 		})
 		Convey("Should export stats", func() {
 			So(len(bf.Datapoints()), ShouldEqual, numStats)
+		})
+		Convey("Should export Pipeliner interface", func() {
+			So(bf.Pipeline(), ShouldEqual, 0)
 		})
 		Convey("Should buffer points", func() {
 			time.Sleep(time.Millisecond * 10)
@@ -150,7 +153,7 @@ func TestBufferedForwarderBasic(t *testing.T) {
 func TestBufferedForwarderContexts(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	config := &Config{
-		BufferSize:         pointer.Int64(0),
+		Pipeline:           pointer.Int64(0),
 		MaxTotalDatapoints: pointer.Int64(10),
 		NumDrainingThreads: pointer.Int64(2),
 		MaxDrainSize:       pointer.Int64(1000),
@@ -212,7 +215,7 @@ func TestBufferedForwarderBlockingDrain(t *testing.T) {
 func TestBufferedForwarderContextsEvent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	config := &Config{
-		BufferSize:         pointer.Int64(0),
+		Pipeline:           pointer.Int64(0),
 		MaxTotalEvents:     pointer.Int64(10),
 		NumDrainingThreads: pointer.Int64(2),
 		MaxDrainSize:       pointer.Int64(1000),
@@ -258,7 +261,7 @@ outer:
 
 func TestBufferedForwarderMaxTotalDatapoints(t *testing.T) {
 	config := &Config{
-		BufferSize:         pointer.Int64(15),
+		Pipeline:           pointer.Int64(15),
 		MaxTotalDatapoints: pointer.Int64(7),
 		NumDrainingThreads: pointer.Int64(1),
 		MaxDrainSize:       pointer.Int64(1000),
@@ -290,7 +293,7 @@ func TestBufferedForwarderMaxTotalDatapoints(t *testing.T) {
 
 func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
 	config := &Config{
-		BufferSize:         pointer.Int64(15),
+		Pipeline:           pointer.Int64(15),
 		MaxTotalEvents:     pointer.Int64(7),
 		NumDrainingThreads: pointer.Int64(1),
 		MaxDrainSize:       pointer.Int64(1000),

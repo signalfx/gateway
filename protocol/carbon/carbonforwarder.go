@@ -13,7 +13,7 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/metricproxy/dp/dpdimsort"
-	"github.com/signalfx/metricproxy/protocol/filtering"
+	"github.com/signalfx/metricproxy/protocol/common"
 	"golang.org/x/net/context"
 )
 

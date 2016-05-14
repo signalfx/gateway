@@ -24,12 +24,14 @@ import (
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/logkey"
+	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/collectd"
 	"golang.org/x/net/context"
 )
 
 // ListenerServer controls listening on a socket for SignalFx connections
 type ListenerServer struct {
+	protocol.CloseableHealthCheck
 	listener net.Listener
 	logger   log.Logger
 
@@ -49,7 +51,7 @@ func (streamer *ListenerServer) Addr() net.Addr {
 
 // Datapoints returns the datapoints about various internal endpoints
 func (streamer *ListenerServer) Datapoints() []*datapoint.Datapoint {
-	return streamer.internalCollectors.Datapoints()
+	return append(streamer.internalCollectors.Datapoints(), streamer.HealthDatapoints()...)
 }
 
 // MericTypeGetter is an old metric interface that returns the type of a metric name
@@ -404,10 +406,7 @@ func NewListener(sink dpsink.Sink, conf *ListenerConfig) (*ListenerServer, error
 		return nil, errors.Annotatef(err, "cannot open listening address %s", *conf.ListenAddr)
 	}
 	r := mux.NewRouter()
-	r.Handle(*conf.HealthCheck, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		_, err := rw.Write([]byte("OK"))
-		log.IfErr(conf.Logger, err)
-	}))
+
 	server := http.Server{
 		Handler:      r,
 		Addr:         *conf.ListenAddr,
@@ -423,6 +422,7 @@ func NewListener(sink dpsink.Sink, conf *ListenerConfig) (*ListenerServer, error
 			jsonMarshal:        conf.JSONMarshal,
 		},
 	}
+	listenServer.SetupHealthCheck(conf.HealthCheck, r, conf.Logger)
 
 	r.Handle("/v1/metric", &listenServer.metricHandler)
 	r.Handle("/metric", &listenServer.metricHandler)
