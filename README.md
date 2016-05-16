@@ -37,6 +37,15 @@ already receiving datapoints, such as graphite's carbon database.
   tail -F *
 ```
 
+## Sizing
+
+We are currently running 118,358 DPS (7,080,000 DPM) on a c3.2xlarge with 70%
+idle CPU (the metric to watch).  I would recommend a server comparable to a
+c3.2xlarge for safety if running around 7 million DPM and a c3.xlarge for
+around 2-3M DPM.  They can start with a server comparable to a AWS c3.xlarge
+and monitor idle CPU to see if they should increase to a c3.2xlarge comparable
+server.
+
 ## Code layout
 
 You only need to read this if you want to develop the proxy or understand
