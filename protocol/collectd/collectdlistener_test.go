@@ -220,9 +220,7 @@ func TestCollectDListener(t *testing.T) {
 				sendRecvData()
 				expectedDims := map[string]string{"dsname": "value", "plugin": "dogstatsd", "env": "dev", "k1": "v1", "host": "some-host"}
 				So(dptest.ExactlyOne(datapoints, "gauge.page.loadtime").Dimensions, ShouldResemble, expectedDims)
-
 				So(dptest.ExactlyOne(listener.Datapoints(), "total_blank_dims").Value.String(), ShouldEqual, "1")
-
 			})
 			Convey("without default dimensions", func() {
 				sendRecvData()

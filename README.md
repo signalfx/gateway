@@ -636,23 +636,23 @@ points to signalfx.
 }
 ```
 
-### Teeing a subset of metrics to each place
+### Teeing a subset of metrics on a forwarder
 
 The config listens on signalfx and graphite, and forwards everything to
 graphite, and a smaller subset (excludes anything starting with cpu) to SignalFx.
 Below any metric starting with cpu will be denied, except for cpu.idle.
-If only allow was specificed, those that matched would be allowed, and those
-that failed, would be denied.  If only deny was provided those that matched
+If only allow was specificed, those that matched would be allowed and those
+that failed would be denied.  If only deny was provided those that matched
 would be denied and those that were not would be allowed.
 
 ```
 {
   "StatsDelay": "1s",
-  "LogDir": "\/tmp",
+  "LogDir": "/tmp",
   "ListenFrom": [
     {
       "Type": "carbon",
-      "ListenAddr": "0.0.0.0:2003",
+      "ListenAddr": "0.0.0.0:2003"
     },
     {
       "Type": "signalfx",
@@ -703,6 +703,46 @@ Health checks are available on the listening port of any collectd or
 signalfx listener. E.g.  If you had a signalfx listener at 8080, the
 healthcheck would be located at `http://localhost:8080/healthz`.
 Healthchecks are useful when putting the proxy behind a loadbalancer.
+
+### Graceful Shutdown
+
+The below config specifies what are the default values for the graceful
+shutdown parameters.  Upon receiving a SIGTERM, the graceful shutdown
+procedure will close all health checks to prevent a loadbalancer from
+initiating any new connections. After waiting MinimalGracefulWaitTime
+it will close the ports on the listeners.  Now it will check every
+GracefulCheckInterval to see if the number of in flight datapoints and
+events is 0.  If it then stays 0 for SilentGracefulTime, or the entire
+graceful shutdown takes longer than MaxGracefulWaitTime the process will
+exit.
+
+```
+{
+  "MinimalGracefulWaitTime": "3s",
+  "MaxGracefulWaitTime": "30s",
+  "GracefulCheckInterval": "1s",
+  "SilentGracefulTime": "2s",
+  "StatsDelay": "1s",
+  "LogDir": "/tmp",
+  "ListenFrom": [
+    {
+      "Type": "carbon",
+      "ListenAddr": "0.0.0.0:2003"
+    },
+    {
+      "Type": "signalfx",
+      "ListenAddr": "0.0.0.0:8080"
+    }
+  ],
+  "ForwardTo": [
+    {
+      "type": "signalfx-json",
+      "DefaultAuthToken": "ABCD",
+      "Name": "signalfxforwarder"
+    }
+  ]
+}
+```
 
 ### Debugging connections via headers
 

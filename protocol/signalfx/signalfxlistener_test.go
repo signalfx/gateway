@@ -242,6 +242,7 @@ func TestSignalfxListener(t *testing.T) {
 			}
 			forwarder := NewForwarder(forwardConfig)
 			So(len(forwarder.Datapoints()), ShouldEqual, 1)
+			So(forwarder.Pipeline(), ShouldEqual, 0)
 			Convey("event post to nowhere should fail", func() {
 				forwarder.eventURL = "http://localhost:1"
 				So(forwarder.AddEvents(ctx, []*event.Event{dptest.E()}), ShouldNotBeNil)

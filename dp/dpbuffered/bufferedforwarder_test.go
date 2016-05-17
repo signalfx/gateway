@@ -81,6 +81,9 @@ func TestBufferedForwarderBasic(t *testing.T) {
 		Convey("Should export stats", func() {
 			So(len(bf.Datapoints()), ShouldEqual, numStats)
 		})
+		Convey("Should export Pipeliner interface", func() {
+			So(bf.Pipeline(), ShouldEqual, 0)
+		})
 		Convey("Should buffer points", func() {
 			time.Sleep(time.Millisecond * 10)
 			for i := 0; i < 100; i++ {
