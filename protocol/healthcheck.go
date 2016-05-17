@@ -32,7 +32,8 @@ func (c *CloseableHealthCheck) SetupHealthCheck(healthCheck *string, r *mux.Rout
 		if atomic.LoadInt32(&c.setCloseHeader) != 0 {
 			rw.Header().Set("Connection", "Close")
 			rw.WriteHeader(http.StatusNotFound)
-			rw.Write([]byte("graceful shutdown"))
+			_, err := rw.Write([]byte("graceful shutdown"))
+			log.IfErr(logger, err)
 			return
 		}
 		_, err := rw.Write([]byte("OK"))
