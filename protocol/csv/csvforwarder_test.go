@@ -11,6 +11,8 @@ import (
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/metricproxy/protocol/filtering"
+	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
@@ -58,4 +60,22 @@ func TestFilenameForwarderBadWrite(t *testing.T) {
 	ctx := context.Background()
 	assert.Error(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dptest.DP()}))
 	assert.Error(t, f.AddEvents(ctx, []*event.Event{dptest.E()}))
+}
+
+func TestBadForwarderCOnfig(t *testing.T) {
+	Convey("Invalid regexes should cause an error", t, func() {
+		fileObj, _ := ioutil.TempFile("", "gotest")
+		defer func() {
+			assert.NoError(t, os.Remove(fileObj.Name()))
+		}()
+		forwardConfig := &Config{
+			Filename: pointer.String(fileObj.Name()),
+			Filters: &filtering.FilterObj{
+				Allow: []string{"["},
+			},
+		}
+		forwarder, err := NewForwarder(forwardConfig)
+		So(err, ShouldNotBeNil)
+		So(forwarder, ShouldBeNil)
+	})
 }

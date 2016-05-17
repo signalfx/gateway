@@ -13,6 +13,7 @@ import (
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/web"
+	"github.com/signalfx/metricproxy/protocol/filtering"
 	. "github.com/smartystreets/goconvey/convey"
 	"golang.org/x/net/context"
 	"io"
@@ -240,7 +241,8 @@ func TestSignalfxListener(t *testing.T) {
 				DatapointURL: pointer.String(fmt.Sprintf("%s/v2/datapoint", baseURI)),
 				EventURL:     pointer.String(fmt.Sprintf("%s/v2/event", baseURI)),
 			}
-			forwarder := NewForwarder(forwardConfig)
+			forwarder, err := NewForwarder(forwardConfig)
+			So(err, ShouldBeNil)
 			So(len(forwarder.Datapoints()), ShouldEqual, 1)
 			Convey("event post to nowhere should fail", func() {
 				forwarder.eventURL = "http://localhost:1"
@@ -453,6 +455,16 @@ func TestSignalfxListener(t *testing.T) {
 			datapointSeen := sendTo.Next()
 			datapointSent.Timestamp = datapointSeen.Timestamp
 			So(datapointSent.String(), ShouldEqual, datapointSeen.String())
+		})
+		Convey("Invalid regexes should cause an error", func() {
+			forwardConfig := &ForwarderConfig{
+				Filters: &filtering.FilterObj{
+					Allow: []string{"["},
+				},
+			}
+			forwarder, err := NewForwarder(forwardConfig)
+			So(err, ShouldNotBeNil)
+			So(forwarder, ShouldBeNil)
 		})
 
 		Reset(func() {

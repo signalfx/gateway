@@ -75,7 +75,7 @@ var defaultForwarderConfig = &ForwarderConfig{
 }
 
 // NewForwarder creates a new JSON forwarder
-func NewForwarder(conf *ForwarderConfig) *Forwarder {
+func NewForwarder(conf *ForwarderConfig) (*Forwarder, error) {
 	conf = pointer.FillDefaultFrom(conf, defaultForwarderConfig).(*ForwarderConfig)
 	tr := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
@@ -105,8 +105,11 @@ func NewForwarder(conf *ForwarderConfig) *Forwarder {
 		datapointSink:    datapointSendingSink,
 		Logger:           conf.Logger,
 	}
-	ret.Setup(conf.Filters)
-	return ret
+	err := ret.Setup(conf.Filters)
+	if err != nil {
+		return nil, err
+	}
+	return ret, nil
 }
 
 func (connector *Forwarder) encodeEventPostBodyProtobufV2(events []*event.Event) ([]byte, string, error) {
