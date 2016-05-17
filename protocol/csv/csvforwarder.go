@@ -106,6 +106,9 @@ func NewForwarder(config *Config) (*Forwarder, error) {
 		writeString: config.WriteString,
 		file:        file,
 	}
-	ret.Setup(config.Filters)
+	err = ret.Setup(config.Filters)
+	if err != nil {
+		return nil, err
+	}
 	return ret, nil
 }

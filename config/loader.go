@@ -171,7 +171,7 @@ func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) 
 		Logger:           s.logger,
 		Filters:          conf.Filters,
 	}
-	return signalfx.NewForwarder(&sfConf), nil
+	return signalfx.NewForwarder(&sfConf)
 }
 
 type carbonLoader struct {

@@ -68,7 +68,10 @@ func NewForwarder(host string, passedConf *ForwarderConfig) (*Forwarder, error) 
 			conns: make([]net.Conn, 0, *conf.IdleConnectionPoolSize),
 		},
 	}
-	ret.Setup(passedConf.Filters)
+	err = ret.Setup(passedConf.Filters)
+	if err != nil {
+		return nil, err
+	}
 
 	ret.pool.Return(conn)
 	return ret, nil

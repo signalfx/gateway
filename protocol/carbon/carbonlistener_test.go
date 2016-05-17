@@ -53,6 +53,19 @@ func TestCarbonForwarderNormal(t *testing.T) {
 		l, err := net.Listen("tcp", "127.0.0.1:0")
 		So(err, ShouldBeNil)
 
+		Convey("Invalid regexes should cause an error", func() {
+			forwardConfig := &ForwarderConfig{
+				Port:    pointer.Uint16(nettest.TCPPort(l)),
+				Timeout: pointer.Duration(time.Millisecond * 100),
+				Filters: &filtering.FilterObj{
+					Allow: []string{"["},
+				},
+			}
+			forwarder, err := NewForwarder("127.0.0.1", forwardConfig)
+			So(err, ShouldNotBeNil)
+			So(forwarder, ShouldBeNil)
+		})
+
 		Convey("With a forwarder", func() {
 			forwarderConfig := ForwarderConfig{
 				Port:    pointer.Uint16(nettest.TCPPort(l)),
