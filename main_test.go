@@ -250,7 +250,7 @@ func TestProxy1(t *testing.T) {
 					if ln != nil {
 						conn, _ := ln.Accept()
 						time.Sleep(time.Second)
-						conn.Close()
+						_ = conn.Close()
 					}
 				}
 			}()
@@ -350,7 +350,8 @@ func TestProxy1(t *testing.T) {
 			sfxListenPort := nettest.TCPPort(p.listeners[2].(*signalfx.ListenerServer))
 			go func() {
 				for {
-					http.Post(fmt.Sprintf("http://127.0.0.1:%d/v2/datapoint", sfxListenPort), "application/json", strings.NewReader("{ \"gauge\": [{ \"metric\": \"test.gauge\", \"dimensions\": { \"host\": \"testserver\" }, \"value\": 42 }]}"))
+					_, err := http.Post(fmt.Sprintf("http://127.0.0.1:%d/v2/datapoint", sfxListenPort), "application/json", strings.NewReader("{ \"gauge\": [{ \"metric\": \"test.gauge\", \"dimensions\": { \"host\": \"testserver\" }, \"value\": 42 }]}"))
+					log.IfErr(log.Discard, err)
 					time.Sleep(time.Millisecond)
 				}
 			}()

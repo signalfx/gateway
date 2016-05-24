@@ -62,7 +62,8 @@ func TestHealthCheck(t *testing.T) {
 		So(listener.Addr(), ShouldNotBeNil)
 		listenServer.SetupHealthCheck(pointer.String("/healthz"), r, log.Discard)
 		go func() {
-			listenServer.server.Serve(listener)
+			err := listenServer.server.Serve(listener)
+			log.IfErr(log.Discard, err)
 		}()
 		Convey("Should expose health check", func() {
 			grabHealthCheck(t, baseURI, http.StatusOK)
