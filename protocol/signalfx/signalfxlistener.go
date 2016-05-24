@@ -266,17 +266,19 @@ func appendProperties(dp *datapoint.Datapoint, Properties map[string]ValueToSend
 	}
 }
 
+var errInvalidJSONFormat = errors.New("invalid JSON format; please see correct format at https://developers.signalfx.com/docs/datapoint\n")
+
 func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error {
 	dec := json.NewDecoder(req.Body)
 	var d JSONDatapointV2
 	if err := dec.Decode(&d); err != nil {
-		return err
+		return errInvalidJSONFormat
 	}
 	dps := make([]*datapoint.Datapoint, 0, len(d))
 	for metricType, datapoints := range d {
 		mt, ok := com_signalfx_metrics_protobuf.MetricType_value[strings.ToUpper(metricType)]
 		if !ok {
-			decoder.Logger.Log(logkey.MetricType, metricType, "Uknown metric type")
+			decoder.Logger.Log(logkey.MetricType, metricType, "Unknown metric type")
 			continue
 		}
 		for _, jsonDatapoint := range datapoints {
