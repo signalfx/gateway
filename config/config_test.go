@@ -130,17 +130,14 @@ func TestConfigTimeout(t *testing.T) {
 
 func TestGracefulDurations(t *testing.T) {
 	convey.Convey("set up a valid config with durations", t, func() {
-		config, err := decodeConfig([]byte(`{"MaxGracefulWaitTime":"1s","GracefulCheckInterval":"1s","MinimalGracefulWaitTime":"1s", "SilentGracefulTime":"1s"}`))
+		config, err := decodeConfig([]byte(`{"MaxGracefulWaitTime":"1s","GracefulCheckInterval":"1s","SilentGracefulTime":"1s"}`))
 		convey.So(err, convey.ShouldBeNil)
 		convey.So(*config.GracefulCheckIntervalDuration, convey.ShouldEqual, time.Second)
 		convey.So(*config.MaxGracefulWaitTimeDuration, convey.ShouldEqual, time.Second)
-		convey.So(*config.MinimalGracefulWaitTimeDuration, convey.ShouldEqual, time.Second)
 		convey.So(*config.SilentGracefulTimeDuration, convey.ShouldEqual, time.Second)
 	})
 	convey.Convey("set up an invalid config with bad durations", t, func() {
 		_, err := decodeConfig([]byte(`{"MaxGracefulWaitTime":"1z"}`))
-		convey.So(err, convey.ShouldNotBeNil)
-		_, err = decodeConfig([]byte(`{"MinimalGracefulWaitTime":"1z"}`))
 		convey.So(err, convey.ShouldNotBeNil)
 		_, err = decodeConfig([]byte(`{"GracefulCheckInterval":"1z"}`))
 		convey.So(err, convey.ShouldNotBeNil)

@@ -287,22 +287,19 @@ func (p *proxy) gracefulShutdown() (err error) {
 		l.CloseHealthCheck()
 	}
 
-	// defer close of forwarders till we exit
+	// defer close of listeners and forwarders till we exit
 	defer func() {
+		for _, l := range p.listeners {
+			errs = append(errs, l.Close())
+		}
 		for _, f := range p.forwarders {
 			errs = append(errs, f.Close())
 		}
+
 		errs = append(errs, p.Close())
 		err = errors.NewMultiErr(errs)
 		p.logger.Log("Graceful shutdown done")
 	}()
-
-	<-p.tk.After(*p.config.MinimalGracefulWaitTimeDuration)
-
-	// close listeners second
-	for _, l := range p.listeners {
-		errs = append(errs, l.Close())
-	}
 
 	p.logger.Log("Waiting for connections to drain")
 	startingTimeGood := p.tk.Now()
