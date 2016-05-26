@@ -42,9 +42,17 @@ already receiving datapoints, such as graphite's carbon database.
 We are currently running 118,358 DPS (7,080,000 DPM) on a c3.2xlarge with 70%
 idle CPU (the metric to watch).  I would recommend a server comparable to a
 c3.2xlarge for safety if running around 7 million DPM and a c3.xlarge for
-around 2-3M DPM.  They can start with a server comparable to a AWS c3.xlarge
-and monitor idle CPU to see if they should increase to a c3.2xlarge comparable
+around 2-3M DPM.  One can start with a server comparable to a c3.xlarge
+and monitor idle CPU to see if this should be increased to a c3.2xlarge comparable
 server.
+
+## Http Proxy Support
+
+The go http code supports the use of an http proxy through the environment
+variable `HTTP_PROXY="http://proxyhost:proxyport"`. With this the metricproxy
+will proxy all http connections through that host and port. This can be put
+into the start script, or as part of the environment sent into the container
+if using a container solution like maestro.
 
 ## Code layout
 
