@@ -66,42 +66,39 @@ func (forwardTo *ForwardTo) String() string {
 
 // ProxyConfig is the full config as presented inside the proxy config file
 type ProxyConfig struct {
-	ForwardTo                       []*ForwardTo   `json:",omitempty"`
-	ListenFrom                      []*ListenFrom  `json:",omitempty"`
-	StatsDelay                      *string        `json:",omitempty"`
-	StatsDelayDuration              *time.Duration `json:"-"`
-	NumProcs                        *int           `json:",omitempty"`
-	LocalDebugServer                *string        `json:",omitempty"`
-	PidFilename                     *string        `json:",omitempty"`
-	LogDir                          *string        `json:",omitempty"`
-	LogMaxSize                      *int           `json:",omitempty"`
-	LogMaxBackups                   *int           `json:",omitempty"`
-	LogFormat                       *string        `json:",omitempty"`
-	PprofAddr                       *string        `json:",omitempty"`
-	DebugFlag                       *string        `json:",omitempty"`
-	ServerName                      *string        `json:",omitempty"`
-	MaxGracefulWaitTime             *string        `json:",omitempty"`
-	GracefulCheckInterval           *string        `json:",omitempty"`
-	MinimalGracefulWaitTime         *string        `json:",omitempty"`
-	SilentGracefulTime              *string        `json:",omitempty"`
-	MaxGracefulWaitTimeDuration     *time.Duration `json:"-"`
-	GracefulCheckIntervalDuration   *time.Duration `json:"-"`
-	MinimalGracefulWaitTimeDuration *time.Duration `json:"-"`
-	SilentGracefulTimeDuration      *time.Duration `json:"-"`
+	ForwardTo                     []*ForwardTo   `json:",omitempty"`
+	ListenFrom                    []*ListenFrom  `json:",omitempty"`
+	StatsDelay                    *string        `json:",omitempty"`
+	StatsDelayDuration            *time.Duration `json:"-"`
+	NumProcs                      *int           `json:",omitempty"`
+	LocalDebugServer              *string        `json:",omitempty"`
+	PidFilename                   *string        `json:",omitempty"`
+	LogDir                        *string        `json:",omitempty"`
+	LogMaxSize                    *int           `json:",omitempty"`
+	LogMaxBackups                 *int           `json:",omitempty"`
+	LogFormat                     *string        `json:",omitempty"`
+	PprofAddr                     *string        `json:",omitempty"`
+	DebugFlag                     *string        `json:",omitempty"`
+	ServerName                    *string        `json:",omitempty"`
+	MaxGracefulWaitTime           *string        `json:",omitempty"`
+	GracefulCheckInterval         *string        `json:",omitempty"`
+	SilentGracefulTime            *string        `json:",omitempty"`
+	MaxGracefulWaitTimeDuration   *time.Duration `json:"-"`
+	GracefulCheckIntervalDuration *time.Duration `json:"-"`
+	SilentGracefulTimeDuration    *time.Duration `json:"-"`
 }
 
 // DefaultProxyConfig is default values for the proxy config
 var DefaultProxyConfig = &ProxyConfig{
-	PidFilename:                     pointer.String("metricproxy.pid"),
-	LogDir:                          pointer.String(os.TempDir()),
-	LogMaxSize:                      pointer.Int(100),
-	LogMaxBackups:                   pointer.Int(10),
-	LogFormat:                       pointer.String(""),
-	ServerName:                      pointer.String(getDefaultName(os.Hostname)),
-	MaxGracefulWaitTimeDuration:     pointer.Duration(30 * time.Second),
-	GracefulCheckIntervalDuration:   pointer.Duration(time.Second),
-	MinimalGracefulWaitTimeDuration: pointer.Duration(3 * time.Second),
-	SilentGracefulTimeDuration:      pointer.Duration(2 * time.Second),
+	PidFilename:                   pointer.String("metricproxy.pid"),
+	LogDir:                        pointer.String(os.TempDir()),
+	LogMaxSize:                    pointer.Int(100),
+	LogMaxBackups:                 pointer.Int(10),
+	LogFormat:                     pointer.String(""),
+	ServerName:                    pointer.String(getDefaultName(os.Hostname)),
+	MaxGracefulWaitTimeDuration:   pointer.Duration(time.Second),
+	GracefulCheckIntervalDuration: pointer.Duration(time.Second),
+	SilentGracefulTimeDuration:    pointer.Duration(2 * time.Second),
 }
 
 func getDefaultName(osHostname func() (string, error)) string {
@@ -158,13 +155,6 @@ func (p *ProxyConfig) decodeTimeouts() error {
 }
 
 func (p *ProxyConfig) decodeGracefulDurations() error {
-	if p.MinimalGracefulWaitTime != nil {
-		duration, err := time.ParseDuration(*p.MinimalGracefulWaitTime)
-		p.MinimalGracefulWaitTimeDuration = &duration
-		if err != nil {
-			return errors.Annotatef(err, "cannot parse minimal graceful wait time %s", *p.MinimalGracefulWaitTime)
-		}
-	}
 	if p.GracefulCheckInterval != nil {
 		duration, err := time.ParseDuration(*p.GracefulCheckInterval)
 		p.GracefulCheckIntervalDuration = &duration

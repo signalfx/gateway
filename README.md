@@ -709,17 +709,23 @@ Healthchecks are useful when putting the proxy behind a loadbalancer.
 The below config specifies what are the default values for the graceful
 shutdown parameters.  Upon receiving a SIGTERM, the graceful shutdown
 procedure will close all health checks to prevent a loadbalancer from
-initiating any new connections. After waiting MinimalGracefulWaitTime
-it will close the ports on the listeners.  Now it will check every
+initiating any new connections. Now it will check every
 GracefulCheckInterval to see if the number of in flight datapoints and
 events is 0.  If it then stays 0 for SilentGracefulTime, or the entire
-graceful shutdown takes longer than MaxGracefulWaitTime the process will
-exit.
+graceful shutdown takes longer than MaxGracefulWaitTime the listeners
+and forwarders will be closed and the process will exit.
+
+If yo're in front of a load balancer we recommend a MaxGracefulWaitTime
+of "30s".  This gives the lb time to hit the health check and divert
+traffic.
+
+If you're not in front of a load balancer you will always hit the
+MaxGracefulWaitTime so you probably want to set that to something
+low like 1s.  The config below is this use case.
 
 ```
 {
-  "MinimalGracefulWaitTime": "3s",
-  "MaxGracefulWaitTime": "30s",
+  "MaxGracefulWaitTime": "1s",
   "GracefulCheckInterval": "1s",
   "SilentGracefulTime": "2s",
   "StatsDelay": "1s",
