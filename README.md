@@ -125,8 +125,12 @@ When configuring CollectD, the target URL path will be `/post-collectd`.
 
 #### signalfx
 
-You can pretend to be a SignalFx endpoint with the `signalfx` type.  For this,
-you will need to specify which port to bind to.  An example config:
+You can expose a SignalFx endpoint with the `signalfx` type. A SignalFx
+endpoint can listen on all the signalfx protocols in both "Protocol Buffers"
+and "JSON" for events and datapoints (e.g. /v2/datapoint, /v2/event). It can
+also listen on the collectd protocol (/v1/collectd).
+
+For this, you will need to specify which port to bind to.  An example config:
 
 ```
         {
