@@ -21,20 +21,20 @@ $ curl -s https://raw.githubusercontent.com/signalfx/metricproxy/master/install.
 ## Running
 
 ```
-$ /etc/init.d/metricproxy start
+/etc/init.d/metricproxy start
 ```
 
 ## Stopping the daemon
 
 ```
-$ /etc/init.d/metricproxy stop
+/etc/init.d/metricproxy stop
 ```
 
 ## Debugging
 
 ```
-$ cd /var/log/sfproxy
-$ tail -F *
+cd /var/log/sfproxy
+tail -F *
 ```
 
 ## Sizing
