@@ -1,40 +1,40 @@
 # metricproxy [![Circle CI](https://circleci.com/gh/signalfx/metricproxy.svg?style=svg)](https://circleci.com/gh/signalfx/metricproxy)
 
-The SignalFx Metricproxy lets you aggregate metrics and send them to SignalFx.
-It is a multilingual datapoint demultiplexer that can accept time
-series data from the statsd, carbon, or signalfx protocols and emit
-those datapoints to a series of servers on the statsd, carbon, or
-signalfx protocol. We recommend placing the proxy either on the same server
-as another aggregator, such as statsd, or on a central server that is
-already receiving datapoints, such as graphite's carbon database.
+The SignalFx Metricproxy lets you aggregate metrics and send them to
+SignalFx. It is a multilingual datapoint demultiplexer that can accept
+time series data from the carbon (Graphite), collectd or SignalFx protocols
+and emit those datapoints to a series of servers using the carbon, collectd
+or SignalFx protocols. We recommend placing the proxy either on the same
+server as another existing metrics aggregator or on a central server that
+is already receiving datapoints, such as Graphite's carbon database.
 
 ## Install and upgrade
 
 ```
-  curl -s https://raw.githubusercontent.com/signalfx/metricproxy/master/install.sh | sudo sh
-  # Config at    /etc/sfdbconfig.conf
-  # Binary at    /opt/sfproxy/bin/metricproxy
-  # Logs at      /var/log/sfproxy
-  # PID file at  /var/run/metricproxy.pid
- ```
+$ curl -s https://raw.githubusercontent.com/signalfx/metricproxy/master/install.sh | sudo sh
+# Config at    /etc/sfdbconfig.conf
+# Binary at    /opt/sfproxy/bin/metricproxy
+# Logs at      /var/log/sfproxy
+# PID file at  /var/run/metricproxy.pid
+```
 
 ## Running
 
 ```
-   /etc/init.d/metricproxy start
- ```
+$ /etc/init.d/metricproxy start
+```
 
 ## Stopping the daemon
 
 ```
-   /etc/init.d/metricproxy stop
- ```
+$ /etc/init.d/metricproxy stop
+```
 
 ## Debugging
 
 ```
-  cd /var/log/sfproxy
-  tail -F *
+$ cd /var/log/sfproxy
+$ tail -F *
 ```
 
 ## Sizing
