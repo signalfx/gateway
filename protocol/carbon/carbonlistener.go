@@ -10,6 +10,8 @@ import (
 
 	"sync"
 
+	"bytes"
+	"fmt"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
@@ -26,14 +28,15 @@ import (
 type Listener struct {
 	protocol.CloseableHealthCheck
 	psocket              net.Listener
+	udpsocket            *net.UDPConn
 	sink                 dpsink.Sink
 	metricDeconstructor  metricdeconstructor.MetricDeconstructor
 	serverAcceptDeadline time.Duration
 	connectionTimeout    time.Duration
-
-	logger log.Logger
-	stats  listenerStats
-	wg     sync.WaitGroup
+	listenfunc           func()
+	logger               log.Logger
+	stats                listenerStats
+	wg                   sync.WaitGroup
 }
 
 var _ protocol.Listener = &Listener{}
@@ -61,7 +64,14 @@ func (listener *Listener) Datapoints() []*datapoint.Datapoint {
 
 // Close the exposed carbon port
 func (listener *Listener) Close() error {
-	err := listener.psocket.Close()
+	var err error
+	if listener.psocket != nil {
+		err = listener.psocket.Close()
+	}
+	if listener.udpsocket != nil {
+		err = listener.udpsocket.Close()
+	}
+
 	listener.wg.Wait()
 	return err
 }
@@ -73,7 +83,38 @@ type carbonListenConn interface {
 	RemoteAddr() net.Addr
 }
 
-func (listener *Listener) handleConnection(ctx context.Context, conn carbonListenConn) error {
+func (listener *Listener) handleUDPConnection(ctx context.Context, addr *net.UDPAddr, data []byte) error {
+	connLogger := log.NewContext(listener.logger).With(logkey.RemoteAddr, addr)
+	atomic.AddInt64(&listener.stats.totalConnections, 1)
+	atomic.AddInt64(&listener.stats.activeConnections, 1)
+	defer atomic.AddInt64(&listener.stats.activeConnections, -1)
+	for {
+		buf := bytes.NewBuffer(data)
+		for {
+			bytes, err := buf.ReadBytes((byte)('\n'))
+			if err == io.EOF {
+				atomic.AddInt64(&listener.stats.totalEOFCloses, 1)
+				if len(bytes) == 0 {
+					return nil
+				}
+			}
+			line := strings.TrimSpace(string(bytes))
+			if line != "" {
+				dp, err := NewCarbonDatapoint(line, listener.metricDeconstructor)
+				if err != nil {
+					atomic.AddInt64(&listener.stats.invalidDatapoints, 1)
+					connLogger.Log(logkey.CarbonLine, line, log.Err, err, "Received data on a carbon udp port, but it doesn't look like carbon data")
+					return err
+				}
+				log.IfErr(connLogger, listener.sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp}))
+				atomic.AddInt64(&listener.stats.totalDatapoints, 1)
+			}
+		}
+
+	}
+}
+
+func (listener *Listener) handleTCPConnection(ctx context.Context, conn carbonListenConn) error {
 	connLogger := log.NewContext(listener.logger).With(logkey.RemoteAddr, conn.RemoteAddr())
 	defer func() {
 		log.IfErr(connLogger, conn.Close())
@@ -109,9 +150,34 @@ func (listener *Listener) handleConnection(ctx context.Context, conn carbonListe
 	}
 }
 
-func (listener *Listener) startListening() {
+func (listener *Listener) startListeningUDP() {
 	defer listener.wg.Done()
-	defer listener.logger.Log("Carbon listener closed")
+	defer listener.logger.Log("Stop listening carbon UDP")
+	buf := make([]byte, 65507) // max size for udp packet body
+	for {
+		log.IfErr(listener.logger, listener.udpsocket.SetDeadline(time.Now().Add(listener.connectionTimeout)))
+		n, addr, err := listener.udpsocket.ReadFromUDP(buf)
+		if err != nil {
+			if netErr, ok := err.(net.Error); ok {
+				if netErr.Timeout() {
+					atomic.AddInt64(&listener.stats.idleTimeouts, 1)
+					continue
+				}
+			}
+			listener.logger.Log(log.Err, err, "Unable to accept a udp socket connection")
+			return
+		}
+		if n != 0 {
+			go func() {
+				log.IfErr(listener.logger, listener.handleUDPConnection(context.Background(), addr, buf[:n]))
+			}()
+		}
+	}
+}
+
+func (listener *Listener) startListeningTCP() {
+	defer listener.wg.Done()
+	defer listener.logger.Log("Stop listening carbon TCP")
 	for {
 		deadlineable, ok := listener.psocket.(*net.TCPListener)
 		if ok {
@@ -129,10 +195,16 @@ func (listener *Listener) startListening() {
 			return
 		}
 		go func() {
-			log.IfErr(listener.logger, listener.handleConnection(context.Background(), conn))
+			log.IfErr(listener.logger, listener.handleTCPConnection(context.Background(), conn))
 		}()
 	}
 }
+
+// Constants for udp and tcp config
+const (
+	TCP = "tcp"
+	UDP = "udp"
+)
 
 // ListenerConfig controls optional parameters for carbon listeners
 type ListenerConfig struct {
@@ -141,6 +213,7 @@ type ListenerConfig struct {
 	ListenAddr           *string
 	MetricDeconstructor  metricdeconstructor.MetricDeconstructor
 	Logger               log.Logger
+	Protocol             *string
 }
 
 var defaultListenerConfig = &ListenerConfig{
@@ -148,30 +221,58 @@ var defaultListenerConfig = &ListenerConfig{
 	ConnectionTimeout:    pointer.Duration(time.Second * 30),
 	ListenAddr:           pointer.String("127.0.0.1:2003"),
 	MetricDeconstructor:  &metricdeconstructor.IdentityMetricDeconstructor{},
+	Protocol:             pointer.String(TCP),
 }
 
 // Addr returns the listening address of this carbon listener
 func (listener *Listener) Addr() net.Addr {
-	return listener.psocket.Addr()
+	if listener.psocket != nil {
+		return listener.psocket.Addr()
+	}
+	return listener.udpsocket.LocalAddr()
+}
+
+func (listener *Listener) getServer(conf *ListenerConfig) error {
+	loweredProtocol := strings.ToLower(*conf.Protocol)
+	if loweredProtocol == UDP {
+		serverAddr, err := net.ResolveUDPAddr(UDP, *conf.ListenAddr)
+		if err != nil {
+			return errors.Annotatef(err, "cannot listen to addr %s", *conf.ListenAddr)
+		}
+		server, err := net.ListenUDP(UDP, serverAddr)
+		if err != nil {
+			return errors.Annotatef(err, "cannot listen to addr %s", *conf.ListenAddr)
+		}
+		listener.udpsocket = server
+		listener.listenfunc = listener.startListeningUDP
+	} else if loweredProtocol == TCP {
+		server, err := net.Listen(TCP, *conf.ListenAddr)
+		if err != nil {
+			return errors.Annotatef(err, "cannot listen to addr %s", *conf.ListenAddr)
+		}
+		listener.psocket = server
+		listener.listenfunc = listener.startListeningTCP
+	} else {
+		return fmt.Errorf("specified protocol '%s' not recognized. '%s' or '%s' only please", *conf.Protocol, UDP, TCP)
+	}
+	return nil
 }
 
 // NewListener creates a new listener for carbon datapoints
 func NewListener(sendTo dpsink.Sink, passedConf *ListenerConfig) (*Listener, error) {
 	conf := pointer.FillDefaultFrom(passedConf, defaultListenerConfig).(*ListenerConfig)
-	psocket, err := net.Listen("tcp", *conf.ListenAddr)
-	if err != nil {
-		return nil, errors.Annotatef(err, "cannot listen to addr %s", *conf.ListenAddr)
-	}
-
 	receiver := Listener{
 		sink:                 sendTo,
-		psocket:              psocket,
 		metricDeconstructor:  conf.MetricDeconstructor,
 		serverAcceptDeadline: *conf.ServerAcceptDeadline,
 		connectionTimeout:    *conf.ConnectionTimeout,
 		logger:               log.NewContext(conf.Logger).With(logkey.Protocol, "carbon", logkey.Direction, "listener"),
 	}
+	err := receiver.getServer(conf)
+	if err != nil {
+		return nil, err
+	}
 	receiver.wg.Add(1)
-	go receiver.startListening()
+	go receiver.listenfunc()
 	return &receiver, nil
 }

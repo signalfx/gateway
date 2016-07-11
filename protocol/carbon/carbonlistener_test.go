@@ -36,6 +36,24 @@ func TestCarbonListenerBadAddr(t *testing.T) {
 		_, err := NewListener(sendTo, listenFrom)
 		So(err, ShouldNotBeNil)
 	})
+	Convey("bad udp listener ports shouldn't be able to accept", t, func() {
+		listenFrom := &ListenerConfig{
+			ListenAddr: pointer.String("127.0.0.1:90090999r"),
+			Protocol:   pointer.String("udp"),
+		}
+		sendTo := dptest.NewBasicSink()
+		_, err := NewListener(sendTo, listenFrom)
+		So(err, ShouldNotBeNil)
+	})
+	Convey("non tcp or udp connections prohibited", t, func() {
+		listenFrom := &ListenerConfig{
+			ListenAddr: pointer.String("127.0.0.1:90090999r"),
+			Protocol:   pointer.String("jack"),
+		}
+		sendTo := dptest.NewBasicSink()
+		_, err := NewListener(sendTo, listenFrom)
+		So(err, ShouldNotBeNil)
+	})
 }
 
 func TestCarbonForwarderBadAddr(t *testing.T) {
@@ -116,7 +134,7 @@ func TestCarbonForwarderNormal(t *testing.T) {
 	})
 }
 
-func TestCarbonListenerNormal(t *testing.T) {
+func TestCarbonListenerNormalTCP(t *testing.T) {
 	Convey("A normally setup listener", t, func() {
 		listenFrom := &ListenerConfig{
 			ListenAddr: pointer.String("127.0.0.1:0"),
@@ -231,5 +249,95 @@ func TestCarbonListenerNormal(t *testing.T) {
 		Reset(func() {
 			So(listener.Close(), ShouldBeNil)
 		})
+	})
+}
+
+func TestCarbonListenerNormalUDP(t *testing.T) {
+	Convey("A normally setup listener", t, func() {
+		listenFrom := &ListenerConfig{
+			ListenAddr: pointer.String("127.0.0.1:0"),
+			Protocol:   pointer.String("udp"),
+		}
+		sendTo := dptest.NewBasicSink()
+		listener, err := NewListener(sendTo, listenFrom)
+		So(err, ShouldBeNil)
+
+		Convey("should error invalid lines", func() {
+			dps := listener.Datapoints()
+			So(dptest.ExactlyOne(dps, "invalid_datapoints").Value.String(), ShouldEqual, "0")
+
+			connAddr := fmt.Sprintf("127.0.0.1:%d", (uint16)(listener.Addr().(*net.UDPAddr).Port))
+			s, err := net.Dial("udp", connAddr)
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(s, "hello world bob\n")
+			So(err, ShouldBeNil)
+			So(s.Close(), ShouldBeNil)
+
+			// Wait for the idle timeout
+			for atomic.LoadInt64(&listener.stats.invalidDatapoints) == 0 {
+				time.Sleep(time.Millisecond)
+			}
+
+			dps = listener.Datapoints()
+			So(dptest.ExactlyOne(dps, "invalid_datapoints").Value.String(), ShouldEqual, "1")
+		})
+		Convey("should eventually time out idle connections", func() {
+			listenFrom.ConnectionTimeout = pointer.Duration(time.Millisecond)
+			listenFrom.ServerAcceptDeadline = pointer.Duration(time.Millisecond)
+			So(listener.Close(), ShouldBeNil)
+			listener, err = NewListener(sendTo, listenFrom)
+			So(err, ShouldBeNil)
+
+			s, err := net.DialUDP("udp", nil, listener.Addr().(*net.UDPAddr))
+			So(err, ShouldBeNil)
+			// Wait for the idle timeout
+			for atomic.LoadInt64(&listener.stats.idleTimeouts) == 0 {
+				time.Sleep(time.Millisecond)
+			}
+			So(s.Close(), ShouldBeNil)
+			dps := listener.Datapoints()
+			dptest.ExactlyOne(dps, "idle_timeouts")
+		})
+		Convey("try sending valid datapoints", func() {
+			s, err := net.DialUDP("udp", nil, listener.Addr().(*net.UDPAddr))
+			metric := "dice.roll 3 3\n"
+			n, err := io.WriteString(s, metric)
+			So(err, ShouldBeNil)
+			So(n, ShouldEqual, len(metric))
+			m := sendTo.Next()
+			So(m.Metric, ShouldEqual, "dice.roll")
+			So(m.Value.String(), ShouldEqual, "3")
+		})
+		Convey("try sending datapoint without new line", func() {
+			s, err := net.DialUDP("udp", nil, listener.Addr().(*net.UDPAddr))
+			metric := "dice.roll 3 3"
+			n, err := io.WriteString(s, metric)
+			So(err, ShouldBeNil)
+			So(n, ShouldEqual, len(metric))
+			m := sendTo.Next()
+			So(m.Metric, ShouldEqual, "dice.roll")
+			So(m.Value.String(), ShouldEqual, "3")
+		})
+		Reset(func() {
+			So(listener.Close(), ShouldBeNil)
+		})
+	})
+}
+
+func TestInvalidConnection(t *testing.T) {
+	Convey("try opening invalid connection", t, func() {
+		listenFrom := &ListenerConfig{
+			ListenAddr: pointer.String("127.0.0.1:10001"),
+			Protocol:   pointer.String("udp"),
+		}
+		sendTo := dptest.NewBasicSink()
+		listener, err := NewListener(sendTo, listenFrom)
+		So(err, ShouldBeNil)
+		addr := listener.Addr().(*net.UDPAddr)
+		So(listener.Close(), ShouldBeNil)
+		_, err = net.ListenUDP("udp", addr)
+		So(err, ShouldBeNil)
+		listener, err = NewListener(sendTo, listenFrom)
+		So(err, ShouldNotBeNil)
 	})
 }
