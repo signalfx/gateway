@@ -205,6 +205,7 @@ func (s *carbonLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Li
 		ListenAddr:           conf.ListenAddr,
 		Logger:               s.logger,
 		MetricDeconstructor:  md,
+		Protocol:             conf.Protocol,
 	}
 
 	return carbon.NewListener(sink, &sfConf)

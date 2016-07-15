@@ -151,6 +151,17 @@ this, you will need to specify the port to bind to.  An example config:
         }
 ```
 
+You can optionally choose to listen to carbon over UDP as well (as opposed
+to the default of TCP).
+
+```
+        {
+            "ListenAddr": "0.0.0.0:12003",
+            "Type": "carbon",
+            "Protocol": "udp"
+        }
+```
+
 #### common properties
 
 All listeners support a "Dimensions" property which is expected to be a

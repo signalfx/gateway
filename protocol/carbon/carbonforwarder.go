@@ -48,7 +48,8 @@ var defaultForwarderConfig = &ForwarderConfig{
 }
 
 // NewForwarder creates a new unbuffered forwarder for sending points to carbon
-func NewForwarder(host string, passedConf *ForwarderConfig) (*Forwarder, error) { //} port uint16, timeout time.Duration, dimensionOrder []string, drainingThreads uint32) (*Forwarder, error) {
+func NewForwarder(host string, passedConf *ForwarderConfig) (*Forwarder, error) {
+
 	conf := pointer.FillDefaultFrom(passedConf, defaultForwarderConfig).(*ForwarderConfig)
 
 	connectionAddress := net.JoinHostPort(host, strconv.FormatUint(uint64(*conf.Port), 10))

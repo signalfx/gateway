@@ -52,6 +52,7 @@ type ListenFrom struct {
 	ListenPath                     *string                `json:",omitempty"`
 	JSONEngine                     *string                `json:",omitempty"`
 	Encrypted                      *bool                  `json:",omitempty"`
+	Protocol                       *string                `json:",omitempty"`
 	TimeoutDuration                *time.Duration         `json:"-"`
 	ServerAcceptDeadline           *time.Duration         `json:"-"`
 }
