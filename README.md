@@ -18,18 +18,6 @@ $ curl -s https://raw.githubusercontent.com/signalfx/metricproxy/master/install.
 # PID file at  /var/run/metricproxy.pid
 ```
 
-#### Go Dependency
-
-There are additional steps required for installation on Ubuntu machines, since 
-the golang package in Ubuntu is not up to date. These steps must be performed before
-running the install script. Running the following commands will update the golang package 
-(via https://github.com/golang/go/wiki/Ubuntu):
-```
-$ sudo add-apt-repository ppa:ubuntu-lxc/lxd-stable
-$ sudo apt-get update
-$ sudo apt-get install golang
-``` 
-
 ## Running
 
 ```
