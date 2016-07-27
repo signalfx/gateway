@@ -11,7 +11,9 @@ is already receiving datapoints, such as Graphite's carbon database.
 ## Install and upgrade
 
 ```
-$ curl -s https://raw.githubusercontent.com/signalfx/metricproxy/master/install.sh | sudo sh
+ curl -s \
+  https://raw.githubusercontent.com/signalfx/metricproxy/master/install.sh \
+  | sudo sh
 # Config at    /etc/sfdbconfig.conf
 # Binary at    /opt/sfproxy/bin/metricproxy
 # Logs at      /var/log/sfproxy
@@ -20,15 +22,15 @@ $ curl -s https://raw.githubusercontent.com/signalfx/metricproxy/master/install.
 
 ### Go Dependency
 
-Additional Steps are required to install the metricproxy on Ubuntu machines because the
-golang package in Ubuntu is not up to date. The following steps to
+Additional Steps are required to install the metricproxy on Ubuntu machines
+because the golang package in Ubuntu is not up to date. The following steps to
 [update](https://github.com/golang/go/wiki/Ubuntu) the golang package on Ubuntu must
-be executed before running the install script:
+be executed before running the install script
 
 ```
-$ sudo add-apt-repository ppa:ubuntu-lxc/lxd-stable
-$ sudo apt-get update
-$ sudo apt-get install golang
+ sudo add-apt-repository ppa:ubuntu-lxc/lxd-stable
+ sudo apt-get update
+ sudo apt-get install golang
 ```
 
 ## Running
