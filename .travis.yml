@@ -6,8 +6,8 @@ go:
   - 1.6
 
 before_install:
-  - wget "http://ftp.debian.org/debian/pool/main/s/shellcheck/shellcheck_0.3.7-5_amd64.deb"
-  - dpkg -x shellcheck_0.3.7-5_amd64.deb $HOME
+  - wget "http://ftp.debian.org/debian/pool/main/s/shellcheck/shellcheck_0.3.4-3_amd64.deb"
+  - dpkg -x shellcheck_0.3.4-3_amd64.deb $HOME
   - export PATH=$HOME/usr/bin:$PATH
   - go get github.com/tools/godep
   - go get github.com/signalfx/goverify
