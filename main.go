@@ -391,7 +391,7 @@ func (p *proxy) run(ctx context.Context) error {
 	p.debugSink.CtxFlagCheck = &p.debugContext
 	hostname := getHostname(os.Hostname)
 	p.logger.Log(logkey.ConfigFile, p.flags.configFileName, "Looking for config file")
-	p.logger.Log(logkey.Env, os.Environ(), "Looking for config file")
+	p.logger.Log(logkey.Env, strings.Join(os.Environ(), "-"), "Looking for config file")
 
 	loadedConfig, err := config.Load(p.flags.configFileName, p.logger)
 	if err != nil {
