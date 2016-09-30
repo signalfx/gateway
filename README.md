@@ -356,26 +356,33 @@ For each rule, you can define the following:
 e.g.
 
 ```
-  "FallbackDeconstructor": nil,
-  "MetricRules": [
-    {
-      "Regex": "(?P<sf_metric_0>foo.*)\\.(?P<middle>.*)(?P<sf_metric_1>\\.baz)",
-      "AdditionalDimensions": {
-        "key": "value"
+{
+  "Type": "carbon",
+  "ListenAddr": "0.0.0.0:2003",
+  "MetricDeconstructor": "regex",
+  "MetricDeconstructorOptionsJSON": {
+    "FallbackDeconstructor": "nil",
+    "MetricRules": [
+      {
+        "Regex": "(?P<sf_metric_0>foo.*)\\.(?P<middle>.*)(?P<sf_metric_1>\\.baz)",
+        "AdditionalDimensions": {
+          "key": "value"
+        }
+      },
+      {
+        "Regex": "(?P<sf_metric>counter.*)",
+        "MetricType": "cumulative_counter"
+      },
+      {
+        "Regex": "madeup.*",
+        "MetricName": "synthetic.metric"
+      },
+      {
+        "Regex": "common.*"
       }
-    },
-    {
-      "Regex": "(?P<sf_metric>counter.*)",
-      "MetricType": "cumulative_counter"
-    },
-    {
-      "Regex": "madeup.*",
-      "MetricName": "synthetic.metric"
-    },
-    {
-      "Regex": "common.*"
-    }
-  ]
+    ]
+  }
+}
 ```
 
 In the above example, if you sent in the metric foo.bar.baz it would match the
