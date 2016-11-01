@@ -95,8 +95,9 @@ func TestLoad(t *testing.T) {
 	}()
 
 	err := ioutil.WriteFile(filename, []byte(`{"ListenFrom":[{"Timeout":"3s"}]}`), os.FileMode(0644))
-
+	assert.Nil(t, err)
 	_, err = Load(filename, log.Discard)
+	assert.Nil(t, err)
 	prev := xdgbasedirGetConfigFileLocation
 	xdgbasedirGetConfigFileLocation = func(string) (string, error) { return "", errors.New("bad") }
 	defer func() { xdgbasedirGetConfigFileLocation = prev }()

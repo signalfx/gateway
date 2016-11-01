@@ -300,6 +300,7 @@ func TestCarbonListenerNormalUDP(t *testing.T) {
 		})
 		Convey("try sending valid datapoints", func() {
 			s, err := net.DialUDP("udp", nil, listener.Addr().(*net.UDPAddr))
+			So(err, ShouldBeNil)
 			metric := "dice.roll 3 3\n"
 			n, err := io.WriteString(s, metric)
 			So(err, ShouldBeNil)
@@ -310,6 +311,7 @@ func TestCarbonListenerNormalUDP(t *testing.T) {
 		})
 		Convey("try sending datapoint without new line", func() {
 			s, err := net.DialUDP("udp", nil, listener.Addr().(*net.UDPAddr))
+			So(err, ShouldBeNil)
 			metric := "dice.roll 3 3"
 			n, err := io.WriteString(s, metric)
 			So(err, ShouldBeNil)
