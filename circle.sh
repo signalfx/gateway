@@ -2,10 +2,10 @@
 set -ex
 
 CIRCLEUTIL_TAG="v1.41"
-DEFAULT_GOLANG_VERSION="1.6"
-GO_TESTED_VERSIONS="1.4.3 1.5.1 1.6"
+DEFAULT_GOLANG_VERSION="1.7.1"
+GO_TESTED_VERSIONS="1.5.1 1.6.1 1.7.1"
 
-export GOLANG_VERSION="1.5.1"
+export GOLANG_VERSION="1.7.1"
 export GOROOT="$HOME/go_circle"
 export GOPATH="$HOME/.go_circle"
 export GOPATH_INTO="$HOME/lints"
@@ -34,6 +34,7 @@ function do_cache() {
   install_all_go_versions "$GO_COMPILER_PATH"
   install_go_version "$GO_COMPILER_PATH" "$DEFAULT_GOLANG_VERSION"
   versioned_goget "github.com/signalfx/gobuild:v1.6" "github.com/tools/godep:master"
+  go get -u github.com/alecthomas/gometalinter
   mkdir -p "$GOPATH_INTO"
   install_shellcheck "$GOPATH_INTO"
   gem install mdl
@@ -62,6 +63,7 @@ function do_test() {
     python -m json.tool < exampleSfdbproxy.conf > /dev/null
   )
   install_go_version "$GO_COMPILER_PATH" "$DEFAULT_GOLANG_VERSION"
+  gometalinter --install --update --no-vendored-linters
   gobuild -verbose install
   for GO_VERSION in $GO_TESTED_VERSIONS; do
     install_go_version "$GO_COMPILER_PATH" "$GO_VERSION"
