@@ -266,7 +266,7 @@ func TestCollectdParseNameForDimensions(t *testing.T) {
 	}
 	for _, test := range tests {
 		inputDim := make(map[string]string)
-		parseNameForDimensions(inputDim, "instance", true, &test.val)
+		parseNameForDimensions(inputDim, "instance", &test.val)
 		assert.Equal(t, test.dim, inputDim, "Dimensions not equal")
 	}
 }
@@ -282,5 +282,22 @@ func BenchmarkGetDimensionFromName(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		x := "ihave[a=b,c=" + strconv.Itoa(rand.Int()) + "]dims"
 		getDimensionsFromName(&x)
+	}
+}
+
+func BenchmarkNewDatapoint(b *testing.B) {
+	postFormat := new([]*JSONWriteFormat)
+	err := json.Unmarshal([]byte(testDecodeCollectdBody), &postFormat)
+	if err != nil {
+		b.Fail()
+	}
+	emptyMap := map[string]string{}
+	for i := 0; i < b.N; i++ {
+		NewDatapoint((*postFormat)[0], uint(0), emptyMap)
+		NewDatapoint((*postFormat)[1], uint(0), emptyMap)
+		NewDatapoint((*postFormat)[2], uint(0), emptyMap)
+		NewDatapoint((*postFormat)[3], uint(0), emptyMap)
+		NewDatapoint((*postFormat)[4], uint(0), emptyMap)
+		NewDatapoint((*postFormat)[5], uint(0), emptyMap)
 	}
 }

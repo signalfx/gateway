@@ -66,18 +66,13 @@ func NewDatapoint(point *JSONWriteFormat, index uint, defaultDimensions map[stri
 	}
 
 	metricType := metricTypeFromDsType(dstype)
-	metricName, usedParts := getReasonableMetricName(point, index)
+	metricName, usedDsName := getReasonableMetricName(point, index, dimensions)
 
 	addIfNotNullOrEmpty(dimensions, "plugin", true, point.Plugin)
 
-	_, usedInMetricName := usedParts["type_instance"]
-	parseDimensionsOut(dimensions, usedInMetricName, point.TypeInstance, point.PluginInstance, point.Host)
+	parseDimensionsOut(dimensions, point.PluginInstance, point.Host)
 
-	_, usedInMetricName = usedParts["type"]
-	addIfNotNullOrEmpty(dimensions, "type", !usedInMetricName, point.TypeS)
-
-	_, usedInMetricName = usedParts["dsname"]
-	addIfNotNullOrEmpty(dimensions, "dsname", !usedInMetricName, dsname)
+	addIfNotNullOrEmpty(dimensions, "dsname", !usedDsName, dsname)
 
 	timestamp := time.Unix(0, int64(float64(time.Second)**point.Time))
 	return datapoint.New(metricName, dimensions, datapoint.NewFloatValue(*val), metricType, timestamp)
@@ -89,10 +84,9 @@ func addIfNotNullOrEmpty(dimensions map[string]string, key string, cond bool, va
 	}
 }
 
-func parseDimensionsOut(dimensions map[string]string, usedInMetricName bool, typeInstance *string, pluginInstance *string, host *string) {
-	parseNameForDimensions(dimensions, "type_instance", !usedInMetricName, typeInstance)
-	parseNameForDimensions(dimensions, "plugin_instance", true, pluginInstance)
-	parseNameForDimensions(dimensions, "host", true, host)
+func parseDimensionsOut(dimensions map[string]string, pluginInstance *string, host *string) {
+	parseNameForDimensions(dimensions, "plugin_instance", pluginInstance)
+	parseNameForDimensions(dimensions, "host", host)
 }
 
 // try to pull out dimensions out of name in the format name[k=v,f=x]-morename would
@@ -139,7 +133,7 @@ func getDimensionsFromName(val *string) (instanceName string, toAddDims map[stri
 	return
 }
 
-func parseNameForDimensions(dimensions map[string]string, key string, cond bool, val *string) {
+func parseNameForDimensions(dimensions map[string]string, key string, val *string) {
 	instanceName, toAddDims := getDimensionsFromName(val)
 
 	for k, v := range toAddDims {
@@ -147,26 +141,45 @@ func parseNameForDimensions(dimensions map[string]string, key string, cond bool,
 			addIfNotNullOrEmpty(dimensions, k, true, &v)
 		}
 	}
-	addIfNotNullOrEmpty(dimensions, key, cond, &instanceName)
+	addIfNotNullOrEmpty(dimensions, key, true, &instanceName)
 }
 
-func getReasonableMetricName(point *JSONWriteFormat, index uint) (string, map[string]struct{}) {
-	parts := []string{}
-	usedParts := make(map[string]struct{})
-	if !isNilOrEmpty(point.TypeS) {
-		parts = append(parts, *point.TypeS)
-		usedParts["type"] = struct{}{}
-	}
+func pointTypeInstance(point *JSONWriteFormat, dimensions map[string]string, parts []byte) []byte {
 	if !isNilOrEmpty(point.TypeInstance) {
-		instanceName, _ := getDimensionsFromName(point.TypeInstance)
-		parts = append(parts, instanceName)
-		usedParts["type_instance"] = struct{}{}
+		instanceName, toAddDims := getDimensionsFromName(point.TypeInstance)
+		if instanceName != "" {
+			if len(parts) > 0 {
+				parts = append(parts, '.')
+			}
+			parts = append(parts, instanceName...)
+		}
+		for k, v := range toAddDims {
+			if _, exists := dimensions[k]; !exists {
+				addIfNotNullOrEmpty(dimensions, k, true, &v)
+			}
+		}
 	}
+	return parts
+}
+
+// getReasonableMetricName creates metrics names by joining them (if non empty) type.typeinstance
+// if there are more than one dsname append .dsname for the particular uint. if there's only one it
+// becomes a dimension
+func getReasonableMetricName(point *JSONWriteFormat, index uint, dimensions map[string]string) (string, bool) {
+	usedDsName := false
+	parts := make([]byte, 0, len(*point.TypeS)+len(*point.TypeInstance))
+	if !isNilOrEmpty(point.TypeS) {
+		parts = append(parts, *point.TypeS...)
+	}
+	parts = pointTypeInstance(point, dimensions, parts)
 	if point.Dsnames != nil && !isNilOrEmpty(point.Dsnames[index]) && len(point.Dsnames) > 1 {
-		parts = append(parts, *point.Dsnames[index])
-		usedParts["dsname"] = struct{}{}
+		if len(parts) > 0 {
+			parts = append(parts, '.')
+		}
+		parts = append(parts, *point.Dsnames[index]...)
+		usedDsName = true
 	}
-	return strings.Join(parts, "."), usedParts
+	return string(parts), usedDsName
 }
 
 // NewEvent creates a new event from collectd's write_http endpoint JSON format
@@ -179,13 +192,11 @@ func NewEvent(e *JSONWriteFormat, defaultDimensions map[string]string) *event.Ev
 	for k, v := range defaultDimensions {
 		dimensions[k] = v
 	}
-
-	eventType, usedParts := getReasonableMetricName(e, 0)
+	// events don't have a dsname
+	eventType, _ := getReasonableMetricName(e, 0, dimensions)
 	addIfNotNullOrEmpty(dimensions, "plugin", true, e.Plugin)
-	parseDimensionsOut(dimensions, true, e.TypeInstance, e.PluginInstance, e.Host)
+	parseDimensionsOut(dimensions, e.PluginInstance, e.Host)
 
-	_, usedInMetricName := usedParts["type"]
-	addIfNotNullOrEmpty(dimensions, "type", !usedInMetricName, e.TypeS)
 	properties := make(map[string]interface{}, len(e.Meta)+2)
 	for k, v := range e.Meta {
 		properties[k] = v
