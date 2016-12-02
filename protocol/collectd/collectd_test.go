@@ -7,6 +7,8 @@ import (
 	"github.com/signalfx/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/stretchr/testify/assert"
+	"math/rand"
+	"strconv"
 )
 
 const testDecodeCollectdBody = `[
@@ -266,5 +268,19 @@ func TestCollectdParseNameForDimensions(t *testing.T) {
 		inputDim := make(map[string]string)
 		parseNameForDimensions(inputDim, "instance", true, &test.val)
 		assert.Equal(t, test.dim, inputDim, "Dimensions not equal")
+	}
+}
+
+func BenchmarkGetDimensionFromNameEmptyDims(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		x := "ihavenodims" + strconv.Itoa(rand.Int())
+		getDimensionsFromName(&x)
+	}
+}
+
+func BenchmarkGetDimensionFromName(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		x := "ihave[a=b,c=" + strconv.Itoa(rand.Int()) + "]dims"
+		getDimensionsFromName(&x)
 	}
 }

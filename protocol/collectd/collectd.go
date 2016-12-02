@@ -98,9 +98,9 @@ func parseDimensionsOut(dimensions map[string]string, usedInMetricName bool, typ
 // try to pull out dimensions out of name in the format name[k=v,f=x]-morename would
 // return name-morename and extract dimensions (k,v) and (f,x)
 // if we encounter something we don't expect use original
+// this is a bit complicated to avoid allocations, string.split allocates, while slices
+// inside same function, do not.
 func getDimensionsFromName(val *string) (instanceName string, toAddDims map[string]string) {
-	toAddDims = make(map[string]string)
-	working := make(map[string]string)
 	instanceName = *val
 	index := strings.Index(*val, "[")
 	if index > -1 {
@@ -108,15 +108,29 @@ func getDimensionsFromName(val *string) (instanceName string, toAddDims map[stri
 		rest := (*val)[index+1:]
 		index = strings.Index(rest, "]")
 		if index > -1 {
+			working := make(map[string]string)
 			dimensions := rest[:index]
 			rest = rest[index+1:]
-			pieces := strings.Split(dimensions, ",")
-			for i := range pieces {
-				tokens := strings.Split(pieces[i], "=")
-				if len(tokens) != 2 {
+			cindex := strings.Index(dimensions, ",")
+			prev := 0
+			for {
+				if cindex == -1 {
+					cindex = len(dimensions)
+				}
+				if dimensions[prev] == ',' {
+					prev++
+				}
+				piece := dimensions[prev:cindex]
+				tindex := strings.Index(piece, "=")
+				if tindex == -1 || strings.Index(piece[tindex+1:], "=") > -1 {
 					return
 				}
-				working[tokens[0]] = tokens[1]
+				working[piece[:tindex]] = piece[tindex+1:]
+				if cindex == len(dimensions) {
+					break
+				}
+				prev = cindex
+				cindex = strings.Index(dimensions[:prev], ",")
 			}
 			toAddDims = working
 			instanceName = left + rest
