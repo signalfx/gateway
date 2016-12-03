@@ -268,7 +268,7 @@ func appendProperties(dp *datapoint.Datapoint, Properties map[string]ValueToSend
 	}
 }
 
-var errInvalidJSONFormat = errors.New("invalid JSON format; please see correct format at https://developers.signalfx.com/docs/datapoint\n")
+var errInvalidJSONFormat = errors.New("invalid JSON format; please see correct format at https://developers.signalfx.com/docs/datapoint")
 
 // Datapoints returns datapoints for json decoder v2
 func (decoder *JSONDecoderV2) Datapoints() []*datapoint.Datapoint {
