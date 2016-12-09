@@ -108,11 +108,8 @@ func getDimensionsFromName(val *string) (instanceName string, toAddDims map[stri
 			cindex := strings.Index(dimensions, ",")
 			prev := 0
 			for {
-				if cindex == -1 {
+				if cindex < prev {
 					cindex = len(dimensions)
-				}
-				if dimensions[prev] == ',' {
-					prev++
 				}
 				piece := dimensions[prev:cindex]
 				tindex := strings.Index(piece, "=")
@@ -123,8 +120,8 @@ func getDimensionsFromName(val *string) (instanceName string, toAddDims map[stri
 				if cindex == len(dimensions) {
 					break
 				}
-				prev = cindex
-				cindex = strings.Index(dimensions[:prev], ",")
+				prev = cindex + 1
+				cindex = strings.Index(dimensions[prev:], ",") + prev
 			}
 			toAddDims = working
 			instanceName = left + rest

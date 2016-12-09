@@ -260,6 +260,7 @@ func TestCollectdParseNameForDimensions(t *testing.T) {
 		{"name[k=v,f=x]-middle-[g=h]-more", map[string]string{"k": "v", "f": "x", "instance": "name-middle-[g=h]-more"}},
 		{"namek=v,f=x]-middle-[g=h]-more", map[string]string{"g": "h", "instance": "namek=v,f=x]-middle--more"}},
 		{"name[k=v,f=x-middle-[g=h]-more", map[string]string{"instance": "name[k=v,f=x-middle-[g=h]-more"}},
+		{"[linux=Ubuntu 14.04.5 LTS,release=3.13.0-53-generic,version=#89-Ubuntu SMP Wed May 20 10:34:39 UTC 2015]", map[string]string{"linux": "Ubuntu 14.04.5 LTS", "release": "3.13.0-53-generic", "version": "#89-Ubuntu SMP Wed May 20 10:34:39 UTC 2015"}},
 		{"name", map[string]string{"instance": "name"}},
 		{"name[k=v", map[string]string{"instance": "name[k=v"}},
 		{"user.hit_rate[host:server1,type:production]", map[string]string{"instance": "user.hit_rate[host:server1,type:production]"}},
