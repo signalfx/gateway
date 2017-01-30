@@ -51,7 +51,7 @@ func (g *goMetrics) Datapoints() []*datapoint.Datapoint {
 		Gauge("NumGC", dims, int64(mstat.NumGC)),
 
 		Gauge("GOMAXPROCS", dims, int64(runtime.GOMAXPROCS(0))),
-		Gauge("process.uptime.ns", dims, time.Now().Sub(startTime).Nanoseconds()),
+		Gauge("process.uptime.ns", dims, time.Since(startTime).Nanoseconds()),
 		Gauge("num_cpu", dims, int64(runtime.NumCPU())),
 
 		Cumulative("num_cgo_call", dims, runtime.NumCgoCall()),

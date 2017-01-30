@@ -330,7 +330,11 @@ func (decoder *JSONEventDecoderV2) Read(ctx context.Context, req *http.Request) 
 		if jsonEvent.Timestamp == nil {
 			jsonEvent.Timestamp = pointer.Int64(0)
 		}
-		evt := event.NewWithProperties(jsonEvent.EventType, *jsonEvent.Category, jsonEvent.Dimensions, jsonEvent.Properties, fromTs(*jsonEvent.Timestamp))
+		cat := event.USERDEFINED
+		if pbcat, ok := com_signalfx_metrics_protobuf.EventCategory_value[*jsonEvent.Category]; ok {
+			cat = event.Category(pbcat)
+		}
+		evt := event.NewWithProperties(jsonEvent.EventType, cat, jsonEvent.Dimensions, jsonEvent.Properties, fromTs(*jsonEvent.Timestamp))
 		evts = append(evts, evt)
 	}
 	return decoder.Sink.AddEvents(ctx, evts)

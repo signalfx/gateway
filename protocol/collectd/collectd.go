@@ -208,5 +208,5 @@ func NewEvent(e *JSONWriteFormat, defaultDimensions map[string]string) *event.Ev
 	}
 
 	timestamp := time.Unix(0, int64(float64(time.Second)**e.Time))
-	return event.NewWithProperties(eventType, "COLLECTD", dimensions, properties, timestamp)
+	return event.NewWithProperties(eventType, event.COLLECTD, dimensions, properties, timestamp)
 }

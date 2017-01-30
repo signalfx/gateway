@@ -16,6 +16,7 @@ import (
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/errors"
+	"github.com/signalfx/golib/event"
 	"golang.org/x/net/context"
 )
 
@@ -25,69 +26,30 @@ const ClientVersion = "1.0"
 // IngestEndpointV2 is the v2 version of the signalfx ingest endpoint
 const IngestEndpointV2 = "https://ingest.signalfx.com/v2/datapoint"
 
+// EventIngestEndpointV2 is the v2 version of the signalfx event endpoint
+const EventIngestEndpointV2 = "https://ingest.signalfx.com/v2/event"
+
 // DefaultUserAgent is the UserAgent string sent to signalfx
 var DefaultUserAgent = fmt.Sprintf("golib-sfxclient/%s (gover %s)", ClientVersion, runtime.Version())
 
 // DefaultTimeout is the default time to fail signalfx datapoint requests if they don't succeed
 const DefaultTimeout = time.Second * 5
 
-// HTTPDatapointSink will accept signalfx datapoints and forward them to SignalFx via HTTP.
-type HTTPDatapointSink struct {
-	AuthToken      string
-	UserAgent      string
-	Endpoint       string
-	Client         http.Client
-	protoMarshaler func(pb proto.Message) ([]byte, error)
+// HTTPSink -
+type HTTPSink struct {
+	AuthToken         string
+	UserAgent         string
+	EventEndpoint     string
+	DatapointEndpoint string
+	Client            http.Client
+	protoMarshaler    func(pb proto.Message) ([]byte, error)
 
 	stats struct {
 		readingBody int64
 	}
 }
 
-var _ Sink = &HTTPDatapointSink{}
-
-// TokenHeaderName is the header key for the auth token in the HTTP request
-const TokenHeaderName = "X-Sf-Token"
-
-// NewHTTPDatapointSink creates a default NewHTTPDatapointSink using package level constants as
-// defaults, including an empty auth token.  If sending directly to SiganlFx, you will be required
-// to explicitly set the AuthToken
-func NewHTTPDatapointSink() *HTTPDatapointSink {
-	return &HTTPDatapointSink{
-		UserAgent: DefaultUserAgent,
-		Endpoint:  IngestEndpointV2,
-		Client: http.Client{
-			Timeout: DefaultTimeout,
-		},
-		protoMarshaler: proto.Marshal,
-	}
-}
-
-// AddDatapoints forwards the datapoints to SignalFx.
-func (h *HTTPDatapointSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) (err error) {
-	if len(points) == 0 {
-		return nil
-	}
-	if ctx.Err() != nil {
-		return errors.Annotate(ctx.Err(), "context already closed")
-	}
-	body, err := h.encodePostBodyProtobufV2(points)
-	if err != nil {
-		return errors.Annotate(err, "cannot encode datapoints into protocol buffers")
-	}
-	req, err := http.NewRequest("POST", h.Endpoint, bytes.NewReader(body))
-	if err != nil {
-		return errors.Annotatef(err, "cannot parse new HTTP request to %s", h.Endpoint)
-	}
-	req.Header.Set("Content-Type", "application/x-protobuf")
-	req.Header.Set(TokenHeaderName, h.AuthToken)
-	req.Header.Set("User-Agent", h.UserAgent)
-	req.Header.Set("Connection", "Keep-Alive")
-
-	return h.withCancel(ctx, req)
-}
-
-func (h *HTTPDatapointSink) handleResponse(resp *http.Response, respErr error) (err error) {
+func (h *HTTPSink) handleResponse(resp *http.Response, respErr error) (err error) {
 	if respErr != nil {
 		return errors.Annotatef(respErr, "failed to send/recieve http request")
 	}
@@ -114,6 +76,35 @@ func (h *HTTPDatapointSink) handleResponse(resp *http.Response, respErr error) (
 	return nil
 }
 
+var _ Sink = &HTTPSink{}
+
+// TokenHeaderName is the header key for the auth token in the HTTP request
+const TokenHeaderName = "X-Sf-Token"
+
+// AddDatapoints forwards the datapoints to SignalFx.
+func (h *HTTPSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) (err error) {
+	if len(points) == 0 {
+		return nil
+	}
+	if ctx.Err() != nil {
+		return errors.Annotate(ctx.Err(), "context already closed")
+	}
+	body, err := h.encodePostBodyProtobufV2(points)
+	if err != nil {
+		return errors.Annotate(err, "cannot encode datapoints into protocol buffers")
+	}
+	req, err := http.NewRequest("POST", h.DatapointEndpoint, bytes.NewReader(body))
+	if err != nil {
+		return errors.Annotatef(err, "cannot parse new HTTP request to %s", h.DatapointEndpoint)
+	}
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	req.Header.Set(TokenHeaderName, h.AuthToken)
+	req.Header.Set("User-Agent", h.UserAgent)
+	req.Header.Set("Connection", "Keep-Alive")
+
+	return h.withCancel(ctx, req)
+}
+
 var toMTMap = map[datapoint.MetricType]com_signalfx_metrics_protobuf.MetricType{
 	datapoint.Counter:   com_signalfx_metrics_protobuf.MetricType_CUMULATIVE_COUNTER,
 	datapoint.Count:     com_signalfx_metrics_protobuf.MetricType_COUNTER,
@@ -129,6 +120,15 @@ func toMT(mt datapoint.MetricType) com_signalfx_metrics_protobuf.MetricType {
 		return ret
 	}
 	panic(fmt.Sprintf("Unknown metric type: %d\n", mt))
+}
+
+func toEC(ec event.Category) com_signalfx_metrics_protobuf.EventCategory {
+	// Check if the event.Category does not have a corresponding com_signalfx_metrics_protobuf.EventCategory
+	if _, ok := com_signalfx_metrics_protobuf.EventCategory_name[int32(ec)]; !ok {
+		panic(fmt.Sprintf("Unknown event category: %v\n", ec))
+	}
+	// Return the com_signalfx_metrics_protobuf.EventCategory
+	return com_signalfx_metrics_protobuf.EventCategory(int32(ec))
 }
 
 func datumForPoint(pv datapoint.Value) *com_signalfx_metrics_protobuf.Datum {
@@ -200,7 +200,7 @@ func rawToProtobuf(raw interface{}) *com_signalfx_metrics_protobuf.PropertyValue
 	return nil
 }
 
-func (h *HTTPDatapointSink) coreDatapointToProtobuf(point *datapoint.Datapoint) *com_signalfx_metrics_protobuf.DataPoint {
+func (h *HTTPSink) coreDatapointToProtobuf(point *datapoint.Datapoint) *com_signalfx_metrics_protobuf.DataPoint {
 	m := point.Metric
 	var ts int64
 	if point.Timestamp.IsZero() {
@@ -229,7 +229,7 @@ func (h *HTTPDatapointSink) coreDatapointToProtobuf(point *datapoint.Datapoint) 
 	return dp
 }
 
-func (h *HTTPDatapointSink) encodePostBodyProtobufV2(datapoints []*datapoint.Datapoint) ([]byte, error) {
+func (h *HTTPSink) encodePostBodyProtobufV2(datapoints []*datapoint.Datapoint) ([]byte, error) {
 	dps := make([]*com_signalfx_metrics_protobuf.DataPoint, 0, len(datapoints))
 	for _, dp := range datapoints {
 		dps = append(dps, h.coreDatapointToProtobuf(dp))
@@ -242,4 +242,93 @@ func (h *HTTPDatapointSink) encodePostBodyProtobufV2(datapoints []*datapoint.Dat
 		return nil, errors.Annotate(err, "protobuf marshal failed")
 	}
 	return body, nil
+}
+
+// AddEvents forwards the events to SignalFx.
+func (h *HTTPSink) AddEvents(ctx context.Context, events []*event.Event) (err error) {
+	if len(events) == 0 {
+		return nil
+	}
+	if ctx.Err() != nil {
+		return errors.Annotate(ctx.Err(), "context already closed")
+	}
+	body, err := h.encodePostBodyProtobufV2Events(events)
+	if err != nil {
+		return errors.Annotate(err, "cannot encode events into protocol buffers")
+	}
+	req, err := http.NewRequest("POST", h.EventEndpoint, bytes.NewReader(body))
+	if err != nil {
+		return errors.Annotatef(err, "cannot parse new HTTP request to %s", h.EventEndpoint)
+	}
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	req.Header.Set(TokenHeaderName, h.AuthToken)
+	req.Header.Set("User-Agent", h.UserAgent)
+	req.Header.Set("Connection", "Keep-Alive")
+
+	return h.withCancel(ctx, req)
+}
+
+func (h *HTTPSink) encodePostBodyProtobufV2Events(events []*event.Event) ([]byte, error) {
+	evs := make([]*com_signalfx_metrics_protobuf.Event, 0, len(events))
+	for _, ev := range events {
+		evs = append(evs, h.coreEventToProtobuf(ev))
+	}
+	msg := &com_signalfx_metrics_protobuf.EventUploadMessage{
+		Events: evs,
+	}
+	body, err := h.protoMarshaler(msg)
+	if err != nil {
+		return nil, errors.Annotate(err, "protobuf marshal failed")
+	}
+	return body, nil
+}
+
+func (h *HTTPSink) coreEventToProtobuf(event *event.Event) *com_signalfx_metrics_protobuf.Event {
+	var ts int64
+	if event.Timestamp.IsZero() {
+		ts = 0
+	} else {
+		ts = event.Timestamp.UnixNano() / time.Millisecond.Nanoseconds()
+	}
+	etype := event.EventType
+	ecat := toEC(event.Category)
+	ev := &com_signalfx_metrics_protobuf.Event{
+		EventType:  &etype,
+		Category:   &ecat,
+		Dimensions: mapToDimensions(event.Dimensions),
+		Properties: mapToProperties(event.Properties),
+		Timestamp:  &ts,
+	}
+	return ev
+
+}
+
+func mapToProperties(properties map[string]interface{}) []*com_signalfx_metrics_protobuf.Property {
+	var response = make([]*com_signalfx_metrics_protobuf.Property, 0, len(properties))
+	for k, v := range properties {
+		kv := k
+		pv := rawToProtobuf(v)
+		if pv != nil && k != "" {
+			response = append(response, &com_signalfx_metrics_protobuf.Property{
+				Key:   &kv,
+				Value: pv,
+			})
+		}
+	}
+	return response
+}
+
+// NewHTTPSink creates a default NewHTTPSink using package level constants as
+// defaults, including an empty auth token.  If sending directly to SiganlFx, you will be required
+// to explicitly set the AuthToken
+func NewHTTPSink() *HTTPSink {
+	return &HTTPSink{
+		EventEndpoint:     EventIngestEndpointV2,
+		DatapointEndpoint: IngestEndpointV2,
+		UserAgent:         DefaultUserAgent,
+		Client: http.Client{
+			Timeout: DefaultTimeout,
+		},
+		protoMarshaler: proto.Marshal,
+	}
 }

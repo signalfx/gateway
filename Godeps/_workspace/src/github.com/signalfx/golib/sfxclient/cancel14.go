@@ -3,14 +3,16 @@
 package sfxclient
 
 import (
-	"golang.org/x/net/context"
 	"net/http"
+
+	"golang.org/x/net/context"
 )
 
-func (h *HTTPDatapointSink) withCancel(ctx context.Context, req *http.Request) (err error) {
-	type canceler interface {
-		CancelRequest(*http.Request)
-	}
+type canceler interface {
+	CancelRequest(*http.Request)
+}
+
+func (h *HTTPSink) withCancel(ctx context.Context, req *http.Request) (err error) {
 	canCancel, ok := h.Client.Transport.(canceler)
 	if !ok {
 		return h.handleResponse(h.Client.Do(req))

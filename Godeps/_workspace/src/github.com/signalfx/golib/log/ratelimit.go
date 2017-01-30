@@ -42,3 +42,12 @@ func (r *RateLimitedLogger) Disabled() bool {
 	now := r.now()
 	return r.EventCounter.Events(now, 0) > r.Limit || IsDisabled(r.Logger)
 }
+
+// NewOnePerSecond returns a *RateLimitedLogger that allows one message per second
+func NewOnePerSecond(log Logger) *RateLimitedLogger {
+	return &RateLimitedLogger{
+		EventCounter: eventcounter.New(time.Now(), time.Second),
+		Limit:        1,
+		Logger:       log,
+	}
+}

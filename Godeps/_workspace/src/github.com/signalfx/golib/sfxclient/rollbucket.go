@@ -21,8 +21,8 @@ var DefaultBucketWidth = time.Second * 20
 // DefaultHistogramSize is the default number of windows RollingBucket uses for created histograms
 var DefaultHistogramSize = 80
 
-// DefaultMaxPipeline is the default number of past bucket Quantile values RollingBucket saves until a Datapoints() call
-var DefaultMaxPipeline = 100
+// DefaultMaxBufferSize is the default number of past bucket Quantile values RollingBucket saves until a Datapoints() call
+var DefaultMaxBufferSize = 100
 
 // RollingBucket keeps histogram style metrics over a BucketWidth window of time.  It allows users
 // to collect and report percentile metrics like like median or p99, as well as min/max/sum/count
@@ -39,9 +39,9 @@ type RollingBucket struct {
 	BucketWidth time.Duration
 	// Hist is an efficient tracker of numeric values for a histogram
 	Hist *gohistogram.NumericHistogram
-	// MaxFlushPipeline is the maximum size of a window to keep for the RollingBucket before
+	// MaxFlushBufferSize is the maximum size of a window to keep for the RollingBucket before
 	// quantiles are dropped.  It is ideally close to len(quantiles) * 3 + 15
-	MaxFlushPipeline int
+	MaxFlushBufferSize int
 	// Timer is used to track time.Now() during default value add calls
 	Timer timekeeper.TimeKeeper
 
@@ -71,7 +71,7 @@ func NewRollingBucket(metricName string, dimensions map[string]string) *RollingB
 		Quantiles:          DefaultQuantiles,
 		BucketWidth:        DefaultBucketWidth,
 		Hist:               gohistogram.NewHistogram(DefaultHistogramSize),
-		MaxFlushPipeline: DefaultMaxPipeline,
+		MaxFlushBufferSize: DefaultMaxBufferSize,
 		Timer:              &timekeeper.RealTime{},
 	}
 }
@@ -150,8 +150,8 @@ func (r *RollingBucket) updateTime(t time.Time) {
 	// Note: The tail of the bucket is exclusive
 	if !t.Before(r.bucketEndTime) {
 		r.pointsToFlush = append(r.pointsToFlush, r.flushPoints()...)
-		if len(r.pointsToFlush) > r.MaxFlushPipeline {
-			r.pointsToFlush = r.pointsToFlush[:r.MaxFlushPipeline]
+		if len(r.pointsToFlush) > r.MaxFlushBufferSize {
+			r.pointsToFlush = r.pointsToFlush[:r.MaxFlushBufferSize]
 		}
 		r.bucketStartTime = r.bucketEndTime
 		r.bucketEndTime = r.bucketEndTime.Add(r.BucketWidth)

@@ -32,7 +32,7 @@ func init() {
 	globalEventSource.Dims = map[string]string{"host": "mwp-signalbox", "plugin": "my_plugin", "f": "x", "plugin_instance": "my_plugin_instance", "k": "v"}
 	globalEventSource.Meta = map[string]interface{}{"string": "value", "boolean": true, "int": int64(40), "double": 0.0}
 	globalEventSource.TimeSource = time.Now
-	globalEventSource.EventCategory = "COLLECTD"
+	globalEventSource.Category = event.COLLECTD
 }
 
 // Next returns a unique datapoint
@@ -51,12 +51,12 @@ func DP() *datapoint.Datapoint {
 type EventSource struct {
 	mu sync.Mutex
 
-	CurrentIndex  int64
-	EventType     string
-	EventCategory string
-	Dims          map[string]string
-	Meta          map[string]interface{}
-	TimeSource    func() time.Time
+	CurrentIndex int64
+	EventType    string
+	Category     event.Category
+	Dims         map[string]string
+	Meta         map[string]interface{}
+	TimeSource   func() time.Time
 }
 
 var globalEventSource EventSource
@@ -72,7 +72,7 @@ func (d *EventSource) Next() *event.Event {
 	}
 	dims["index"] = strconv.FormatInt(atomic.AddInt64(&d.CurrentIndex, 1), 10)
 
-	return event.NewWithProperties(d.EventType, d.EventCategory, d.Dims, d.Meta, d.TimeSource())
+	return event.NewWithProperties(d.EventType, d.Category, d.Dims, d.Meta, d.TimeSource())
 }
 
 // E generates and returns a unique event to use for testing purposes

@@ -32,6 +32,8 @@ var (
 
 	// DiscoService is the name of a service in disco
 	DiscoService = log.Key("service")
+	// DiscoNode is the name of an ephemeral node in disco
+	DiscoNode = log.Key("node")
 	// GUID is the ID attached to a disco advertiser
 	GUID = log.Key("GUID")
 	// Protocol is the method of sending information
