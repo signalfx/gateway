@@ -43,7 +43,7 @@ function do_cache() {
   (
     cd "$SRC_PATH"
     load_docker_images
-    LD_FLAGS="-X main.Version=$BUILD_VERSION -X main.BuildDate=$(date --rfc-3339=seconds | sed 's/ /T/')"
+    LD_FLAGS="-X main.Version=$BUILD_VERSION -X main.BuildDate=$(date --rfc-3339=seconds | sed 's/ /T/') -s -w"
     GOPATH="$GOPATH:$(godep path)" CGO_ENABLED=0 go build -ldflags "$LD_FLAGS" -v -installsuffix .
     docker build -t "$(docker_url)" .
     cache_docker_image "$(docker_url)" metricproxy
