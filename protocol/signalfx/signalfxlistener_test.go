@@ -2,6 +2,7 @@ package signalfx
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
@@ -121,7 +122,7 @@ func TestSignalfxProtobufV1Decoder(t *testing.T) {
 	})
 }
 
-func verifyEventRequest(baseURI string, contentType string, path string, body io.Reader, channel *dptest.BasicSink, eventType string, category string, dimensions map[string]string, properties map[string]interface{}, reqErr error) {
+func verifyEventRequest(baseURI string, contentType string, path string, body io.Reader, channel *dptest.BasicSink, eventType string, category event.Category, dimensions map[string]string, properties map[string]interface{}, reqErr error) {
 	Convey("given a new request with path "+path, func() {
 		req, err := http.NewRequest("POST", baseURI+path, body)
 		if reqErr != nil {
@@ -173,12 +174,6 @@ func TestSignalfxListenerFailure(t *testing.T) {
 	})
 }
 
-func TestMapToProperties(t *testing.T) {
-	if len(mapToProperties(map[string]interface{}{"test": errors.New("unknown")})) > 0 {
-		t.Error("Unexpected map length")
-	}
-}
-
 func TestCheckResp(t *testing.T) {
 	Convey("With a resp", t, func() {
 		resp := &http.Response{
@@ -202,6 +197,25 @@ func TestCheckResp(t *testing.T) {
 			So(errors.Details(checkResp(resp)), ShouldContainSubstring, "Resp body not ok")
 		})
 	})
+}
+
+func checkResp(resp *http.Response) error {
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return errors.Annotate(err, "unable to verify response body")
+	}
+	if resp.StatusCode != 200 {
+		return errors.Errorf("invalid status code: %d", resp.StatusCode)
+	}
+	var body string
+	err = json.Unmarshal(respBody, &body)
+	if err != nil {
+		return errors.Annotate(err, string(respBody))
+	}
+	if body != "OK" {
+		return errors.Errorf("Resp body not ok: %s", respBody)
+	}
+	return nil
 }
 
 func TestSignalfxListener(t *testing.T) {
@@ -245,10 +259,6 @@ func TestSignalfxListener(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(len(forwarder.Datapoints()), ShouldEqual, 1)
 			So(forwarder.Pipeline(), ShouldEqual, 0)
-			Convey("event post to nowhere should fail", func() {
-				forwarder.eventURL = "http://localhost:1"
-				So(forwarder.AddEvents(ctx, []*event.Event{dptest.E()}), ShouldNotBeNil)
-			})
 			Convey("Should be able to send a point", func() {
 				dpSent := dptest.DP()
 				dpSent.Timestamp = dpSent.Timestamp.Round(time.Millisecond)
@@ -275,12 +285,6 @@ func TestSignalfxListener(t *testing.T) {
 			})
 			Convey("Should be able to send zero len datapoints", func() {
 				So(forwarder.AddDatapoints(ctx, []*datapoint.Datapoint{}), ShouldBeNil)
-			})
-			Convey("Should check event marshal failures", func() {
-				forwarder.protoMarshal = func(pb proto.Message) ([]byte, error) {
-					return nil, errors.New("nope")
-				}
-				So(forwarder.AddEvents(ctx, []*event.Event{dptest.E()}), ShouldNotBeNil)
 			})
 			Convey("Should be able to send events", func() {
 				eventSent := dptest.E()
@@ -335,13 +339,13 @@ func TestSignalfxListener(t *testing.T) {
 		Convey("given a json body without a timestamp or category", func() {
 			body := bytes.NewBuffer([]byte(`[{"eventType": "mwp.test2", "dimensions": {"instance": "mwpinstance4", "host": "myhost-4", "service": "myservice4"}, "properties": {"version": "2015-11-23-4"}}]`))
 			Convey("verify the timestamp is filled in and the category becomes USER_DEFINED", func() {
-				verifyEventRequest(baseURI, "application/json", "/v2/event", body, sendTo, "mwp.test2", "USER_DEFINED", map[string]string{"instance": "mwpinstance4", "host": "myhost-4", "service": "myservice4"}, map[string]interface{}{"version": "2015-11-23-4"}, nil)
+				verifyEventRequest(baseURI, "application/json", "/v2/event", body, sendTo, "mwp.test2", event.USERDEFINED, map[string]string{"instance": "mwpinstance4", "host": "myhost-4", "service": "myservice4"}, map[string]interface{}{"version": "2015-11-23-4"}, nil)
 			})
 		})
 		Convey("given a json body with a timestamp and category ALERT", func() {
 			body := bytes.NewBuffer([]byte(`[{"category":"ALERT", "eventType": "mwp.test2", "dimensions": {"instance": "mwpinstance4", "host": "myhost-4", "service": "myservice4"}, "properties": {"version": "2015-11-23-4"}, "timestamp":12345}]`))
 			Convey("verify the timestamp is acurate the category is ALERT", func() {
-				verifyEventRequest(baseURI, "application/json", "/v2/event", body, sendTo, "mwp.test2", "ALERT", map[string]string{"instance": "mwpinstance4", "host": "myhost-4", "service": "myservice4"}, map[string]interface{}{"version": "2015-11-23-4"}, nil)
+				verifyEventRequest(baseURI, "application/json", "/v2/event", body, sendTo, "mwp.test2", event.ALERT, map[string]string{"instance": "mwpinstance4", "host": "myhost-4", "service": "myservice4"}, map[string]interface{}{"version": "2015-11-23-4"}, nil)
 			})
 		})
 		Convey("Should be able to send a v2 JSON point", func() {
@@ -400,7 +404,7 @@ func TestSignalfxListener(t *testing.T) {
 			trySend(body, "application/json", "/v2/event")
 			eventSent := event.Event{
 				EventType: "ET",
-				Category:  "cat",
+				Category:  event.USERDEFINED,
 				Timestamp: now,
 			}
 			eventSeen := sendTo.NextEvent()

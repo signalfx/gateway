@@ -46,6 +46,16 @@ func Int64(i int64) *int64 {
 	return &i
 }
 
+// Bool returns a pointer to a bool
+func Bool(b bool) *bool {
+	return &b
+}
+
+// Float64 returns a pointer to a float64
+func Float64(b float64) *float64 {
+	return &b
+}
+
 func canNil(k reflect.Kind) bool {
 	return k == reflect.Chan || k == reflect.Func || k == reflect.Map || k == reflect.Ptr || k == reflect.Interface || k == reflect.Slice
 }

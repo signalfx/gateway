@@ -1,17 +1,17 @@
 // Package sfxclient creates convenient go functions and wrappers to send metrics to SignalFx.
 //
-// The core of the library is HTTPDatapointSink which allows users to send metrics to SignalFx
+// The core of the library is HTTPSink which allows users to send metrics and events to SignalFx
 // ad-hoc.  A Scheduler is built on top of this to facility easy management of metrics for multiple
 // SignalFx reporters at once in more complex libraries.
 //
-// HTTPDatapointSink
+// HTTPSink
 //
-// The simplest way to send metrics to SignalFx is with HTTPDatapointSink.  The only struct
+// The simplest way to send metrics and events to SignalFx is with HTTPSink.  The only struct
 // parameter that needs to be configured is AuthToken.  To make it easier to create common
 // Datapoint objects, wrappers exist for Gauge and Cumulative.  An example of sending a hello
 // world metric would look like this:
 //     func SendHelloWorld() {
-//         client := NewHTTPDatapointSink()
+//         client := NewHTTPSink()
 //         client.AuthToken = "ABCDXYZ"
 //         ctx := context.Background()
 //         client.AddDatapoints(ctx, []*datapoint.Datapoint{
@@ -33,7 +33,7 @@
 //     }
 //     func main() {
 //         scheduler := sfxclient.NewScheduler()
-//         scheduler.Sink.(*HTTPDatapointSink).AuthToken = "ABCD-XYZ"
+//         scheduler.Sink.(*HTTPSink).AuthToken = "ABCD-XYZ"
 //         app := &CustomApplication{}
 //         scheduler.AddCallback(app)
 //         go scheduler.Schedule(context.Background())
@@ -154,7 +154,7 @@ type Scheduler struct {
 // interval.
 func NewScheduler() *Scheduler {
 	return &Scheduler{
-		Sink:             NewHTTPDatapointSink(),
+		Sink:             NewHTTPSink(),
 		Timer:            timekeeper.RealTime{},
 		ErrorHandler:     DefaultErrorHandler,
 		ReportingDelayNs: DefaultReportingDelay.Nanoseconds(),

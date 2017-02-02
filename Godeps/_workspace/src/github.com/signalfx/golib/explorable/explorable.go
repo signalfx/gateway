@@ -41,7 +41,7 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 			nonEmptyParts = append(nonEmptyParts, p)
 		}
 	}
-	logger.Log(logkey.ExplorableParts, nonEmptyParts, logkey.URL, r.URL, "Exploring object")
+	logger.Log(logkey.ExplorableParts, fmt.Sprintf("%v", nonEmptyParts), logkey.URL, r.URL, "Exploring object")
 	o := ExploreObject(reflect.ValueOf(h.Val), nonEmptyParts)
 
 	parent := ""

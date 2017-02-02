@@ -5,25 +5,29 @@
 Package signalfx creates convenient go functions and wrappers to send metrics to
 SignalFx.
 
-The core of the library is HTTPDatapointSink which allows users to send metrics
+The core of the library is HTTPSink which allows users to send metrics
 to SignalFx ad-hoc. A Scheduler is built on top of this to facility easy
 management of metrics for multiple SignalFx reporters at once in more complex
 libraries.
 
 
-### HTTPDatapointSink
+### HTTPSink
 
-The simplest way to send metrics to SignalFx is with HTTPDatapointSink. The only
+The simplest way to send metrics to SignalFx is with HTTPSink. The only
 struct parameter that needs to be configured is AuthToken. To make it easier to
 create common Datapoint objects, wrappers exist for Gauge and Cumulative. An
 example of sending a hello world metric would look like this:
 
     func SendHelloWorld() {
-        client := NewHTTPDatapointSink()
+        client := NewHTTPSink()
         client.AuthToken = "ABCDXYZ"
         ctx := context.Background()
         client.AddDatapoints(ctx, []*datapoint.Datapoint{
             GaugeF("hello.world", nil, 1.0),
+        })
+        dims = make(map[string]string)
+        client.AddEvents(ctx, []*event.Event{
+            event.New("hello.world", event.USERDEFINED, dims, time.Time{}),
         })
     }
 
@@ -44,7 +48,7 @@ some periodic interval.
     }
     func main() {
         scheduler := sfxclient.NewScheduler()
-        scheduler.Sink.(*HTTPDatapointSink).AuthToken = "ABCD-XYZ"
+        scheduler.Sink.(*HTTPSink).AuthToken = "ABCD-XYZ"
         app := &CustomApplication{}
         scheduler.AddCallback(app)
         go scheduler.Schedule(context.Background())
@@ -73,9 +77,10 @@ existing Scheduler.
     + [func (*CumulativeBucket) Add](#func-cumulativebucket-add)
     + [func (*CumulativeBucket) Datapoints](#func-cumulativebucket-datapoints)
     + [func (*CumulativeBucket) MultiAdd](#func-cumulativebucket-multiadd)
-* [type HTTPDatapointSink](#type-httpdatapointsink)
-    + [func  NewHTTPDatapointSink](#func--newhttpdatapointsink)
-    + [func (*HTTPDatapointSink) AddDatapoints](#func-httpdatapointsink-adddatapoints)
+* [type HTTPSink](#type-httpsink)
+    + [func  NewHTTPSink](#func--newhttpsink)
+    + [func (*HTTPSink) AddDatapoints](#func-httpsink-adddatapoints)
+    + [func (*HTTPSink) AddEvents](#func-httpsink-addevents)
 * [type HashableCollector](#type-hashablecollector)
     + [func  CollectorFunc](#func--collectorfunc)
     + [func (*HashableCollector) Datapoints](#func-hashablecollector-datapoints)
@@ -157,9 +162,9 @@ DefaultHistogramSize is the default number of windows RollingBucket uses for
 created histograms
 
 ```go
-var DefaultMaxPipeline = 100
+var DefaultMaxBufferSize = 100
 ```
-DefaultMaxPipeline is the default number of past bucket Quantile values
+DefaultMaxBufferSize is the default number of past bucket Quantile values
 RollingBucket saves until a Datapoints() call
 
 ```go
@@ -268,35 +273,43 @@ func (b *CumulativeBucket) MultiAdd(res *Result)
 MultiAdd many items into the bucket at once using a Result. This can be more
 efficient as it involves only a constant number of atomic operations.
 
-#### type [HTTPDatapointSink](#httpdatapointsink)
+#### type [HTTPSink](#httpsink)
 
 ```go
-type HTTPDatapointSink struct {
-	AuthToken string
-	UserAgent string
-	Endpoint  string
-	Client    http.Client
+type HTTPSink struct {
+	AuthToken          string
+	UserAgent          string
+	DatapointEndpoint  string
+    EventEndpoint      string
+	Client             http.Client
 }
 ```
 
-HTTPDatapointSink will accept signalfx datapoints and forward them to SignalFx
+HTTPSink will accept signalfx datapoints and forward them to SignalFx
 via HTTP.
 
-#### func  [NewHTTPDatapointSink](#newhttpdatapointsink)
+#### func  [NewHTTPSink](#newhttpsink)
 
 ```go
-func NewHTTPDatapointSink() *HTTPDatapointSink
+func NewHTTPSink() *HTTPSink
 ```
-NewHTTPDatapointSink creates a default NewHTTPDatapointSink using package level
+NewHTTPSink creates a default NewHTTPSink using package level
 constants as defaults, including an empty auth token. If sending directly to
 SiganlFx, you will be required to explicitly set the AuthToken
 
-#### func (*HTTPDatapointSink) [AddDatapoints](#adddatapoints)
+#### func (*HTTPSink) [AddDatapoints](#adddatapoints)
 
 ```go
-func (h *HTTPDatapointSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) (err error)
+func (h *HTTPSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) (err error)
 ```
 AddDatapoints forwards the datapoints to SignalFx.
+
+#### func (*HTTPSink) [AddEvents](#addevents)
+
+```go
+func (h *HTTPSink) AddEvents(ctx context.Context, points []*event.Event) (err error)
+```
+AddEvents forwards the events to SignalFx.
 
 #### type [HashableCollector](#hashablecollector)
 
@@ -375,9 +388,9 @@ type RollingBucket struct {
 	BucketWidth time.Duration
 	// Hist is an efficient tracker of numeric values for a histogram
 	Hist *gohistogram.NumericHistogram
-	// MaxFlushPipeline is the maximum size of a window to keep for the RollingBucket before
+	// MaxFlushBufferSize is the maximum size of a window to keep for the RollingBucket before
 	// quantiles are dropped.  It is ideally close to len(quantiles) * 3 + 15
-	MaxFlushPipeline int
+	MaxFlushBufferSize int
 	// Timer is used to track time.Now() during default value add calls
 	Timer timekeeper.TimeKeeper
 }
