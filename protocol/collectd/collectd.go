@@ -75,7 +75,13 @@ func NewDatapoint(point *JSONWriteFormat, index uint, defaultDimensions map[stri
 	addIfNotNullOrEmpty(dimensions, "dsname", !usedDsName, dsname)
 
 	timestamp := time.Unix(0, int64(float64(time.Second)**point.Time))
-	return datapoint.New(metricName, dimensions, datapoint.NewFloatValue(*val), metricType, timestamp)
+	var value datapoint.Value
+	if *val == float64(int64(*val)) {
+		value = datapoint.NewIntValue(int64(*val))
+	} else {
+		value = datapoint.NewFloatValue(*val)
+	}
+	return datapoint.New(metricName, dimensions, value, metricType, timestamp)
 }
 
 func addIfNotNullOrEmpty(dimensions map[string]string, key string, cond bool, val *string) {

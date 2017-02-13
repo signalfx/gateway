@@ -7,6 +7,7 @@ import (
 	"github.com/signalfx/gohelpers/workarounds"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/stretchr/testify/assert"
+	"math"
 	"math/rand"
 	"strconv"
 )
@@ -105,7 +106,7 @@ const testDecodeCollectdBody = `[
         "type": "",
         "type_instance": "free",
         "values": [
-            5.36202e+09
+            1.7976931348623157e+308
         ]
     },
     {
@@ -123,7 +124,7 @@ const testDecodeCollectdBody = `[
         "type": "memory",
         "type_instance": "free",
         "values": [
-            5.36202e+09
+            2.147483647e+09
         ]
     }
 ]`
@@ -166,11 +167,13 @@ func TestCollectdJsonDecoding(t *testing.T) {
 	assert.Equal(t, "free", dp.Metric, "Metric not named correctly")
 	dp = NewDatapoint((*postFormat)[4], uint(0), emptyMap)
 	f := dp.Value.(datapoint.FloatValue).Float()
-	assert.Equal(t, 5.36202e+09, f, "Cannot parse value correctly")
+	assert.Equal(t, math.MaxFloat64, f, "Cannot parse value correctly")
 
 	dp = NewDatapoint((*postFormat)[5], uint(0), emptyMap)
 	assert.Equal(t, "memory.free", dp.Metric)
 	assert.Equal(t, 3, len(dp.Dimensions))
+	i := dp.Value.(datapoint.IntValue).Int()
+	assert.Equal(t, int64(math.MaxInt32), i, "Cannot parse value correctly")
 }
 
 func TestCollectdEventJsonDecoding(t *testing.T) {

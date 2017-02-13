@@ -38,6 +38,9 @@ type ValueToSend interface {
 func ValueToValue(v ValueToSend) (datapoint.Value, error) {
 	f, ok := v.(float64)
 	if ok {
+		if f == float64(int64(f)) {
+			return datapoint.NewIntValue(int64(f)), nil
+		}
 		return datapoint.NewFloatValue(f), nil
 	}
 	i, ok := v.(int64)
