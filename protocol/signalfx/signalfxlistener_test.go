@@ -480,3 +480,73 @@ func TestSignalfxListener(t *testing.T) {
 		})
 	})
 }
+
+type fastSink struct {
+	dp    *datapoint.Datapoint
+	count int64
+}
+
+func (f *fastSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
+	f.dp = points[0]
+	f.count++
+	return nil
+}
+
+// AddEvents buffers the event on an internal chan or returns errors if RetErr is set
+func (f *fastSink) AddEvents(ctx context.Context, points []*event.Event) error {
+	return nil
+}
+
+func BenchmarkJSONDecoderV2_Read(b *testing.B) {
+	v2Body := fmt.Sprintf(`{"gauge": [{"metric":"bob", "value": 7, "timestamp": %d}]}`, time.Now().UnixNano()/time.Millisecond.Nanoseconds())
+	s := &fastSink{}
+
+	dec := &JSONDecoderV2{Sink: s, Logger: log.DefaultLogger}
+	ctx := context.Background()
+	req := &http.Request{
+		Body: ioutil.NopCloser(bytes.NewReader([]byte(v2Body))),
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := dec.Read(ctx, req)
+		if err != nil {
+			fmt.Println(i)
+			b.Fatal(err)
+		}
+		req = &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader([]byte(v2Body))),
+		}
+	}
+	b.StopTimer()
+	if _, ok := s.dp.Value.(datapoint.IntValue); ok {
+		b.Log("was an int")
+	}
+	if _, ok := s.dp.Value.(datapoint.FloatValue); ok {
+		b.Log("was a float")
+	}
+	v2FloatBody := fmt.Sprintf(`{"gauge": [{"metric":"bob", "value": 3.1, "timestamp": %d}]}`, time.Now().UnixNano()/time.Millisecond.Nanoseconds())
+	req = &http.Request{
+		Body: ioutil.NopCloser(bytes.NewReader([]byte(v2FloatBody))),
+	}
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		err := dec.Read(ctx, req)
+		if err != nil {
+			fmt.Println(i)
+			b.Fatal(err)
+		}
+		req = &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader([]byte(v2FloatBody))),
+		}
+	}
+	b.StopTimer()
+	if s.count == 0 {
+		b.Fatal("nothing happened")
+	}
+	if _, ok := s.dp.Value.(datapoint.IntValue); ok {
+		b.Log("was an int")
+	}
+	if _, ok := s.dp.Value.(datapoint.FloatValue); ok {
+		b.Log("was a float")
+	}
+}

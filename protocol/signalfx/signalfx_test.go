@@ -11,21 +11,41 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/pointer"
+	"math"
 )
 
 func TestValueToValue(t *testing.T) {
+	testVal := func(toSend interface{}, expected string) datapoint.Value {
+		dv, err := ValueToValue(toSend)
+		So(err, ShouldBeNil)
+		So(expected, ShouldEqual, dv.String())
+		return dv
+	}
 	Convey("v2v conversion", t, func() {
-		testVal := func(toSend interface{}, expected string) {
-			dv, err := ValueToValue(toSend)
-			So(err, ShouldBeNil)
-			So(expected, ShouldEqual, dv.String())
-		}
-		testVal(int64(1), "1")
-		testVal(float64(.2), "0.2")
-		testVal(int(3), "3")
-		testVal("4", "4")
-		_, err := ValueToValue(errors.New("testing"))
-		So(err, ShouldNotBeNil)
+		Convey("test basic conversions", func() {
+			testVal(int64(1), "1")
+			testVal(float64(.2), "0.2")
+			testVal(int(3), "3")
+			testVal("4", "4")
+			_, err := ValueToValue(errors.New("testing"))
+			So(err, ShouldNotBeNil)
+		})
+		Convey("show that maxfloat64 is too large to be a long", func() {
+			dv := testVal(math.MaxFloat64, "179769313486231570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+			_, ok := dv.(datapoint.FloatValue)
+			So(ok, ShouldBeTrue)
+
+		})
+		Convey("show that maxint32 will be a long", func() {
+			dv := testVal(math.MaxInt32, "2147483647")
+			_, ok := dv.(datapoint.IntValue)
+			So(ok, ShouldBeTrue)
+		})
+		Convey("show that float(maxint64) will be a float due to edgyness of conversions", func() {
+			dv := testVal(float64(math.MaxInt64), "9223372036854776000")
+			_, ok := dv.(datapoint.FloatValue)
+			So(ok, ShouldBeTrue)
+		})
 	})
 }
 
