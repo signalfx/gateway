@@ -602,6 +602,7 @@ func SetupJSONV2EventPaths(r *mux.Router, handler http.Handler) {
 // endpoint) should see
 func SetupJSONByPaths(r *mux.Router, handler http.Handler, endpoint string) {
 	r.Path(endpoint).Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
+	r.Path(endpoint).Methods("POST").Headers("Content-Type", "application/json; charset=UTF-8").Handler(handler)
 	r.Path(endpoint).Methods("POST").Headers("Content-Type", "").HandlerFunc(web.InvalidContentType)
 	r.Path(endpoint).Methods("POST").Handler(handler)
 }
