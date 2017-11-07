@@ -35,6 +35,7 @@ function do_cache() {
   install_go_version "$GO_COMPILER_PATH" "$DEFAULT_GOLANG_VERSION"
   go get -u github.com/signalfx/gobuild
   go get -u github.com/alecthomas/gometalinter
+  go get -u github.com/prometheus/prometheus/prompb
   mkdir -p "$GOPATH_INTO"
   install_shellcheck "$GOPATH_INTO"
   copy_local_to_path "$SRC_PATH"

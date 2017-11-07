@@ -161,7 +161,7 @@ var defaultListenerConfig = &ListenerConfig{
 	StartingContext: context.Background(),
 }
 
-// NewListener servers http collectd requests
+// NewListener serves http collectd requests
 func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer, error) {
 	conf := pointer.FillDefaultFrom(passedConf, defaultListenerConfig).(*ListenerConfig)
 
