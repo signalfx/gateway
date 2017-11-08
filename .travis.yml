@@ -3,28 +3,18 @@ language: go
 sudo: false
 
 go:
-  - 1.6
+  - 1.8
 
 before_install:
-  - wget "http://ftp.debian.org/debian/pool/main/s/shellcheck/shellcheck_0.3.4-3_amd64.deb"
-  - dpkg -x shellcheck_0.3.4-3_amd64.deb $HOME
+  - wget "http://ftp.debian.org/debian/pool/main/s/shellcheck/shellcheck_0.4.6-1_amd64.deb"
+  - dpkg -x shellcheck_0.4.6-1_amd64.deb $HOME
   - export PATH=$HOME/usr/bin:$PATH
-  - go get github.com/tools/godep
-  - go get github.com/signalfx/goverify
-  - go get github.com/signalfx/gobuild
-  - go get github.com/signalfx/gocoverdir
-  - go get github.com/axw/gocov/gocov
-  - go get github.com/mattn/goveralls
+  - go get -u github.com/signalfx/gobuild
+  - go get -u github.com/alecthomas/gometalinter
+  - gometalinter --install
   - gem install mdl
-
-install:
-  - godep go install -v .
 
 script:
   - export PATH=$HOME/gopath/bin:$PATH
   - export GOCOVERDIR_DIR="."
-  - ./travis_check.sh
-  - goveralls -coverprofile=coverage.out -service=travis-ci
-
-after_script:
-  - cat coverage.out
+  - ./scripts/travis_check.sh

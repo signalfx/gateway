@@ -1,0 +1,221 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "5rPfda8jFccr3A6heL+JAmi9K9g=",
+			"path": "github.com/davecgh/go-spew/spew",
+			"revision": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
+		},
+		{
+			"checksumSHA1": "FczzogSoZcKU3h21tCUyHzMsnBY=",
+			"path": "github.com/golang/protobuf/proto",
+			"revision": "bf531ff1a004f24ee53329dfd5ce0b41bfdc17df"
+		},
+		{
+			"checksumSHA1": "heMa8aseS2k6NeJYumwo/xeKToY=",
+			"comment": "go1.5-45-g19e100e",
+			"path": "github.com/gopherjs/gopherjs/js",
+			"revision": "19e100e9652485a76176bc5fd2669f57d3a2743c"
+		},
+		{
+			"checksumSHA1": "iIUYZyoanCQQTUaWsu8b+iOSPt4=",
+			"comment": "v1.1-2-ga8d44e7",
+			"path": "github.com/gorilla/context",
+			"revision": "a8d44e7d8e4d532b6a27a02dd82abb31cc1b01bd"
+		},
+		{
+			"checksumSHA1": "xF+WqeL9eAlbUkiO2bLghMQzO4k=",
+			"comment": "v1.1",
+			"path": "github.com/gorilla/mux",
+			"revision": "0eeaf8392f5b04950925b8a69fe70f110fa7cbfc"
+		},
+		{
+			"checksumSHA1": "tewA7jXVGCw1zb5mA0BDecWi4iQ=",
+			"comment": "v4.2.0",
+			"path": "github.com/jtolds/gls",
+			"revision": "8ddce2a84170772b95dd5d576c48d517b22cac63"
+		},
+		{
+			"checksumSHA1": "abKzFXAn0KDr5U+JON1ZgJ2lUtU=",
+			"path": "github.com/kr/logfmt",
+			"revision": "b84e30acd515aadc4b783ad4ff83aff3299bdfe0"
+		},
+		{
+			"checksumSHA1": "LuFv4/jlrmFNnDb/5SCSEPAM9vU=",
+			"path": "github.com/pmezard/go-difflib/difflib",
+			"revision": "792786c7400a136282c1664665ae0a8db921c6c2"
+		},
+		{
+			"checksumSHA1": "Vvm9cKGBDDKO6BHHDvyQ4ME3//o=",
+			"path": "github.com/signalfx/com_signalfx_metrics_protobuf",
+			"revision": "1477d7f5730360be99fcaf7e7d7c56e03be2eabc"
+		},
+		{
+			"checksumSHA1": "l9am2jOCG3AsRMZF6yHUJguPWYU=",
+			"path": "github.com/signalfx/gohelpers/stringhelper",
+			"revision": "ac9f0e053f1594a6565e3c6778ce2ef56900ec98"
+		},
+		{
+			"checksumSHA1": "U4aGGGuY4maP1phy+tEfn6S9Nig=",
+			"path": "github.com/signalfx/gohelpers/workarounds",
+			"revision": "ac9f0e053f1594a6565e3c6778ce2ef56900ec98"
+		},
+		{
+			"checksumSHA1": "47eomoBADlzqcm9/+l+obP+VYd4=",
+			"path": "github.com/signalfx/gohistogram",
+			"revision": "1ccfd2ff508314074672f4450a917011a2060408"
+		},
+		{
+			"checksumSHA1": "v7hz8W9CHtmSRfvSCFeXX3hzh5U=",
+			"path": "github.com/signalfx/golib/datapoint",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "ybH7OITlwRJLsrewUO448NEzVQs=",
+			"path": "github.com/signalfx/golib/datapoint/dpsink",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "yyH3QGWY3H9KFPwalqx+ZWPcDNM=",
+			"path": "github.com/signalfx/golib/datapoint/dptest",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "GuSggAzlI13Uu1yZ9rM8puMTEi8=",
+			"path": "github.com/signalfx/golib/errors",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "TKw8OWEUCx543Q1t2JszNxgS6Mg=",
+			"path": "github.com/signalfx/golib/event",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "TVb+/MOLmMBr4ZJ2qLQUbsyL5is=",
+			"path": "github.com/signalfx/golib/eventcounter",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "OFrPOY5sCUCxCJwS9EDWACTNksQ=",
+			"path": "github.com/signalfx/golib/explorable",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "29gulXpUnRTaBcQorpXbELFZoRM=",
+			"path": "github.com/signalfx/golib/expvar2",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "9u1IVJSTnAac1Ugd/9Hcu3nONiE=",
+			"path": "github.com/signalfx/golib/httpdebug",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "eekSTeSfgjaUfoYorQcRonUBN/0=",
+			"path": "github.com/signalfx/golib/log",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "N1czeG+M5llo4GkYkGjzdXqX+YQ=",
+			"path": "github.com/signalfx/golib/logkey",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "Rp9SRtpmfC8hbM2DH4Hu/bEYwAM=",
+			"path": "github.com/signalfx/golib/nettest",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "e437Xftv3lq51VGANp9KcH7cD8U=",
+			"path": "github.com/signalfx/golib/pointer",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "8umjAfnmHIfH/h5HUYYZrAoFcXk=",
+			"path": "github.com/signalfx/golib/sfxclient",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "kLiclgZJImywtHf9fXdY7D0PsvY=",
+			"path": "github.com/signalfx/golib/timekeeper",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "UA65Vf/M7UnAJsJpRHT+8kX1CB0=",
+			"path": "github.com/signalfx/golib/web",
+			"revision": "ddf42090f324cc1f632ad5e9bc2f974037c23670"
+		},
+		{
+			"checksumSHA1": "obE0xJc+ZsHkrdT5o4IOvu/caAM=",
+			"path": "github.com/signalfx/xdgbasedir",
+			"revision": "cd6a71c07e4e43eec22cbf1606ff14c327207445"
+		},
+		{
+			"checksumSHA1": "6AYg4fjEvFuAVN3wHakGApjhZAM=",
+			"comment": "1.6.0-2-g2d74a41",
+			"path": "github.com/smartystreets/assertions",
+			"revision": "2d74a419fbe076f8c76ed8b1c7c633a676c5dc63"
+		},
+		{
+			"checksumSHA1": "Vzb+dEH/LTYbvr8RXHmt6xJHz04=",
+			"comment": "1.6.0-2-g2d74a41",
+			"path": "github.com/smartystreets/assertions/internal/go-render/render",
+			"revision": "2d74a419fbe076f8c76ed8b1c7c633a676c5dc63"
+		},
+		{
+			"checksumSHA1": "QCsUvPHx/Ifqm+sJmocjSvePAIc=",
+			"comment": "1.6.0-2-g2d74a41",
+			"path": "github.com/smartystreets/assertions/internal/oglematchers",
+			"revision": "2d74a419fbe076f8c76ed8b1c7c633a676c5dc63"
+		},
+		{
+			"checksumSHA1": "/mwAihy9AmznMzmbPQ5nWJXBiRU=",
+			"comment": "1.6.1-20-gcc5d85f",
+			"path": "github.com/smartystreets/goconvey/convey",
+			"revision": "cc5d85f4f15bd2163abf0fe6e6753356dde72aa2"
+		},
+		{
+			"checksumSHA1": "9LakndErFi5uCXtY1KWl0iRnT4c=",
+			"comment": "1.6.1-20-gcc5d85f",
+			"path": "github.com/smartystreets/goconvey/convey/gotest",
+			"revision": "cc5d85f4f15bd2163abf0fe6e6753356dde72aa2"
+		},
+		{
+			"checksumSHA1": "FWDhk37bhAwZ2363D/L2xePwR64=",
+			"comment": "1.6.1-20-gcc5d85f",
+			"path": "github.com/smartystreets/goconvey/convey/reporting",
+			"revision": "cc5d85f4f15bd2163abf0fe6e6753356dde72aa2"
+		},
+		{
+			"checksumSHA1": "Bn333k9lTndxU3D6n/G5c+GMcYY=",
+			"comment": "v1.1.3-12-gc5d7a69",
+			"path": "github.com/stretchr/testify/assert",
+			"revision": "c5d7a69bf8a2c9c374798160849c071093e41dd1"
+		},
+		{
+			"checksumSHA1": "hKZGpbFuCrkE4s1vxubKK1aFlfI=",
+			"path": "golang.org/x/net/context",
+			"revision": "db8e4de5b2d6653f66aea53094624468caad15d2"
+		},
+		{
+			"checksumSHA1": "BL+BM1D6OaAgGKUVdcz5+LhLXrc=",
+			"comment": "v0.1.0",
+			"path": "gopkg.in/logfmt.v0",
+			"revision": "08ab82a63ef462ac643ec79e659f023891f588f5"
+		},
+		{
+			"checksumSHA1": "dsQ5n+qfjPnd1P5wA0y9LSwbs4A=",
+			"comment": "v1.0-16-g20b71e5",
+			"path": "gopkg.in/natefinch/lumberjack.v2",
+			"revision": "20b71e5b60d756d3d2f80def009790325acc2b23"
+		},
+		{
+			"checksumSHA1": "KWXr8TKxKwDFtYRUEp+jxT5C1Cs=",
+			"comment": "v1.5.0",
+			"path": "gopkg.in/stack.v1",
+			"revision": "ac4c579c437a23e1a15814c867ccb82122fb383b"
+		}
+	],
+	"rootPath": "github.com/signalfx/metricproxy"
+}
