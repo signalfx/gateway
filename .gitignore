@@ -4,3 +4,4 @@ metricproxy.pid
 /sfproxytest.json
 /metricproxy
 /sf
+/.go

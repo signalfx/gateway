@@ -9,6 +9,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
+	"strings"
 )
 
 var validConfig = `{
@@ -372,7 +373,7 @@ func TestInvalidMapToObject(t *testing.T) {
 		Convey("should parse the config and err", func() {
 			So(err, ShouldNotBeNil)
 			So(m, ShouldBeNil)
-			So(err.Error(), ShouldEqual, "json: cannot unmarshal number into Go value of type string")
+			So(strings.HasPrefix(err.Error(), "json: cannot unmarshal number"), ShouldBeTrue)
 		})
 	})
 }

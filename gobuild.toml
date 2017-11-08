@@ -10,7 +10,7 @@
     golint = true
     gofmt = true
     varcheck = true
-    aligncheck = true
+    maligned = true
     gocyclo = true
     vet = true
     deadcode = true

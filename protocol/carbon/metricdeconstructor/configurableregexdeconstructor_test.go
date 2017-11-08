@@ -5,6 +5,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
 )
 
@@ -218,7 +219,7 @@ func TestBadRegexConfig(t *testing.T) {
 		Convey("should parse the config and err", func() {
 			So(err, ShouldNotBeNil)
 			So(m, ShouldBeNil)
-			So(err.Error(), ShouldEqual, "json: cannot unmarshal string into Go value of type map[string]string")
+			So(strings.HasPrefix(err.Error(), "json: cannot unmarshal string"), ShouldBeTrue)
 		})
 	})
 	Convey("Given the bad config with bad json", t, func() {

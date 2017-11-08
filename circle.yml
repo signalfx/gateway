@@ -13,20 +13,20 @@ dependencies:
     - ~/lints
     - ~/docker_images
   override:
-    - ./circle.sh cache > >(tee $CIRCLE_ARTIFACTS/cache.stdout.txt) 2> >(tee $CIRCLE_ARTIFACTS/cache.stderr.txt >&2)
+    - ./scripts/circle.sh cache > >(tee $CIRCLE_ARTIFACTS/cache.stdout.txt) 2> >(tee $CIRCLE_ARTIFACTS/cache.stderr.txt >&2)
 
 test:
   override:
-    - ./circle.sh test > >(tee $CIRCLE_ARTIFACTS/test.stdout.txt) 2> >(tee $CIRCLE_ARTIFACTS/test.stderr.txt >&2)
+    - ./scripts/circle.sh test > >(tee $CIRCLE_ARTIFACTS/test.stdout.txt) 2> >(tee $CIRCLE_ARTIFACTS/test.stderr.txt >&2)
 
 deployment:
   quaybranch:
     branch: [release, /feature.*/]
     commands:
       - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS quay.io
-      - ./circle.sh deploy > >(tee $CIRCLE_ARTIFACTS/cache.deploy.txt) 2> >(tee $CIRCLE_ARTIFACTS/cache.deploy.txt >&2)
+      - ./scripts/circle.sh deploy > >(tee $CIRCLE_ARTIFACTS/cache.deploy.txt) 2> >(tee $CIRCLE_ARTIFACTS/cache.deploy.txt >&2)
   quaytag:
     tag: /v[0-9]+(\.[0-9]+)*/
     commands:
       - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS quay.io
-      - ./circle.sh deploy > >(tee $CIRCLE_ARTIFACTS/cache.deploy.txt) 2> >(tee $CIRCLE_ARTIFACTS/cache.deploy.txt >&2)
+      - ./scripts/circle.sh deploy > >(tee $CIRCLE_ARTIFACTS/cache.deploy.txt) 2> >(tee $CIRCLE_ARTIFACTS/cache.deploy.txt >&2)
