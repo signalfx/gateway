@@ -10,6 +10,7 @@ import (
 	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
 	"github.com/signalfx/metricproxy/protocol/collectd"
 	"github.com/signalfx/metricproxy/protocol/csv"
+	"github.com/signalfx/metricproxy/protocol/prometheus"
 	"github.com/signalfx/metricproxy/protocol/signalfx"
 	"golang.org/x/net/context"
 )
@@ -52,6 +53,12 @@ func NewLoader(ctx context.Context, logger log.Logger, version string, debugCont
 				logger: logger,
 			},
 			"collectd": &collectdLoader{
+				rootContext:  ctx,
+				debugContext: debugContext,
+				logger:       logger,
+				httpChain:    next,
+			},
+			"prometheus": &prometheusLoader{
 				rootContext:  ctx,
 				debugContext: debugContext,
 				logger:       logger,
@@ -122,6 +129,25 @@ type collectdLoader struct {
 	debugContext *web.HeaderCtxFlag
 	httpChain    web.NextConstructor
 	logger       log.Logger
+}
+
+type prometheusLoader struct {
+	rootContext  context.Context
+	debugContext *web.HeaderCtxFlag
+	httpChain    web.NextConstructor
+	logger       log.Logger
+}
+
+func (p *prometheusLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
+	sfConf := prometheus.Config{
+		ListenAddr:      conf.ListenAddr,
+		ListenPath:      conf.ListenPath,
+		Timeout:         conf.TimeoutDuration,
+		StartingContext: p.rootContext,
+		HTTPChain:       p.httpChain,
+		Logger:          p.logger,
+	}
+	return prometheus.NewListener(sink, &sfConf)
 }
 
 func (s *collectdLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {

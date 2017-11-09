@@ -178,6 +178,30 @@ to the default of TCP).
         }
 ```
 
+#### prometheus
+
+You can use the metricproxy as prometheus remote storage. To do this, you will
+need to specify the port to bind to.  An example config:
+
+```
+        {
+            "ListenAddr": "0.0.0.0:12003",
+            "Type": "prometheus"
+            "ListenPath": "/write"
+        }
+```
+
+If you want someting different than the default endpoint of "/write" you can
+specify it with "ListenPath". An alternative example config:
+
+```
+        {
+            "ListenAddr": "0.0.0.0:12003",
+            "Type": "prometheus",
+            "ListenPath": "/receive"
+        }
+```
+
 #### common properties
 
 All listeners support a "Dimensions" property which is expected to be a
