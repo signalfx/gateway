@@ -1,9 +1,11 @@
 [vars]
-  ignoreDirs = [".git", "Godeps"]
+  ignoreDirs = [".git", "vendor"]
   duplLimit = "300"
   testCoverage = 100.0
 
 [metalinter]
+  [metalinter.vars]
+    args = ["-t", "--disable-all", "--vendor", "--min-confidence=.3", "--deadline=300s"]
   [metalinter.ignored]
     coverageignored = "ignored is unused"
   [metalinter.enabled]
