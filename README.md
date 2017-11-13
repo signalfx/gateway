@@ -134,7 +134,7 @@ For this, you will need to specify which port to bind to.  An example config:
         {
             "ListenAddr": "0.0.0.0:18000",
             "Type": "collectd"
-        },
+        }
 ```
 
 When configuring CollectD, the target URL path will be `/post-collectd`.
@@ -152,7 +152,7 @@ For this, you will need to specify which port to bind to.  An example config:
         {
             "ListenAddr": "0.0.0.0:18080",
             "Type": "signalfx"
-        },
+        }
 ```
 
 #### carbon (for read)
@@ -243,7 +243,7 @@ the carbon server is.
             "Host": "example.com",
             "Port": 2003,
             "type": "carbon"
-        },
+        }
 ```
 
 #### signalfx-json
@@ -255,8 +255,8 @@ configure your auth token inside DefaultAuthToken.
         {
             "type": "signalfx-json",
             "DefaultAuthToken": "___AUTH_TOKEN___",
-            "Name": "testproxy",
-        },
+            "Name": "testproxy"
+        }
 ```
 
 ## Example configs
@@ -276,7 +276,7 @@ to signalfx at 1s intervals
       "Type": "carbon",
       "ListenAddr" : "0.0.0.0:2003",
       "Timeout" : "2m"
-    },
+    }
   ],
 
   "ForwardTo": [
@@ -304,8 +304,8 @@ dot delimited name.
   "ListenFrom": [
     {
       "Type": "collectd",
-      "ListenAddr" : "0.0.0.0:8081",
-    },
+      "ListenAddr" : "0.0.0.0:8081"
+    }
   ],
 
   "ForwardTo": [
@@ -342,14 +342,14 @@ seconds.
       "Timeout": "1m",
       "MetricDeconstructor": "commakeys",
       "MetricDeconstructorOptions": "mtypedim:metrictype"
-    },
+    }
   ],
 
   "ForwardTo": [
     {
       "type": "signalfx-json",
       "DefaultAuthToken": "ABCD",
-      "Name": "signalfxforwarder",
+      "Name": "signalfxforwarder"
     }
   ]
 }
@@ -637,7 +637,7 @@ messages.  Only use debug logging temporarily.
     {
       "Type": "carbon",
       "ListenAddr" : "0.0.0.0:2003"
-    },
+    }
   ],
 
   "ForwardTo": [
@@ -666,7 +666,7 @@ the Dimensions attribute which expects a map of string => string.
       "Type": "collectd",
       "ListenAddr" : "0.0.0.0:8081",
       "Dimensions" : {"hello": "world"}
-    },
+    }
   ],
 
   "ForwardTo": [
@@ -692,15 +692,15 @@ points to signalfx.
   "ListenFrom": [
     {
       "Type": "signalfx",
-      "ListenAddr" : "0.0.0.0:8080",
-    },
+      "ListenAddr" : "0.0.0.0:8080"
+    }
   ],
 
   "ForwardTo": [
     {
       "type": "signalfx-json",
       "DefaultAuthToken": "ABCD",
-      "Name": "signalfxforwarder",
+      "Name": "signalfxforwarder"
     }
   ]
 }
@@ -831,7 +831,7 @@ Setup a debug config
     {
       "type": "signalfx-json",
       "DefaultAuthToken": "ABCD",
-      "Name": "signalfxforwarder",
+      "Name": "signalfxforwarder"
     }
 }
 ```
@@ -859,7 +859,7 @@ logged out.
     {
       "type": "signalfx-json",
       "DefaultAuthToken": "ABCD",
-      "Name": "signalfxforwarder",
+      "Name": "signalfxforwarder"
     }
 }
 ```
