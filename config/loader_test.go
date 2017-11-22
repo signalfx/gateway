@@ -69,6 +69,11 @@ func TestConfigLoader(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(f.Close(), ShouldBeNil)
 		})
+		Convey("should load wavefront listener", func() {
+			f, err := l.Listener(nil, &ListenFrom{Type: "wavefront", ListenAddr: pointer.String("127.0.0.1:0")})
+			So(err, ShouldBeNil)
+			So(f.Close(), ShouldBeNil)
+		})
 		Convey("should load signalfx listener", func() {
 			f, err := l.Listener(nil, &ListenFrom{Type: "signalfx", ListenAddr: pointer.String("127.0.0.1:0")})
 			So(err, ShouldBeNil)

@@ -202,6 +202,34 @@ specify it with "ListenPath". An alternative example config:
         }
 ```
 
+#### wavefront
+
+You can send wavefront metrics to signalfx through our proxy in the same
+fashion as you would have sent them to the wavefront proxy. You will need
+to specify the port to bind to.  An example config:
+
+```
+        {
+            "ListenAddr": "0.0.0.0:12878",
+            "Type": "wavefront",
+            "ExtractCollectdDimensions": "false"
+        }
+```
+
+You can optionally choose to decode dimensions like we do from collectd style
+metrics (although it's applied to all metrics coming in) by changing
+`ExtractCollectdDimensions` to true. Default is true. If you were encoding
+dimensions using the `[foo=bar]` sytnax inside instance and host fields, this
+will continue to give you the dimensions you expect.
+
+```
+        {
+            "ListenAddr": "0.0.0.0:12878",
+            "Type": "wavefront",
+            "ExtractCollectdDimensions": "true"
+        }
+```
+
 #### common properties
 
 All listeners support a "Dimensions" property which is expected to be a

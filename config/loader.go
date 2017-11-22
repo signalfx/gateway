@@ -12,6 +12,7 @@ import (
 	"github.com/signalfx/metricproxy/protocol/csv"
 	"github.com/signalfx/metricproxy/protocol/prometheus"
 	"github.com/signalfx/metricproxy/protocol/signalfx"
+	"github.com/signalfx/metricproxy/protocol/wavefront"
 	"golang.org/x/net/context"
 )
 
@@ -63,6 +64,9 @@ func NewLoader(ctx context.Context, logger log.Logger, version string, debugCont
 				debugContext: debugContext,
 				logger:       logger,
 				httpChain:    next,
+			},
+			"wavefront": &wavefrontLoader{
+				logger: logger,
 			},
 		},
 		listenWrappers: []listenSinkWrapper{
@@ -252,4 +256,19 @@ func (s *carbonLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) {
 	return &protocol.UneventfulForwarder{
 		DatapointForwarder: f,
 	}, err
+}
+
+type wavefrontLoader struct {
+	logger log.Logger
+}
+
+func (s *wavefrontLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
+	sfConf := wavefront.ListenerConfig{
+		ServerAcceptDeadline: conf.ServerAcceptDeadline,
+		ConnectionTimeout:    conf.TimeoutDuration,
+		ListenAddr:           conf.ListenAddr,
+		Logger:               s.logger,
+	}
+
+	return wavefront.NewListener(sink, &sfConf)
 }

@@ -21,7 +21,7 @@ var (
 	StatKeepers = log.Key("stat_keepers")
 	// RemoteAddr of a network connection
 	RemoteAddr = log.Key("remote_addr")
-	// CarbonLine is a direct line recieved from carbon protocol
+	// CarbonLine is a direct line received from carbon protocol
 	CarbonLine = log.Key("carbon_line")
 	// TotalPipeline is the total number of things buffered and downstream of a forwarder
 	TotalPipeline = log.Key("total_pipeline")
@@ -51,4 +51,6 @@ var (
 	MetricType = log.Key("metric_type")
 	// ListenFrom is the listening config
 	ListenFrom = log.Key("listen_from")
+	// WavefrontLine is a direct line received from wavefront protocol
+	WavefrontLine = log.Key("wavefront_line")
 )
