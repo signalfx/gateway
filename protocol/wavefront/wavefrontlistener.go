@@ -87,9 +87,14 @@ func extractCollectdDimensions(doit bool, metricName string) (string, map[string
 	for {
 		metricName, toAddDims = collectd.GetDimensionsFromName(&metricName)
 		if len(toAddDims) == 0 {
-			// we may have put two dots next to each other extracting this stuff, see if there were two beforehand and if not, replace them if they occur with a single dot
-			// TODO could do better here if wavefront users prefixed all metrics with collectd, we could know how they're constructed and could make them be almost as good as coming from collectd
-			// could even be crazy and put the types.db file in here and provide accurate metric types... overkill?
+			// we may have put two dots next to each other extracting this stuff, see
+			// if there were two beforehand and if not, replace them if they occur with
+			// a single dot
+			// TODO could do better here if wavefront users prefixed all metrics with
+			// collectd, we could know how they're constructed and could make them be
+			// almost as good as coming from collectd.
+			// could even be crazy and put the types.db file in here and provide
+			// accurate metric types... overkill?
 			if index == -1 {
 				metricName = strings.Replace(metricName, "..", ".", -1)
 			}
@@ -106,39 +111,39 @@ func extractCollectdDimensions(doit bool, metricName string) (string, map[string
 func (listener *Listener) fromWavefrontDatapoint(line string) *datapoint.Datapoint {
 	// TODO rewrite without Split using Index and slices as they don't allocate
 	pieces := strings.Split(line, " ")
-	if len(pieces) >= 3 {
-		metricName, dimensions := extractCollectdDimensions(listener.extractCollectdDimensions, pieces[0])
-
-		valueString := pieces[1]
-
-		var value datapoint.Value
-		if i, err := strconv.ParseInt(valueString, 10, 64); err == nil {
-			value = datapoint.NewIntValue(i)
-		} else if f, err := strconv.ParseFloat(valueString, 64); err == nil {
-			value = datapoint.NewFloatValue(f)
-		} else {
-			return nil
-		}
-		var timestamp time.Time
-		epoch, err := strconv.ParseInt(pieces[2], 10, 64)
-		if err != nil {
-			// probably not the timestamp, probably a dimension
-			pieces = pieces[2:]
-			timestamp = time.Now()
-		} else {
-			timestamp = time.Unix(epoch, 0)
-			pieces = pieces[3:]
-		}
-		for _, p := range pieces {
-			dimPieces := strings.SplitN(p, "=", 2)
-			if len(dimPieces) == 2 {
-				dimensions[dimPieces[0]] = dimPieces[1]
-			}
-			// ignore malformed dimensions
-		}
-		return datapoint.New(metricName, dimensions, value, datapoint.Gauge, timestamp)
+	if len(pieces) < 3 {
+		return nil
 	}
-	return nil
+	metricName, dimensions := extractCollectdDimensions(listener.extractCollectdDimensions, pieces[0])
+
+	valueString := pieces[1]
+
+	var value datapoint.Value
+	if i, err := strconv.ParseInt(valueString, 10, 64); err == nil {
+		value = datapoint.NewIntValue(i)
+	} else if f, err := strconv.ParseFloat(valueString, 64); err == nil {
+		value = datapoint.NewFloatValue(f)
+	} else {
+		return nil
+	}
+	var timestamp time.Time
+	epoch, err := strconv.ParseInt(pieces[2], 10, 64)
+	if err != nil {
+		// probably not the timestamp, probably a dimension
+		pieces = pieces[2:]
+		timestamp = time.Now()
+	} else {
+		timestamp = time.Unix(epoch, 0)
+		pieces = pieces[3:]
+	}
+	for _, p := range pieces {
+		dimPieces := strings.SplitN(p, "=", 2)
+		if len(dimPieces) == 2 {
+			dimensions[dimPieces[0]] = dimPieces[1]
+		}
+		// ignore malformed dimensions
+	}
+	return datapoint.New(metricName, dimensions, value, datapoint.Gauge, timestamp)
 }
 
 var errInvalidDatapoint = errors.New("invalid wavefront datapoint")
