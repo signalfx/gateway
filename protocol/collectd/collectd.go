@@ -95,12 +95,12 @@ func parseDimensionsOut(dimensions map[string]string, pluginInstance *string, ho
 	parseNameForDimensions(dimensions, "host", host)
 }
 
-// try to pull out dimensions out of name in the format name[k=v,f=x]-morename would
-// return name-morename and extract dimensions (k,v) and (f,x)
+// GetDimensionsFromName tries to pull out dimensions out of name in the format name[k=v,f=x]-morename
+// would return name-morename and extract dimensions (k,v) and (f,x)
 // if we encounter something we don't expect use original
 // this is a bit complicated to avoid allocations, string.split allocates, while slices
 // inside same function, do not.
-func getDimensionsFromName(val *string) (instanceName string, toAddDims map[string]string) {
+func GetDimensionsFromName(val *string) (instanceName string, toAddDims map[string]string) {
 	instanceName = *val
 	index := strings.Index(*val, "[")
 	if index > -1 {
@@ -137,7 +137,7 @@ func getDimensionsFromName(val *string) (instanceName string, toAddDims map[stri
 }
 
 func parseNameForDimensions(dimensions map[string]string, key string, val *string) {
-	instanceName, toAddDims := getDimensionsFromName(val)
+	instanceName, toAddDims := GetDimensionsFromName(val)
 
 	for k, v := range toAddDims {
 		if _, exists := dimensions[k]; !exists {
@@ -149,7 +149,7 @@ func parseNameForDimensions(dimensions map[string]string, key string, val *strin
 
 func pointTypeInstance(point *JSONWriteFormat, dimensions map[string]string, parts []byte) []byte {
 	if !isNilOrEmpty(point.TypeInstance) {
-		instanceName, toAddDims := getDimensionsFromName(point.TypeInstance)
+		instanceName, toAddDims := GetDimensionsFromName(point.TypeInstance)
 		if instanceName != "" {
 			if len(parts) > 0 {
 				parts = append(parts, '.')

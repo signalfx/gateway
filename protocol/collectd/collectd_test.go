@@ -278,14 +278,14 @@ func TestCollectdParseNameForDimensions(t *testing.T) {
 func BenchmarkGetDimensionFromNameEmptyDims(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		x := "ihavenodims" + strconv.Itoa(rand.Int())
-		getDimensionsFromName(&x)
+		GetDimensionsFromName(&x)
 	}
 }
 
 func BenchmarkGetDimensionFromName(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		x := "ihave[a=b,c=" + strconv.Itoa(rand.Int()) + "]dims"
-		getDimensionsFromName(&x)
+		GetDimensionsFromName(&x)
 	}
 }
 
