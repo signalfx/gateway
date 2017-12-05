@@ -583,7 +583,7 @@ dimensions = {customer=Acme, component=cassandra, identifier=bbac,
         },
         "TypeRules": [
           {
-            "MetricType": "count",
+            "MetricType": "counter",
             "EndsWith": "counter.count"
           },
           {
