@@ -52,6 +52,14 @@ func TestFromWavefrontDatapoint(t *testing.T) {
 			expectedValue:      "566.005707",
 		},
 		{
+			doit:               false,
+			desc:               "test quotes",
+			line:               "\"ima/metric,name\" 566.005707 source=\"source junk''\"foo\"more\" x=\"foo-bar\"",
+			expectedMetric:     "ima/metric,name",
+			expectedDimensions: map[string]string{"source": "source junk''\"foo\"more", "x": "foo-bar"},
+			expectedValue:      "566.005707",
+		},
+		{
 			doit:               true,
 			desc:               "complex",
 			line:               "collectd.signalfx-metadata.[metadata=0.0.29,collectd=5.7.2.sfx0].gauge.sf.host-plugin_uptime[linux=Ubuntu_14.04.5_LTS,release=3.13.0-53-generic,version=_89-Ubuntu_SMP_Wed_May_20_10:34:39_UTC_2015] 566.005707 1511370774 host=mwp-signalbox  use=prod dc=mwp",

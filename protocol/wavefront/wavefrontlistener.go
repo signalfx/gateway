@@ -19,6 +19,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 )
 
 // Listener once setup will listen for wavefront protocol points to forward on
@@ -107,14 +108,47 @@ func extractCollectdDimensions(doit bool, metricName string) (string, map[string
 	}
 }
 
+// i always wonder about passing strings around and if it's worth it to use thier address
+// TODO write a benchmark to test performance and garbage generation here
+func stripQuotes(s string) string {
+	if s[0] == '"' {
+		s = s[1:]
+	}
+	if s[len(s)-1] == '"' {
+		s = s[:len(s)-1]
+	}
+	return s
+}
+
+func getMetricPieces(line string) []string {
+	lastQuote := rune(0)
+	f := func(c rune) bool {
+		switch {
+		case c == lastQuote:
+			lastQuote = rune(0)
+			return false
+		case lastQuote != rune(0):
+			return false
+		case unicode.In(c, unicode.Quotation_Mark):
+			lastQuote = c
+			return false
+		default:
+			return unicode.IsSpace(c)
+
+		}
+	}
+
+	return strings.FieldsFunc(line, f)
+}
+
 // https://docs.wavefront.com/wavefront_data_format.html
+//<metricName> <metricValue> [<timestamp>] source=<source> [pointTags]
 func (listener *Listener) fromWavefrontDatapoint(line string) *datapoint.Datapoint {
-	// TODO rewrite without Split using Index and slices as they don't allocate
-	pieces := strings.Split(line, " ")
+	pieces := getMetricPieces(line)
 	if len(pieces) < 3 {
 		return nil
 	}
-	metricName, dimensions := extractCollectdDimensions(listener.extractCollectdDimensions, pieces[0])
+	metricName, dimensions := extractCollectdDimensions(listener.extractCollectdDimensions, stripQuotes(pieces[0]))
 
 	valueString := pieces[1]
 
@@ -139,7 +173,9 @@ func (listener *Listener) fromWavefrontDatapoint(line string) *datapoint.Datapoi
 	for _, p := range pieces {
 		dimPieces := strings.SplitN(p, "=", 2)
 		if len(dimPieces) == 2 {
-			dimensions[dimPieces[0]] = dimPieces[1]
+			key := dimPieces[0]
+			value := stripQuotes(dimPieces[1])
+			dimensions[key] = value
 		}
 		// ignore malformed dimensions
 	}
