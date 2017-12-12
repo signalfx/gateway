@@ -139,7 +139,7 @@ For this, you will need to specify which port to bind to.  An example config:
 
 When configuring CollectD, the target URL path will be `/post-collectd`.
 
-#### signalfx
+#### signalfx (for read)
 
 You can expose a SignalFx endpoint with the `signalfx` type. A SignalFx
 endpoint can listen on all the signalfx protocols in both "Protocol Buffers"
@@ -274,14 +274,14 @@ the carbon server is.
         }
 ```
 
-#### signalfx-json
+#### signalfx (for write)
 
 You can write datapoints to SignalFx with this endpoint.  You will need to
 configure your auth token inside DefaultAuthToken.
 
 ```
         {
-            "type": "signalfx-json",
+            "type": "signalfx",
             "DefaultAuthToken": "___AUTH_TOKEN___",
             "Name": "testproxy"
         }
@@ -309,7 +309,7 @@ to signalfx at 1s intervals
 
   "ForwardTo": [
     {
-      "type": "signalfx-json",
+      "type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
@@ -375,7 +375,7 @@ seconds.
 
   "ForwardTo": [
     {
-      "type": "signalfx-json",
+      "type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
@@ -510,7 +510,7 @@ dimensions = {service=cassandra, instance=cassandra23, tier=production}
   ],
   "ForwardTo": [
     {
-      "type": "signalfx-json",
+      "type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
@@ -607,7 +607,7 @@ dimensions = {customer=Acme, component=cassandra, identifier=bbac,
   ],
   "ForwardTo": [
     {
-      "type": "signalfx-json",
+      "type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
@@ -670,7 +670,7 @@ messages.  Only use debug logging temporarily.
 
   "ForwardTo": [
     {
-      "type": "signalfx-json",
+      "type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder",
       "BufferSize": 1000000,
@@ -726,7 +726,7 @@ points to signalfx.
 
   "ForwardTo": [
     {
-      "type": "signalfx-json",
+      "type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
@@ -765,7 +765,7 @@ would be denied and those that were not would be allowed.
       "Port": 2003
     },
     {
-      "type": "signalfx-json",
+      "type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder",
       "Filters": {
@@ -840,7 +840,7 @@ low like 1s.  The config below is this use case.
   ],
   "ForwardTo": [
     {
-      "type": "signalfx-json",
+      "type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
@@ -857,7 +857,7 @@ Setup a debug config
   "DebugFlag": "secretdebug",
   "ForwardTo": [
     {
-      "type": "signalfx-json",
+      "type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
@@ -885,7 +885,7 @@ logged out.
   "LocalDebugServer": "0.0.0.0:6060",
   "ForwardTo": [
     {
-      "type": "signalfx-json",
+      "type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
