@@ -186,7 +186,7 @@ need to specify the port to bind to.  An example config:
 ```
         {
             "ListenAddr": "0.0.0.0:12003",
-            "Type": "prometheus"
+            "Type": "prometheus",
             "ListenPath": "/write"
         }
 ```
