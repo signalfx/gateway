@@ -293,11 +293,6 @@
 			"revision": "c5d7a69bf8a2c9c374798160849c071093e41dd1"
 		},
 		{
-			"checksumSHA1": "hKZGpbFuCrkE4s1vxubKK1aFlfI=",
-			"path": "golang.org/x/net/context",
-			"revision": "db8e4de5b2d6653f66aea53094624468caad15d2"
-		},
-		{
 			"checksumSHA1": "RhpmDgSgY6ZyJbkksQSOHbwsTQw=",
 			"path": "golang.org/x/net/http2",
 			"revision": "a337091b0525af65de94df2eb7e98bd9962dcbe2",

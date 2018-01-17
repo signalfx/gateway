@@ -12,7 +12,7 @@ import _ "google.golang.org/genproto/googleapis/api/annotations"
 import time "time"
 
 import (
-	context "golang.org/x/net/context"
+	context "context"
 	grpc "google.golang.org/grpc"
 )
 

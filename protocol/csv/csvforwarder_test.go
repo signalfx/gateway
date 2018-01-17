@@ -7,6 +7,7 @@ import (
 
 	"errors"
 
+	"context"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/event"
@@ -14,7 +15,6 @@ import (
 	"github.com/signalfx/metricproxy/protocol/filtering"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
 )
 
 func TestFilenameForwarder(t *testing.T) {

@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"context"
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
@@ -26,7 +27,6 @@ import (
 	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/collectd"
-	"golang.org/x/net/context"
 )
 
 // ListenerServer controls listening on a socket for SignalFx connections

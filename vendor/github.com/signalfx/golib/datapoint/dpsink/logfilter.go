@@ -7,7 +7,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
-	"golang.org/x/net/context"
+	"context"
 	"net/http"
 	"sync"
 	"sync/atomic"

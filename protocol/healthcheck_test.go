@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/signalfx/golib/datapoint"
@@ -10,7 +11,6 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/web"
 	. "github.com/smartystreets/goconvey/convey"
-	"golang.org/x/net/context"
 	"net"
 	"net/http"
 	"testing"

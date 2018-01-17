@@ -1,6 +1,7 @@
 package prometheus
 
 import (
+	"context"
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/gorilla/mux"
@@ -13,7 +14,6 @@ import (
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/protocol"
-	"golang.org/x/net/context"
 	"io"
 	"io/ioutil"
 	"math"

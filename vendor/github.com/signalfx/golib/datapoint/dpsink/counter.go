@@ -8,7 +8,7 @@ import (
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
-	"golang.org/x/net/context"
+	"context"
 )
 
 // DefaultLogger is used by package structs that don't have a default logger set.

@@ -3,7 +3,7 @@ package dpsink
 import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
-	"golang.org/x/net/context"
+	"context"
 )
 
 type discardSink struct {

@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
+	"context"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/metricproxy/dp/dpdimsort"
 	"github.com/signalfx/metricproxy/protocol/filtering"
-	"golang.org/x/net/context"
 )
 
 // Forwarder is a sink that forwards points to a carbon endpoint

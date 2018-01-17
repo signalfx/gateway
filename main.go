@@ -19,6 +19,7 @@ import (
 	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol"
 
+	"context"
 	"expvar"
 	"fmt"
 	"github.com/signalfx/golib/eventcounter"
@@ -26,7 +27,6 @@ import (
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/dp/dpbuffered"
 	"github.com/signalfx/metricproxy/protocol/demultiplexer"
-	"golang.org/x/net/context"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 	"net"
 	"net/http"

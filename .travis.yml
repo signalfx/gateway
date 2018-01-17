@@ -3,7 +3,8 @@ language: go
 sudo: false
 
 go:
-  - 1.8
+  - 1.8.1
+  - 1.9.1
 
 before_install:
   - wget "http://ftp.debian.org/debian/pool/main/s/shellcheck/shellcheck_0.4.6-1_amd64.deb"

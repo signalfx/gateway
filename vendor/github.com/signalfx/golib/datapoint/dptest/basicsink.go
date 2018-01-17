@@ -5,7 +5,7 @@ import (
 
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
-	"golang.org/x/net/context"
+	"context"
 )
 
 // BasicSink is a pure testing sink that blocks forwarded points onto a channel

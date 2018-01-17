@@ -2,6 +2,7 @@ package signalfx
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/golang/protobuf/proto"
@@ -16,7 +17,6 @@ import (
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/protocol/filtering"
 	. "github.com/smartystreets/goconvey/convey"
-	"golang.org/x/net/context"
 	"io"
 	"io/ioutil"
 	"net/http"

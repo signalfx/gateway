@@ -13,6 +13,7 @@ import (
 
 	"encoding/json"
 
+	"context"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
@@ -22,7 +23,6 @@ import (
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/protocol"
-	"golang.org/x/net/context"
 )
 
 // ListenerServer will listen for collectd datapoint connections

@@ -17,7 +17,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
-	"golang.org/x/net/context"
+	"context"
 )
 
 // ClientVersion is the version of this library and is embedded into the user agent
