@@ -1,9 +1,9 @@
 package dpsink
 
 import (
+	"context"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
-	"context"
 )
 
 type discardSink struct {
