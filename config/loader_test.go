@@ -3,92 +3,99 @@ package config
 import (
 	"context"
 	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/protocol/carbon"
+	"github.com/signalfx/metricproxy/protocol/signalfx"
 	. "github.com/smartystreets/goconvey/convey"
 	"os"
 	"testing"
 )
 
+func getLoader() *Loader {
+	ctx := context.Background()
+	logger := log.Discard
+	version := "123"
+	debugContext := web.HeaderCtxFlag{}
+	itemFlagger := signalfx.ItemFlagger{}
+	l := NewLoader(ctx, logger, version, &debugContext, &itemFlagger, nil, nil)
+	return l
+}
+
+type testCase struct {
+	name       string
+	forwardTo  *ForwardTo
+	listenFrom *ListenFrom
+	pass       bool
+	reset      func() error
+}
+
+func TestForwarders(t *testing.T) {
+	Convey("test some forwarders", t, func() {
+		l := getLoader()
+		tests := []testCase{
+			{name: "should fail empty forwarders", forwardTo: &ForwardTo{}},
+			{name: "should fail for unknown forwarders", forwardTo: &ForwardTo{Type: "unknown"}},
+			{name: "carbon forwarder should require a host", forwardTo: &ForwardTo{Type: "carbon"}},
+			{name: "should load CSV forwarder", forwardTo: &ForwardTo{Type: "csv", Filename: pointer.String("datapoints.csv")}, pass: true, reset: func() error { So(os.Remove("datapoints.csv"), ShouldBeNil); return nil }},
+			{name: "signalfx forwarder should work", forwardTo: &ForwardTo{Type: "signalfx"}, pass: true},
+		}
+		for _, test := range tests {
+			Convey(test.name, func() {
+				f, err := l.Forwarder(test.forwardTo)
+				if test.pass {
+					So(err, ShouldBeNil)
+					So(f.Close(), ShouldBeNil)
+				} else {
+					So(err, ShouldNotBeNil)
+				}
+				if test.reset != nil {
+					test.reset()
+				}
+			})
+		}
+	})
+}
+
+func TestListeners(t *testing.T) {
+	Convey("test some listeners", t, func() {
+		l := getLoader()
+		tests := []testCase{
+			{name: "should fail empty listeners", listenFrom: &ListenFrom{}},
+			{name: "should fail unknown listeners", listenFrom: &ListenFrom{Type: "unknown"}},
+			{name: "carbon listener should require metric deconstructor", listenFrom: &ListenFrom{Type: "carbon", MetricDeconstructor: pointer.String("unknown")}},
+			{name: "should load CollectdD listener", listenFrom: &ListenFrom{Type: "collectd", ListenAddr: pointer.String("127.0.0.1:0")}, pass: true},
+			{name: "should load prometheus listener", listenFrom: &ListenFrom{Type: "prometheus", ListenAddr: pointer.String("127.0.0.1:0")}, pass: true},
+			{name: "should load wavefront listener", listenFrom: &ListenFrom{Type: "wavefront", ListenAddr: pointer.String("127.0.0.1:0")}, pass: true},
+			{name: "should load signalfx listener", listenFrom: &ListenFrom{Type: "signalfx", ListenAddr: pointer.String("127.0.0.1:0")}, pass: true},
+			{name: "should load carbon listener", listenFrom: &ListenFrom{Type: "carbon", ListenAddr: pointer.String("127.0.0.1:0")}, pass: true},
+		}
+		for _, test := range tests {
+			Convey(test.name, func() {
+				f, err := l.Listener(nil, test.listenFrom)
+				if test.pass {
+					So(err, ShouldBeNil)
+					So(f.Close(), ShouldBeNil)
+				} else {
+					So(err, ShouldNotBeNil)
+				}
+				if test.reset != nil {
+					So(test.reset(), ShouldBeNil)
+				}
+			})
+		}
+	})
+}
+
 func TestConfigLoader(t *testing.T) {
 	Convey("a setup loader", t, func() {
+		l := getLoader()
 		ctx := context.Background()
-		logger := log.Discard
-		version := "123"
 		sink := dptest.NewBasicSink()
 		sink.Resize(1)
-
-		debugContext := web.HeaderCtxFlag{}
-		itemFlagger := dpsink.ItemFlagger{}
-
-		l := NewLoader(ctx, logger, version, &debugContext, &itemFlagger, nil, nil)
-		Convey("should fail empty forwarders", func() {
-			_, err := l.Forwarder(&ForwardTo{})
-			So(err, ShouldNotBeNil)
-		})
-		Convey("should fail empty listeners", func() {
-			_, err := l.Listener(nil, &ListenFrom{})
-			So(err, ShouldNotBeNil)
-		})
-		Convey("should fail unknown forwarders", func() {
-			_, err := l.Forwarder(&ForwardTo{Type: "unknown"})
-			So(err, ShouldNotBeNil)
-		})
-		Convey("should fail unknown listeners", func() {
-			_, err := l.Listener(nil, &ListenFrom{Type: "unknown"})
-			So(err, ShouldNotBeNil)
-		})
-		Convey("carbon forwarder should require a host", func() {
-			_, err := l.Forwarder(&ForwardTo{Type: "carbon"})
-			So(err, ShouldNotBeNil)
-		})
-		Convey("carbon listener should require metricdeconstructor to load", func() {
-			_, err := l.Listener(nil, &ListenFrom{Type: "carbon", MetricDeconstructor: pointer.String("unknown")})
-			So(err, ShouldNotBeNil)
-		})
-
-		Convey("should load CSV forwarder", func() {
-			f, err := l.Forwarder(&ForwardTo{Type: "csv", Filename: pointer.String("datapoints.csv")})
-			So(err, ShouldBeNil)
-			So(f.Close(), ShouldBeNil)
-			So(os.Remove("datapoints.csv"), ShouldBeNil)
-		})
-
-		Convey("should load CollectD listener", func() {
-			f, err := l.Listener(nil, &ListenFrom{Type: "collectd", ListenAddr: pointer.String("127.0.0.1:0")})
-			So(err, ShouldBeNil)
-			So(f.Close(), ShouldBeNil)
-		})
-		Convey("should load prometheus listener", func() {
-			f, err := l.Listener(nil, &ListenFrom{Type: "prometheus", ListenAddr: pointer.String("127.0.0.1:0")})
-			So(err, ShouldBeNil)
-			So(f.Close(), ShouldBeNil)
-		})
-		Convey("should load wavefront listener", func() {
-			f, err := l.Listener(nil, &ListenFrom{Type: "wavefront", ListenAddr: pointer.String("127.0.0.1:0")})
-			So(err, ShouldBeNil)
-			So(f.Close(), ShouldBeNil)
-		})
-		Convey("should load signalfx listener", func() {
-			f, err := l.Listener(nil, &ListenFrom{Type: "signalfx", ListenAddr: pointer.String("127.0.0.1:0")})
-			So(err, ShouldBeNil)
-			So(f.Close(), ShouldBeNil)
-		})
-		Convey("should load signalfx forwarder", func() {
-			f, err := l.Forwarder(&ForwardTo{Type: "signalfx"})
-			So(err, ShouldBeNil)
-			So(f.Close(), ShouldBeNil)
-		})
-		Convey("should load carbon listener without options", func() {
-			f, err := l.Listener(nil, &ListenFrom{Type: "carbon", ListenAddr: pointer.String("127.0.0.1:0")})
-			So(err, ShouldBeNil)
-			So(f.Close(), ShouldBeNil)
-		})
 		Convey("should load carbon listener", func() {
 			f, err := l.Listener(sink, &ListenFrom{Dimensions: map[string]string{"name": "john"}, Type: "carbon", MetricDeconstructor: pointer.String(""), MetricDeconstructorOptions: pointer.String(""), ListenAddr: pointer.String("127.0.0.1:0")})
 			So(err, ShouldBeNil)

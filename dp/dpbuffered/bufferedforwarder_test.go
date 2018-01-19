@@ -12,14 +12,16 @@ import (
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
+	"github.com/signalfx/metricproxy/protocol/signalfx"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"sync"
 )
 
-const numStats = 4
+const numStats = 6
 
 type boolChecker bool
 
@@ -43,15 +45,18 @@ func TestBufferedForwarderBasic(t *testing.T) {
 	Convey("Basic forwarder setup", t, func() {
 		ctx := context.Background()
 		flagCheck := boolChecker(false)
-		checker := &dpsink.ItemFlagger{
-			CtxFlagCheck:        &flagCheck,
-			EventMetaName:       "meta_event",
-			MetricDimensionName: "sf_metric",
+		checker := &signalfx.ItemFlagger{
+			ItemFlagger: dpsink.ItemFlagger{
+				CtxFlagCheck:        &flagCheck,
+				EventMetaName:       "meta_event",
+				MetricDimensionName: "sf_metric",
+			},
 		}
 		config := &Config{
 			BufferSize:         pointer.Int64(210),
 			MaxTotalDatapoints: pointer.Int64(1000),
 			MaxTotalEvents:     pointer.Int64(1000),
+			MaxTotalSpans:      pointer.Int64(1000),
 			NumDrainingThreads: pointer.Int64(1),
 			MaxDrainSize:       pointer.Int64(1000),
 			Checker:            checker,
@@ -68,6 +73,10 @@ func TestBufferedForwarderBasic(t *testing.T) {
 		events := []*event.Event{
 			dptest.E(),
 			dptest.E(),
+		}
+		spans := []*trace.Span{
+			{},
+			{},
 		}
 		Reset(func() {
 			So(bf.Close(), ShouldBeNil)
@@ -103,6 +112,17 @@ func TestBufferedForwarderBasic(t *testing.T) {
 				So(bf.AddEvents(ctx, events), ShouldBeNil)
 				if i == 0 {
 					seen := <-sendTo.EventsChan
+					So(len(seen), ShouldEqual, 2)
+				}
+			}
+			So(bf.AddEvents(ctx, events), ShouldBeNil)
+		})
+		Convey("Should buffer traces", func() {
+			time.Sleep(time.Millisecond * 10)
+			for i := 0; i < 100; i++ {
+				So(bf.AddSpans(ctx, spans), ShouldBeNil)
+				if i == 0 {
+					seen := <-sendTo.TracesChan
 					So(len(seen), ShouldEqual, 2)
 				}
 			}
@@ -158,8 +178,10 @@ func TestBufferedForwarderContexts(t *testing.T) {
 		NumDrainingThreads: pointer.Int64(2),
 		MaxDrainSize:       pointer.Int64(1000),
 		Cdim:               &log.CtxDimensions{},
-		Checker: &dpsink.ItemFlagger{
-			CtxFlagCheck: &web.HeaderCtxFlag{},
+		Checker: &signalfx.ItemFlagger{
+			ItemFlagger: dpsink.ItemFlagger{
+				CtxFlagCheck: &web.HeaderCtxFlag{},
+			},
 		},
 	}
 
@@ -200,6 +222,7 @@ outer:
 func TestBufferedForwarderBlockingDrain(t *testing.T) {
 	f := BufferedForwarder{
 		eChan: make(chan []*event.Event, 3),
+		tChan: make(chan []*trace.Span, 3),
 		config: &Config{
 			MaxDrainSize: pointer.Int64(1000),
 		},
@@ -210,6 +233,12 @@ func TestBufferedForwarderBlockingDrain(t *testing.T) {
 
 	evs := f.blockingDrainEventsUpTo()
 	assert.True(t, len(evs) == 3)
+
+	f.tChan <- []*trace.Span{{}}
+	f.tChan <- []*trace.Span{{}, {}}
+
+	spans := f.blockingDrainSpansUpTo()
+	assert.True(t, len(spans) == 3)
 }
 
 func TestBufferedForwarderContextsEvent(t *testing.T) {
@@ -217,21 +246,24 @@ func TestBufferedForwarderContextsEvent(t *testing.T) {
 	config := &Config{
 		BufferSize:         pointer.Int64(0),
 		MaxTotalEvents:     pointer.Int64(10),
+		MaxTotalSpans:      pointer.Int64(10),
 		NumDrainingThreads: pointer.Int64(2),
 		MaxDrainSize:       pointer.Int64(1000),
 		Cdim:               &log.CtxDimensions{},
-		Checker: &dpsink.ItemFlagger{
-			CtxFlagCheck: &web.HeaderCtxFlag{},
+		Checker: &signalfx.ItemFlagger{
+			ItemFlagger: dpsink.ItemFlagger{
+				CtxFlagCheck: &web.HeaderCtxFlag{},
+			},
 		},
 	}
 
-	datas := []*event.Event{
-		{},
-	}
+	events := []*event.Event{{}}
+	spans := []*trace.Span{{}}
 
 	sendTo := dptest.NewBasicSink()
 	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
-	assert.NoError(t, bf.AddEvents(ctx, datas))
+	assert.NoError(t, bf.AddEvents(ctx, events))
+	assert.NoError(t, bf.AddSpans(ctx, spans))
 	canceledContext, cancelFunc := context.WithCancel(ctx)
 	waiter := make(chan struct{})
 	go func() {
@@ -247,16 +279,20 @@ func TestBufferedForwarderContextsEvent(t *testing.T) {
 outer:
 	for {
 		select {
-		case bf.eChan <- datas:
+		case bf.eChan <- events:
 		default:
 			break outer
 		}
 	}
-	assert.Equal(t, context.Canceled, bf.AddEvents(canceledContext, datas), "Should escape when passed context canceled")
+	assert.Equal(t, context.Canceled, bf.AddEvents(canceledContext, events), "Should escape when passed context canceled")
+	assert.Equal(t, context.Canceled, bf.AddSpans(canceledContext, spans), "Should escape when passed context canceled")
 	cancel()
-	assert.Equal(t, context.Canceled, bf.AddEvents(context.Background(), datas), "Should err when parent context canceled")
+	assert.Equal(t, context.Canceled, bf.AddEvents(context.Background(), events), "Should err when parent context canceled")
+	assert.Equal(t, context.Canceled, bf.AddSpans(context.Background(), spans), "Should err when parent context canceled")
 	bf.stopContext = context.Background()
-	assert.Equal(t, context.Canceled, bf.AddEvents(canceledContext, datas), "Should escape when passed context canceled")
+	assert.Equal(t, context.Canceled, bf.AddEvents(canceledContext, events), "Should escape when passed context canceled")
+	bf.stopContext = context.Background()
+	assert.Equal(t, context.Canceled, bf.AddSpans(canceledContext, spans), "Should escape when passed context canceled")
 }
 
 func TestBufferedForwarderMaxTotalDatapoints(t *testing.T) {
@@ -266,8 +302,10 @@ func TestBufferedForwarderMaxTotalDatapoints(t *testing.T) {
 		NumDrainingThreads: pointer.Int64(1),
 		MaxDrainSize:       pointer.Int64(1000),
 		Cdim:               &log.CtxDimensions{},
-		Checker: &dpsink.ItemFlagger{
-			CtxFlagCheck: &web.HeaderCtxFlag{},
+		Checker: &signalfx.ItemFlagger{
+			ItemFlagger: dpsink.ItemFlagger{
+				CtxFlagCheck: &web.HeaderCtxFlag{},
+			},
 		},
 		Name: pointer.String("blarg"),
 	}
@@ -297,11 +335,14 @@ func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
 	config := &Config{
 		BufferSize:         pointer.Int64(15),
 		MaxTotalEvents:     pointer.Int64(7),
+		MaxTotalSpans:      pointer.Int64(7),
 		NumDrainingThreads: pointer.Int64(1),
 		MaxDrainSize:       pointer.Int64(1000),
 		Cdim:               &log.CtxDimensions{},
-		Checker: &dpsink.ItemFlagger{
-			CtxFlagCheck: &web.HeaderCtxFlag{},
+		Checker: &signalfx.ItemFlagger{
+			ItemFlagger: dpsink.ItemFlagger{
+				CtxFlagCheck: &web.HeaderCtxFlag{},
+			},
 		},
 		Name: pointer.String("blarg"),
 	}
@@ -312,13 +353,20 @@ func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
 		assert.NoError(t, bf.Close())
 	}()
 
-	events := []*event.Event{
-		{},
-		{},
-	}
+	events := []*event.Event{{}, {}}
+	spans := []*trace.Span{{}, {}}
 	found := false
 	for i := 0; i < 100; i++ {
 		if err := bf.AddEvents(ctx, events); err == errEBufferFull(*config.Name) {
+			assert.NotEmpty(t, err.Error())
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "With small buffer size, I should error out with a full buffer")
+	found = false
+	for i := 0; i < 100; i++ {
+		if err := bf.AddSpans(ctx, spans); err == errTBufferFull(*config.Name) {
 			assert.NotEmpty(t, err.Error())
 			found = true
 			break

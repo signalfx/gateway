@@ -14,6 +14,7 @@ import (
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/protocol/filtering"
 	. "github.com/smartystreets/goconvey/convey"
@@ -246,6 +247,7 @@ func TestSignalfxListener(t *testing.T) {
 			forwardConfig := &ForwarderConfig{
 				DatapointURL: pointer.String(fmt.Sprintf("%s/v2/datapoint", baseURI)),
 				EventURL:     pointer.String(fmt.Sprintf("%s/v2/event", baseURI)),
+				TraceURL:     pointer.String(fmt.Sprintf("%s/v1/trace", baseURI)),
 			}
 			forwarder, err := NewForwarder(forwardConfig)
 			So(err, ShouldBeNil)
@@ -277,6 +279,12 @@ func TestSignalfxListener(t *testing.T) {
 			})
 			Convey("Should be able to send zero len datapoints", func() {
 				So(forwarder.AddDatapoints(ctx, []*datapoint.Datapoint{}), ShouldBeNil)
+			})
+			Convey("Should be able to send zero len traces", func() {
+				So(forwarder.AddSpans(ctx, []*trace.Span{}), ShouldBeNil)
+			})
+			Convey("Should be able to send traces", func() {
+				So(forwarder.AddSpans(ctx, []*trace.Span{{}}), ShouldBeNil)
 			})
 			Convey("Should be able to send events", func() {
 				eventSent := dptest.E()
@@ -386,7 +394,7 @@ func TestSignalfxListener(t *testing.T) {
 			verifyStatusCode("INVALID_PROTOBUF", "application/x-protobuf", "/v2/datapoint", http.StatusBadRequest)
 			dps = listener.Datapoints()
 			So(dptest.ExactlyOneDims(dps, "total_errors", map[string]string{"http_endpoint": "sfx_protobuf_v2"}).Value.String(), ShouldEqual, "1")
-			So(len(dps), ShouldEqual, 108)
+			So(len(dps), ShouldEqual, 147)
 			So(dptest.ExactlyOneDims(dps, "dropped_points", map[string]string{"protocol": "sfx_json_v2", "reason": "unknown_metric_type"}).Value.String(), ShouldEqual, "0")
 			So(dptest.ExactlyOneDims(dps, "dropped_points", map[string]string{"protocol": "sfx_json_v2", "reason": "invalid_value"}).Value.String(), ShouldEqual, "0")
 		})
@@ -466,6 +474,32 @@ func TestSignalfxListener(t *testing.T) {
 			So(err, ShouldNotBeNil)
 			So(forwarder, ShouldBeNil)
 		})
+		Convey("Lets test some things", func() {
+			verifyStatusCode := func(body string, contentType string, pathSuffix string, expectedStatusCode int) {
+				client := http.Client{}
+				req, err := http.NewRequest("POST", baseURI+pathSuffix, strings.NewReader(body))
+				So(err, ShouldBeNil)
+				req.Header.Add("Content-Type", contentType)
+				resp, err := client.Do(req)
+				So(err, ShouldBeNil)
+				So(resp.StatusCode, ShouldEqual, expectedStatusCode)
+			}
+			for _, v := range []struct {
+				desc     string
+				body     string
+				content  string
+				path     string
+				expected int
+			}{
+				{"trivial", "[]", "application/json", "/v1/trace", 200},
+				{"valid1", trace.ValidJSON, "application/json", "/v1/trace", 200},
+				{"just an object", "{}", "application/json", "/v1/trace", 400},
+			} {
+				Convey(v.desc, func() {
+					verifyStatusCode(v.body, v.content, v.path, v.expected)
+				})
+			}
+		})
 
 		Reset(func() {
 			So(listener.Close(), ShouldBeNil)
@@ -484,8 +518,11 @@ func (f *fastSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapo
 	return nil
 }
 
-// AddEvents buffers the event on an internal chan or returns errors if RetErr is set
 func (f *fastSink) AddEvents(ctx context.Context, points []*event.Event) error {
+	return nil
+}
+
+func (f *fastSink) AddSpans(ctx context.Context, points []*trace.Span) error {
 	return nil
 }
 

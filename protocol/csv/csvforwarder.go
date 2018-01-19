@@ -6,11 +6,13 @@ import (
 	"sync"
 
 	"context"
+	"encoding/json"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/metricproxy/protocol/filtering"
 	"sync/atomic"
 )
@@ -31,6 +33,7 @@ var defaultConfig = &Config{
 type stats struct {
 	totalDatapointsForwarded int64
 	totalEventsForwarded     int64
+	totalSpansForwarded      int64
 }
 
 // Forwarder prints datapoints to a file
@@ -71,6 +74,23 @@ func (f *Forwarder) AddEvents(ctx context.Context, events []*event.Event) error 
 	for _, e := range events {
 		if _, err := f.writeString(f.file, e.String()+"\n"); err != nil {
 			return errors.Annotate(err, "cannot write event to string")
+		}
+	}
+	return f.file.Sync()
+}
+
+// AddSpans writes the spans to a file
+func (f *Forwarder) AddSpans(ctx context.Context, spans []*trace.Span) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	atomic.AddInt64(&f.stats.totalSpansForwarded, int64(len(spans)))
+	for _, s := range spans {
+		b, err := json.Marshal(s)
+		if err == nil {
+			_, err = f.writeString(f.file, string(b)+"\n")
+		}
+		if err != nil {
+			return errors.Annotate(err, "cannot write span to string")
 		}
 	}
 	return f.file.Sync()

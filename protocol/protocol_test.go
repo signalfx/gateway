@@ -9,6 +9,7 @@ import (
 func TestUneventfulForwarder(t *testing.T) {
 	u := UneventfulForwarder{nil}
 	assert.Equal(t, u.AddEvents(nil, nil), nil)
+	assert.Equal(t, u.AddSpans(nil, nil), nil)
 	assert.Equal(t, int64(0), u.Pipeline())
 }
 
