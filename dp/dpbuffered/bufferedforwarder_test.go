@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"bytes"
+	"context"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/datapoint/dptest"
@@ -14,7 +15,6 @@ import (
 	"github.com/signalfx/golib/web"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
 	"io"
 	"sync"
 )

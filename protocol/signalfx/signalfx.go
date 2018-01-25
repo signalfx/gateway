@@ -122,7 +122,7 @@ func fromMT(mt com_signalfx_metrics_protobuf.MetricType) datapoint.MetricType {
 	if exists {
 		return ret
 	}
-	panic(fmt.Sprintf("Unknown metric type: %s\n", mt))
+	panic(fmt.Sprintf("Unknown metric type: %v\n", mt))
 }
 
 func fromTs(ts int64) time.Time {

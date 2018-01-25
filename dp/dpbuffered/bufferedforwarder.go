@@ -5,6 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"context"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/event"
@@ -12,7 +13,6 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/metricproxy/logkey"
-	"golang.org/x/net/context"
 )
 
 // Config controls BufferedForwarder limits

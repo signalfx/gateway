@@ -2,6 +2,7 @@ package wavefront
 
 import (
 	"bufio"
+	"context"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
@@ -11,7 +12,6 @@ import (
 	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/collectd"
-	"golang.org/x/net/context"
 	"io"
 	"net"
 	"strconv"

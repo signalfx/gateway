@@ -2,13 +2,13 @@ package collectd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/web"
 	. "github.com/smartystreets/goconvey/convey"
-	"golang.org/x/net/context"
 	"net/http"
 	"net/http/httptest"
 	"strings"

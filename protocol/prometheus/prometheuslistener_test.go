@@ -2,6 +2,7 @@ package prometheus
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"github.com/gogo/protobuf/proto"
@@ -14,7 +15,6 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/web"
 	. "github.com/smartystreets/goconvey/convey"
-	"golang.org/x/net/context"
 	"io"
 	"math"
 	"net/http"

@@ -5,13 +5,13 @@ import (
 
 	"sync"
 
+	"context"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/metricproxy/protocol/filtering"
-	"golang.org/x/net/context"
 	"sync/atomic"
 )
 

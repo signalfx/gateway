@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
@@ -21,7 +22,6 @@ import (
 	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
-	"golang.org/x/net/context"
 )
 
 // Listener once setup will listen for carbon protocol points to forward on

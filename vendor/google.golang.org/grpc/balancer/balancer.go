@@ -24,7 +24,7 @@ import (
 	"errors"
 	"net"
 
-	"golang.org/x/net/context"
+	"context"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/resolver"

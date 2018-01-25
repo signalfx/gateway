@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"github.com/signalfx/golib/datapoint"
@@ -15,7 +16,6 @@ import (
 	"github.com/signalfx/metricproxy/protocol/carbon"
 	"github.com/signalfx/metricproxy/protocol/signalfx"
 	. "github.com/smartystreets/goconvey/convey"
-	"golang.org/x/net/context"
 	"io"
 	"io/ioutil"
 	"net"
@@ -161,7 +161,8 @@ func TestMainInstance(t *testing.T) {
 	flagParse = flag.Parse
 }
 
-func failingTestRun(t *testing.T, c string, closeAfterSetup bool, expectedLog string, expectedErr string) {
+func failingTestRun(t *testing.T, c string, closeAfterSetup bool, expectedLog string, expectedErr string) context.CancelFunc {
+	var cc context.CancelFunc
 	Convey("failing config test", t, func() {
 		logBuf := &bytes.Buffer{}
 		logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
@@ -188,6 +189,8 @@ func failingTestRun(t *testing.T, c string, closeAfterSetup bool, expectedLog st
 				<-p.setupDoneSignal
 				contextCancel()
 			}()
+		} else {
+			cc = contextCancel
 		}
 		err = p.main(ctx)
 		if expectedErr != "" {
@@ -200,6 +203,7 @@ func failingTestRun(t *testing.T, c string, closeAfterSetup bool, expectedLog st
 			So(logBuf.String(), ShouldContainSubstring, expectedLog)
 		}
 	})
+	return cc
 }
 
 func TestEmptyConfig(t *testing.T) {
@@ -234,9 +238,11 @@ func TestForwarderName(t *testing.T) {
 }
 
 func TestProxy1(t *testing.T) {
+	var cancelfunc context.CancelFunc
 	Convey("a setup carbon proxy", t, func() {
 		sendTo := dptest.NewBasicSink()
-		ctx, _ := context.WithCancel(context.Background())
+		var ctx context.Context
+		ctx, cancelfunc = context.WithCancel(context.Background())
 		var p *proxy
 		var mainDoneChan chan error
 		var filename string
@@ -371,6 +377,9 @@ func TestProxy1(t *testing.T) {
 			}
 			So(os.Remove(filename), ShouldBeNil)
 			So(cl.Close(), ShouldBeNil)
+			if cancelfunc != nil {
+				cancelfunc()
+			}
 		})
 	})
 }

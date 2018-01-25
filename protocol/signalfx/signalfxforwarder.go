@@ -1,6 +1,7 @@
 package signalfx
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/golang/protobuf/proto"
@@ -11,7 +12,6 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/metricproxy/protocol/filtering"
-	"golang.org/x/net/context"
 	"net"
 	"net/http"
 	"runtime"

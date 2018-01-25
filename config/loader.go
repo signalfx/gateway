@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
@@ -13,7 +14,6 @@ import (
 	"github.com/signalfx/metricproxy/protocol/prometheus"
 	"github.com/signalfx/metricproxy/protocol/signalfx"
 	"github.com/signalfx/metricproxy/protocol/wavefront"
-	"golang.org/x/net/context"
 )
 
 type forwarderLoader interface {

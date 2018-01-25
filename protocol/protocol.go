@@ -3,10 +3,10 @@ package protocol
 import (
 	"io"
 
+	"context"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/sfxclient"
-	"golang.org/x/net/context"
 )
 
 // DatapointForwarder can send datapoints and not events
