@@ -191,6 +191,14 @@ need to specify the port to bind to.  An example config:
         }
 ```
 
+...and then add the following to your prometheus.yml:
+
+```
+
+remote_write:
+  - url: "http://hostname:12003/write"
+```
+
 If you want someting different than the default endpoint of "/write" you can
 specify it with "ListenPath". An alternative example config:
 
@@ -200,6 +208,14 @@ specify it with "ListenPath". An alternative example config:
             "Type": "prometheus",
             "ListenPath": "/receive"
         }
+```
+
+...and then add the following to your prometheus.yml:
+
+```
+
+remote_write:
+  - url: "http://hostname:12003/receive"
 ```
 
 #### wavefront
