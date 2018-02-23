@@ -3,6 +3,12 @@ package carbon
 import (
 	"context"
 	"fmt"
+	"io"
+	"net"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/errors"
@@ -10,11 +16,6 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/metricproxy/protocol/filtering"
 	. "github.com/smartystreets/goconvey/convey"
-	"io"
-	"net"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 var errDeadline = errors.New("nope")
@@ -319,6 +320,18 @@ func TestCarbonListenerNormalUDP(t *testing.T) {
 			m := sendTo.Next()
 			So(m.Metric, ShouldEqual, "dice.roll")
 			So(m.Value.String(), ShouldEqual, "3")
+		})
+		Convey("try sending datapoint with float timestamps", func() {
+			s, err := net.DialUDP("udp", nil, listener.Addr().(*net.UDPAddr))
+			So(err, ShouldBeNil)
+			metric := "dice.roll 3 1519398226.544148"
+			n, err := io.WriteString(s, metric)
+			So(err, ShouldBeNil)
+			So(n, ShouldEqual, len(metric))
+			m := sendTo.Next()
+			So(m.Metric, ShouldEqual, "dice.roll")
+			So(m.Value.String(), ShouldEqual, "3")
+			So(m.Timestamp.UnixNano()/1000000, ShouldEqual, int64(1519398226544))
 		})
 		Reset(func() {
 			So(listener.Close(), ShouldBeNil)

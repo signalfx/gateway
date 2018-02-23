@@ -40,7 +40,8 @@ func NewCarbonDatapoint(line string, metricDeconstructor metricdeconstructor.Met
 	if err != nil {
 		return nil, err
 	}
-	metricTime, err := strconv.ParseInt(parts[2], 10, 64)
+
+	metricTime, err := strconv.ParseFloat(parts[2], 64)
 	if err != nil {
 		return nil, errors.Annotatef(err, "invalid carbon metric time on input line %s", line)
 	}
@@ -59,5 +60,5 @@ func NewCarbonDatapoint(line string, metricDeconstructor metricdeconstructor.Met
 	if err != nil {
 		return nil, err
 	}
-	return datapoint.NewWithMeta(metricName, dimensions, meta, v, mtype, time.Unix(0, metricTime*int64(time.Second))), nil
+	return datapoint.NewWithMeta(metricName, dimensions, meta, v, mtype, time.Unix(0, int64(metricTime*1000)*int64(time.Millisecond))), nil
 }
