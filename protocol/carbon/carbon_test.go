@@ -21,6 +21,10 @@ func TestNewCarbonDatapoint(t *testing.T) {
 	assert.Equal(t, nil, err, "Should be a valid carbon line")
 	assert.Equal(t, "hello", dp.Metric, "Should get metric back")
 
+	floatDp, err := NewCarbonDatapoint("hello 3 1519398226.544148", identityParser)
+	assert.Equal(t, nil, err, "Should be a valid carbon line")
+	assert.Equal(t, "hello", floatDp.Metric, "Should get metric back")
+
 	_, err = NewCarbonDatapoint("INVALIDLINE", identityParser)
 	assert.NotEqual(t, nil, err, "Line should be invalid")
 
@@ -30,6 +34,9 @@ func TestNewCarbonDatapoint(t *testing.T) {
 	_, err = NewCarbonDatapoint("hello bob 3", identityParser)
 	assert.NotEqual(t, nil, err, "Line should be invalid")
 
+	floatDp, _ = NewCarbonDatapoint("hello 3.3 1519398226.544148", identityParser)
+	assert.Equal(t, int64(1519398226), floatDp.Timestamp.Unix(), "Should get value back")
+
 	dp, _ = NewCarbonDatapoint("hello 3.3 3", identityParser)
 	f := dp.Value.(datapoint.FloatValue).Float()
 	assert.Equal(t, 3.3, f, "Should get value back")
@@ -37,6 +44,6 @@ func TestNewCarbonDatapoint(t *testing.T) {
 	carbonDp, _ := NativeCarbonLine(dp)
 	assert.Equal(t, "hello 3.3 3", carbonDp, "Should get the carbon line back")
 
-	dp, err = NewCarbonDatapoint("hello 3 3", &errorDeconstructor{})
+	_, err = NewCarbonDatapoint("hello 3 3", &errorDeconstructor{})
 	assert.NotEqual(t, nil, err, "Should NOT be a valid carbon line")
 }
