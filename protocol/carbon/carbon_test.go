@@ -23,7 +23,7 @@ func TestNewCarbonDatapoint(t *testing.T) {
 
 	floatDp, err := NewCarbonDatapoint("hello 3 1519398226.544148", identityParser)
 	assert.Equal(t, nil, err, "Should be a valid carbon line")
-	assert.Equal(t, "hello", floatDp.Metric, "Should get metric back")
+	assert.Equal(t, "hello", floatDp.Metric, "Should get floating timestamp metric back")
 
 	_, err = NewCarbonDatapoint("INVALIDLINE", identityParser)
 	assert.NotEqual(t, nil, err, "Line should be invalid")
@@ -35,7 +35,7 @@ func TestNewCarbonDatapoint(t *testing.T) {
 	assert.NotEqual(t, nil, err, "Line should be invalid")
 
 	floatDp, _ = NewCarbonDatapoint("hello 3.3 1519398226.544148", identityParser)
-	assert.Equal(t, int64(1519398226), floatDp.Timestamp.Unix(), "Should get value back")
+	assert.Equal(t, int64(1519398226), floatDp.Timestamp.Unix(), "Should get floating timestamp back as an int64")
 
 	dp, _ = NewCarbonDatapoint("hello 3.3 3", identityParser)
 	f := dp.Value.(datapoint.FloatValue).Float()
