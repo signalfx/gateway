@@ -35,7 +35,7 @@ func TestNewCarbonDatapoint(t *testing.T) {
 	assert.NotEqual(t, nil, err, "Line should be invalid")
 
 	floatDp, _ = NewCarbonDatapoint("hello 3.3 1519398226.544148", identityParser)
-	assert.Equal(t, int64(1519398226), floatDp.Timestamp.Unix(), "Should get floating timestamp back as an int64")
+	assert.Equal(t, int64(1519398226544), floatDp.Timestamp.UnixNano()/1000000, "Should get floating timestamp back as an int64")
 
 	dp, _ = NewCarbonDatapoint("hello 3.3 3", identityParser)
 	f := dp.Value.(datapoint.FloatValue).Float()

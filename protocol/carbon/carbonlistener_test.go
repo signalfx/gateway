@@ -331,7 +331,7 @@ func TestCarbonListenerNormalUDP(t *testing.T) {
 			m := sendTo.Next()
 			So(m.Metric, ShouldEqual, "dice.roll")
 			So(m.Value.String(), ShouldEqual, "3")
-			So(m.Timestamp.Unix(), ShouldEqual, int64(1519398226))
+			So(m.Timestamp.UnixNano()/1000000, ShouldEqual, int64(1519398226544))
 		})
 		Reset(func() {
 			So(listener.Close(), ShouldBeNil)
