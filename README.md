@@ -303,6 +303,19 @@ configure your auth token inside DefaultAuthToken.
         }
 ```
 
+By default gzip compression talking to SignalFx is turned on, if for some
+reason you want to turn it off you can disable it in the SigalFx forward config
+like this:
+
+```
+        {
+            "type": "signalfx",
+            "DefaultAuthToken": "___AUTH_TOKEN___",
+            "Name": "testproxy",
+            "DisableCompression" :true
+        }
+```
+
 ## Example configs
 
 ### Basic

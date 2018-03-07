@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"bytes"
 	"context"
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
@@ -27,6 +28,7 @@ import (
 	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/collectd"
+	"github.com/signalfx/metricproxy/protocol/zipper"
 )
 
 // ListenerServer controls listening on a socket for SignalFx connections
@@ -192,20 +194,28 @@ type ProtobufDecoderV2 struct {
 
 var errInvalidContentLength = errors.New("invalid Content-Length")
 
+func getBuffer(req *http.Request, logger log.Logger) (*bytes.Buffer, error) {
+	// TODO: Source of memory creation.  Maybe pass buf in?
+	// for compressed transactions, contentLength isn't trustworthy
+	buf := new(bytes.Buffer)
+	readLen, err := buf.ReadFrom(req.Body)
+	if err != nil {
+		logger.Log(log.Err, err, logkey.ReadLen, readLen, logkey.ContentLength, req.ContentLength, "Unable to fully read from buffer")
+		return nil, err
+	}
+	return buf, nil
+}
+
 func (decoder *ProtobufDecoderV2) Read(ctx context.Context, req *http.Request) error {
 	if req.ContentLength == -1 {
 		return errInvalidContentLength
 	}
-
-	// TODO: Source of memory creation.  Maybe pass buf in?
-	buf := make([]byte, req.ContentLength)
-	readLen, err := io.ReadFull(req.Body, buf)
+	buf, err := getBuffer(req, decoder.Logger)
 	if err != nil {
-		decoder.Logger.Log(log.Err, err, logkey.ReadLen, readLen, logkey.ContentLength, req.ContentLength, "Unable to fully read from buffer")
 		return err
 	}
 	var msg com_signalfx_metrics_protobuf.DataPointUploadMessage
-	err = proto.Unmarshal(buf, &msg)
+	err = proto.Unmarshal(buf.Bytes(), &msg)
 	if err != nil {
 		return err
 	}
@@ -229,15 +239,12 @@ func (decoder *ProtobufEventDecoderV2) Read(ctx context.Context, req *http.Reque
 		return errInvalidContentLength
 	}
 
-	// TODO: Source of memory creation.  Maybe pass buf in?
-	buf := make([]byte, req.ContentLength)
-	readLen, err := io.ReadFull(req.Body, buf)
+	buf, err := getBuffer(req, decoder.Logger)
 	if err != nil {
-		decoder.Logger.Log(log.Err, err, logkey.ReadLen, readLen, logkey.ContentLength, req.ContentLength, "Unable to fully read from buffer")
 		return err
 	}
 	var msg com_signalfx_metrics_protobuf.EventUploadMessage
-	err = proto.Unmarshal(buf, &msg)
+	err = proto.Unmarshal(buf.Bytes(), &msg)
 	if err != nil {
 		return err
 	}
@@ -471,7 +478,8 @@ func setupNotFoundHandler(ctx context.Context, r *mux.Router) sfxclient.Collecto
 	}
 }
 
-func setupChain(ctx context.Context, sink dpsink.Sink, chainType string, getReader func(dpsink.Sink) ErrorReader, httpChain web.NextConstructor, logger log.Logger) (*web.Handler, sfxclient.Collector) {
+func setupChain(ctx context.Context, sink dpsink.Sink, chainType string, getReader func(dpsink.Sink) ErrorReader, httpChain web.NextConstructor, logger log.Logger, moreConstructors ...web.Constructor) (http.Handler, sfxclient.Collector) {
+	zippers := zipper.NewZipper()
 	counter := &dpsink.Counter{}
 	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
 	errReader := getReader(finalSink)
@@ -481,17 +489,21 @@ func setupChain(ctx context.Context, sink dpsink.Sink, chainType string, getRead
 	}
 	metricTracking := web.RequestCounter{}
 	handler := web.NewHandler(ctx, &errorTracker).Add(web.NextHTTP(metricTracking.ServeHTTP)).Add(httpChain)
+	for _, c := range moreConstructors {
+		handler.Add(c)
+	}
 	st := &sfxclient.WithDimensions{
 		Collector: sfxclient.NewMultiCollector(
 			&metricTracking,
 			&errorTracker,
 			counter,
+			zippers,
 		),
 		Dimensions: map[string]string{
 			"http_endpoint": "sfx_" + chainType,
 		},
 	}
-	return handler, st
+	return zippers.GzipHandler(handler), st
 }
 
 func setupProtobufV1(ctx context.Context, r *mux.Router, sink dpsink.Sink, typeGetter MericTypeGetter, logger log.Logger, httpChain web.NextConstructor) sfxclient.Collector {
@@ -525,24 +537,26 @@ func SetupJSONV1Paths(r *mux.Router, handler http.Handler) {
 }
 
 func setupProtobufV2(ctx context.Context, r *mux.Router, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor) sfxclient.Collector {
+	additionalConstructors := []web.Constructor{}
+	if debugContext != nil {
+		additionalConstructors = append(additionalConstructors, debugContext)
+	}
 	handler, st := setupChain(ctx, sink, "protobuf_v2", func(s dpsink.Sink) ErrorReader {
 		return &ProtobufDecoderV2{Sink: s, Logger: logger}
-	}, httpChain, logger)
-	if debugContext != nil {
-		handler = handler.Add(debugContext)
-	}
+	}, httpChain, logger, additionalConstructors...)
 	SetupProtobufV2DatapointPaths(r, handler)
 
 	return st
 }
 
 func setupProtobufEventV2(ctx context.Context, r *mux.Router, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor) sfxclient.Collector {
+	additionalConstructors := []web.Constructor{}
+	if debugContext != nil {
+		additionalConstructors = append(additionalConstructors, debugContext)
+	}
 	handler, st := setupChain(ctx, sink, "protobuf_event_v2", func(s dpsink.Sink) ErrorReader {
 		return &ProtobufEventDecoderV2{Sink: s, Logger: logger}
-	}, httpChain, logger)
-	if debugContext != nil {
-		handler = handler.Add(debugContext)
-	}
+	}, httpChain, logger, additionalConstructors...)
 	SetupProtobufV2EventPaths(r, handler)
 
 	return st
@@ -564,26 +578,28 @@ func SetupProtobufV2ByPaths(r *mux.Router, handler http.Handler, path string) {
 }
 
 func setupJSONV2(ctx context.Context, r *mux.Router, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor) sfxclient.Collector {
+	additionalConstructors := []web.Constructor{}
+	if debugContext != nil {
+		additionalConstructors = append(additionalConstructors, debugContext)
+	}
 	var j2 *JSONDecoderV2
 	handler, st := setupChain(ctx, sink, "json_v2", func(s dpsink.Sink) ErrorReader {
 		j2 = &JSONDecoderV2{Sink: s, Logger: logger}
 		return j2
-	}, httpChain, logger)
-	if debugContext != nil {
-		handler = handler.Add(debugContext)
-	}
+	}, httpChain, logger, additionalConstructors...)
 	multi := sfxclient.NewMultiCollector(st, j2)
 	SetupJSONV2DatapointPaths(r, handler)
 	return multi
 }
 
 func setupJSONEventV2(ctx context.Context, r *mux.Router, sink dpsink.Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor) sfxclient.Collector {
+	additionalConstructors := []web.Constructor{}
+	if debugContext != nil {
+		additionalConstructors = append(additionalConstructors, debugContext)
+	}
 	handler, st := setupChain(ctx, sink, "json_event_v2", func(s dpsink.Sink) ErrorReader {
 		return &JSONEventDecoderV2{Sink: s, Logger: logger}
-	}, httpChain, logger)
-	if debugContext != nil {
-		handler = handler.Add(debugContext)
-	}
+	}, httpChain, logger, additionalConstructors...)
 	SetupJSONV2EventPaths(r, handler)
 	return st
 }

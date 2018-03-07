@@ -23,6 +23,7 @@ import (
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/protocol"
+	"github.com/signalfx/metricproxy/protocol/zipper"
 )
 
 // ListenerServer will listen for collectd datapoint connections
@@ -163,6 +164,7 @@ var defaultListenerConfig = &ListenerConfig{
 
 // NewListener serves http collectd requests
 func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer, error) {
+	zippers := zipper.NewZipper()
 	conf := pointer.FillDefaultFrom(passedConf, defaultListenerConfig).(*ListenerConfig)
 
 	listener, err := net.Listen("tcp", *conf.ListenAddr)
@@ -192,14 +194,16 @@ func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer,
 		decoder: &decoder,
 		collector: sfxclient.NewMultiCollector(
 			metricTracking,
-			&decoder),
+			&decoder,
+			zippers,
+		),
 	}
 	listenServer.SetupHealthCheck(conf.HealthCheck, r, conf.Logger)
 	httpHandler := web.NewHandler(conf.StartingContext, listenServer.decoder)
 	if conf.DebugContext != nil {
 		httpHandler.Add(conf.DebugContext)
 	}
-	SetupCollectdPaths(r, httpHandler, *conf.ListenPath)
+	SetupCollectdPaths(r, zippers.GzipHandler(httpHandler), *conf.ListenPath)
 
 	go func() {
 		log.IfErr(conf.Logger, listenServer.server.Serve(listener))
