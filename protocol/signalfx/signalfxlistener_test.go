@@ -394,7 +394,7 @@ func TestSignalfxListener(t *testing.T) {
 			verifyStatusCode("INVALID_PROTOBUF", "application/x-protobuf", "/v2/datapoint", http.StatusBadRequest)
 			dps = listener.Datapoints()
 			So(dptest.ExactlyOneDims(dps, "total_errors", map[string]string{"http_endpoint": "sfx_protobuf_v2"}).Value.String(), ShouldEqual, "1")
-			So(len(dps), ShouldEqual, 84)
+			So(len(dps), ShouldEqual, 102)
 			So(dptest.ExactlyOneDims(dps, "dropped_points", map[string]string{"protocol": "sfx_json_v2", "reason": "unknown_metric_type"}).Value.String(), ShouldEqual, "0")
 			So(dptest.ExactlyOneDims(dps, "dropped_points", map[string]string{"protocol": "sfx_json_v2", "reason": "invalid_value"}).Value.String(), ShouldEqual, "0")
 		})
@@ -495,6 +495,44 @@ func (f *fastSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapo
 // AddEvents buffers the event on an internal chan or returns errors if RetErr is set
 func (f *fastSink) AddEvents(ctx context.Context, points []*event.Event) error {
 	return nil
+}
+
+func BenchmarkProtobufDecoderV2_Read(b *testing.B) {
+	dp := &com_signalfx_metrics_protobuf.DataPoint{
+		Metric: pointer.String("metric"),
+		Value: &com_signalfx_metrics_protobuf.Datum{
+			IntValue: pointer.Int64(3),
+		},
+		Dimensions: []*com_signalfx_metrics_protobuf.Dimension{
+			{Key: pointer.String("this"), Value: pointer.String("that")},
+			{Key: pointer.String("here"), Value: pointer.String("there")},
+		},
+	}
+	dps := &com_signalfx_metrics_protobuf.DataPointUploadMessage{
+		Datapoints: []*com_signalfx_metrics_protobuf.DataPoint{
+			dp, dp, dp, dp, dp, dp, dp, dp, dp, dp, dp, dp, dp, dp, dp, dp, dp,
+		},
+	}
+	s := &fastSink{}
+
+	bb, err := proto.Marshal(dps)
+	if err != nil {
+		b.Fatal(err.Error())
+	}
+	dec := &ProtobufDecoderV2{Sink: s, Logger: log.DefaultLogger}
+	ctx := context.Background()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		req := &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader(bb)),
+		}
+		b.StartTimer()
+		err := dec.Read(ctx, req)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
 }
 
 func BenchmarkJSONDecoderV2_Read(b *testing.B) {
