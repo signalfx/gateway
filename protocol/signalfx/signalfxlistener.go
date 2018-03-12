@@ -194,23 +194,30 @@ type ProtobufDecoderV2 struct {
 
 var errInvalidContentLength = errors.New("invalid Content-Length")
 
-func getBuffer(req *http.Request, logger log.Logger) (*bytes.Buffer, error) {
-	// TODO: Source of memory creation.  Maybe pass buf in?
+var buffs = sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
+}
+
+func readFromRequest(jeff *bytes.Buffer, req *http.Request, logger log.Logger) (*bytes.Buffer, error) {
 	// for compressed transactions, contentLength isn't trustworthy
-	buf := new(bytes.Buffer)
-	readLen, err := buf.ReadFrom(req.Body)
+	readLen, err := jeff.ReadFrom(req.Body)
 	if err != nil {
 		logger.Log(log.Err, err, logkey.ReadLen, readLen, logkey.ContentLength, req.ContentLength, "Unable to fully read from buffer")
 		return nil, err
 	}
-	return buf, nil
+	return jeff, nil
 }
 
 func (decoder *ProtobufDecoderV2) Read(ctx context.Context, req *http.Request) error {
 	if req.ContentLength == -1 {
 		return errInvalidContentLength
 	}
-	buf, err := getBuffer(req, decoder.Logger)
+	jeff := buffs.Get().(*bytes.Buffer)
+	defer buffs.Put(jeff)
+	jeff.Reset()
+	buf, err := readFromRequest(jeff, req, decoder.Logger)
 	if err != nil {
 		return err
 	}
@@ -225,7 +232,10 @@ func (decoder *ProtobufDecoderV2) Read(ctx context.Context, req *http.Request) e
 			dps = append(dps, dp)
 		}
 	}
-	return decoder.Sink.AddDatapoints(ctx, dps)
+	if len(dps) > 0 {
+		err = decoder.Sink.AddDatapoints(ctx, dps)
+	}
+	return err
 }
 
 // ProtobufEventDecoderV2 decodes protocol buffers in signalfx's v2 format and sends them to Sink
@@ -239,7 +249,10 @@ func (decoder *ProtobufEventDecoderV2) Read(ctx context.Context, req *http.Reque
 		return errInvalidContentLength
 	}
 
-	buf, err := getBuffer(req, decoder.Logger)
+	jeff := buffs.Get().(*bytes.Buffer)
+	defer buffs.Put(jeff)
+	jeff.Reset()
+	buf, err := readFromRequest(jeff, req, decoder.Logger)
 	if err != nil {
 		return err
 	}
