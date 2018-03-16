@@ -3,8 +3,8 @@ package zipper
 import (
 	"bytes"
 	"compress/gzip"
-	"errors"
 	"fmt"
+	"github.com/signalfx/golib/errors"
 	. "github.com/smartystreets/goconvey/convey"
 	"io"
 	"net/http"
@@ -49,6 +49,7 @@ func Test(t *testing.T) {
 		}{
 			{zippers, "test non gzipped", []byte("OK"), http.StatusOK, map[string]string{}},
 			{zippers, "test gzipped", zipped.Bytes(), http.StatusOK, map[string]string{"Content-Encoding": "gzip"}},
+			{zippers, "test gzipped bad", zipped.Bytes()[:5], http.StatusBadRequest, map[string]string{"Content-Encoding": "gzip"}},
 			{badZippers, "test gzipped failure", zipped.Bytes(), http.StatusBadRequest, map[string]string{"Content-Encoding": "gzip"}},
 		}
 		for _, test := range tests {
@@ -66,7 +67,7 @@ func Test(t *testing.T) {
 			})
 		}
 		Convey("check datapoints", func() {
-			So(len(zippers.Datapoints()), ShouldEqual, 3)
+			So(len(zippers.Datapoints()), ShouldEqual, 4)
 		})
 	})
 }
