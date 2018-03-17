@@ -215,12 +215,10 @@ func loadNoDefault(configFile string, logger log.Logger) (*ProxyConfig, error) {
 	logCtx := log.NewContext(logger).With(logkey.ConfigFile, configFile)
 	var errConfigfile error
 	config, errConfigfile := loadConfig(configFile)
-	if errConfigfile != nil {
-		logCtx.Log(log.Err, errConfigfile, "unable to load config again")
-		return nil, errors.Annotatef(errConfigfile, "cannot load config file %s", errConfigfile)
-	} else {
+	if errConfigfile == nil {
 		return config, nil
-	}
+	} 
+	logCtx.Log(log.Err, errConfigfile, "unable to load config")
 	filename, err := xdgbasedirGetConfigFileLocation(configFile)
 	if err != nil {
 		return nil, errors.Annotatef(err, "cannot get config file for location %s", configFile)
