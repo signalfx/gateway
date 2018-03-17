@@ -213,21 +213,21 @@ func Load(configFile string, logger log.Logger) (*ProxyConfig, error) {
 
 func loadNoDefault(configFile string, logger log.Logger) (*ProxyConfig, error) {
 	logCtx := log.NewContext(logger).With(logkey.ConfigFile, configFile)
+	var errConfigfile error
+	config, errConfigfile := loadConfig(configFile)
+	if errConfigfile == nil {
+		return config, nil
+	} 
+	logCtx.Log(log.Err, errConfigfile, "unable to load config")
 	filename, err := xdgbasedirGetConfigFileLocation(configFile)
 	if err != nil {
 		return nil, errors.Annotatef(err, "cannot get config file for location %s", configFile)
 	}
 	logCtx = logCtx.With(logkey.Filename, filename)
 	config, errFilename := loadConfig(filename)
-	if errFilename == nil {
-		return config, nil
-	}
-	logCtx.Log(log.Err, errFilename, "unable to load original config filename")
-	var errConfigfile error
-	config, errConfigfile = loadConfig(configFile)
-	if errConfigfile != nil {
-		logCtx.Log(log.Err, errConfigfile, "unable to load config again")
-		return nil, errors.Annotatef(errConfigfile, "cannot load config file %s", errConfigfile)
+	if errFilename != nil {
+		logCtx.Log(log.Err, errFilename, "unable to load original config filename")
+		return nil, errors.Annotatef(errFilename, "unable to load original config filename")	
 	}
 	return config, nil
 }

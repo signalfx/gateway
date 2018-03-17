@@ -455,7 +455,7 @@ func (p *proxy) run(ctx context.Context) error {
 	if err := p.setupDebugServer(loadedConfig, logger, scheduler); err != nil {
 		return err
 	}
-	logger.Log("Setup done.  Blocking!")
+	logger.Log("Setup done.  Listening!")
 	if p.setupDoneSignal != nil {
 		close(p.setupDoneSignal)
 	}
