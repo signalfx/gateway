@@ -53,6 +53,14 @@ func TestSignalfxProtoDecoders(t *testing.T) {
 			ctx := context.Background()
 			So(decoder.Read(ctx, req), ShouldEqual, errReadErr)
 		})
+		Convey("chunked should work", func() {
+			req := &http.Request{
+				Body: ioutil.NopCloser(&errorReader{}),
+			}
+			req.TransferEncoding = append(req.TransferEncoding, "chunked")
+			ctx := context.Background()
+			So(decoder.Read(ctx, req), ShouldEqual, errReadErr)
+		})
 	}
 	Convey("a setup ProtobufDecoderV2", t, func() {
 		decoder := ProtobufDecoderV2{Logger: log.Discard}
