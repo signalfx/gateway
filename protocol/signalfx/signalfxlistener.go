@@ -29,6 +29,7 @@ import (
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/collectd"
 	"github.com/signalfx/metricproxy/protocol/zipper"
+	"net/http/httputil"
 )
 
 // ListenerServer controls listening on a socket for SignalFx connections
@@ -200,30 +201,39 @@ var buffs = sync.Pool{
 	},
 }
 
-func readFromRequest(jeff *bytes.Buffer, req *http.Request, logger log.Logger) (*bytes.Buffer, error) {
-	// for compressed transactions, contentLength isn't trustworthy
-	readLen, err := jeff.ReadFrom(req.Body)
-	if err != nil {
-		logger.Log(log.Err, err, logkey.ReadLen, readLen, logkey.ContentLength, req.ContentLength, "Unable to fully read from buffer")
-		return nil, err
+func readFromRequest(jeff *bytes.Buffer, req *http.Request, logger log.Logger) error {
+	var r io.Reader
+	r = req.Body
+	chunked := false
+	for _, k := range req.TransferEncoding {
+		if k == "chunked" {
+			r = httputil.NewChunkedReader(req.Body)
+			chunked = true
+		}
 	}
-	return jeff, nil
-}
 
-func (decoder *ProtobufDecoderV2) Read(ctx context.Context, req *http.Request) error {
-	if req.ContentLength == -1 {
+	if !chunked && req.ContentLength == -1 {
 		return errInvalidContentLength
 	}
+
+	// for compressed transactions, contentLength isn't trustworthy
+	readLen, err := jeff.ReadFrom(r)
+	if err != nil {
+		logger.Log(log.Err, err, logkey.ReadLen, readLen, logkey.ContentLength, req.ContentLength, "Unable to fully read from buffer")
+		return err
+	}
+	return nil
+}
+
+func (decoder *ProtobufDecoderV2) Read(ctx context.Context, req *http.Request) (err error) {
 	jeff := buffs.Get().(*bytes.Buffer)
 	defer buffs.Put(jeff)
 	jeff.Reset()
-	buf, err := readFromRequest(jeff, req, decoder.Logger)
-	if err != nil {
+	if err = readFromRequest(jeff, req, decoder.Logger); err != nil {
 		return err
 	}
 	var msg com_signalfx_metrics_protobuf.DataPointUploadMessage
-	err = proto.Unmarshal(buf.Bytes(), &msg)
-	if err != nil {
+	if err = proto.Unmarshal(jeff.Bytes(), &msg); err != nil {
 		return err
 	}
 	dps := make([]*datapoint.Datapoint, 0, len(msg.GetDatapoints()))
@@ -244,21 +254,15 @@ type ProtobufEventDecoderV2 struct {
 	Logger log.Logger
 }
 
-func (decoder *ProtobufEventDecoderV2) Read(ctx context.Context, req *http.Request) error {
-	if req.ContentLength == -1 {
-		return errInvalidContentLength
-	}
-
+func (decoder *ProtobufEventDecoderV2) Read(ctx context.Context, req *http.Request) (err error) {
 	jeff := buffs.Get().(*bytes.Buffer)
 	defer buffs.Put(jeff)
 	jeff.Reset()
-	buf, err := readFromRequest(jeff, req, decoder.Logger)
-	if err != nil {
+	if err = readFromRequest(jeff, req, decoder.Logger); err != nil {
 		return err
 	}
 	var msg com_signalfx_metrics_protobuf.EventUploadMessage
-	err = proto.Unmarshal(buf.Bytes(), &msg)
-	if err != nil {
+	if err = proto.Unmarshal(jeff.Bytes(), &msg); err != nil {
 		return err
 	}
 	evts := make([]*event.Event, 0, len(msg.GetEvents()))
@@ -267,7 +271,10 @@ func (decoder *ProtobufEventDecoderV2) Read(ctx context.Context, req *http.Reque
 			evts = append(evts, e)
 		}
 	}
-	return decoder.Sink.AddEvents(ctx, evts)
+	if len(evts) > 0 {
+		err = decoder.Sink.AddEvents(ctx, evts)
+	}
+	return err
 }
 
 // JSONDecoderV2 decodes v2 json data for signalfx and sends it to Sink
