@@ -37,27 +37,11 @@ func (errorReader *errorReader) Read([]byte) (int, error) {
 
 func TestSignalfxProtoDecoders(t *testing.T) {
 	readerCheck := func(decoder ErrorReader) {
-		Convey("Should expect invalid content length", func() {
-			req := &http.Request{
-				Body: ioutil.NopCloser(bytes.NewReader(nil)),
-			}
-			req.ContentLength = -1
-			ctx := context.Background()
-			So(decoder.Read(ctx, req), ShouldEqual, errInvalidContentLength)
-		})
 		Convey("should check read errors", func() {
 			req := &http.Request{
 				Body: ioutil.NopCloser(&errorReader{}),
 			}
 			req.ContentLength = 1
-			ctx := context.Background()
-			So(decoder.Read(ctx, req), ShouldEqual, errReadErr)
-		})
-		Convey("chunked should work", func() {
-			req := &http.Request{
-				Body: ioutil.NopCloser(&errorReader{}),
-			}
-			req.TransferEncoding = append(req.TransferEncoding, "chunked")
 			ctx := context.Background()
 			So(decoder.Read(ctx, req), ShouldEqual, errReadErr)
 		})
