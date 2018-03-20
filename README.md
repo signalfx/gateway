@@ -29,7 +29,7 @@ to [update](https://github.com/golang/go/wiki/Ubuntu) the golang package on
 Ubuntu must be executed before running the install script.
 
 ```
-sudo add-apt-repository ppa:ubuntu-lxc/lxd-stable
+sudo add-apt-repository ppa:ubuntu-lxc/lxc-stable
 sudo apt-get update
 sudo apt-get install golang
 ```
