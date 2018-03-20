@@ -29,7 +29,6 @@ import (
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/collectd"
 	"github.com/signalfx/metricproxy/protocol/zipper"
-	"net/http/httputil"
 )
 
 // ListenerServer controls listening on a socket for SignalFx connections
@@ -193,8 +192,6 @@ type ProtobufDecoderV2 struct {
 	Logger log.Logger
 }
 
-var errInvalidContentLength = errors.New("invalid Content-Length")
-
 var buffs = sync.Pool{
 	New: func() interface{} {
 		return new(bytes.Buffer)
@@ -202,22 +199,8 @@ var buffs = sync.Pool{
 }
 
 func readFromRequest(jeff *bytes.Buffer, req *http.Request, logger log.Logger) error {
-	var r io.Reader
-	r = req.Body
-	chunked := false
-	for _, k := range req.TransferEncoding {
-		if k == "chunked" {
-			r = httputil.NewChunkedReader(req.Body)
-			chunked = true
-		}
-	}
-
-	if !chunked && req.ContentLength == -1 {
-		return errInvalidContentLength
-	}
-
 	// for compressed transactions, contentLength isn't trustworthy
-	readLen, err := jeff.ReadFrom(r)
+	readLen, err := jeff.ReadFrom(req.Body)
 	if err != nil {
 		logger.Log(log.Err, err, logkey.ReadLen, readLen, logkey.ContentLength, req.ContentLength, "Unable to fully read from buffer")
 		return err
