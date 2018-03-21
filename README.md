@@ -29,9 +29,21 @@ to [update](https://github.com/golang/go/wiki/Ubuntu) the golang package on
 Ubuntu must be executed before running the install script.
 
 ```
-sudo add-apt-repository ppa:ubuntu-lxc/lxd-stable
+sudo add-apt-repository ppa:gophers/archive
 sudo apt-get update
-sudo apt-get install golang
+sudo apt-get install golang-1.10
+```
+
+If /usr/bin/go does NOT exist then create a symbolic link
+
+```
+sudo ln /usr/lib/go-1.10/bin/go /usr/bin/go
+```
+
+Or if /usr/bin/go does exist, then overwrite the older binary
+
+```
+sudo cp /usr/lib/go-1.10/bin/go /usr/bin/go
 ```
 
 ## Running
