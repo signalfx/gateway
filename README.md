@@ -344,7 +344,7 @@ to signalfx at 1s intervals
     {
       "Type": "carbon",
       "ListenAddr" : "0.0.0.0:2003",
-      "Timeout" : "2m"
+      "ConnectionTimeout" : "2m"
     }
   ],
 
@@ -408,7 +408,7 @@ seconds.
     {
       "Type": "carbon",
       "ListenAddr" : "0.0.0.0:2003",
-      "Timeout": "1m",
+      "ConnectionTimeout": "1m",
       "MetricDeconstructor": "commakeys",
       "MetricDeconstructorOptions": "mtypedim:metrictype"
     }
