@@ -38,6 +38,8 @@ type Forwarder struct {
 type stats struct {
 	totalDatapointsForwarded int64
 	totalEventsForwarded     int64
+	requests                 *sfxclient.RollingBucket
+	drainSize                *sfxclient.RollingBucket
 }
 
 // ForwarderConfig controls optional parameters for a signalfx forwarder
@@ -96,6 +98,16 @@ func NewForwarder(conf *ForwarderConfig) (*Forwarder, error) {
 		jsonMarshal:      conf.JSONMarshal,
 		sink:             datapointSendingSink,
 		Logger:           conf.Logger,
+		stats: stats{
+			requests: sfxclient.NewRollingBucket("request_time.ns", map[string]string{
+				"direction":   "forwarder",
+				"destination": "signalfx",
+			}),
+			drainSize: sfxclient.NewRollingBucket("drain_size", map[string]string{
+				"direction":   "forwarder",
+				"destination": "signalfx",
+			}),
+		},
 	}
 	err := ret.Setup(conf.Filters)
 	if err != nil {
@@ -106,7 +118,10 @@ func NewForwarder(conf *ForwarderConfig) (*Forwarder, error) {
 
 // Datapoints returns nothing.
 func (connector *Forwarder) Datapoints() []*datapoint.Datapoint {
-	return connector.GetFilteredDatapoints()
+	dps := connector.stats.requests.Datapoints()
+	dps = append(dps, connector.stats.drainSize.Datapoints()...)
+	dps = append(dps, connector.GetFilteredDatapoints()...)
+	return dps
 }
 
 // Close will terminate idle HTTP client connections
@@ -120,6 +135,9 @@ const TokenHeaderName = "X-SF-TOKEN"
 
 // AddDatapoints forwards datapoints to SignalFx
 func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*datapoint.Datapoint) error {
+	start := time.Now()
+	defer connector.stats.requests.Add(float64(time.Now().Sub(start).Nanoseconds()))
+	defer connector.stats.drainSize.Add(float64(len(datapoints)))
 	atomic.AddInt64(&connector.stats.totalDatapointsForwarded, int64(len(datapoints)))
 	datapoints = connector.emptyMetricNameFilter.FilterDatapoints(datapoints)
 	datapoints = connector.FilterDatapoints(datapoints)

@@ -122,7 +122,7 @@ func TestListener(t *testing.T) {
 		})
 		Convey("Is a Collector", func() {
 			dps := listener.Datapoints()
-			So(len(dps), ShouldEqual, 7)
+			So(len(dps), ShouldEqual, 13)
 		})
 		Convey("test getDatapoints edge cases", func() {
 			ts := getWriteRequest().Timeseries[0]

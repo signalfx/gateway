@@ -49,6 +49,8 @@ type decoder struct {
 	TotalErrors        int64
 	TotalNaNs          int64
 	TotalBadDatapoints int64
+	Bucket             *sfxclient.RollingBucket
+	DrainSize          *sfxclient.RollingBucket
 	SendTo             dpsink.Sink
 	Logger             log.Logger
 	readAll            func(r io.Reader) ([]byte, error)
@@ -124,6 +126,8 @@ func (d *decoder) getDatapoints(ts *prompb.TimeSeries) []*datapoint.Datapoint {
 
 // ServeHTTPC decodes datapoints for the connection and sends them to the decoder's sink
 func (d *decoder) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, req *http.Request) {
+	start := time.Now()
+	defer d.Bucket.Add(float64(time.Now().Sub(start).Nanoseconds()))
 	var err error
 	var compressed []byte
 	defer func() {
@@ -157,6 +161,7 @@ func (d *decoder) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, req *h
 		dps = append(dps, datapoints...)
 	}
 
+	d.DrainSize.Add(float64(len(dps)))
 	if len(dps) > 0 {
 		err = d.SendTo.AddDatapoints(ctx, dps)
 		if err != nil {
@@ -168,11 +173,14 @@ func (d *decoder) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, req *h
 
 // Datapoints about this decoder, including how many datapoints it decoded
 func (d *decoder) Datapoints() []*datapoint.Datapoint {
-	return []*datapoint.Datapoint{
+	dps := d.Bucket.Datapoints()
+	dps = append(dps, d.DrainSize.Datapoints()...)
+	dps = append(dps,
 		sfxclient.Cumulative("prometheus.invalid_requests", nil, atomic.LoadInt64(&d.TotalErrors)),
 		sfxclient.Cumulative("prometheus.total_NAN_samples", nil, atomic.LoadInt64(&d.TotalNaNs)),
 		sfxclient.Cumulative("prometheus.total_bad_datapoints", nil, atomic.LoadInt64(&d.TotalBadDatapoints)),
-	}
+	)
+	return dps
 }
 
 // Config controls optional parameters for collectd listeners
@@ -215,6 +223,14 @@ func NewListener(sink dpsink.Sink, passedConf *Config) (*Server, error) {
 		SendTo:  sink,
 		Logger:  conf.Logger,
 		readAll: ioutil.ReadAll,
+		Bucket: sfxclient.NewRollingBucket("request_time.ns", map[string]string{
+			"endpoint":  "prometheus",
+			"direction": "listener",
+		}),
+		DrainSize: sfxclient.NewRollingBucket("drain_size", map[string]string{
+			"direction":   "forwarder",
+			"destination": "signalfx",
+		}),
 	}
 	listenServer := Server{
 		listener: listener,

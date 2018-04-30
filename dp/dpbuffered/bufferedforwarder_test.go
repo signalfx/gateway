@@ -269,6 +269,7 @@ func TestBufferedForwarderMaxTotalDatapoints(t *testing.T) {
 		Checker: &dpsink.ItemFlagger{
 			CtxFlagCheck: &web.HeaderCtxFlag{},
 		},
+		Name: pointer.String("blarg"),
 	}
 	ctx := context.Background()
 	sendTo := dptest.NewBasicSink()
@@ -283,7 +284,8 @@ func TestBufferedForwarderMaxTotalDatapoints(t *testing.T) {
 	}
 	found := false
 	for i := 0; i < 100; i++ {
-		if bf.AddDatapoints(ctx, datas) == ErrDPBufferFull {
+		if err := bf.AddDatapoints(ctx, datas); err == errDPBufferFull(*config.Name) {
+			assert.NotEmpty(t, err.Error())
 			found = true
 			break
 		}
@@ -301,6 +303,7 @@ func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
 		Checker: &dpsink.ItemFlagger{
 			CtxFlagCheck: &web.HeaderCtxFlag{},
 		},
+		Name: pointer.String("blarg"),
 	}
 	ctx := context.Background()
 	sendTo := dptest.NewBasicSink()
@@ -315,7 +318,8 @@ func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
 	}
 	found := false
 	for i := 0; i < 100; i++ {
-		if bf.AddEvents(ctx, events) == ErrEBufferFull {
+		if err := bf.AddEvents(ctx, events); err == errEBufferFull(*config.Name) {
+			assert.NotEmpty(t, err.Error())
 			found = true
 			break
 		}

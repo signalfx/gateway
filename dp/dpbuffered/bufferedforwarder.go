@@ -1,7 +1,6 @@
 package dpbuffered
 
 import (
-	"errors"
 	"sync"
 	"sync/atomic"
 
@@ -24,6 +23,7 @@ type Config struct {
 	NumDrainingThreads *int64
 	Checker            *dpsink.ItemFlagger
 	Cdim               *log.CtxDimensions
+	Name               *string
 }
 
 // DefaultConfig are default values for buffered forwarders
@@ -33,6 +33,7 @@ var DefaultConfig = &Config{
 	MaxTotalEvents:     pointer.Int64(10000),
 	MaxDrainSize:       pointer.Int64(1000),
 	NumDrainingThreads: pointer.Int64(5),
+	Name:               pointer.String(""),
 }
 
 type stats struct {
@@ -55,6 +56,7 @@ type BufferedForwarder struct {
 	logger                      log.Logger
 	checker                     *dpsink.ItemFlagger
 	cdim                        *log.CtxDimensions
+	identifier                  string
 
 	sendTo      dpsink.Sink
 	stopContext context.Context
@@ -63,8 +65,11 @@ type BufferedForwarder struct {
 
 var _ dpsink.Sink = &BufferedForwarder{}
 
-// ErrDPBufferFull is returned by BufferedForwarder.AddDatapoints if the sink's buffer is full
-var ErrDPBufferFull = errors.New("unable to send more datapoints.  Buffer full")
+type errDPBufferFull string
+
+func (e errDPBufferFull) Error() string {
+	return "Forwarder " + string(e) + " unable to send more datapoints.  Buffer full"
+}
 
 // AddDatapoints sends the datapoints to a chan buffer that eventually is flushed in big groups
 func (forwarder *BufferedForwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
@@ -74,7 +79,7 @@ func (forwarder *BufferedForwarder) AddDatapoints(ctx context.Context, points []
 	atomic.AddInt64(&forwarder.stats.totalDatapointsBuffered, int64(len(points)))
 	if *forwarder.config.MaxTotalDatapoints <= atomic.LoadInt64(&forwarder.stats.totalDatapointsBuffered) {
 		atomic.AddInt64(&forwarder.stats.totalDatapointsBuffered, int64(-len(points)))
-		return ErrDPBufferFull
+		return errDPBufferFull(forwarder.identifier)
 	}
 	select {
 	case forwarder.dpChan <- points:
@@ -86,18 +91,21 @@ func (forwarder *BufferedForwarder) AddDatapoints(ctx context.Context, points []
 	}
 }
 
-// ErrEBufferFull is returned by BufferedForwarder.AddEvents if the sink's buffer is full
-var ErrEBufferFull = errors.New("unable to send more events.  Buffer full")
+type errEBufferFull string
+
+func (e errEBufferFull) Error() string {
+	return "Forwarder " + string(e) + " unable to send more events.  Buffer full"
+}
 
 // AddEvents sends the events to a chan buffer that eventually is flushed in big groups
 func (forwarder *BufferedForwarder) AddEvents(ctx context.Context, events []*event.Event) error {
 	if forwarder.checker.CtxFlagCheck.HasFlag(ctx) {
-		forwarder.cdim.With(ctx, forwarder.logger).Log("Events call recieved in buffered forwarder")
+		forwarder.cdim.With(ctx, forwarder.logger).Log("Events call received in buffered forwarder")
 	}
 	atomic.AddInt64(&forwarder.stats.totalEventsBuffered, int64(len(events)))
 	if *forwarder.config.MaxTotalEvents <= atomic.LoadInt64(&forwarder.stats.totalEventsBuffered) {
 		atomic.AddInt64(&forwarder.stats.totalEventsBuffered, int64(-len(events)))
-		return ErrEBufferFull
+		return errEBufferFull(forwarder.identifier)
 	}
 	select {
 	case forwarder.eChan <- events:
@@ -264,6 +272,7 @@ func NewBufferedForwarder(ctx context.Context, config *Config, sendTo dpsink.Sin
 		logger:      logCtx,
 		checker:     config.Checker,
 		cdim:        config.Cdim,
+		identifier:  *config.Name,
 	}
 	ret.start()
 	return ret
