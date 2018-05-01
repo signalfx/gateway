@@ -68,6 +68,8 @@ func (f *FilteredForwarder) FilterMetricName(metricName string) bool {
 
 // FilterDatapoints filters datapoints based on the metric name as well as counts how many it filters
 func (f *FilteredForwarder) FilterDatapoints(datapoints []*datapoint.Datapoint) []*datapoint.Datapoint {
+	// TODO use a sync.pool of buffers here
+	// TODO if we spun this off into several go routines instead of doing this in the main forwarder thread we could do a lot more work
 	validDatapoints := make([]*datapoint.Datapoint, 0, len(datapoints))
 	for _, d := range datapoints {
 		if f.FilterMetricName(d.Metric) {

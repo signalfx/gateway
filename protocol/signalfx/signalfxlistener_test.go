@@ -249,7 +249,7 @@ func TestSignalfxListener(t *testing.T) {
 			}
 			forwarder, err := NewForwarder(forwardConfig)
 			So(err, ShouldBeNil)
-			So(len(forwarder.Datapoints()), ShouldEqual, 1)
+			So(len(forwarder.Datapoints()), ShouldEqual, 7)
 			So(forwarder.Pipeline(), ShouldEqual, 0)
 			Convey("Should be able to send a point", func() {
 				dpSent := dptest.DP()

@@ -160,6 +160,7 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 			MaxTotalEvents:     forwardConfig.BufferSize,
 			MaxDrainSize:       forwardConfig.MaxDrainSize,
 			NumDrainingThreads: forwardConfig.DrainingThreads,
+			Name:               forwardConfig.Name,
 			Cdim:               cdim,
 		}
 		bf := dpbuffered.NewBufferedForwarder(ctx, bconf, endingSink, limitedLogger)
