@@ -305,7 +305,7 @@ func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error
 		for _, jsonDatapoint := range datapoints {
 			v, err := ValueToValue(jsonDatapoint.Value)
 			if err != nil {
-				decoder.Logger.Log(log.Err, err, logkey.Struct, jsonDatapoint, "Unable to get value for datapoint")
+				decoder.Logger.Log(log.Err, err, logkey.Caller, req.Header.Get(TokenHeaderName), logkey.Struct, jsonDatapoint, "Unable to get value for datapoint")
 				atomic.AddInt64(&decoder.invalidValue, 1)
 				continue
 			}
