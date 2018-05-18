@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/web"
@@ -21,15 +20,15 @@ type forwarderLoader interface {
 }
 
 type listenerLoader interface {
-	Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error)
+	Listener(sink signalfx.Sink, conf *ListenFrom) (protocol.Listener, error)
 }
 
 type listenSinkWrapper interface {
-	WrapSink(sink dpsink.Sink, conf *ListenFrom) dpsink.Sink
+	WrapSink(sink signalfx.Sink, conf *ListenFrom) signalfx.Sink
 }
 
 // NewLoader creates the default loader for proxy protocols
-func NewLoader(ctx context.Context, logger log.Logger, version string, debugContext *web.HeaderCtxFlag, itemFlagger *dpsink.ItemFlagger, ctxdims *log.CtxDimensions, next web.NextConstructor) *Loader {
+func NewLoader(ctx context.Context, logger log.Logger, version string, debugContext *web.HeaderCtxFlag, itemFlagger *signalfx.ItemFlagger, ctxdims *log.CtxDimensions, next web.NextConstructor) *Loader {
 	sfxL := &signalFxLoader{
 		logger:        logger,
 		rootContext:   ctx,
@@ -94,7 +93,7 @@ func (l *Loader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) {
 }
 
 // Listener loads a listener based upon config, finding the right listener first
-func (l *Loader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
+func (l *Loader) Listener(sink signalfx.Sink, conf *ListenFrom) (protocol.Listener, error) {
 	if conf.Type == "" {
 		return nil, errors.New("type required to load config")
 	}
@@ -111,11 +110,11 @@ func (l *Loader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener
 type dimensionListenerSink struct {
 }
 
-func (d *dimensionListenerSink) WrapSink(sink dpsink.Sink, conf *ListenFrom) dpsink.Sink {
+func (d *dimensionListenerSink) WrapSink(sink signalfx.Sink, conf *ListenFrom) signalfx.Sink {
 	if len(conf.Dimensions) == 0 {
 		return sink
 	}
-	return dpsink.IncludingDimensions(conf.Dimensions, sink)
+	return signalfx.IncludingDimensions(conf.Dimensions, sink)
 }
 
 type csvLoader struct {
@@ -142,7 +141,7 @@ type prometheusLoader struct {
 	logger       log.Logger
 }
 
-func (p *prometheusLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
+func (p *prometheusLoader) Listener(sink signalfx.Sink, conf *ListenFrom) (protocol.Listener, error) {
 	sfConf := prometheus.Config{
 		ListenAddr:      conf.ListenAddr,
 		ListenPath:      conf.ListenPath,
@@ -154,7 +153,7 @@ func (p *prometheusLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protoco
 	return prometheus.NewListener(sink, &sfConf)
 }
 
-func (s *collectdLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
+func (s *collectdLoader) Listener(sink signalfx.Sink, conf *ListenFrom) (protocol.Listener, error) {
 	sfConf := collectd.ListenerConfig{
 		ListenAddr:      conf.ListenAddr,
 		ListenPath:      conf.ListenPath,
@@ -172,12 +171,12 @@ type signalFxLoader struct {
 	rootContext   context.Context
 	debugContext  *web.HeaderCtxFlag
 	versionString string
-	itemFlagger   *dpsink.ItemFlagger
+	itemFlagger   *signalfx.ItemFlagger
 	ctxdims       *log.CtxDimensions
 	httpChain     web.NextConstructor
 }
 
-func (s *signalFxLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
+func (s *signalFxLoader) Listener(sink signalfx.Sink, conf *ListenFrom) (protocol.Listener, error) {
 	sfConf := signalfx.ListenerConfig{
 		ListenAddr:   conf.ListenAddr,
 		Timeout:      conf.TimeoutDuration,
@@ -193,6 +192,7 @@ func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) 
 	sfConf := signalfx.ForwarderConfig{
 		DatapointURL:     conf.URL,
 		EventURL:         conf.EventURL,
+		TraceURL:         conf.TraceURL,
 		Timeout:          conf.TimeoutDuration,
 		SourceDimensions: conf.SourceDimensions,
 		ProxyVersion:     &s.versionString,
@@ -224,7 +224,7 @@ func (s *carbonLoader) loadMetricDeconstructor(conf *ListenFrom) (metricdeconstr
 	return metricdeconstructor.LoadJSON(*conf.MetricDeconstructor, conf.MetricDeconstructorOptionsJSON)
 }
 
-func (s *carbonLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
+func (s *carbonLoader) Listener(sink signalfx.Sink, conf *ListenFrom) (protocol.Listener, error) {
 	md, err := s.loadMetricDeconstructor(conf)
 	if err != nil {
 		return nil, errors.Annotate(err, "cannot load metric deconstructor")
@@ -262,7 +262,7 @@ type wavefrontLoader struct {
 	logger log.Logger
 }
 
-func (s *wavefrontLoader) Listener(sink dpsink.Sink, conf *ListenFrom) (protocol.Listener, error) {
+func (s *wavefrontLoader) Listener(sink signalfx.Sink, conf *ListenFrom) (protocol.Listener, error) {
 	sfConf := wavefront.ListenerConfig{
 		ServerAcceptDeadline: conf.ServerAcceptDeadline,
 		ConnectionTimeout:    conf.TimeoutDuration,

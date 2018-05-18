@@ -12,6 +12,7 @@ import (
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/metricproxy/protocol/filtering"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
@@ -35,6 +36,7 @@ func TestFilenameForwarder(t *testing.T) {
 	assert.Equal(t, len(f.Datapoints()), 1)
 	assert.NoError(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dptest.DP()}))
 	assert.NoError(t, f.AddEvents(ctx, []*event.Event{dptest.E()}))
+	assert.NoError(t, f.AddSpans(ctx, []*trace.Span{{}}))
 	assert.Equal(t, int64(0), f.Pipeline())
 }
 
@@ -61,6 +63,7 @@ func TestFilenameForwarderBadWrite(t *testing.T) {
 	ctx := context.Background()
 	assert.Error(t, f.AddDatapoints(ctx, []*datapoint.Datapoint{dptest.DP()}))
 	assert.Error(t, f.AddEvents(ctx, []*event.Event{dptest.E()}))
+	assert.Error(t, f.AddSpans(ctx, []*trace.Span{{}}))
 }
 
 func TestBadForwarderCOnfig(t *testing.T) {

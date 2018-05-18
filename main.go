@@ -24,10 +24,12 @@ import (
 	"fmt"
 	"github.com/signalfx/golib/eventcounter"
 	"github.com/signalfx/golib/httpdebug"
+	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/dp/dpbuffered"
 	"github.com/signalfx/metricproxy/protocol/demultiplexer"
-	lumberjack "gopkg.in/natefinch/lumberjack.v2"
+	"github.com/signalfx/metricproxy/protocol/signalfx"
+	"gopkg.in/natefinch/lumberjack.v2"
 	"net"
 	"net/http"
 	"os/signal"
@@ -65,7 +67,7 @@ type proxy struct {
 	stdout              io.Writer
 	gomaxprocs          func(int) int
 	debugContext        web.HeaderCtxFlag
-	debugSink           dpsink.ItemFlagger
+	debugSink           signalfx.ItemFlagger
 	ctxDims             log.CtxDimensions
 	signalChan          chan os.Signal
 	config              *config.ProxyConfig
@@ -79,9 +81,11 @@ var mainInstance = proxy{
 	debugContext: web.HeaderCtxFlag{
 		HeaderName: "X-Debug-Id",
 	},
-	debugSink: dpsink.ItemFlagger{
-		EventMetaName:       "dbg_events",
-		MetricDimensionName: "sf_metric",
+	debugSink: signalfx.ItemFlagger{
+		ItemFlagger: dpsink.ItemFlagger{
+			EventMetaName:       "dbg_events",
+			MetricDimensionName: "sf_metric",
+		},
 	},
 	signalChan: make(chan os.Signal, 1),
 }
@@ -131,13 +135,12 @@ func getHostname(osHostname func() (string, error)) string {
 	return name
 }
 
-func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions) ([]protocol.Forwarder, error) {
+func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *signalfx.ItemFlagger, cdim *log.CtxDimensions) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, forwardConfig.Type, logkey.Direction, "forwarder")
 		forwarder, err := loader.Forwarder(forwardConfig)
 		if err != nil {
-			logCtx.Log(log.Err, err, "unable to load config")
 			return nil, err
 		}
 		name := forwarderName(forwardConfig)
@@ -149,10 +152,11 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 			Logger:       logCtx,
 			Now:          tk.Now,
 		}
-		count := &dpsink.Counter{
+		dcount := &dpsink.Counter{
 			Logger: limitedLogger,
 		}
-		endingSink := dpsink.FromChain(forwarder, dpsink.NextWrap(count))
+		count := signalfx.CounterWrap(dcount)
+		endingSink := signalfx.FromChain(forwarder, signalfx.NextWrap(count))
 		bconf := &dpbuffered.Config{
 			Checker:            Checker,
 			BufferSize:         forwardConfig.BufferSize,
@@ -170,6 +174,7 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 
 		scheduler.AddGroupedCallback(groupName, forwarder)
 		scheduler.AddGroupedCallback(groupName, bf)
+		scheduler.AddGroupedCallback(groupName, dcount)
 		scheduler.GroupedDefaultDimensions(groupName, map[string]string{
 			"name":      name,
 			"direction": "forwarder",
@@ -181,9 +186,9 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 	return allForwarders, nil
 }
 
-func setupListeners(tk timekeeper.TimeKeeper, hostname string, loader *config.Loader, loadedConfig *config.ProxyConfig, multiplexer dpsink.Sink, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Listener, error) {
-	listeners := make([]protocol.Listener, 0, len(loadedConfig.ListenFrom))
-	for idx, listenConfig := range loadedConfig.ListenFrom {
+func setupListeners(tk timekeeper.TimeKeeper, hostname string, loader *config.Loader, listenFrom []*config.ListenFrom, multiplexer signalfx.Sink, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Listener, error) {
+	listeners := make([]protocol.Listener, 0, len(listenFrom))
+	for idx, listenConfig := range listenFrom {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, listenConfig.Type, logkey.Direction, "listener")
 		name := func() string {
 			if listenConfig.Name != nil {
@@ -199,7 +204,7 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loader *config.Lo
 				Now:          tk.Now,
 			},
 		}
-		endingSink := dpsink.FromChain(multiplexer, dpsink.NextWrap(count))
+		endingSink := signalfx.FromChain(multiplexer, signalfx.NextWrap(signalfx.CounterWrap(count)))
 
 		listener, err := loader.Listener(endingSink, listenConfig)
 		if err != nil {
@@ -221,14 +226,17 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loader *config.Lo
 	return listeners, nil
 }
 
-func splitSinks(forwarders []protocol.Forwarder) ([]dpsink.DSink, []dpsink.ESink) {
+func splitSinks(forwarders []protocol.Forwarder) ([]dpsink.DSink, []dpsink.ESink, []trace.Sink) {
 	dsinks := make([]dpsink.DSink, 0, len(forwarders))
 	esinks := make([]dpsink.ESink, 0, len(forwarders))
+	tsinks := make([]trace.Sink, 0, len(forwarders))
 	for _, f := range forwarders {
 		dsinks = append(dsinks, f)
 		esinks = append(esinks, f)
+		tsinks = append(tsinks, f)
 	}
-	return dsinks, esinks
+
+	return dsinks, esinks, tsinks
 }
 
 func (p *proxy) setupDebugServer(conf *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler) error {
@@ -420,14 +428,17 @@ func (p *proxy) run(ctx context.Context) error {
 		return errors.Annotate(err, "unable to setup forwarders")
 	}
 	p.forwarders = forwarders
-	dpSinks, eSinks := splitSinks(forwarders)
+	dpSinks, eSinks, tSinks := splitSinks(forwarders)
 
-	multiplexer := dpsink.FromChain(&demultiplexer.Demultiplexer{
+	dmux := &demultiplexer.Demultiplexer{
 		DatapointSinks: dpSinks,
 		EventSinks:     eSinks,
-	}, dpsink.NextWrap(&p.debugSink))
+		TraceSinks:     tSinks,
+	}
 
-	listeners, err := setupListeners(p.tk, hostname, loader, loadedConfig, multiplexer, logger, scheduler)
+	multiplexer := signalfx.FromChain(dmux, signalfx.NextWrap(&p.debugSink))
+
+	listeners, err := setupListeners(p.tk, hostname, loader, loadedConfig.ListenFrom, multiplexer, logger, scheduler)
 	if err != nil {
 		return errors.Annotate(err, "cannot setup listeners from configuration")
 	}

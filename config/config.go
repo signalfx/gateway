@@ -20,6 +20,7 @@ import (
 type ForwardTo struct {
 	URL               *string `json:",omitempty"`
 	EventURL          *string `json:",omitempty"`
+	TraceURL          *string `json:",omitempty"`
 	Host              *string `json:",omitempty"`
 	Port              *uint16 `json:",omitempty"`
 	Type              string
@@ -222,7 +223,6 @@ func loadNoDefault(configFile string, logger log.Logger) (*ProxyConfig, error) {
 	if errFilename == nil {
 		return config, nil
 	}
-	logCtx.Log(log.Err, errFilename, "unable to load original config filename")
 	var errConfigfile error
 	config, errConfigfile = loadConfig(configFile)
 	if errConfigfile != nil {
