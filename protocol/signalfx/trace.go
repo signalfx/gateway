@@ -22,28 +22,6 @@ const (
 // Dataformat is used to read the json off the wire
 type Dataformat []*trace.Span
 
-// InputSpan defines a span that is the union of v1 and v2 spans
-type InputSpan struct {
-	trace.Span
-	Annotations       []Annotation       `json:"annotations"`
-	BinaryAnnotations []BinaryAnnotation `json:"binaryAnnotations"`
-}
-
-// Annotation associates an event that explains latency with a timestamp.
-// Unlike log statements, annotations are often codes. Ex. “ws” for WireSend
-type Annotation struct {
-	Endpoint  *trace.Endpoint `json:"endpoint"`
-	Timestamp *float64        `json:"timestamp"`
-	Value     *string         `json:"value"`
-}
-
-// BinaryAnnotation associates an event that explains latency with a timestamp.
-type BinaryAnnotation struct {
-	Endpoint *trace.Endpoint `json:"endpoint"`
-	Key      *string         `json:"key"`
-	Value    *interface{}    `json:"value"`
-}
-
 // JSONTraceDecoderV1 decodes json to structs
 type JSONTraceDecoderV1 struct {
 	Logger log.Logger
