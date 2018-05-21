@@ -67,7 +67,7 @@ type proxy struct {
 	stdout              io.Writer
 	gomaxprocs          func(int) int
 	debugContext        web.HeaderCtxFlag
-	debugSink           signalfx.ItemFlagger
+	debugSink           dpsink.ItemFlagger
 	ctxDims             log.CtxDimensions
 	signalChan          chan os.Signal
 	config              *config.ProxyConfig
@@ -81,11 +81,9 @@ var mainInstance = proxy{
 	debugContext: web.HeaderCtxFlag{
 		HeaderName: "X-Debug-Id",
 	},
-	debugSink: signalfx.ItemFlagger{
-		ItemFlagger: dpsink.ItemFlagger{
-			EventMetaName:       "dbg_events",
-			MetricDimensionName: "sf_metric",
-		},
+	debugSink: dpsink.ItemFlagger{
+		EventMetaName:       "dbg_events",
+		MetricDimensionName: "sf_metric",
 	},
 	signalChan: make(chan os.Signal, 1),
 }
@@ -135,7 +133,7 @@ func getHostname(osHostname func() (string, error)) string {
 	return name
 }
 
-func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *signalfx.ItemFlagger, cdim *log.CtxDimensions) ([]protocol.Forwarder, error) {
+func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, forwardConfig.Type, logkey.Direction, "forwarder")
@@ -155,7 +153,7 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 		dcount := &dpsink.Counter{
 			Logger: limitedLogger,
 		}
-		count := signalfx.CounterWrap(dcount)
+		count := signalfx.UnifyNextSinkWrap(dcount)
 		endingSink := signalfx.FromChain(forwarder, signalfx.NextWrap(count))
 		bconf := &dpbuffered.Config{
 			Checker:            Checker,
@@ -204,7 +202,7 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loader *config.Lo
 				Now:          tk.Now,
 			},
 		}
-		endingSink := signalfx.FromChain(multiplexer, signalfx.NextWrap(signalfx.CounterWrap(count)))
+		endingSink := signalfx.FromChain(multiplexer, signalfx.NextWrap(signalfx.UnifyNextSinkWrap(count)))
 
 		listener, err := loader.Listener(endingSink, listenConfig)
 		if err != nil {
@@ -436,7 +434,7 @@ func (p *proxy) run(ctx context.Context) error {
 		TraceSinks:     tSinks,
 	}
 
-	multiplexer := signalfx.FromChain(dmux, signalfx.NextWrap(&p.debugSink))
+	multiplexer := signalfx.FromChain(dmux, signalfx.NextWrap(signalfx.UnifyNextSinkWrap(&p.debugSink)))
 
 	listeners, err := setupListeners(p.tk, hostname, loader, loadedConfig.ListenFrom, multiplexer, logger, scheduler)
 	if err != nil {

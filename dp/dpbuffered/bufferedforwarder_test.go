@@ -14,7 +14,6 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
-	"github.com/signalfx/metricproxy/protocol/signalfx"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 	"io"
@@ -45,12 +44,10 @@ func TestBufferedForwarderBasic(t *testing.T) {
 	Convey("Basic forwarder setup", t, func() {
 		ctx := context.Background()
 		flagCheck := boolChecker(false)
-		checker := &signalfx.ItemFlagger{
-			ItemFlagger: dpsink.ItemFlagger{
-				CtxFlagCheck:        &flagCheck,
-				EventMetaName:       "meta_event",
-				MetricDimensionName: "sf_metric",
-			},
+		checker := &dpsink.ItemFlagger{
+			CtxFlagCheck:        &flagCheck,
+			EventMetaName:       "meta_event",
+			MetricDimensionName: "sf_metric",
 		}
 		config := &Config{
 			BufferSize:         pointer.Int64(210),
@@ -178,10 +175,8 @@ func TestBufferedForwarderContexts(t *testing.T) {
 		NumDrainingThreads: pointer.Int64(2),
 		MaxDrainSize:       pointer.Int64(1000),
 		Cdim:               &log.CtxDimensions{},
-		Checker: &signalfx.ItemFlagger{
-			ItemFlagger: dpsink.ItemFlagger{
-				CtxFlagCheck: &web.HeaderCtxFlag{},
-			},
+		Checker: &dpsink.ItemFlagger{
+			CtxFlagCheck: &web.HeaderCtxFlag{},
 		},
 	}
 
@@ -250,10 +245,8 @@ func TestBufferedForwarderContextsEvent(t *testing.T) {
 		NumDrainingThreads: pointer.Int64(2),
 		MaxDrainSize:       pointer.Int64(1000),
 		Cdim:               &log.CtxDimensions{},
-		Checker: &signalfx.ItemFlagger{
-			ItemFlagger: dpsink.ItemFlagger{
-				CtxFlagCheck: &web.HeaderCtxFlag{},
-			},
+		Checker: &dpsink.ItemFlagger{
+			CtxFlagCheck: &web.HeaderCtxFlag{},
 		},
 	}
 
@@ -302,10 +295,8 @@ func TestBufferedForwarderMaxTotalDatapoints(t *testing.T) {
 		NumDrainingThreads: pointer.Int64(1),
 		MaxDrainSize:       pointer.Int64(1000),
 		Cdim:               &log.CtxDimensions{},
-		Checker: &signalfx.ItemFlagger{
-			ItemFlagger: dpsink.ItemFlagger{
-				CtxFlagCheck: &web.HeaderCtxFlag{},
-			},
+		Checker: &dpsink.ItemFlagger{
+			CtxFlagCheck: &web.HeaderCtxFlag{},
 		},
 		Name: pointer.String("blarg"),
 	}
@@ -339,10 +330,8 @@ func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
 		NumDrainingThreads: pointer.Int64(1),
 		MaxDrainSize:       pointer.Int64(1000),
 		Cdim:               &log.CtxDimensions{},
-		Checker: &signalfx.ItemFlagger{
-			ItemFlagger: dpsink.ItemFlagger{
-				CtxFlagCheck: &web.HeaderCtxFlag{},
-			},
+		Checker: &dpsink.ItemFlagger{
+			CtxFlagCheck: &web.HeaderCtxFlag{},
 		},
 		Name: pointer.String("blarg"),
 	}

@@ -3,13 +3,13 @@ package config
 import (
 	"context"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/protocol/carbon"
-	"github.com/signalfx/metricproxy/protocol/signalfx"
 	. "github.com/smartystreets/goconvey/convey"
 	"os"
 	"testing"
@@ -20,7 +20,7 @@ func getLoader() *Loader {
 	logger := log.Discard
 	version := "123"
 	debugContext := web.HeaderCtxFlag{}
-	itemFlagger := signalfx.ItemFlagger{}
+	itemFlagger := dpsink.ItemFlagger{}
 	l := NewLoader(ctx, logger, version, &debugContext, &itemFlagger, nil, nil)
 	return l
 }

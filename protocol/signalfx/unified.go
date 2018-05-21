@@ -112,48 +112,30 @@ func (w *WithDimensions) AddSpans(ctx context.Context, spans []*trace.Span, next
 	return next.AddSpans(ctx, spans)
 }
 
-// CounterWrap wraps a dpsink.Counter to make it usable as NextSink
-func CounterWrap(wrappedCounter *dpsink.Counter) NextSink {
-	return &counterWrap{
-		Counter: wrappedCounter,
+type almostNextSink interface {
+	dpsink.NextSink
+	trace.NextSink
+}
+
+type ans struct {
+	asink almostNextSink
+}
+
+func (a *ans) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint, next Sink) error {
+	return a.asink.AddDatapoints(ctx, points, next)
+}
+
+func (a *ans) AddEvents(ctx context.Context, events []*event.Event, next Sink) error {
+	return a.asink.AddEvents(ctx, events, next)
+}
+
+func (a *ans) AddSpans(ctx context.Context, spans []*trace.Span, next Sink) error {
+	return a.asink.AddSpans(ctx, spans, next)
+}
+
+// UnifyNextSinkWrap converts the combination of a dpsink.NextSink and a trace.NextSink into a signalfx.NextSink
+func UnifyNextSinkWrap(s almostNextSink) NextSink {
+	return &ans{
+		asink: s,
 	}
-}
-
-type counterWrap struct {
-	*dpsink.Counter
-}
-
-// AddDatapoints will send points to the next sink and track points send to the next sink
-func (c *counterWrap) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint, next Sink) error {
-	return c.Counter.AddDatapoints(ctx, points, next)
-}
-
-// AddEvents will send events to the next sink and track events sent to the next sink
-func (c *counterWrap) AddEvents(ctx context.Context, events []*event.Event, next Sink) error {
-	return c.Counter.AddEvents(ctx, events, next)
-}
-
-// AddSpans will send spans to the next sink and track spans sent to the next sink
-func (c *counterWrap) AddSpans(ctx context.Context, spans []*trace.Span, next Sink) error {
-	return c.Counter.AddSpans(ctx, spans, next)
-}
-
-// ItemFlagger is a unified version of the dpsink.ItemFlagger
-type ItemFlagger struct {
-	dpsink.ItemFlagger
-}
-
-// AddDatapoints will send points to the next sink and track points send to the next sink
-func (c *ItemFlagger) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint, next Sink) error {
-	return c.ItemFlagger.AddDatapoints(ctx, points, next)
-}
-
-// AddEvents will send events to the next sink and track events sent to the next sink
-func (c *ItemFlagger) AddEvents(ctx context.Context, events []*event.Event, next Sink) error {
-	return c.ItemFlagger.AddEvents(ctx, events, next)
-}
-
-// AddSpans will send spans to the next sink and track spans sent to the next sink
-func (c *ItemFlagger) AddSpans(ctx context.Context, spans []*trace.Span, next Sink) error {
-	return c.ItemFlagger.AddSpans(ctx, spans, next)
 }
