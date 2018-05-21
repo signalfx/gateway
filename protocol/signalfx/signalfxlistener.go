@@ -228,7 +228,7 @@ func setupChain(ctx context.Context, sink Sink, chainType string, getReader func
 		Logger: logger,
 	}
 
-	ucount := CounterWrap(counter)
+	ucount := UnifyNextSinkWrap(counter)
 	finalSink := FromChain(sink, NextWrap(ucount))
 	errReader := getReader(finalSink)
 	errorTracker := ErrorTrackerHandler{

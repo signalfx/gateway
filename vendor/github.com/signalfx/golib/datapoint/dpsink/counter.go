@@ -103,3 +103,48 @@ func (c *Counter) AddSpans(ctx context.Context, spans []*trace.Span, next trace.
 	}
 	return err
 }
+
+// HistoCounter wraps a Counter with a histogram around batch sizes
+type HistoCounter struct {
+	sink            *Counter
+	DatapointBucket *sfxclient.RollingBucket
+	EventBucket     *sfxclient.RollingBucket
+	SpanBucket      *sfxclient.RollingBucket
+}
+
+// AddDatapoints sample length of slice and pass on
+func (h *HistoCounter) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint, next Sink) error {
+	h.DatapointBucket.Add(float64(len(points)))
+	return h.sink.AddDatapoints(ctx, points, next)
+}
+
+// AddEvents sample length of slice and pass on
+func (h *HistoCounter) AddEvents(ctx context.Context, events []*event.Event, next Sink) error {
+	h.EventBucket.Add(float64(len(events)))
+	return h.sink.AddEvents(ctx, events, next)
+}
+
+// AddSpans sample length of slice and pass on
+func (h *HistoCounter) AddSpans(ctx context.Context, spans []*trace.Span, next trace.Sink) error {
+	h.SpanBucket.Add(float64(len(spans)))
+	return h.sink.AddSpans(ctx, spans, next)
+}
+
+// Datapoints is rather self explanitory
+func (h *HistoCounter) Datapoints() []*datapoint.Datapoint {
+	dps := h.sink.Datapoints()
+	dps = append(dps, h.DatapointBucket.Datapoints()...)
+	dps = append(dps, h.EventBucket.Datapoints()...)
+	dps = append(dps, h.SpanBucket.Datapoints()...)
+	return dps
+}
+
+// NewHistoCounter is a constructor
+func NewHistoCounter(sink *Counter) *HistoCounter {
+	return &HistoCounter{
+		sink:            sink,
+		DatapointBucket: sfxclient.NewRollingBucket("datapoint_batch_size", map[string]string{}),
+		EventBucket:     sfxclient.NewRollingBucket("event_batch_size", map[string]string{}),
+		SpanBucket:      sfxclient.NewRollingBucket("span_batch_size", map[string]string{}),
+	}
+}

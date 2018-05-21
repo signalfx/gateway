@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/web"
@@ -28,7 +29,7 @@ type listenSinkWrapper interface {
 }
 
 // NewLoader creates the default loader for proxy protocols
-func NewLoader(ctx context.Context, logger log.Logger, version string, debugContext *web.HeaderCtxFlag, itemFlagger *signalfx.ItemFlagger, ctxdims *log.CtxDimensions, next web.NextConstructor) *Loader {
+func NewLoader(ctx context.Context, logger log.Logger, version string, debugContext *web.HeaderCtxFlag, itemFlagger *dpsink.ItemFlagger, ctxdims *log.CtxDimensions, next web.NextConstructor) *Loader {
 	sfxL := &signalFxLoader{
 		logger:        logger,
 		rootContext:   ctx,
@@ -171,7 +172,7 @@ type signalFxLoader struct {
 	rootContext   context.Context
 	debugContext  *web.HeaderCtxFlag
 	versionString string
-	itemFlagger   *signalfx.ItemFlagger
+	itemFlagger   *dpsink.ItemFlagger
 	ctxdims       *log.CtxDimensions
 	httpChain     web.NextConstructor
 }

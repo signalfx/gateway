@@ -25,7 +25,7 @@ type Config struct {
 	MaxTotalSpans      *int64
 	MaxDrainSize       *int64
 	NumDrainingThreads *int64
-	Checker            *signalfx.ItemFlagger
+	Checker            *dpsink.ItemFlagger
 	Cdim               *log.CtxDimensions
 	Name               *string
 }
@@ -67,7 +67,7 @@ type BufferedForwarder struct {
 	blockingEventDrainWaitMutex sync.Mutex
 	blockingTraceDrainWaitMutex sync.Mutex
 	logger                      log.Logger
-	checker                     *signalfx.ItemFlagger
+	checker                     *dpsink.ItemFlagger
 	cdim                        *log.CtxDimensions
 	identifier                  string
 

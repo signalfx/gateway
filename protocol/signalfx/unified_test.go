@@ -119,19 +119,17 @@ func (b *boolFlagCheck) HasFlag(ctx context.Context) bool {
 func TestFilter(t *testing.T) {
 	Convey("With item flagger", t, func() {
 		flagCheck := boolFlagCheck(false)
-		i := &ItemFlagger{
-			ItemFlagger: dpsink.ItemFlagger{
-				CtxFlagCheck:        &flagCheck,
-				EventMetaName:       "my_events",
-				MetricDimensionName: "sf_metric",
-				Logger:              log.Discard,
-			},
+		i := &dpsink.ItemFlagger{
+			CtxFlagCheck:        &flagCheck,
+			EventMetaName:       "my_events",
+			MetricDimensionName: "sf_metric",
+			Logger:              log.Discard,
 		}
 		dp1 := datapoint.New("mname", map[string]string{"org": "mine", "type": "prod"}, nil, datapoint.Gauge, time.Time{})
 		dp2 := datapoint.New("mname2", map[string]string{"org": "another", "type": "prod"}, nil, datapoint.Gauge, time.Time{})
 		ev1 := event.New("mname", event.USERDEFINED, map[string]string{"org": "mine", "type": "prod"}, time.Time{})
 		ev2 := event.New("mname2", event.USERDEFINED, map[string]string{"org": "another", "type": "prod"}, time.Time{})
-		chain := FromChain(dpsink.Discard, NextWrap(i))
+		chain := FromChain(dpsink.Discard, NextWrap(UnifyNextSinkWrap(i)))
 		ctx := context.Background()
 		So(len(i.Datapoints()), ShouldEqual, 4)
 		Convey("should not flag by default", func() {
@@ -216,12 +214,10 @@ func TestCounterSink(t *testing.T) {
 	}
 	ctx := context.Background()
 	bs := dptest.NewBasicSink()
-	count := &counterWrap{
-		Counter: &dpsink.Counter{
-			Logger: log.Discard,
-		},
+	count := &dpsink.Counter{
+		Logger: log.Discard,
 	}
-	middleSink := NextWrap(count)(bs)
+	middleSink := NextWrap(UnifyNextSinkWrap(count))(bs)
 	go func() {
 		// Allow time for us to get in the middle of a call
 		time.Sleep(time.Millisecond)
@@ -248,10 +244,8 @@ func TestCounterSinkEvent(t *testing.T) {
 	}
 	ctx := context.Background()
 	bs := dptest.NewBasicSink()
-	count := &counterWrap{
-		Counter: &dpsink.Counter{},
-	}
-	middleSink := NextWrap(count)(bs)
+	count := &dpsink.Counter{}
+	middleSink := NextWrap(UnifyNextSinkWrap(count))(bs)
 	go func() {
 		// Allow time for us to get in the middle of a call
 		time.Sleep(time.Millisecond)
@@ -279,7 +273,7 @@ func TestCounterSinkTrace(t *testing.T) {
 	dcount := &dpsink.Counter{}
 	ctx := context.Background()
 	sink := dptest.NewBasicSink()
-	counter := CounterWrap(dcount)
+	counter := UnifyNextSinkWrap(dcount)
 	finalSink := FromChain(sink, NextWrap(counter))
 
 	go func() {
