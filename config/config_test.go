@@ -144,6 +144,10 @@ func TestGracefulDurations(t *testing.T) {
 		convey.So(err, convey.ShouldNotBeNil)
 		_, err = decodeConfig([]byte(`{"SilentGracefulTime":"1z"}`))
 		convey.So(err, convey.ShouldNotBeNil)
+		_, err = decodeConfig([]byte(`{"FutureThreshold":"1z"}`))
+		convey.So(err, convey.ShouldNotBeNil)
+		_, err = decodeConfig([]byte(`{"LateThreshold":"1z"}`))
+		convey.So(err, convey.ShouldNotBeNil)
 	})
 
 }

@@ -88,6 +88,10 @@ type ProxyConfig struct {
 	MaxGracefulWaitTimeDuration   *time.Duration `json:"-"`
 	GracefulCheckIntervalDuration *time.Duration `json:"-"`
 	SilentGracefulTimeDuration    *time.Duration `json:"-"`
+	LateThreshold                 *string        `json:",omitempty"`
+	FutureThreshold               *string        `json:",omitempty"`
+	LateThresholdDuration         *time.Duration `json:"-"`
+	FutureThresholdDuration       *time.Duration `json:"-"`
 }
 
 // DefaultProxyConfig is default values for the proxy config
@@ -127,7 +131,7 @@ func decodeConfig(configBytes []byte) (*ProxyConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = config.decodeGracefulDurations()
+	err = config.decodeDurations()
 	if err != nil {
 		return nil, err
 	}
@@ -156,27 +160,32 @@ func (p *ProxyConfig) decodeTimeouts() error {
 	return nil
 }
 
-func (p *ProxyConfig) decodeGracefulDurations() error {
-	if p.GracefulCheckInterval != nil {
-		duration, err := time.ParseDuration(*p.GracefulCheckInterval)
-		p.GracefulCheckIntervalDuration = &duration
+func decodeDuration(str *string, dur **time.Duration) error {
+	if str != nil {
+		duration, err := time.ParseDuration(*str)
 		if err != nil {
-			return errors.Annotatef(err, "cannot parse graceful check interval %s", *p.GracefulCheckInterval)
+			return err
 		}
+		*dur = &duration
 	}
-	if p.MaxGracefulWaitTime != nil {
-		duration, err := time.ParseDuration(*p.MaxGracefulWaitTime)
-		p.MaxGracefulWaitTimeDuration = &duration
-		if err != nil {
-			return errors.Annotatef(err, "cannot parse max graceful wait time %s", *p.MaxGracefulWaitTime)
-		}
+	return nil
+}
+
+func (p *ProxyConfig) decodeDurations() error {
+	if err := decodeDuration(p.GracefulCheckInterval, &p.GracefulCheckIntervalDuration); err != nil {
+		return errors.Annotatef(err, "cannot parse graceful check interval %s", *p.GracefulCheckInterval)
 	}
-	if p.SilentGracefulTime != nil {
-		duration, err := time.ParseDuration(*p.SilentGracefulTime)
-		p.SilentGracefulTimeDuration = &duration
-		if err != nil {
-			return errors.Annotatef(err, "cannot parse silent graceful wait time %s", *p.SilentGracefulTime)
-		}
+	if err := decodeDuration(p.MaxGracefulWaitTime, &p.MaxGracefulWaitTimeDuration); err != nil {
+		return errors.Annotatef(err, "cannot parse max graceful wait time %s", *p.MaxGracefulWaitTime)
+	}
+	if err := decodeDuration(p.SilentGracefulTime, &p.SilentGracefulTimeDuration); err != nil {
+		return errors.Annotatef(err, "cannot parse silent graceful wait time %s", *p.SilentGracefulTime)
+	}
+	if err := decodeDuration(p.FutureThreshold, &p.FutureThresholdDuration); err != nil {
+		return errors.Annotatef(err, "cannot parse future threshold %s", *p.FutureThreshold)
+	}
+	if err := decodeDuration(p.LateThreshold, &p.LateThresholdDuration); err != nil {
+		return errors.Annotatef(err, "cannot parse lag threshold %s", *p.LateThreshold)
 	}
 	return nil
 }
