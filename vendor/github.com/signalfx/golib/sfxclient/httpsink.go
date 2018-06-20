@@ -378,15 +378,17 @@ type spanResponse struct {
 }
 
 func spanResponseValidator(respBody []byte) error {
-	var respObj spanResponse
+	if string(respBody) != `"OK"` {
+		var respObj spanResponse
 
-	if err := json.Unmarshal(respBody, &respObj); err != nil {
-		return errors.Annotatef(err, "cannot unmarshal response body %s", respBody)
-	}
+		if err := json.Unmarshal(respBody, &respObj); err != nil {
+			return errors.Annotatef(err, "cannot unmarshal response body %s", respBody)
+		}
 
-	for _, v := range respObj.Invalid {
-		if len(v) > 0 {
-			return errors.Errorf("some spans were invalid: %v", respObj.Invalid)
+		for _, v := range respObj.Invalid {
+			if len(v) > 0 {
+				return errors.Errorf("some spans were invalid: %v", respObj.Invalid)
+			}
 		}
 	}
 
