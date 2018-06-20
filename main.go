@@ -432,7 +432,11 @@ func (p *proxy) run(ctx context.Context) error {
 		DatapointSinks: dpSinks,
 		EventSinks:     eSinks,
 		TraceSinks:     tSinks,
+		Logger:         log.NewOnePerSecond(logger),
+		LateDuration:   loadedConfig.LateThresholdDuration,
+		FutureDuration: loadedConfig.FutureThresholdDuration,
 	}
+	scheduler.AddCallback(dmux)
 
 	multiplexer := signalfx.FromChain(dmux, signalfx.NextWrap(signalfx.UnifyNextSinkWrap(&p.debugSink)))
 

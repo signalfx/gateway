@@ -698,10 +698,21 @@ simultaniously with each thread sending no more than 5,000 points in a single
 call.  It also turns on debug logging, which will spew a large number of log
 messages.  Only use debug logging temporarily.
 
+StatsDelay being set to 1s means every 1s we'll emit metrics out all forwarders
+about the running metric proxy.
+
+Also note that we're setting LateThreshold and FutureThreshold to 1s.  This means
+we'll count datapoints, events and spans that exceed those thresholds (if set) and
+log them up to one per second. When you've turned on as described immediately above
+you'll see metrics named late.count and future.count emitted counting each type of
+data that was late or in the future respectively.
+
 ```
 {
   "StatsDelay": "1s",
   "LogLevel": "debug",
+  "LateThreshold": "1s",
+  "FutureThreshold": "1s",
   "ListenFrom": [
     {
       "Type": "carbon",
