@@ -695,8 +695,7 @@ The following is a full list of overrideable options and their defaults:
 This config listens for carbon data on port 2003 and forwards it to signalfx
 using an internal datapoint buffer size of 1,000,000 and sending with 50 threads
 simultaniously with each thread sending no more than 5,000 points in a single
-call.  It also turns on debug logging, which will spew a large number of log
-messages.  Only use debug logging temporarily.
+call.
 
 StatsDelay being set to 1s means every 1s we'll emit metrics out all forwarders
 about the running metric proxy.
@@ -710,7 +709,6 @@ data that was late or in the future respectively.
 ```
 {
   "StatsDelay": "1s",
-  "LogLevel": "debug",
   "LateThreshold": "1s",
   "FutureThreshold": "1s",
   "ListenFrom": [
