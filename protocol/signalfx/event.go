@@ -3,7 +3,6 @@ package signalfx
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
@@ -14,6 +13,8 @@ import (
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/web"
 	"net/http"
+	"github.com/mailru/easyjson"
+	"github.com/signalfx/metricproxy/protocol/signalfx/format"
 )
 
 // ProtobufEventDecoderV2 decodes protocol buffers in signalfx's v2 format and sends them to Sink
@@ -52,9 +53,8 @@ type JSONEventDecoderV2 struct {
 }
 
 func (decoder *JSONEventDecoderV2) Read(ctx context.Context, req *http.Request) error {
-	dec := json.NewDecoder(req.Body)
-	var e JSONEventV2
-	if err := dec.Decode(&e); err != nil {
+	var e signalfxformat.JSONEventV2
+	if err := easyjson.UnmarshalFromReader(req.Body, &e); err != nil {
 		return err
 	}
 	evts := make([]*event.Event, 0, len(e))

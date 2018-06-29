@@ -202,14 +202,3 @@ func NewProtobufEvent(e *com_signalfx_metrics_protobuf.Event) (*event.Event, err
 	return event.NewWithProperties(e.GetEventType(), cat, dims, props, fromTs(e.GetTimestamp())), nil
 }
 
-// JSONEventV2 is the V2 json event sending format
-type JSONEventV2 []*EventSendFormatV2
-
-// EventSendFormatV2 is the JSON format signalfx datapoints are expected to be in
-type EventSendFormatV2 struct {
-	EventType  string                 `json:"eventType"`
-	Category   *string                `json:"category"`
-	Dimensions map[string]string      `json:"dimensions"`
-	Properties map[string]interface{} `json:"properties"`
-	Timestamp  *int64                 `json:"timestamp"`
-}
