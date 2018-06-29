@@ -13,6 +13,7 @@ import (
 	"github.com/signalfx/metricproxy/protocol/signalfx/format"
 )
 
+// ValueToSend is an alias
 type ValueToSend signalfxformat.ValueToSend
 
 // NewDatumValue creates new datapoint value referenced from a value of the datum protobuf
@@ -201,4 +202,3 @@ func NewProtobufEvent(e *com_signalfx_metrics_protobuf.Event) (*event.Event, err
 	cat := event.ToProtoEC(e.GetCategory())
 	return event.NewWithProperties(e.GetEventType(), cat, dims, props, fromTs(e.GetTimestamp())), nil
 }
-

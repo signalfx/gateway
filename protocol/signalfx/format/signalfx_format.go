@@ -1,6 +1,9 @@
 package signalfxformat
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/signalfx/golib/trace"
+)
 
 // JSONDatapointV1 is the JSON API format for /v1/datapoint
 //easyjson:json
@@ -45,3 +48,42 @@ type EventSendFormatV2 struct {
 	Properties map[string]interface{} `json:"properties"`
 	Timestamp  *int64                 `json:"timestamp"`
 }
+
+// InputAnnotation associates an event that explains latency with a timestamp.
+// Unlike log statements, annotations are often codes. Ex. “ws” for WireSend
+//easyjson:json
+type InputAnnotation struct {
+	Endpoint  *trace.Endpoint `json:"endpoint"`
+	Timestamp *float64        `json:"timestamp"`
+	Value     *string         `json:"value"`
+}
+
+// ToV2 converts an InputAnnotation to a V2 InputAnnotation, which basically
+// means dropping the endpoint.  The endpoint must be considered in other
+// logic to know which span to associate the endpoint with.
+func (a *InputAnnotation) ToV2() *trace.Annotation {
+	return &trace.Annotation{
+		Timestamp: a.Timestamp,
+		Value:     a.Value,
+	}
+}
+
+// BinaryAnnotation associates an event that explains latency with a timestamp.
+//easyjson:json
+type BinaryAnnotation struct {
+	Endpoint *trace.Endpoint `json:"endpoint"`
+	Key      *string         `json:"key"`
+	Value    *interface{}    `json:"value"`
+}
+
+// InputSpan defines a span that is the union of v1 and v2 spans
+//easyjson:json
+type InputSpan struct {
+	trace.Span
+	Annotations       []*InputAnnotation  `json:"annotations"`
+	BinaryAnnotations []*BinaryAnnotation `json:"binaryAnnotations"`
+}
+
+// InputSpanList is an array of InputSpan pointers
+//easyjson:json
+type InputSpanList []*InputSpan

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
+	"github.com/mailru/easyjson"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
@@ -25,10 +26,10 @@ import (
 	"time"
 )
 
-// JSONDadtapointV1 is an alias
+// JSONDatapointV1 is an alias
 type JSONDatapointV1 signalfxformat.JSONDatapointV1
 
-// JSONDadtapointV2 is an alias
+// JSONDatapointV2 is an alias
 type JSONDatapointV2 signalfxformat.JSONDatapointV2
 
 // BodySendFormatV2 is an alias
@@ -191,7 +192,7 @@ func (decoder *JSONDecoderV2) Datapoints() []*datapoint.Datapoint {
 func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error {
 	var d signalfxformat.JSONDatapointV2
 	if err := easyjson.UnmarshalFromReader(req.Body, &d); err != nil {
-		return err
+		return errInvalidJSONFormat
 	}
 	dps := make([]*datapoint.Datapoint, 0, len(d))
 	for metricType, datapoints := range d {

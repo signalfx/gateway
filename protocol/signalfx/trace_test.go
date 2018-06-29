@@ -9,7 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/trace"
+	"github.com/signalfx/metricproxy/protocol/signalfx/format"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -89,19 +91,6 @@ func BenchmarkTraceDecoder(b *testing.B) {
 		}
 	}
 	b.StopTimer()
-}
-
-func strAddr(s string) *string {
-	return &s
-}
-
-func float64Addr(u uint64) *float64 {
-	f := float64(u)
-	return &f
-}
-
-func int32Addr(i int32) *int32 {
-	return &i
 }
 
 func interfaceAddr(i interface{}) *interface{} {
@@ -220,23 +209,23 @@ func TestTraceDecoder(t *testing.T) {
 				TraceID:  "0123456789abcdef",
 				ParentID: nil,
 				ID:       "abc1234567890def",
-				Name:     strAddr("span1"),
+				Name:     pointer.String("span1"),
 				Kind:     &ClientKind,
 				LocalEndpoint: &trace.Endpoint{
-					ServiceName: strAddr("myclient"),
-					Ipv4:        strAddr("127.0.0.1"),
+					ServiceName: pointer.String("myclient"),
+					Ipv4:        pointer.String("127.0.0.1"),
 				},
 				RemoteEndpoint: &trace.Endpoint{
-					ServiceName: strAddr("myserver"),
-					Ipv4:        strAddr("127.0.1.1"),
-					Port:        int32Addr(443),
+					ServiceName: pointer.String("myserver"),
+					Ipv4:        pointer.String("127.0.1.1"),
+					Port:        pointer.Int32(443),
 				},
-				Timestamp: float64Addr(1000),
-				Duration:  float64Addr(100),
+				Timestamp: pointer.Float64(1000),
+				Duration:  pointer.Float64(100),
 				Debug:     &trueVar,
 				Shared:    &trueVar,
 				Annotations: []*trace.Annotation{
-					{Timestamp: float64Addr(1001), Value: strAddr("something happened")},
+					{Timestamp: pointer.Float64(1001), Value: pointer.String("something happened")},
 				},
 				Tags: map[string]string{
 					"additionalProp1": "string",
@@ -246,14 +235,14 @@ func TestTraceDecoder(t *testing.T) {
 			},
 			{
 				TraceID:        "abcdef0123456789",
-				ParentID:       strAddr("0123456789abcdef"),
+				ParentID:       pointer.String("0123456789abcdef"),
 				ID:             "abcdef",
-				Name:           strAddr("span2"),
+				Name:           pointer.String("span2"),
 				Kind:           &ServerKind,
 				LocalEndpoint:  nil,
 				RemoteEndpoint: nil,
-				Timestamp:      float64Addr(2000),
-				Duration:       float64Addr(200),
+				Timestamp:      pointer.Float64(2000),
+				Duration:       pointer.Float64(200),
 				Debug:          &falseVar,
 				Shared:         &falseVar,
 				Tags: map[string]string{
@@ -264,11 +253,11 @@ func TestTraceDecoder(t *testing.T) {
 			},
 			{
 				TraceID:   "abcdef0123456789",
-				ParentID:  strAddr("0123456789abcdef"),
+				ParentID:  pointer.String("0123456789abcdef"),
 				ID:        "oldspan",
-				Name:      strAddr("span3"),
-				Timestamp: float64Addr(2000),
-				Duration:  float64Addr(200),
+				Name:      pointer.String("span3"),
+				Timestamp: pointer.Float64(2000),
+				Duration:  pointer.Float64(200),
 				Tags: map[string]string{
 					"a": "v",
 				},
@@ -281,36 +270,36 @@ func TestTraceDecoder(t *testing.T) {
 // https://github.com/openzipkin/zipkin/blob/2.8.4/zipkin/src/test/java/zipkin/internal/V2SpanConverterTest.java
 func TestTraceConversion(t *testing.T) {
 	frontend := &trace.Endpoint{
-		ServiceName: strAddr("frontend"),
-		Ipv4:        strAddr("127.0.0.1"),
+		ServiceName: pointer.String("frontend"),
+		Ipv4:        pointer.String("127.0.0.1"),
 	}
 
 	backend := &trace.Endpoint{
-		ServiceName: strAddr("backend"),
-		Ipv4:        strAddr("192.168.99.101"),
-		Port:        int32Addr(9000),
+		ServiceName: pointer.String("backend"),
+		Ipv4:        pointer.String("192.168.99.101"),
+		Port:        pointer.Int32(9000),
 	}
 
 	kafka := &trace.Endpoint{
-		ServiceName: strAddr("kafka"),
+		ServiceName: pointer.String("kafka"),
 	}
 
 	Convey("Zipkin v2 spans gets passed through unaltered", t, func() {
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:        "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:       strAddr("6b221d5bc9e6496c"),
+				ParentID:       pointer.String("6b221d5bc9e6496c"),
 				ID:             "5b4185666d50f68b",
-				Name:           strAddr("get"),
+				Name:           pointer.String("get"),
 				Kind:           &ClientKind,
 				LocalEndpoint:  frontend,
 				RemoteEndpoint: backend,
-				Timestamp:      float64Addr(1472470996199000),
-				Duration:       float64Addr(207000),
+				Timestamp:      pointer.Float64(1472470996199000),
+				Duration:       pointer.Float64(207000),
 				Annotations: []*trace.Annotation{
-					{Timestamp: float64Addr(1472470996403000), Value: strAddr("no")},
-					{Timestamp: float64Addr(1472470996238000), Value: strAddr("ws")},
-					{Timestamp: float64Addr(1472470996403000), Value: strAddr("wr")},
+					{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("no")},
+					{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("ws")},
+					{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("wr")},
 				},
 				Tags: map[string]string{
 					"http_path":            "/api",
@@ -326,18 +315,18 @@ func TestTraceConversion(t *testing.T) {
 	Convey("client", t, func() {
 		simpleClient := trace.Span{
 			TraceID:        "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:       strAddr("6b221d5bc9e6496c"),
+			ParentID:       pointer.String("6b221d5bc9e6496c"),
 			ID:             "5b4185666d50f68b",
-			Name:           strAddr("get"),
+			Name:           pointer.String("get"),
 			Kind:           &ClientKind,
 			LocalEndpoint:  frontend,
 			RemoteEndpoint: backend,
-			Timestamp:      float64Addr(1472470996199000),
-			Duration:       float64Addr(207000),
+			Timestamp:      pointer.Float64(1472470996199000),
+			Duration:       pointer.Float64(207000),
 			Annotations: []*trace.Annotation{
-				{Timestamp: float64Addr(1472470996403000), Value: strAddr("no")},
-				{Timestamp: float64Addr(1472470996238000), Value: strAddr("ws")},
-				{Timestamp: float64Addr(1472470996403000), Value: strAddr("wr")},
+				{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("no")},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("ws")},
+				{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("wr")},
 			},
 			Tags: map[string]string{
 				"http_path":            "/api",
@@ -345,58 +334,59 @@ func TestTraceConversion(t *testing.T) {
 			},
 		}
 
-		client := inputSpan{
+		client := InputSpan{
 			Span: trace.Span{TraceID: "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  strAddr("6b221d5bc9e6496c"),
+				ParentID:  pointer.String("6b221d5bc9e6496c"),
 				ID:        "5b4185666d50f68b",
-				Name:      strAddr("get"),
-				Timestamp: float64Addr(1472470996199000),
-				Duration:  float64Addr(207000),
+				Name:      pointer.String("get"),
+				Timestamp: pointer.Float64(1472470996199000),
+				Duration:  pointer.Float64(207000),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("cs"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996238000), Value: strAddr("ws"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996403000), Value: strAddr("wr"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996406000), Value: strAddr("cr"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996403000), Value: strAddr("no"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("ws"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("wr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("cr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("no"), Endpoint: frontend},
 			},
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("http_path"), Value: interfaceAddr("/api"), Endpoint: frontend},
-				{Key: strAddr("clnt/finagle.version"), Value: interfaceAddr("6.45.0"), Endpoint: frontend},
-				{Key: strAddr("sa"), Value: interfaceAddr(true), Endpoint: backend},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("http_path"), Value: interfaceAddr("/api"), Endpoint: frontend},
+				{Key: pointer.String("clnt/finagle.version"), Value: interfaceAddr("6.45.0"), Endpoint: frontend},
+				{Key: pointer.String("sa"), Value: interfaceAddr(true), Endpoint: backend},
 			},
 		}
 
-		sp, _ := client.fromZipkinV1()
+		sp, err := client.fromZipkinV1()
+		So(err, ShouldBeNil)
 		So(sp, ShouldResemble, []*trace.Span{&simpleClient})
 	})
 
 	Convey("client_unfinished", t, func() {
 		simpleClient := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:      strAddr("6b221d5bc9e6496c"),
+			ParentID:      pointer.String("6b221d5bc9e6496c"),
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("get"),
+			Name:          pointer.String("get"),
 			Kind:          &ClientKind,
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996199000),
+			Timestamp:     pointer.Float64(1472470996199000),
 			Annotations: []*trace.Annotation{
-				{Timestamp: float64Addr(1472470996238000), Value: strAddr("ws")},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("ws")},
 			},
 			Tags: map[string]string{},
 		}
 
-		client := &inputSpan{
+		client := &InputSpan{
 			Span: trace.Span{
 				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  strAddr("6b221d5bc9e6496c"),
+				ParentID:  pointer.String("6b221d5bc9e6496c"),
 				ID:        "5b4185666d50f68b",
-				Name:      strAddr("get"),
-				Timestamp: float64Addr(1472470996199000),
+				Name:      pointer.String("get"),
+				Timestamp: pointer.Float64(1472470996199000),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("cs"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996238000), Value: strAddr("ws"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("ws"), Endpoint: frontend},
 			},
 		}
 
@@ -407,27 +397,27 @@ func TestTraceConversion(t *testing.T) {
 	Convey("client_unstarted", t, func() {
 		simpleClient := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:      strAddr("6b221d5bc9e6496c"),
+			ParentID:      pointer.String("6b221d5bc9e6496c"),
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("get"),
+			Name:          pointer.String("get"),
 			Kind:          &ClientKind,
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996199000),
-			Duration:      float64Addr(100),
+			Timestamp:     pointer.Float64(1472470996199000),
+			Duration:      pointer.Float64(100),
 			Tags:          map[string]string{},
 		}
 
-		client := &inputSpan{
+		client := &InputSpan{
 			Span: trace.Span{
 				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  strAddr("6b221d5bc9e6496c"),
+				ParentID:  pointer.String("6b221d5bc9e6496c"),
 				ID:        "5b4185666d50f68b",
-				Name:      strAddr("get"),
-				Timestamp: float64Addr(1472470996199000),
-				Duration:  float64Addr(100),
+				Name:      pointer.String("get"),
+				Timestamp: pointer.Float64(1472470996199000),
+				Duration:  pointer.Float64(100),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199100), Value: strAddr("cr"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199100), Value: pointer.String("cr"), Endpoint: frontend},
 			},
 		}
 
@@ -438,28 +428,28 @@ func TestTraceConversion(t *testing.T) {
 	Convey("noAnnotationsExceptAddresses", t, func() {
 		span2 := trace.Span{
 			TraceID:        "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:       strAddr("6b221d5bc9e6496c"),
+			ParentID:       pointer.String("6b221d5bc9e6496c"),
 			ID:             "5b4185666d50f68b",
-			Name:           strAddr("get"),
+			Name:           pointer.String("get"),
 			LocalEndpoint:  frontend,
 			RemoteEndpoint: backend,
-			Timestamp:      float64Addr(1472470996199000),
-			Duration:       float64Addr(207000),
+			Timestamp:      pointer.Float64(1472470996199000),
+			Duration:       pointer.Float64(207000),
 			Tags:           map[string]string{},
 		}
 
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  strAddr("6b221d5bc9e6496c"),
+				ParentID:  pointer.String("6b221d5bc9e6496c"),
 				ID:        "5b4185666d50f68b",
-				Name:      strAddr("get"),
-				Timestamp: float64Addr(1472470996199000),
-				Duration:  float64Addr(207000),
+				Name:      pointer.String("get"),
+				Timestamp: pointer.Float64(1472470996199000),
+				Duration:  pointer.Float64(207000),
 			},
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("ca"), Value: interfaceAddr(true), Endpoint: frontend},
-				{Key: strAddr("sa"), Value: interfaceAddr(true), Endpoint: backend},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("ca"), Value: interfaceAddr(true), Endpoint: frontend},
+				{Key: pointer.String("sa"), Value: interfaceAddr(true), Endpoint: backend},
 			},
 		}
 
@@ -470,32 +460,32 @@ func TestTraceConversion(t *testing.T) {
 	Convey("fromSpan_redundantAddressAnnotations", t, func() {
 		span2 := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:      strAddr("6b221d5bc9e6496c"),
+			ParentID:      pointer.String("6b221d5bc9e6496c"),
 			ID:            "5b4185666d50f68b",
 			Kind:          &ClientKind,
-			Name:          strAddr("get"),
+			Name:          pointer.String("get"),
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996199000),
-			Duration:      float64Addr(207000),
+			Timestamp:     pointer.Float64(1472470996199000),
+			Duration:      pointer.Float64(207000),
 			Tags:          map[string]string{},
 		}
 
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  strAddr("6b221d5bc9e6496c"),
+				ParentID:  pointer.String("6b221d5bc9e6496c"),
 				ID:        "5b4185666d50f68b",
-				Name:      strAddr("get"),
-				Timestamp: float64Addr(1472470996199000),
-				Duration:  float64Addr(207000),
+				Name:      pointer.String("get"),
+				Timestamp: pointer.Float64(1472470996199000),
+				Duration:  pointer.Float64(207000),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("cs"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996406000), Value: strAddr("cr"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("cr"), Endpoint: frontend},
 			},
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("ca"), Value: interfaceAddr(true), Endpoint: frontend},
-				{Key: strAddr("sa"), Value: interfaceAddr(true), Endpoint: frontend},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("ca"), Value: interfaceAddr(true), Endpoint: frontend},
+				{Key: pointer.String("sa"), Value: interfaceAddr(true), Endpoint: frontend},
 			},
 		}
 
@@ -507,34 +497,34 @@ func TestTraceConversion(t *testing.T) {
 		simpleServer := trace.Span{
 			TraceID:        "7180c278b62e8f6a216a2aea45d08fc9",
 			ID:             "216a2aea45d08fc9",
-			Name:           strAddr("get"),
+			Name:           pointer.String("get"),
 			Kind:           &ServerKind,
 			LocalEndpoint:  backend,
 			RemoteEndpoint: frontend,
-			Timestamp:      float64Addr(1472470996199000),
-			Duration:       float64Addr(207000),
+			Timestamp:      pointer.Float64(1472470996199000),
+			Duration:       pointer.Float64(207000),
 			Tags: map[string]string{
 				"http_path":            "/api",
 				"clnt/finagle.version": "6.45.0",
 			},
 		}
 
-		server := inputSpan{
+		server := InputSpan{
 			Span: trace.Span{
 				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
 				ID:        "216a2aea45d08fc9",
-				Name:      strAddr("get"),
-				Timestamp: float64Addr(1472470996199000),
-				Duration:  float64Addr(207000),
+				Name:      pointer.String("get"),
+				Timestamp: pointer.Float64(1472470996199000),
+				Duration:  pointer.Float64(207000),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("sr"), Endpoint: backend},
-				{Timestamp: float64Addr(1472470996406000), Value: strAddr("ss"), Endpoint: backend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("sr"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("ss"), Endpoint: backend},
 			},
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("http_path"), Value: interfaceAddr("/api"), Endpoint: backend},
-				{Key: strAddr("clnt/finagle.version"), Value: interfaceAddr("6.45.0"), Endpoint: backend},
-				{Key: strAddr("ca"), Value: interfaceAddr(true), Endpoint: frontend},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("http_path"), Value: interfaceAddr("/api"), Endpoint: backend},
+				{Key: pointer.String("clnt/finagle.version"), Value: interfaceAddr("6.45.0"), Endpoint: backend},
+				{Key: pointer.String("ca"), Value: interfaceAddr(true), Endpoint: frontend},
 			},
 		}
 
@@ -546,24 +536,24 @@ func TestTraceConversion(t *testing.T) {
 		span2 := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
 			ID:            "216a2aea45d08fc9",
-			Name:          strAddr("get"),
+			Name:          pointer.String("get"),
 			Kind:          &ClientKind,
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996199000),
-			Duration:      float64Addr(207000),
+			Timestamp:     pointer.Float64(1472470996199000),
+			Duration:      pointer.Float64(207000),
 			Tags:          map[string]string{},
 		}
 
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
 				ID:        "216a2aea45d08fc9",
-				Name:      strAddr("get"),
-				Timestamp: float64Addr(1472470996199000),
-				Duration:  float64Addr(207000),
+				Name:      pointer.String("get"),
+				Timestamp: pointer.Float64(1472470996199000),
+				Duration:  pointer.Float64(207000),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996406000), Value: strAddr("cs"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("cs"), Endpoint: frontend},
 			},
 		}
 
@@ -575,24 +565,24 @@ func TestTraceConversion(t *testing.T) {
 		span2 := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
 			ID:            "216a2aea45d08fc9",
-			Name:          strAddr("get"),
+			Name:          pointer.String("get"),
 			Kind:          &ServerKind,
 			LocalEndpoint: backend,
-			Timestamp:     float64Addr(1472470996199000),
-			Duration:      float64Addr(207000),
+			Timestamp:     pointer.Float64(1472470996199000),
+			Duration:      pointer.Float64(207000),
 			Tags:          map[string]string{},
 		}
 
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
 				ID:        "216a2aea45d08fc9",
-				Name:      strAddr("get"),
-				Timestamp: float64Addr(1472470996199000),
-				Duration:  float64Addr(207000),
+				Name:      pointer.String("get"),
+				Timestamp: pointer.Float64(1472470996199000),
+				Duration:  pointer.Float64(207000),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996406000), Value: strAddr("ss"), Endpoint: backend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("ss"), Endpoint: backend},
 			},
 		}
 
@@ -603,22 +593,22 @@ func TestTraceConversion(t *testing.T) {
 	Convey("missingEndpoints", t, func() {
 		span2 := trace.Span{
 			TraceID:   "1",
-			ParentID:  strAddr("1"),
+			ParentID:  pointer.String("1"),
 			ID:        "2",
-			Name:      strAddr("foo"),
-			Timestamp: float64Addr(1472470996199000),
-			Duration:  float64Addr(207000),
+			Name:      pointer.String("foo"),
+			Timestamp: pointer.Float64(1472470996199000),
+			Duration:  pointer.Float64(207000),
 			Tags:      map[string]string{},
 		}
 
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:   "1",
-				ParentID:  strAddr("1"),
+				ParentID:  pointer.String("1"),
 				ID:        "2",
-				Name:      strAddr("foo"),
-				Duration:  float64Addr(207000),
-				Timestamp: float64Addr(1472470996199000),
+				Name:      pointer.String("foo"),
+				Duration:  pointer.Float64(207000),
+				Timestamp: pointer.Float64(1472470996199000),
 			},
 		}
 
@@ -629,26 +619,26 @@ func TestTraceConversion(t *testing.T) {
 	Convey("missingEndpoints_coreAnnotation", t, func() {
 		span2 := trace.Span{
 			TraceID:   "1",
-			ParentID:  strAddr("1"),
+			ParentID:  pointer.String("1"),
 			ID:        "2",
-			Name:      strAddr("foo"),
-			Timestamp: float64Addr(1472470996199000),
+			Name:      pointer.String("foo"),
+			Timestamp: pointer.Float64(1472470996199000),
 			Annotations: []*trace.Annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("sr")},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("sr")},
 			},
 			Tags: map[string]string{},
 		}
 
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:   "1",
-				ParentID:  strAddr("1"),
+				ParentID:  pointer.String("1"),
 				ID:        "2",
-				Name:      strAddr("foo"),
-				Timestamp: float64Addr(1472470996199000),
+				Name:      pointer.String("foo"),
+				Timestamp: pointer.Float64(1472470996199000),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("sr"), Endpoint: nil},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("sr"), Endpoint: nil},
 			},
 		}
 
@@ -659,25 +649,25 @@ func TestTraceConversion(t *testing.T) {
 	Convey("incomplete_only_sr", t, func() {
 		span2 := trace.Span{
 			TraceID:       "1",
-			ParentID:      strAddr("1"),
+			ParentID:      pointer.String("1"),
 			ID:            "2",
-			Name:          strAddr("foo"),
+			Name:          pointer.String("foo"),
 			Kind:          &ServerKind,
-			Timestamp:     float64Addr(1472470996199000),
+			Timestamp:     pointer.Float64(1472470996199000),
 			Shared:        &trueVar,
 			LocalEndpoint: backend,
 			Tags:          map[string]string{},
 		}
 
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:  "1",
-				ParentID: strAddr("1"),
+				ParentID: pointer.String("1"),
 				ID:       "2",
-				Name:     strAddr("foo"),
+				Name:     pointer.String("foo"),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("sr"), Endpoint: backend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("sr"), Endpoint: backend},
 			},
 		}
 
@@ -688,30 +678,30 @@ func TestTraceConversion(t *testing.T) {
 	Convey("lateRemoteEndpoint_ss", t, func() {
 		span2 := trace.Span{
 			TraceID:        "1",
-			ParentID:       strAddr("1"),
+			ParentID:       pointer.String("1"),
 			ID:             "2",
-			Name:           strAddr("foo"),
+			Name:           pointer.String("foo"),
 			Kind:           &ServerKind,
 			LocalEndpoint:  backend,
 			RemoteEndpoint: frontend,
 			Annotations: []*trace.Annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("ss")},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("ss")},
 			},
 			Tags: map[string]string{},
 		}
 
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:  "1",
-				ParentID: strAddr("1"),
+				ParentID: pointer.String("1"),
 				ID:       "2",
-				Name:     strAddr("foo"),
+				Name:     pointer.String("foo"),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("ss"), Endpoint: backend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("ss"), Endpoint: backend},
 			},
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("ca"), Value: interfaceAddr(true), Endpoint: frontend},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("ca"), Value: interfaceAddr(true), Endpoint: frontend},
 			},
 		}
 
@@ -723,23 +713,23 @@ func TestTraceConversion(t *testing.T) {
 	Convey("lateRemoteEndpoint_ca", t, func() {
 		span2 := trace.Span{
 			TraceID:        "1",
-			ParentID:       strAddr("1"),
+			ParentID:       pointer.String("1"),
 			ID:             "2",
-			Name:           strAddr("foo"),
+			Name:           pointer.String("foo"),
 			Kind:           &ServerKind,
 			RemoteEndpoint: frontend,
 			Tags:           map[string]string{},
 		}
 
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:  "1",
-				ParentID: strAddr("1"),
+				ParentID: pointer.String("1"),
 				ID:       "2",
-				Name:     strAddr("foo"),
+				Name:     pointer.String("foo"),
 			},
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("ca"), Value: interfaceAddr(true), Endpoint: frontend},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("ca"), Value: interfaceAddr(true), Endpoint: frontend},
 			},
 		}
 
@@ -750,30 +740,30 @@ func TestTraceConversion(t *testing.T) {
 	Convey("lateRemoteEndpoint_cr", t, func() {
 		span2 := trace.Span{
 			TraceID:        "1",
-			ParentID:       strAddr("1"),
+			ParentID:       pointer.String("1"),
 			ID:             "2",
-			Name:           strAddr("foo"),
+			Name:           pointer.String("foo"),
 			Kind:           &ClientKind,
 			LocalEndpoint:  frontend,
 			RemoteEndpoint: backend,
 			Annotations: []*trace.Annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("cr")},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cr")},
 			},
 			Tags: map[string]string{},
 		}
 
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:  "1",
-				ParentID: strAddr("1"),
+				ParentID: pointer.String("1"),
 				ID:       "2",
-				Name:     strAddr("foo"),
+				Name:     pointer.String("foo"),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("cr"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cr"), Endpoint: frontend},
 			},
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("sa"), Value: interfaceAddr(true), Endpoint: backend},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("sa"), Value: interfaceAddr(true), Endpoint: backend},
 			},
 		}
 
@@ -784,24 +774,24 @@ func TestTraceConversion(t *testing.T) {
 	Convey("lateRemoteEndpoint_sa", t, func() {
 		span2 := trace.Span{
 			TraceID:        "1",
-			ParentID:       strAddr("1"),
+			ParentID:       pointer.String("1"),
 			ID:             "2",
-			Name:           strAddr("foo"),
+			Name:           pointer.String("foo"),
 			Kind:           &ClientKind,
 			RemoteEndpoint: backend,
 			Tags:           map[string]string{},
 		}
 
-		span := inputSpan{
+		span := InputSpan{
 
 			Span: trace.Span{
 				TraceID:  "1",
-				ParentID: strAddr("1"),
+				ParentID: pointer.String("1"),
 				ID:       "2",
-				Name:     strAddr("foo"),
+				Name:     pointer.String("foo"),
 			},
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("sa"), Value: interfaceAddr(true), Endpoint: backend},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("sa"), Value: interfaceAddr(true), Endpoint: backend},
 			},
 		}
 
@@ -812,27 +802,27 @@ func TestTraceConversion(t *testing.T) {
 	Convey("localSpan_emptyComponent", t, func() {
 		simpleLocal := trace.Span{
 			TraceID:       "1",
-			ParentID:      strAddr("1"),
+			ParentID:      pointer.String("1"),
 			ID:            "2",
-			Name:          strAddr("local"),
+			Name:          pointer.String("local"),
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996199000),
-			Duration:      float64Addr(207000),
+			Timestamp:     pointer.Float64(1472470996199000),
+			Duration:      pointer.Float64(207000),
 			Tags:          map[string]string{},
 		}
 
-		local := inputSpan{
+		local := InputSpan{
 			Span: trace.Span{
 				TraceID:   "1",
-				ParentID:  strAddr("1"),
+				ParentID:  pointer.String("1"),
 				ID:        "2",
-				Name:      strAddr("local"),
-				Timestamp: float64Addr(1472470996199000),
-				Duration:  float64Addr(207000),
+				Name:      pointer.String("local"),
+				Timestamp: pointer.Float64(1472470996199000),
+				Duration:  pointer.Float64(207000),
 			},
 
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("lc"), Value: interfaceAddr(""), Endpoint: frontend},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("lc"), Value: interfaceAddr(""), Endpoint: frontend},
 			},
 		}
 
@@ -843,50 +833,50 @@ func TestTraceConversion(t *testing.T) {
 	Convey("clientAndServer", t, func() {
 		noNameService := &trace.Endpoint{
 			ServiceName: nil,
-			Ipv4:        strAddr("127.0.0.1"),
+			Ipv4:        pointer.String("127.0.0.1"),
 		}
-		shared := inputSpan{
+		shared := InputSpan{
 			Span: trace.Span{
 				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  strAddr("6b221d5bc9e6496c"),
+				ParentID:  pointer.String("6b221d5bc9e6496c"),
 				ID:        "5b4185666d50f68b",
-				Name:      strAddr("get"),
-				Timestamp: float64Addr(1472470996199000),
-				Duration:  float64Addr(207000),
+				Name:      pointer.String("get"),
+				Timestamp: pointer.Float64(1472470996199000),
+				Duration:  pointer.Float64(207000),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("cs"), Endpoint: noNameService},
-				{Timestamp: float64Addr(1472470996238000), Value: strAddr("ws"), Endpoint: noNameService},
-				{Timestamp: float64Addr(1472470996250000), Value: strAddr("sr"), Endpoint: backend},
-				{Timestamp: float64Addr(1472470996350000), Value: strAddr("ss"), Endpoint: backend},
-				{Timestamp: float64Addr(1472470996403000), Value: strAddr("wr"), Endpoint: noNameService},
-				{Timestamp: float64Addr(1472470996406000), Value: strAddr("cr"), Endpoint: noNameService},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cs"), Endpoint: noNameService},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("ws"), Endpoint: noNameService},
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("sr"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996350000), Value: pointer.String("ss"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("wr"), Endpoint: noNameService},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("cr"), Endpoint: noNameService},
 			},
 
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("http_path"), Value: interfaceAddr("/api"), Endpoint: noNameService},
-				{Key: strAddr("http_path"), Value: interfaceAddr("/backend"), Endpoint: backend},
-				{Key: strAddr("clnt/finagle.version"), Value: interfaceAddr("6.45.0"), Endpoint: noNameService},
-				{Key: strAddr("srv/finagle.version"), Value: interfaceAddr("6.44.0"), Endpoint: backend},
-				{Key: strAddr("ca"), Value: interfaceAddr(true), Endpoint: noNameService},
-				{Key: strAddr("sa"), Value: interfaceAddr(true), Endpoint: backend},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("http_path"), Value: interfaceAddr("/api"), Endpoint: noNameService},
+				{Key: pointer.String("http_path"), Value: interfaceAddr("/backend"), Endpoint: backend},
+				{Key: pointer.String("clnt/finagle.version"), Value: interfaceAddr("6.45.0"), Endpoint: noNameService},
+				{Key: pointer.String("srv/finagle.version"), Value: interfaceAddr("6.44.0"), Endpoint: backend},
+				{Key: pointer.String("ca"), Value: interfaceAddr(true), Endpoint: noNameService},
+				{Key: pointer.String("sa"), Value: interfaceAddr(true), Endpoint: backend},
 			},
 		}
 
 		// the client side owns timestamp and duration
 		client := trace.Span{
 			TraceID:        "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:       strAddr("6b221d5bc9e6496c"),
+			ParentID:       pointer.String("6b221d5bc9e6496c"),
 			ID:             "5b4185666d50f68b",
-			Name:           strAddr("get"),
+			Name:           pointer.String("get"),
 			Kind:           &ClientKind,
 			LocalEndpoint:  noNameService,
 			RemoteEndpoint: backend,
-			Timestamp:      float64Addr(1472470996199000),
-			Duration:       float64Addr(207000),
+			Timestamp:      pointer.Float64(1472470996199000),
+			Duration:       pointer.Float64(207000),
 			Annotations: []*trace.Annotation{
-				{Timestamp: float64Addr(1472470996238000), Value: strAddr("ws")},
-				{Timestamp: float64Addr(1472470996403000), Value: strAddr("wr")},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("ws")},
+				{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("wr")},
 			},
 			Tags: map[string]string{
 				"http_path":            "/api",
@@ -897,15 +887,15 @@ func TestTraceConversion(t *testing.T) {
 		// notice server tags are different than the client, and the client's annotations aren't here
 		server := trace.Span{
 			TraceID:        "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:       strAddr("6b221d5bc9e6496c"),
+			ParentID:       pointer.String("6b221d5bc9e6496c"),
 			ID:             "5b4185666d50f68b",
-			Name:           strAddr("get"),
+			Name:           pointer.String("get"),
 			Kind:           &ServerKind,
 			Shared:         &trueVar,
 			LocalEndpoint:  backend,
 			RemoteEndpoint: noNameService,
-			Timestamp:      float64Addr(1472470996250000),
-			Duration:       float64Addr(100000),
+			Timestamp:      pointer.Float64(1472470996250000),
+			Duration:       pointer.Float64(100000),
 			Tags: map[string]string{
 				"http_path":           "/backend",
 				"srv/finagle.version": "6.44.0",
@@ -921,29 +911,29 @@ func TestTraceConversion(t *testing.T) {
 	 * a signal
 	 */
 	Convey("assumesServerWithoutTimestampIsShared", t, func() {
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID: strAddr("6b221d5bc9e6496c"),
+				ParentID: pointer.String("6b221d5bc9e6496c"),
 				ID:       "5b4185666d50f68b",
-				Name:     strAddr("get"),
+				Name:     pointer.String("get"),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996250000), Value: strAddr("sr"), Endpoint: backend},
-				{Timestamp: float64Addr(1472470996350000), Value: strAddr("ss"), Endpoint: backend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("sr"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996350000), Value: pointer.String("ss"), Endpoint: backend},
 			},
 		}
 
 		span2 := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:      strAddr("6b221d5bc9e6496c"),
+			ParentID:      pointer.String("6b221d5bc9e6496c"),
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("get"),
+			Name:          pointer.String("get"),
 			Kind:          &ServerKind,
 			Shared:        &trueVar,
 			LocalEndpoint: backend,
-			Timestamp:     float64Addr(1472470996250000),
-			Duration:      float64Addr(100000),
+			Timestamp:     pointer.Float64(1472470996250000),
+			Duration:      pointer.Float64(100000),
 			Tags:          map[string]string{},
 		}
 
@@ -952,46 +942,46 @@ func TestTraceConversion(t *testing.T) {
 	})
 
 	Convey("clientAndServer_loopback", t, func() {
-		shared := inputSpan{
+		shared := InputSpan{
 			Span: trace.Span{
 				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  strAddr("6b221d5bc9e6496c"),
+				ParentID:  pointer.String("6b221d5bc9e6496c"),
 				ID:        "5b4185666d50f68b",
-				Name:      strAddr("get"),
-				Timestamp: float64Addr(1472470996199000),
-				Duration:  float64Addr(207000),
+				Name:      pointer.String("get"),
+				Timestamp: pointer.Float64(1472470996199000),
+				Duration:  pointer.Float64(207000),
 			},
 
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("cs"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996250000), Value: strAddr("sr"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996350000), Value: strAddr("ss"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996406000), Value: strAddr("cr"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("sr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996350000), Value: pointer.String("ss"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("cr"), Endpoint: frontend},
 			},
 		}
 
 		client := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:      strAddr("6b221d5bc9e6496c"),
+			ParentID:      pointer.String("6b221d5bc9e6496c"),
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("get"),
+			Name:          pointer.String("get"),
 			Kind:          &ClientKind,
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996199000),
-			Duration:      float64Addr(207000),
+			Timestamp:     pointer.Float64(1472470996199000),
+			Duration:      pointer.Float64(207000),
 			Tags:          map[string]string{},
 		}
 
 		server := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:      strAddr("6b221d5bc9e6496c"),
+			ParentID:      pointer.String("6b221d5bc9e6496c"),
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("get"),
+			Name:          pointer.String("get"),
 			Kind:          &ServerKind,
 			Shared:        &trueVar,
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996250000),
-			Duration:      float64Addr(100000),
+			Timestamp:     pointer.Float64(1472470996250000),
+			Duration:      pointer.Float64(100000),
 			Tags:          map[string]string{},
 		}
 
@@ -1000,39 +990,39 @@ func TestTraceConversion(t *testing.T) {
 	})
 
 	Convey("oneway_loopback", t, func() {
-		shared := inputSpan{
+		shared := InputSpan{
 			Span: trace.Span{
 				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID: strAddr("6b221d5bc9e6496c"),
+				ParentID: pointer.String("6b221d5bc9e6496c"),
 				ID:       "5b4185666d50f68b",
-				Name:     strAddr("get"),
+				Name:     pointer.String("get"),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("cs"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996250000), Value: strAddr("sr"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("sr"), Endpoint: frontend},
 			},
 		}
 
 		client := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:      strAddr("6b221d5bc9e6496c"),
+			ParentID:      pointer.String("6b221d5bc9e6496c"),
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("get"),
+			Name:          pointer.String("get"),
 			Kind:          &ClientKind,
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996199000),
+			Timestamp:     pointer.Float64(1472470996199000),
 			Tags:          map[string]string{},
 		}
 
 		server := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:      strAddr("6b221d5bc9e6496c"),
+			ParentID:      pointer.String("6b221d5bc9e6496c"),
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("get"),
+			Name:          pointer.String("get"),
 			Kind:          &ServerKind,
 			Shared:        &trueVar,
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996250000),
+			Timestamp:     pointer.Float64(1472470996250000),
 			Tags:          map[string]string{},
 		}
 
@@ -1041,26 +1031,26 @@ func TestTraceConversion(t *testing.T) {
 	})
 
 	Convey("producer", t, func() {
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID: strAddr("6b221d5bc9e6496c"),
+				ParentID: pointer.String("6b221d5bc9e6496c"),
 				ID:       "5b4185666d50f68b",
-				Name:     strAddr("send"),
+				Name:     pointer.String("send"),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("ms"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
 			},
 		}
 
 		span2 := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:      strAddr("6b221d5bc9e6496c"),
+			ParentID:      pointer.String("6b221d5bc9e6496c"),
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("send"),
+			Name:          pointer.String("send"),
 			Kind:          &ProducerKind,
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996199000),
+			Timestamp:     pointer.Float64(1472470996199000),
 			Tags:          map[string]string{},
 		}
 
@@ -1069,30 +1059,30 @@ func TestTraceConversion(t *testing.T) {
 	})
 
 	Convey("producer_remote", t, func() {
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  strAddr("6b221d5bc9e6496c"),
+				ParentID:  pointer.String("6b221d5bc9e6496c"),
 				ID:        "5b4185666d50f68b",
-				Name:      strAddr("send"),
-				Timestamp: float64Addr(1472470996199000),
+				Name:      pointer.String("send"),
+				Timestamp: pointer.Float64(1472470996199000),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("ms"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
 			},
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("ma"), Value: interfaceAddr(true), Endpoint: kafka},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("ma"), Value: interfaceAddr(true), Endpoint: kafka},
 			},
 		}
 
 		span2 := trace.Span{
 			TraceID:        "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:       strAddr("6b221d5bc9e6496c"),
+			ParentID:       pointer.String("6b221d5bc9e6496c"),
 			ID:             "5b4185666d50f68b",
-			Name:           strAddr("send"),
+			Name:           pointer.String("send"),
 			Kind:           &ProducerKind,
 			LocalEndpoint:  frontend,
-			Timestamp:      float64Addr(1472470996199000),
+			Timestamp:      pointer.Float64(1472470996199000),
 			RemoteEndpoint: kafka,
 			Tags:           map[string]string{},
 		}
@@ -1102,30 +1092,30 @@ func TestTraceConversion(t *testing.T) {
 	})
 
 	Convey("producer_duration", t, func() {
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  strAddr("6b221d5bc9e6496c"),
+				ParentID:  pointer.String("6b221d5bc9e6496c"),
 				ID:        "5b4185666d50f68b",
-				Name:      strAddr("send"),
-				Timestamp: float64Addr(1472470996199000),
-				Duration:  float64Addr(51000),
+				Name:      pointer.String("send"),
+				Timestamp: pointer.Float64(1472470996199000),
+				Duration:  pointer.Float64(51000),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("ms"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996250000), Value: strAddr("ws"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("ws"), Endpoint: frontend},
 			},
 		}
 
 		span2 := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:      strAddr("6b221d5bc9e6496c"),
+			ParentID:      pointer.String("6b221d5bc9e6496c"),
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("send"),
+			Name:          pointer.String("send"),
 			Kind:          &ProducerKind,
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996199000),
-			Duration:      float64Addr(51000),
+			Timestamp:     pointer.Float64(1472470996199000),
+			Duration:      pointer.Float64(51000),
 			Tags:          map[string]string{},
 		}
 
@@ -1134,27 +1124,27 @@ func TestTraceConversion(t *testing.T) {
 	})
 
 	Convey("consumer", t, func() {
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  strAddr("6b221d5bc9e6496c"),
+				ParentID:  pointer.String("6b221d5bc9e6496c"),
 				ID:        "5b4185666d50f68b",
-				Name:      strAddr("send"),
-				Timestamp: float64Addr(1472470996199000),
+				Name:      pointer.String("send"),
+				Timestamp: pointer.Float64(1472470996199000),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("mr"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("mr"), Endpoint: frontend},
 			},
 		}
 
 		span2 := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:      strAddr("6b221d5bc9e6496c"),
+			ParentID:      pointer.String("6b221d5bc9e6496c"),
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("send"),
+			Name:          pointer.String("send"),
 			Kind:          &ConsumerKind,
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996199000),
+			Timestamp:     pointer.Float64(1472470996199000),
 			Tags:          map[string]string{},
 		}
 
@@ -1163,31 +1153,31 @@ func TestTraceConversion(t *testing.T) {
 	})
 
 	Convey("consumer_remote", t, func() {
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  strAddr("6b221d5bc9e6496c"),
+				ParentID:  pointer.String("6b221d5bc9e6496c"),
 				ID:        "5b4185666d50f68b",
-				Name:      strAddr("send"),
-				Timestamp: float64Addr(1472470996199000),
+				Name:      pointer.String("send"),
+				Timestamp: pointer.Float64(1472470996199000),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("mr"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("mr"), Endpoint: frontend},
 			},
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("ma"), Value: interfaceAddr(true), Endpoint: kafka},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("ma"), Value: interfaceAddr(true), Endpoint: kafka},
 			},
 		}
 
 		span2 := trace.Span{
 			TraceID:        "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:       strAddr("6b221d5bc9e6496c"),
+			ParentID:       pointer.String("6b221d5bc9e6496c"),
 			ID:             "5b4185666d50f68b",
-			Name:           strAddr("send"),
+			Name:           pointer.String("send"),
 			Kind:           &ConsumerKind,
 			LocalEndpoint:  frontend,
 			RemoteEndpoint: kafka,
-			Timestamp:      float64Addr(1472470996199000),
+			Timestamp:      pointer.Float64(1472470996199000),
 			Tags:           map[string]string{},
 		}
 
@@ -1196,30 +1186,30 @@ func TestTraceConversion(t *testing.T) {
 	})
 
 	Convey("consumer_duration", t, func() {
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  strAddr("6b221d5bc9e6496c"),
+				ParentID:  pointer.String("6b221d5bc9e6496c"),
 				ID:        "5b4185666d50f68b",
-				Name:      strAddr("send"),
-				Timestamp: float64Addr(1472470996199000),
-				Duration:  float64Addr(51000),
+				Name:      pointer.String("send"),
+				Timestamp: pointer.Float64(1472470996199000),
+				Duration:  pointer.Float64(51000),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("wr"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996250000), Value: strAddr("mr"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("wr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("mr"), Endpoint: frontend},
 			},
 		}
 
 		span2 := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:      strAddr("6b221d5bc9e6496c"),
+			ParentID:      pointer.String("6b221d5bc9e6496c"),
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("send"),
+			Name:          pointer.String("send"),
 			Kind:          &ConsumerKind,
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996199000),
-			Duration:      float64Addr(51000),
+			Timestamp:     pointer.Float64(1472470996199000),
+			Duration:      pointer.Float64(51000),
 			Tags:          map[string]string{},
 		}
 
@@ -1229,47 +1219,47 @@ func TestTraceConversion(t *testing.T) {
 
 	/** shared span IDs for messaging spans isn't supported, but shouldn't break */
 	Convey("producerAndConsumer", t, func() {
-		shared := inputSpan{
+		shared := InputSpan{
 			Span: trace.Span{
 				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID: strAddr("6b221d5bc9e6496c"),
+				ParentID: pointer.String("6b221d5bc9e6496c"),
 				ID:       "5b4185666d50f68b",
-				Name:     strAddr("whatev"),
+				Name:     pointer.String("whatev"),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("ms"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996238000), Value: strAddr("ws"), Endpoint: frontend},
-				{Timestamp: nil, Value: strAddr("wr"), Endpoint: backend},
-				{Timestamp: float64Addr(1472470996406000), Value: strAddr("mr"), Endpoint: backend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("ws"), Endpoint: frontend},
+				{Timestamp: nil, Value: pointer.String("wr"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("mr"), Endpoint: backend},
 			},
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("ma"), Value: interfaceAddr(true), Endpoint: kafka},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("ma"), Value: interfaceAddr(true), Endpoint: kafka},
 			},
 		}
 
 		producer := trace.Span{
 			TraceID:        "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:       strAddr("6b221d5bc9e6496c"),
+			ParentID:       pointer.String("6b221d5bc9e6496c"),
 			ID:             "5b4185666d50f68b",
-			Name:           strAddr("whatev"),
+			Name:           pointer.String("whatev"),
 			Kind:           &ProducerKind,
 			LocalEndpoint:  frontend,
 			RemoteEndpoint: kafka,
-			Timestamp:      float64Addr(1472470996199000),
-			Duration:       float64Addr(1472470996238000 - 1472470996199000),
+			Timestamp:      pointer.Float64(1472470996199000),
+			Duration:       pointer.Float64(1472470996238000 - 1472470996199000),
 			Tags:           map[string]string{},
 		}
 
 		consumer := trace.Span{
 			TraceID:        "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:       strAddr("6b221d5bc9e6496c"),
+			ParentID:       pointer.String("6b221d5bc9e6496c"),
 			ID:             "5b4185666d50f68b",
-			Name:           strAddr("whatev"),
+			Name:           pointer.String("whatev"),
 			Kind:           &ConsumerKind,
 			Shared:         &trueVar,
 			LocalEndpoint:  backend,
 			RemoteEndpoint: kafka,
-			Timestamp:      float64Addr(1472470996406000),
+			Timestamp:      pointer.Float64(1472470996406000),
 			Duration:       nil,
 			Tags:           map[string]string{},
 		}
@@ -1280,43 +1270,43 @@ func TestTraceConversion(t *testing.T) {
 
 	/** shared span IDs for messaging spans isn't supported, but shouldn't break */
 	Convey("producerAndConsumer_loopback_shared", t, func() {
-		shared := inputSpan{
+		shared := InputSpan{
 			Span: trace.Span{
 				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID: strAddr("6b221d5bc9e6496c"),
+				ParentID: pointer.String("6b221d5bc9e6496c"),
 				ID:       "5b4185666d50f68b",
-				Name:     strAddr("message"),
+				Name:     pointer.String("message"),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("ms"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996238000), Value: strAddr("ws"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996403000), Value: strAddr("wr"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996406000), Value: strAddr("mr"), Endpoint: frontend},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("ws"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("wr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("mr"), Endpoint: frontend},
 			},
 		}
 
 		producer := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:      strAddr("6b221d5bc9e6496c"),
+			ParentID:      pointer.String("6b221d5bc9e6496c"),
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("message"),
+			Name:          pointer.String("message"),
 			Kind:          &ProducerKind,
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996199000),
-			Duration:      float64Addr(1472470996238000 - 1472470996199000),
+			Timestamp:     pointer.Float64(1472470996199000),
+			Duration:      pointer.Float64(1472470996238000 - 1472470996199000),
 			Tags:          map[string]string{},
 		}
 
 		consumer := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
-			ParentID:      strAddr("6b221d5bc9e6496c"),
+			ParentID:      pointer.String("6b221d5bc9e6496c"),
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("message"),
+			Name:          pointer.String("message"),
 			Kind:          &ConsumerKind,
 			Shared:        &trueVar,
 			LocalEndpoint: frontend,
-			Timestamp:     float64Addr(1472470996403000),
-			Duration:      float64Addr(1472470996406000 - 1472470996403000),
+			Timestamp:     pointer.Float64(1472470996403000),
+			Duration:      pointer.Float64(1472470996406000 - 1472470996403000),
 			Tags:          map[string]string{},
 		}
 
@@ -1325,35 +1315,35 @@ func TestTraceConversion(t *testing.T) {
 	})
 
 	Convey("dataMissingEndpointGoesOnFirstSpan", t, func() {
-		shared := inputSpan{
+		shared := InputSpan{
 			Span: trace.Span{
 				TraceID: "7180c278b62e8f6a216a2aea45d08fc9",
 				ID:      "5b4185666d50f68b",
-				Name:    strAddr("missing"),
+				Name:    pointer.String("missing"),
 			},
-			Annotations: []*annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("foo"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996238000), Value: strAddr("bar"), Endpoint: frontend},
-				{Timestamp: float64Addr(1472470996250000), Value: strAddr("baz"), Endpoint: backend},
-				{Timestamp: float64Addr(1472470996350000), Value: strAddr("qux"), Endpoint: backend},
-				{Timestamp: float64Addr(1472470996403000), Value: strAddr("missing"), Endpoint: nil},
+			Annotations: []*signalfxformat.InputAnnotation{
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("foo"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("bar"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("baz"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996350000), Value: pointer.String("qux"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("missing"), Endpoint: nil},
 			},
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("foo"), Value: interfaceAddr("bar"), Endpoint: frontend},
-				{Key: strAddr("baz"), Value: interfaceAddr("qux"), Endpoint: backend},
-				{Key: strAddr("missing"), Value: interfaceAddr(""), Endpoint: nil},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("foo"), Value: interfaceAddr("bar"), Endpoint: frontend},
+				{Key: pointer.String("baz"), Value: interfaceAddr("qux"), Endpoint: backend},
+				{Key: pointer.String("missing"), Value: interfaceAddr(""), Endpoint: nil},
 			},
 		}
 
 		first := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("missing"),
+			Name:          pointer.String("missing"),
 			LocalEndpoint: frontend,
 			Annotations: []*trace.Annotation{
-				{Timestamp: float64Addr(1472470996199000), Value: strAddr("foo")},
-				{Timestamp: float64Addr(1472470996238000), Value: strAddr("bar")},
-				{Timestamp: float64Addr(1472470996403000), Value: strAddr("missing")},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("foo")},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("bar")},
+				{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("missing")},
 			},
 			Tags: map[string]string{
 				"foo":     "bar",
@@ -1364,11 +1354,11 @@ func TestTraceConversion(t *testing.T) {
 		second := trace.Span{
 			TraceID:       "7180c278b62e8f6a216a2aea45d08fc9",
 			ID:            "5b4185666d50f68b",
-			Name:          strAddr("missing"),
+			Name:          pointer.String("missing"),
 			LocalEndpoint: backend,
 			Annotations: []*trace.Annotation{
-				{Timestamp: float64Addr(1472470996250000), Value: strAddr("baz")},
-				{Timestamp: float64Addr(1472470996350000), Value: strAddr("qux")},
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("baz")},
+				{Timestamp: pointer.Float64(1472470996350000), Value: pointer.String("qux")},
 			},
 			Tags: map[string]string{
 				"baz": "qux",
@@ -1380,26 +1370,26 @@ func TestTraceConversion(t *testing.T) {
 	})
 
 	Convey("convertBinaryAnnotations", t, func() {
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID: "1",
-				Name:    strAddr("test"),
+				Name:    pointer.String("test"),
 				ID:      "2",
 			},
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("bool"), Value: interfaceAddr(true), Endpoint: frontend},
-				{Key: strAddr("bytes"), Value: interfaceAddr([]byte("hello")), Endpoint: frontend},
-				{Key: strAddr("short"), Value: interfaceAddr(uint16(20)), Endpoint: frontend},
-				{Key: strAddr("int"), Value: interfaceAddr(int32(32800)), Endpoint: frontend},
-				{Key: strAddr("long"), Value: interfaceAddr(int64(2147483700)), Endpoint: frontend},
-				{Key: strAddr("double"), Value: interfaceAddr(3.1415), Endpoint: frontend},
-				{Key: strAddr("novalue"), Value: nil, Endpoint: frontend},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("bool"), Value: interfaceAddr(true), Endpoint: frontend},
+				{Key: pointer.String("bytes"), Value: interfaceAddr([]byte("hello")), Endpoint: frontend},
+				{Key: pointer.String("short"), Value: interfaceAddr(uint16(20)), Endpoint: frontend},
+				{Key: pointer.String("int"), Value: interfaceAddr(int32(32800)), Endpoint: frontend},
+				{Key: pointer.String("long"), Value: interfaceAddr(int64(2147483700)), Endpoint: frontend},
+				{Key: pointer.String("double"), Value: interfaceAddr(3.1415), Endpoint: frontend},
+				{Key: pointer.String("novalue"), Value: nil, Endpoint: frontend},
 			},
 		}
 
 		span2 := trace.Span{
 			TraceID:       "1",
-			Name:          strAddr("test"),
+			Name:          pointer.String("test"),
 			ID:            "2",
 			LocalEndpoint: frontend,
 			Tags: map[string]string{
@@ -1417,14 +1407,14 @@ func TestTraceConversion(t *testing.T) {
 	})
 
 	Convey("convertBadBinaryAnnotations", t, func() {
-		span := inputSpan{
+		span := InputSpan{
 			Span: trace.Span{
 				TraceID: "1",
-				Name:    strAddr("test"),
+				Name:    pointer.String("test"),
 				ID:      "2",
 			},
-			BinaryAnnotations: []*binaryAnnotation{
-				{Key: strAddr("badtype"), Value: interfaceAddr([]int{1, 2, 3}), Endpoint: frontend},
+			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
+				{Key: pointer.String("badtype"), Value: interfaceAddr([]int{1, 2, 3}), Endpoint: frontend},
 			},
 		}
 

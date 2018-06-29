@@ -2,17 +2,19 @@ package signalfx
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/mailru/easyjson"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
+	"github.com/signalfx/metricproxy/protocol/signalfx/format"
+	"reflect"
 )
 
 const (
@@ -21,38 +23,6 @@ const (
 	// ZipkinV1 is a constant used for protocol naming
 	ZipkinV1 = "zipkin_json_v1"
 )
-
-// annotation associates an event that explains latency with a timestamp.
-// Unlike log statements, annotations are often codes. Ex. “ws” for WireSend
-type annotation struct {
-	Endpoint  *trace.Endpoint `json:"endpoint"`
-	Timestamp *float64        `json:"timestamp"`
-	Value     *string         `json:"value"`
-}
-
-// ToV2 converts an annotation to a V2 annotation, which basically
-// means dropping the endpoint.  The endpoint must be considered in other
-// logic to know which span to associate the endpoint with.
-func (a *annotation) ToV2() *trace.Annotation {
-	return &trace.Annotation{
-		Timestamp: a.Timestamp,
-		Value:     a.Value,
-	}
-}
-
-// BinaryAnnotation associates an event that explains latency with a timestamp.
-type binaryAnnotation struct {
-	Endpoint *trace.Endpoint `json:"endpoint"`
-	Key      *string         `json:"key"`
-	Value    *interface{}    `json:"value"`
-}
-
-// inputSpan defines a span that is the union of v1 and v2 spans
-type inputSpan struct {
-	trace.Span
-	Annotations       []*annotation       `json:"annotations"`
-	BinaryAnnotations []*binaryAnnotation `json:"binaryAnnotations"`
-}
 
 // Constants as variables so it is easy to get a pointer to them
 var (
@@ -64,7 +34,10 @@ var (
 	ConsumerKind = "CONSUMER"
 )
 
-func (is *inputSpan) isDefinitelyZipkinV2() bool {
+// InputSpan is an alias
+type InputSpan signalfxformat.InputSpan
+
+func (is *InputSpan) isDefinitelyZipkinV2() bool {
 	// The presence of the "kind" field, tags, or local/remote endpoints is a
 	// dead giveaway that this is a Zipkin v2 span, so shortcut the whole
 	// process and return it as an optimization.  If it doesn't have any of
@@ -73,9 +46,9 @@ func (is *inputSpan) isDefinitelyZipkinV2() bool {
 	return is.Span.Kind != nil || len(is.Span.Tags) > 0 || is.Span.LocalEndpoint != nil || is.Span.RemoteEndpoint != nil
 }
 
-// asZipkinV2 shortcuts the span conversion process and treats the inputSpan as
+// asZipkinV2 shortcuts the span conversion process and treats the InputSpan as
 // ZipkinV2 and returns that span directly.
-func (is *inputSpan) fromZipkinV2() (*trace.Span, error) {
+func (is *InputSpan) fromZipkinV2() (*trace.Span, error) {
 	// Do some basic validation
 	if len(is.BinaryAnnotations) > 0 {
 		return nil, errors.New("span cannot have binaryAnnotations with Zipkin V2 fields")
@@ -91,14 +64,14 @@ func (is *inputSpan) fromZipkinV2() (*trace.Span, error) {
 	return &is.Span, nil
 }
 
-// asTraceSpan should be used when we are not sure that the inputSpan is
+// asTraceSpan should be used when we are not sure that the InputSpan is
 // already in Zipkin V2 format.  It returns a slice of our SignalFx span
 // object, which is equivalent to a Zipkin V2 span.  A single span in Zipkin v1
 // can contain multiple v2 spans because the annotations and binary annotations
 // contain endpoints.  This would also work for Zipkin V2 spans, it just
 // involves a lot more processing.  The conversion code was mostly ported from
 // https://github.com/openzipkin/zipkin/blob/2.8.4/zipkin/src/main/java/zipkin/internal/V2SpanConverter.java
-func (is *inputSpan) fromZipkinV1() ([]*trace.Span, error) {
+func (is *InputSpan) fromZipkinV1() ([]*trace.Span, error) {
 	if is.Span.Tags == nil {
 		is.Span.Tags = map[string]string{}
 	}
@@ -115,17 +88,17 @@ func (is *inputSpan) fromZipkinV1() ([]*trace.Span, error) {
 	return spanBuilder.spans, nil
 }
 
-func (is *inputSpan) endTimestampReflectsSpanDuration(end *annotation) bool {
+func (is *InputSpan) endTimestampReflectsSpanDuration(end *signalfxformat.InputAnnotation) bool {
 	return end != nil && is.Timestamp != nil && is.Duration != nil && end.Timestamp != nil &&
 		*is.Timestamp+*is.Duration == *end.Timestamp
 }
 
 type spanBuilder struct {
 	spans                          []*trace.Span
-	cs, sr, ss, cr, ms, mr, ws, wr *annotation
+	cs, sr, ss, cr, ms, mr, ws, wr *signalfxformat.InputAnnotation
 }
 
-func (sb *spanBuilder) addSpanForEndpoint(is *inputSpan, e *trace.Endpoint) *trace.Span {
+func (sb *spanBuilder) addSpanForEndpoint(is *InputSpan, e *trace.Endpoint) *trace.Span {
 	s := is.Span
 	s.LocalEndpoint = e
 	s.Tags = map[string]string{}
@@ -134,7 +107,7 @@ func (sb *spanBuilder) addSpanForEndpoint(is *inputSpan, e *trace.Endpoint) *tra
 	return &s
 }
 
-func (sb *spanBuilder) spanForEndpoint(is *inputSpan, e *trace.Endpoint) *trace.Span {
+func (sb *spanBuilder) spanForEndpoint(is *InputSpan, e *trace.Endpoint) *trace.Span {
 	if e == nil {
 		// Allocate missing endpoint data to first span.  For a Zipkin v2
 		// span this will be the only one.
@@ -154,7 +127,7 @@ func (sb *spanBuilder) spanForEndpoint(is *inputSpan, e *trace.Endpoint) *trace.
 	return sb.addSpanForEndpoint(is, e)
 }
 
-func (sb *spanBuilder) processAnnotations(is *inputSpan) {
+func (sb *spanBuilder) processAnnotations(is *InputSpan) {
 	sb.pullOutSpecialAnnotations(is)
 	sb.fillInStartAnnotations(is)
 
@@ -177,7 +150,7 @@ func (sb *spanBuilder) processAnnotations(is *inputSpan) {
 	sb.handleMessageQueueAnnotations(is)
 }
 
-func (sb *spanBuilder) pullOutSpecialAnnotations(is *inputSpan) {
+func (sb *spanBuilder) pullOutSpecialAnnotations(is *InputSpan) {
 	for i := range is.Annotations {
 		anno := is.Annotations[i]
 
@@ -200,7 +173,7 @@ func (sb *spanBuilder) pullOutSpecialAnnotations(is *inputSpan) {
 	}
 }
 
-func (sb *spanBuilder) handleSpecialAnnotation(anno *annotation, span *trace.Span) bool {
+func (sb *spanBuilder) handleSpecialAnnotation(anno *signalfxformat.InputAnnotation, span *trace.Span) bool {
 	switch *anno.Value {
 	case "cs":
 		span.Kind = &ClientKind
@@ -230,11 +203,11 @@ func (sb *spanBuilder) handleSpecialAnnotation(anno *annotation, span *trace.Spa
 	return true
 }
 
-func (sb *spanBuilder) fillInStartAnnotations(is *inputSpan) {
+func (sb *spanBuilder) fillInStartAnnotations(is *InputSpan) {
 	// When bridging between event and span model, you can end up missing a start annotation
 	if sb.cs == nil && is.endTimestampReflectsSpanDuration(sb.cr) {
 		val := "cs"
-		sb.cs = &annotation{
+		sb.cs = &signalfxformat.InputAnnotation{
 			Timestamp: is.Timestamp,
 			Value:     &val,
 			Endpoint:  sb.cr.Endpoint,
@@ -242,7 +215,7 @@ func (sb *spanBuilder) fillInStartAnnotations(is *inputSpan) {
 	}
 	if sb.sr == nil && is.endTimestampReflectsSpanDuration(sb.ss) {
 		val := "sr"
-		sb.sr = &annotation{
+		sb.sr = &signalfxformat.InputAnnotation{
 			Timestamp: is.Timestamp,
 			Value:     &val,
 			Endpoint:  sb.ss.Endpoint,
@@ -250,7 +223,7 @@ func (sb *spanBuilder) fillInStartAnnotations(is *inputSpan) {
 	}
 }
 
-func (sb *spanBuilder) fillInMissingTimings(is *inputSpan) {
+func (sb *spanBuilder) fillInMissingTimings(is *InputSpan) {
 	// in a shared span, the client side owns span duration by annotations or explicit timestamp
 	sb.maybeTimestampDuration(sb.cs, sb.cr, is)
 
@@ -279,7 +252,7 @@ func (sb *spanBuilder) fillInMissingTimings(is *inputSpan) {
 	}
 }
 
-func (sb *spanBuilder) handleIncompleteSpan(is *inputSpan) {
+func (sb *spanBuilder) handleIncompleteSpan(is *InputSpan) {
 	for i := range sb.spans {
 		next := sb.spans[i]
 		if next.Kind != nil && *next.Kind == ClientKind {
@@ -308,14 +281,14 @@ func (sb *spanBuilder) handleIncompleteSpan(is *inputSpan) {
 	}
 }
 
-func (sb *spanBuilder) fillInTimingsOnFirstSpan(is *inputSpan) {
+func (sb *spanBuilder) fillInTimingsOnFirstSpan(is *InputSpan) {
 	if is.Timestamp != nil {
 		sb.spans[0].Timestamp = is.Timestamp
 		sb.spans[0].Duration = is.Duration
 	}
 }
 
-func (sb *spanBuilder) handleMessageQueueAnnotations(is *inputSpan) {
+func (sb *spanBuilder) handleMessageQueueAnnotations(is *InputSpan) {
 	// ms and mr are not supposed to be in the same span, but in case they are..
 	if sb.ms != nil && sb.mr != nil {
 		sb.handleBothMSAndMR(is)
@@ -345,7 +318,7 @@ func (sb *spanBuilder) handleMessageQueueAnnotations(is *inputSpan) {
 	}
 }
 
-func (sb *spanBuilder) handleBothMSAndMR(is *inputSpan) {
+func (sb *spanBuilder) handleBothMSAndMR(is *InputSpan) {
 	// special-case loopback: We need to make sure on loopback there are two span2s
 	producer := sb.spanForEndpoint(is, sb.ms.Endpoint)
 	var consumer *trace.Span
@@ -374,7 +347,7 @@ func (sb *spanBuilder) handleBothMSAndMR(is *inputSpan) {
 	}
 }
 
-func (sb *spanBuilder) maybeTimestampDuration(begin, end *annotation, is *inputSpan) {
+func (sb *spanBuilder) maybeTimestampDuration(begin, end *signalfxformat.InputAnnotation, is *InputSpan) {
 	span2 := sb.spanForEndpoint(is, begin.Endpoint)
 
 	if is.Timestamp != nil && is.Duration != nil {
@@ -389,7 +362,7 @@ func (sb *spanBuilder) maybeTimestampDuration(begin, end *annotation, is *inputS
 	}
 }
 
-func (sb *spanBuilder) processBinaryAnnotations(is *inputSpan) error {
+func (sb *spanBuilder) processBinaryAnnotations(is *InputSpan) error {
 	ca, sa, ma, err := sb.pullOutSpecialBinaryAnnotations(is)
 	if err != nil {
 		return err
@@ -413,7 +386,7 @@ func (sb *spanBuilder) processBinaryAnnotations(is *inputSpan) error {
 	return nil
 }
 
-func (sb *spanBuilder) pullOutSpecialBinaryAnnotations(is *inputSpan) (*trace.Endpoint, *trace.Endpoint, *trace.Endpoint, error) {
+func (sb *spanBuilder) pullOutSpecialBinaryAnnotations(is *InputSpan) (*trace.Endpoint, *trace.Endpoint, *trace.Endpoint, error) {
 	var ca, sa, ma *trace.Endpoint
 	for i := range is.BinaryAnnotations {
 		ba := is.BinaryAnnotations[i]
@@ -446,7 +419,7 @@ func (sb *spanBuilder) pullOutSpecialBinaryAnnotations(is *inputSpan) (*trace.En
 	return ca, sa, ma, nil
 }
 
-func (sb *spanBuilder) convertToTagOnSpan(currentSpan *trace.Span, ba *binaryAnnotation) error {
+func (sb *spanBuilder) convertToTagOnSpan(currentSpan *trace.Span, ba *signalfxformat.BinaryAnnotation) error {
 	switch val := (*ba.Value).(type) {
 	case string:
 		// don't add marker "lc" tags
@@ -461,13 +434,14 @@ func (sb *spanBuilder) convertToTagOnSpan(currentSpan *trace.Span, ba *binaryAnn
 	case int8, int16, int32, int64, uint8, uint16, uint32, uint64:
 		currentSpan.Tags[*ba.Key] = fmt.Sprintf("%d", val)
 	default:
-		return fmt.Errorf("invalid binary annotation type for %v", *ba.Value)
+		fmt.Printf("invalid binary annotation type of %s, for key %s for span %s\n", reflect.TypeOf(val), *ba.Key, *currentSpan.Name)
+		return fmt.Errorf("invalid binary annotation type of %s, for key %s", reflect.TypeOf(val), *ba.Key)
 	}
 	return nil
 }
 
 // special-case when we are missing core annotations, but we have both address annotations
-func (sb *spanBuilder) handleOnlyAddressAnnotations(is *inputSpan, ca, sa *trace.Endpoint) bool {
+func (sb *spanBuilder) handleOnlyAddressAnnotations(is *InputSpan, ca, sa *trace.Endpoint) bool {
 	if sb.cs == nil && sb.sr == nil && ca != nil && sa != nil {
 		sb.spanForEndpoint(is, ca).RemoteEndpoint = sa
 		return true
@@ -475,7 +449,7 @@ func (sb *spanBuilder) handleOnlyAddressAnnotations(is *inputSpan, ca, sa *trace
 	return false
 }
 
-func (sb *spanBuilder) handleSAPresent(is *inputSpan, sa *trace.Endpoint) {
+func (sb *spanBuilder) handleSAPresent(is *InputSpan, sa *trace.Endpoint) {
 	if sb.cs != nil && !closeEnough(sa, sb.cs.Endpoint) {
 		sb.spanForEndpoint(is, sb.cs.Endpoint).RemoteEndpoint = sa
 	} else if sb.cr != nil && !closeEnough(sa, sb.cr.Endpoint) {
@@ -487,7 +461,7 @@ func (sb *spanBuilder) handleSAPresent(is *inputSpan, sa *trace.Endpoint) {
 	}
 }
 
-func (sb *spanBuilder) handleCAPresent(is *inputSpan, ca *trace.Endpoint) {
+func (sb *spanBuilder) handleCAPresent(is *InputSpan, ca *trace.Endpoint) {
 	if sb.sr != nil && !closeEnough(ca, sb.sr.Endpoint) {
 		sb.spanForEndpoint(is, sb.sr.Endpoint).RemoteEndpoint = ca
 	}
@@ -500,7 +474,7 @@ func (sb *spanBuilder) handleCAPresent(is *inputSpan, ca *trace.Endpoint) {
 	}
 }
 
-func (sb *spanBuilder) handleMAPresent(is *inputSpan, ma *trace.Endpoint) {
+func (sb *spanBuilder) handleMAPresent(is *InputSpan, ma *trace.Endpoint) {
 	if sb.ms != nil && !closeEnough(ma, sb.ms.Endpoint) {
 		sb.spanForEndpoint(is, sb.ms.Endpoint).RemoteEndpoint = ma
 	}
@@ -560,10 +534,8 @@ var errInvalidJSONTraceFormat = errors.New("invalid JSON format; please see corr
 
 // Read the data off the wire in json format
 func (decoder *JSONTraceDecoderV1) Read(ctx context.Context, req *http.Request) error {
-	dec := json.NewDecoder(req.Body)
-
-	var input []*inputSpan
-	if err := dec.Decode(&input); err != nil {
+	var input signalfxformat.InputSpanList
+	if err := easyjson.UnmarshalFromReader(req.Body, &input); err != nil {
 		return errInvalidJSONTraceFormat
 	}
 
@@ -576,9 +548,10 @@ func (decoder *JSONTraceDecoderV1) Read(ctx context.Context, req *http.Request) 
 	// Don't let an error converting one set of spans prevent other valid spans
 	// in the same request from being rejected.
 	var conversionErrs *traceErrs
-	for i := range input {
-		if input[i].isDefinitelyZipkinV2() {
-			s, err := input[i].fromZipkinV2()
+	for _, is := range input {
+		inputSpan := (*InputSpan)(is)
+		if inputSpan.isDefinitelyZipkinV2() {
+			s, err := inputSpan.fromZipkinV2()
 			if err != nil {
 				conversionErrs = conversionErrs.Append(err)
 				continue
@@ -586,7 +559,7 @@ func (decoder *JSONTraceDecoderV1) Read(ctx context.Context, req *http.Request) 
 
 			spans = append(spans, s)
 		} else {
-			derived, err := input[i].fromZipkinV1()
+			derived, err := inputSpan.fromZipkinV1()
 			if err != nil {
 				conversionErrs = conversionErrs.Append(err)
 				continue

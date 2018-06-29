@@ -7,6 +7,7 @@ import (
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
+	trace "github.com/signalfx/golib/trace"
 )
 
 // suppress unused package warning
@@ -302,7 +303,804 @@ func (v *JSONDatapointV1) UnmarshalJSON(data []byte) error {
 func (v *JSONDatapointV1) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat2(l, v)
 }
-func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(in *jlexer.Lexer, out *EventSendFormatV2) {
+func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(in *jlexer.Lexer, out *InputSpanList) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		in.Skip()
+		*out = nil
+	} else {
+		in.Delim('[')
+		if *out == nil {
+			if !in.IsDelim(']') {
+				*out = make(InputSpanList, 0, 8)
+			} else {
+				*out = InputSpanList{}
+			}
+		} else {
+			*out = (*out)[:0]
+		}
+		for !in.IsDelim(']') {
+			var v9 *InputSpan
+			if in.IsNull() {
+				in.Skip()
+				v9 = nil
+			} else {
+				if v9 == nil {
+					v9 = new(InputSpan)
+				}
+				(*v9).UnmarshalEasyJSON(in)
+			}
+			*out = append(*out, v9)
+			in.WantComma()
+		}
+		in.Delim(']')
+	}
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(out *jwriter.Writer, in InputSpanList) {
+	if in == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
+		out.RawString("null")
+	} else {
+		out.RawByte('[')
+		for v10, v11 := range in {
+			if v10 > 0 {
+				out.RawByte(',')
+			}
+			if v11 == nil {
+				out.RawString("null")
+			} else {
+				(*v11).MarshalEasyJSON(out)
+			}
+		}
+		out.RawByte(']')
+	}
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v InputSpanList) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v InputSpanList) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *InputSpanList) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *InputSpanList) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(l, v)
+}
+func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(in *jlexer.Lexer, out *InputSpan) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeString()
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "annotations":
+			if in.IsNull() {
+				in.Skip()
+				out.Annotations = nil
+			} else {
+				in.Delim('[')
+				if out.Annotations == nil {
+					if !in.IsDelim(']') {
+						out.Annotations = make([]*InputAnnotation, 0, 8)
+					} else {
+						out.Annotations = []*InputAnnotation{}
+					}
+				} else {
+					out.Annotations = (out.Annotations)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v12 *InputAnnotation
+					if in.IsNull() {
+						in.Skip()
+						v12 = nil
+					} else {
+						if v12 == nil {
+							v12 = new(InputAnnotation)
+						}
+						(*v12).UnmarshalEasyJSON(in)
+					}
+					out.Annotations = append(out.Annotations, v12)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
+		case "binaryAnnotations":
+			if in.IsNull() {
+				in.Skip()
+				out.BinaryAnnotations = nil
+			} else {
+				in.Delim('[')
+				if out.BinaryAnnotations == nil {
+					if !in.IsDelim(']') {
+						out.BinaryAnnotations = make([]*BinaryAnnotation, 0, 8)
+					} else {
+						out.BinaryAnnotations = []*BinaryAnnotation{}
+					}
+				} else {
+					out.BinaryAnnotations = (out.BinaryAnnotations)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v13 *BinaryAnnotation
+					if in.IsNull() {
+						in.Skip()
+						v13 = nil
+					} else {
+						if v13 == nil {
+							v13 = new(BinaryAnnotation)
+						}
+						(*v13).UnmarshalEasyJSON(in)
+					}
+					out.BinaryAnnotations = append(out.BinaryAnnotations, v13)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
+		case "traceId":
+			out.TraceID = string(in.String())
+		case "name":
+			if in.IsNull() {
+				in.Skip()
+				out.Name = nil
+			} else {
+				if out.Name == nil {
+					out.Name = new(string)
+				}
+				*out.Name = string(in.String())
+			}
+		case "parentId":
+			if in.IsNull() {
+				in.Skip()
+				out.ParentID = nil
+			} else {
+				if out.ParentID == nil {
+					out.ParentID = new(string)
+				}
+				*out.ParentID = string(in.String())
+			}
+		case "id":
+			out.ID = string(in.String())
+		case "kind":
+			if in.IsNull() {
+				in.Skip()
+				out.Kind = nil
+			} else {
+				if out.Kind == nil {
+					out.Kind = new(string)
+				}
+				*out.Kind = string(in.String())
+			}
+		case "timestamp":
+			if in.IsNull() {
+				in.Skip()
+				out.Timestamp = nil
+			} else {
+				if out.Timestamp == nil {
+					out.Timestamp = new(float64)
+				}
+				*out.Timestamp = float64(in.Float64())
+			}
+		case "duration":
+			if in.IsNull() {
+				in.Skip()
+				out.Duration = nil
+			} else {
+				if out.Duration == nil {
+					out.Duration = new(float64)
+				}
+				*out.Duration = float64(in.Float64())
+			}
+		case "debug":
+			if in.IsNull() {
+				in.Skip()
+				out.Debug = nil
+			} else {
+				if out.Debug == nil {
+					out.Debug = new(bool)
+				}
+				*out.Debug = bool(in.Bool())
+			}
+		case "shared":
+			if in.IsNull() {
+				in.Skip()
+				out.Shared = nil
+			} else {
+				if out.Shared == nil {
+					out.Shared = new(bool)
+				}
+				*out.Shared = bool(in.Bool())
+			}
+		case "localEndpoint":
+			if in.IsNull() {
+				in.Skip()
+				out.LocalEndpoint = nil
+			} else {
+				if out.LocalEndpoint == nil {
+					out.LocalEndpoint = new(trace.Endpoint)
+				}
+				easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(in, &*out.LocalEndpoint)
+			}
+		case "remoteEndpoint":
+			if in.IsNull() {
+				in.Skip()
+				out.RemoteEndpoint = nil
+			} else {
+				if out.RemoteEndpoint == nil {
+					out.RemoteEndpoint = new(trace.Endpoint)
+				}
+				easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(in, &*out.RemoteEndpoint)
+			}
+		case "tags":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				in.Delim('{')
+				if !in.IsDelim('}') {
+					out.Tags = make(map[string]string)
+				} else {
+					out.Tags = nil
+				}
+				for !in.IsDelim('}') {
+					key := string(in.String())
+					in.WantColon()
+					var v14 string
+					v14 = string(in.String())
+					(out.Tags)[key] = v14
+					in.WantComma()
+				}
+				in.Delim('}')
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(out *jwriter.Writer, in InputSpan) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"annotations\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Annotations == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
+			out.RawString("null")
+		} else {
+			out.RawByte('[')
+			for v15, v16 := range in.Annotations {
+				if v15 > 0 {
+					out.RawByte(',')
+				}
+				if v16 == nil {
+					out.RawString("null")
+				} else {
+					(*v16).MarshalEasyJSON(out)
+				}
+			}
+			out.RawByte(']')
+		}
+	}
+	{
+		const prefix string = ",\"binaryAnnotations\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.BinaryAnnotations == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
+			out.RawString("null")
+		} else {
+			out.RawByte('[')
+			for v17, v18 := range in.BinaryAnnotations {
+				if v17 > 0 {
+					out.RawByte(',')
+				}
+				if v18 == nil {
+					out.RawString("null")
+				} else {
+					(*v18).MarshalEasyJSON(out)
+				}
+			}
+			out.RawByte(']')
+		}
+	}
+	{
+		const prefix string = ",\"traceId\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.TraceID))
+	}
+	{
+		const prefix string = ",\"name\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Name == nil {
+			out.RawString("null")
+		} else {
+			out.String(string(*in.Name))
+		}
+	}
+	{
+		const prefix string = ",\"parentId\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.ParentID == nil {
+			out.RawString("null")
+		} else {
+			out.String(string(*in.ParentID))
+		}
+	}
+	{
+		const prefix string = ",\"id\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.ID))
+	}
+	{
+		const prefix string = ",\"kind\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Kind == nil {
+			out.RawString("null")
+		} else {
+			out.String(string(*in.Kind))
+		}
+	}
+	{
+		const prefix string = ",\"timestamp\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Timestamp == nil {
+			out.RawString("null")
+		} else {
+			out.Float64(float64(*in.Timestamp))
+		}
+	}
+	{
+		const prefix string = ",\"duration\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Duration == nil {
+			out.RawString("null")
+		} else {
+			out.Float64(float64(*in.Duration))
+		}
+	}
+	{
+		const prefix string = ",\"debug\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Debug == nil {
+			out.RawString("null")
+		} else {
+			out.Bool(bool(*in.Debug))
+		}
+	}
+	{
+		const prefix string = ",\"shared\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Shared == nil {
+			out.RawString("null")
+		} else {
+			out.Bool(bool(*in.Shared))
+		}
+	}
+	{
+		const prefix string = ",\"localEndpoint\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.LocalEndpoint == nil {
+			out.RawString("null")
+		} else {
+			easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(out, *in.LocalEndpoint)
+		}
+	}
+	{
+		const prefix string = ",\"remoteEndpoint\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.RemoteEndpoint == nil {
+			out.RawString("null")
+		} else {
+			easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(out, *in.RemoteEndpoint)
+		}
+	}
+	{
+		const prefix string = ",\"tags\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Tags == nil && (out.Flags&jwriter.NilMapAsEmpty) == 0 {
+			out.RawString(`null`)
+		} else {
+			out.RawByte('{')
+			v19First := true
+			for v19Name, v19Value := range in.Tags {
+				if v19First {
+					v19First = false
+				} else {
+					out.RawByte(',')
+				}
+				out.String(string(v19Name))
+				out.RawByte(':')
+				out.String(string(v19Value))
+			}
+			out.RawByte('}')
+		}
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v InputSpan) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v InputSpan) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *InputSpan) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *InputSpan) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(l, v)
+}
+func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(in *jlexer.Lexer, out *trace.Endpoint) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeString()
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "serviceName":
+			if in.IsNull() {
+				in.Skip()
+				out.ServiceName = nil
+			} else {
+				if out.ServiceName == nil {
+					out.ServiceName = new(string)
+				}
+				*out.ServiceName = string(in.String())
+			}
+		case "ipv4":
+			if in.IsNull() {
+				in.Skip()
+				out.Ipv4 = nil
+			} else {
+				if out.Ipv4 == nil {
+					out.Ipv4 = new(string)
+				}
+				*out.Ipv4 = string(in.String())
+			}
+		case "ipv6":
+			if in.IsNull() {
+				in.Skip()
+				out.Ipv6 = nil
+			} else {
+				if out.Ipv6 == nil {
+					out.Ipv6 = new(string)
+				}
+				*out.Ipv6 = string(in.String())
+			}
+		case "port":
+			if in.IsNull() {
+				in.Skip()
+				out.Port = nil
+			} else {
+				if out.Port == nil {
+					out.Port = new(int32)
+				}
+				*out.Port = int32(in.Int32())
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(out *jwriter.Writer, in trace.Endpoint) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"serviceName\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.ServiceName == nil {
+			out.RawString("null")
+		} else {
+			out.String(string(*in.ServiceName))
+		}
+	}
+	{
+		const prefix string = ",\"ipv4\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Ipv4 == nil {
+			out.RawString("null")
+		} else {
+			out.String(string(*in.Ipv4))
+		}
+	}
+	{
+		const prefix string = ",\"ipv6\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Ipv6 == nil {
+			out.RawString("null")
+		} else {
+			out.String(string(*in.Ipv6))
+		}
+	}
+	{
+		const prefix string = ",\"port\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Port == nil {
+			out.RawString("null")
+		} else {
+			out.Int32(int32(*in.Port))
+		}
+	}
+	out.RawByte('}')
+}
+func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(in *jlexer.Lexer, out *InputAnnotation) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeString()
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "endpoint":
+			if in.IsNull() {
+				in.Skip()
+				out.Endpoint = nil
+			} else {
+				if out.Endpoint == nil {
+					out.Endpoint = new(trace.Endpoint)
+				}
+				easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(in, &*out.Endpoint)
+			}
+		case "timestamp":
+			if in.IsNull() {
+				in.Skip()
+				out.Timestamp = nil
+			} else {
+				if out.Timestamp == nil {
+					out.Timestamp = new(float64)
+				}
+				*out.Timestamp = float64(in.Float64())
+			}
+		case "value":
+			if in.IsNull() {
+				in.Skip()
+				out.Value = nil
+			} else {
+				if out.Value == nil {
+					out.Value = new(string)
+				}
+				*out.Value = string(in.String())
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(out *jwriter.Writer, in InputAnnotation) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"endpoint\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Endpoint == nil {
+			out.RawString("null")
+		} else {
+			easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(out, *in.Endpoint)
+		}
+	}
+	{
+		const prefix string = ",\"timestamp\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Timestamp == nil {
+			out.RawString("null")
+		} else {
+			out.Float64(float64(*in.Timestamp))
+		}
+	}
+	{
+		const prefix string = ",\"value\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Value == nil {
+			out.RawString("null")
+		} else {
+			out.String(string(*in.Value))
+		}
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v InputAnnotation) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v InputAnnotation) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *InputAnnotation) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *InputAnnotation) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(l, v)
+}
+func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat6(in *jlexer.Lexer, out *EventSendFormatV2) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -346,9 +1144,9 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(i
 				for !in.IsDelim('}') {
 					key := string(in.String())
 					in.WantColon()
-					var v9 string
-					v9 = string(in.String())
-					(out.Dimensions)[key] = v9
+					var v20 string
+					v20 = string(in.String())
+					(out.Dimensions)[key] = v20
 					in.WantComma()
 				}
 				in.Delim('}')
@@ -366,15 +1164,15 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(i
 				for !in.IsDelim('}') {
 					key := string(in.String())
 					in.WantColon()
-					var v10 interface{}
-					if m, ok := v10.(easyjson.Unmarshaler); ok {
+					var v21 interface{}
+					if m, ok := v21.(easyjson.Unmarshaler); ok {
 						m.UnmarshalEasyJSON(in)
-					} else if m, ok := v10.(json.Unmarshaler); ok {
+					} else if m, ok := v21.(json.Unmarshaler); ok {
 						_ = m.UnmarshalJSON(in.Raw())
 					} else {
-						v10 = in.Interface()
+						v21 = in.Interface()
 					}
-					(out.Properties)[key] = v10
+					(out.Properties)[key] = v21
 					in.WantComma()
 				}
 				in.Delim('}')
@@ -399,7 +1197,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(i
 		in.Consumed()
 	}
 }
-func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(out *jwriter.Writer, in EventSendFormatV2) {
+func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat6(out *jwriter.Writer, in EventSendFormatV2) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -439,16 +1237,16 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(o
 			out.RawString(`null`)
 		} else {
 			out.RawByte('{')
-			v11First := true
-			for v11Name, v11Value := range in.Dimensions {
-				if v11First {
-					v11First = false
+			v22First := true
+			for v22Name, v22Value := range in.Dimensions {
+				if v22First {
+					v22First = false
 				} else {
 					out.RawByte(',')
 				}
-				out.String(string(v11Name))
+				out.String(string(v22Name))
 				out.RawByte(':')
-				out.String(string(v11Value))
+				out.String(string(v22Value))
 			}
 			out.RawByte('}')
 		}
@@ -465,21 +1263,21 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(o
 			out.RawString(`null`)
 		} else {
 			out.RawByte('{')
-			v12First := true
-			for v12Name, v12Value := range in.Properties {
-				if v12First {
-					v12First = false
+			v23First := true
+			for v23Name, v23Value := range in.Properties {
+				if v23First {
+					v23First = false
 				} else {
 					out.RawByte(',')
 				}
-				out.String(string(v12Name))
+				out.String(string(v23Name))
 				out.RawByte(':')
-				if m, ok := v12Value.(easyjson.Marshaler); ok {
+				if m, ok := v23Value.(easyjson.Marshaler); ok {
 					m.MarshalEasyJSON(out)
-				} else if m, ok := v12Value.(json.Marshaler); ok {
+				} else if m, ok := v23Value.(json.Marshaler); ok {
 					out.Raw(m.MarshalJSON())
 				} else {
-					out.Raw(json.Marshal(v12Value))
+					out.Raw(json.Marshal(v23Value))
 				}
 			}
 			out.RawByte('}')
@@ -505,27 +1303,27 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(o
 // MarshalJSON supports json.Marshaler interface
 func (v EventSendFormatV2) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(&w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat6(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v EventSendFormatV2) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat6(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *EventSendFormatV2) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(&r, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat6(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *EventSendFormatV2) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(l, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat6(l, v)
 }
-func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(in *jlexer.Lexer, out *BodySendFormatV2) {
+func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat7(in *jlexer.Lexer, out *BodySendFormatV2) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -569,9 +1367,9 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(i
 				for !in.IsDelim('}') {
 					key := string(in.String())
 					in.WantColon()
-					var v13 string
-					v13 = string(in.String())
-					(out.Dimensions)[key] = v13
+					var v24 string
+					v24 = string(in.String())
+					(out.Dimensions)[key] = v24
 					in.WantComma()
 				}
 				in.Delim('}')
@@ -589,15 +1387,15 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(i
 				for !in.IsDelim('}') {
 					key := string(in.String())
 					in.WantColon()
-					var v14 ValueToSend
-					if m, ok := v14.(easyjson.Unmarshaler); ok {
+					var v25 ValueToSend
+					if m, ok := v25.(easyjson.Unmarshaler); ok {
 						m.UnmarshalEasyJSON(in)
-					} else if m, ok := v14.(json.Unmarshaler); ok {
+					} else if m, ok := v25.(json.Unmarshaler); ok {
 						_ = m.UnmarshalJSON(in.Raw())
 					} else {
-						v14 = in.Interface()
+						v25 = in.Interface()
 					}
-					(out.Properties)[key] = v14
+					(out.Properties)[key] = v25
 					in.WantComma()
 				}
 				in.Delim('}')
@@ -612,7 +1410,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(i
 		in.Consumed()
 	}
 }
-func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(out *jwriter.Writer, in BodySendFormatV2) {
+func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat7(out *jwriter.Writer, in BodySendFormatV2) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -664,16 +1462,16 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(o
 			out.RawString(`null`)
 		} else {
 			out.RawByte('{')
-			v15First := true
-			for v15Name, v15Value := range in.Dimensions {
-				if v15First {
-					v15First = false
+			v26First := true
+			for v26Name, v26Value := range in.Dimensions {
+				if v26First {
+					v26First = false
 				} else {
 					out.RawByte(',')
 				}
-				out.String(string(v15Name))
+				out.String(string(v26Name))
 				out.RawByte(':')
-				out.String(string(v15Value))
+				out.String(string(v26Value))
 			}
 			out.RawByte('}')
 		}
@@ -690,21 +1488,21 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(o
 			out.RawString(`null`)
 		} else {
 			out.RawByte('{')
-			v16First := true
-			for v16Name, v16Value := range in.Properties {
-				if v16First {
-					v16First = false
+			v27First := true
+			for v27Name, v27Value := range in.Properties {
+				if v27First {
+					v27First = false
 				} else {
 					out.RawByte(',')
 				}
-				out.String(string(v16Name))
+				out.String(string(v27Name))
 				out.RawByte(':')
-				if m, ok := v16Value.(easyjson.Marshaler); ok {
+				if m, ok := v27Value.(easyjson.Marshaler); ok {
 					m.MarshalEasyJSON(out)
-				} else if m, ok := v16Value.(json.Marshaler); ok {
+				} else if m, ok := v27Value.(json.Marshaler); ok {
 					out.Raw(m.MarshalJSON())
 				} else {
-					out.Raw(json.Marshal(v16Value))
+					out.Raw(json.Marshal(v27Value))
 				}
 			}
 			out.RawByte('}')
@@ -716,23 +1514,166 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(o
 // MarshalJSON supports json.Marshaler interface
 func (v BodySendFormatV2) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(&w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat7(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v BodySendFormatV2) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat7(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *BodySendFormatV2) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(&r, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat7(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *BodySendFormatV2) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(l, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat7(l, v)
+}
+func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(in *jlexer.Lexer, out *BinaryAnnotation) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeString()
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "endpoint":
+			if in.IsNull() {
+				in.Skip()
+				out.Endpoint = nil
+			} else {
+				if out.Endpoint == nil {
+					out.Endpoint = new(trace.Endpoint)
+				}
+				easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(in, &*out.Endpoint)
+			}
+		case "key":
+			if in.IsNull() {
+				in.Skip()
+				out.Key = nil
+			} else {
+				if out.Key == nil {
+					out.Key = new(string)
+				}
+				*out.Key = string(in.String())
+			}
+		case "value":
+			if in.IsNull() {
+				in.Skip()
+				out.Value = nil
+			} else {
+				if out.Value == nil {
+					out.Value = new(interface{})
+				}
+				if m, ok := (*out.Value).(easyjson.Unmarshaler); ok {
+					m.UnmarshalEasyJSON(in)
+				} else if m, ok := (*out.Value).(json.Unmarshaler); ok {
+					_ = m.UnmarshalJSON(in.Raw())
+				} else {
+					*out.Value = in.Interface()
+				}
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(out *jwriter.Writer, in BinaryAnnotation) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"endpoint\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Endpoint == nil {
+			out.RawString("null")
+		} else {
+			easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(out, *in.Endpoint)
+		}
+	}
+	{
+		const prefix string = ",\"key\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Key == nil {
+			out.RawString("null")
+		} else {
+			out.String(string(*in.Key))
+		}
+	}
+	{
+		const prefix string = ",\"value\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Value == nil {
+			out.RawString("null")
+		} else {
+			if m, ok := (*in.Value).(easyjson.Marshaler); ok {
+				m.MarshalEasyJSON(out)
+			} else if m, ok := (*in.Value).(json.Marshaler); ok {
+				out.Raw(m.MarshalJSON())
+			} else {
+				out.Raw(json.Marshal(*in.Value))
+			}
+		}
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v BinaryAnnotation) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v BinaryAnnotation) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *BinaryAnnotation) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *BinaryAnnotation) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(l, v)
 }
