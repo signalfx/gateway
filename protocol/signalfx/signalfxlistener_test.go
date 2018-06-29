@@ -508,8 +508,12 @@ func TestSignalfxListener(t *testing.T) {
 }
 
 type fastSink struct {
-	dp    *datapoint.Datapoint
-	count int64
+	dp     *datapoint.Datapoint
+	e      *event.Event
+	s      *trace.Span
+	count  int64
+	ecount int64
+	scount int64
 }
 
 func (f *fastSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
@@ -518,11 +522,15 @@ func (f *fastSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapo
 	return nil
 }
 
-func (f *fastSink) AddEvents(ctx context.Context, points []*event.Event) error {
+func (f *fastSink) AddEvents(ctx context.Context, events []*event.Event) error {
+	f.e = events[0]
+	f.ecount++
 	return nil
 }
 
-func (f *fastSink) AddSpans(ctx context.Context, points []*trace.Span) error {
+func (f *fastSink) AddSpans(ctx context.Context, spans []*trace.Span) error {
+	f.s = spans[0]
+	f.scount++
 	return nil
 }
 
@@ -564,8 +572,10 @@ func BenchmarkProtobufDecoderV2_Read(b *testing.B) {
 	}
 }
 
-func BenchmarkJSONDecoderV2_Read(b *testing.B) {
-	v2Body := fmt.Sprintf(`{"gauge": [{"metric":"bob", "value": 7, "timestamp": %d}]}`, time.Now().UnixNano()/time.Millisecond.Nanoseconds())
+func BenchmarkJSONDecoderV2_ReadInt(b *testing.B) {
+	individualmetric := fmt.Sprintf(`,{"metric":"bob", "value": 7, "timestamp": %d, "dimensions":{"foo":"bar", "a":"b", "less":"more", "one":"two", "somewhatlong":"quick brown fox jumps over the lazy dog"}}`, time.Now().UnixNano()/time.Millisecond.Nanoseconds())
+	metrics := strings.Repeat(individualmetric, 100)
+	v2Body := fmt.Sprintf(`{"gauge": [` + metrics[1:] + "]}")
 	s := &fastSink{}
 
 	dec := &JSONDecoderV2{Sink: s, Logger: log.DefaultLogger}
@@ -585,14 +595,21 @@ func BenchmarkJSONDecoderV2_Read(b *testing.B) {
 		}
 	}
 	b.StopTimer()
-	if _, ok := s.dp.Value.(datapoint.IntValue); ok {
-		b.Log("was an int")
+	b.Log("Count", s.count)
+	if s.count == 0 {
+		b.Fatal("nothing happened")
 	}
-	if _, ok := s.dp.Value.(datapoint.FloatValue); ok {
-		b.Log("was a float")
-	}
-	v2FloatBody := fmt.Sprintf(`{"gauge": [{"metric":"bob", "value": 3.1, "timestamp": %d}]}`, time.Now().UnixNano()/time.Millisecond.Nanoseconds())
-	req = &http.Request{
+}
+
+func BenchmarkJSONDecoderV2_ReadFloat(b *testing.B) {
+	individualFmetric := fmt.Sprintf(`,{"metric":"bob", "value": 7.1, "timestamp": %d, "dimensions":{"foo":"bar", "a":"b", "less":"more", "one":"two", "somewhatlong":"quick brown fox jumps over the lazy dog"}}`, time.Now().UnixNano()/time.Millisecond.Nanoseconds())
+	metricsF := strings.Repeat(individualFmetric, 100)
+	v2FloatBody := fmt.Sprintf(`{"gauge": [` + metricsF[1:] + "]}")
+	s := &fastSink{}
+
+	dec := &JSONDecoderV2{Sink: s, Logger: log.DefaultLogger}
+	ctx := context.Background()
+	req := &http.Request{
 		Body: ioutil.NopCloser(bytes.NewReader([]byte(v2FloatBody))),
 	}
 	b.StartTimer()
@@ -607,13 +624,74 @@ func BenchmarkJSONDecoderV2_Read(b *testing.B) {
 		}
 	}
 	b.StopTimer()
+	b.Log("Count", s.count)
 	if s.count == 0 {
 		b.Fatal("nothing happened")
 	}
-	if _, ok := s.dp.Value.(datapoint.IntValue); ok {
-		b.Log("was an int")
+}
+
+func BenchmarkJSONDecoderV1_Read(b *testing.B) {
+	individualmetric := `{"metric":"gauge.bob", "value": 7, "source":"signalboost-ingest-1--bbbaa"}`
+	v1Body := strings.Repeat(individualmetric, 100)
+	s := &fastSink{}
+
+	dec := &JSONDecoderV1{
+		Sink:   s,
+		Logger: log.DefaultLogger,
+		TypeGetter: &metricHandler{
+			metricCreationsMap: make(map[string]com_signalfx_metrics_protobuf.MetricType),
+		},
 	}
-	if _, ok := s.dp.Value.(datapoint.FloatValue); ok {
-		b.Log("was a float")
+	ctx := context.Background()
+	req := &http.Request{
+		Body: ioutil.NopCloser(bytes.NewReader([]byte(v1Body))),
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := dec.Read(ctx, req)
+		if err != nil {
+			fmt.Println(i)
+			b.Fatal(err)
+		}
+		req = &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader([]byte(v1Body))),
+		}
+	}
+	b.StopTimer()
+	b.Log("Count", s.count)
+	if s.count == 0 {
+		b.Fatal("nothing happened")
+	}
+}
+
+func BenchmarkJSONEVentDecoderV2_Read(b *testing.B) {
+	individualEvent := `,{"category":"ALERT", "eventType": "mwp.test2", "dimensions": {"instance": "mwpinstance4", "host": "myhost-4", "service": "myservice4"}, "properties": {"version": "2015-11-23-4"}, "timestamp":12345}`
+	events := strings.Repeat(individualEvent, 100)
+	v2Body := fmt.Sprintf("[" + events[1:] + "]")
+	s := &fastSink{}
+
+	dec := &JSONEventDecoderV2{
+		Sink:   s,
+		Logger: log.DefaultLogger,
+	}
+	ctx := context.Background()
+	req := &http.Request{
+		Body: ioutil.NopCloser(bytes.NewReader([]byte(v2Body))),
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := dec.Read(ctx, req)
+		if err != nil {
+			fmt.Println(i)
+			b.Fatal(err)
+		}
+		req = &http.Request{
+			Body: ioutil.NopCloser(bytes.NewReader([]byte(v2Body))),
+		}
+	}
+	b.StopTimer()
+	b.Log("Count", s.ecount)
+	if s.ecount == 0 {
+		b.Fatal("nothing happened")
 	}
 }
