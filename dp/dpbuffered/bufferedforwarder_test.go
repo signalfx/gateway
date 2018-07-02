@@ -6,6 +6,9 @@ import (
 
 	"bytes"
 	"context"
+	"io"
+	"sync"
+
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/datapoint/dptest"
@@ -16,8 +19,6 @@ import (
 	"github.com/signalfx/golib/web"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
-	"io"
-	"sync"
 )
 
 const numStats = 6
@@ -100,6 +101,14 @@ func TestBufferedForwarderBasic(t *testing.T) {
 				}
 			}
 			So(bf.AddDatapoints(ctx, datas), ShouldBeNil)
+			seen := <-sendTo.PointsChan
+			So(len(seen), ShouldBeGreaterThan, 1)
+		})
+		Convey("Should buffer points that come in fast", func() {
+			time.Sleep(time.Millisecond * 10)
+			for i := 0; i < 100; i++ {
+				bf.AddDatapoints(ctx, datas)
+			}
 			seen := <-sendTo.PointsChan
 			So(len(seen), ShouldBeGreaterThan, 1)
 		})
