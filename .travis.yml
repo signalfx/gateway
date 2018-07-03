@@ -13,7 +13,7 @@ before_install:
   - go get -u github.com/signalfx/gobuild
   - go get -u github.com/alecthomas/gometalinter
   - gometalinter --install
-  - gem install mdl
+  - gem install mdl --version 0.4.0
 
 script:
   - export PATH=$HOME/gopath/bin:$PATH
