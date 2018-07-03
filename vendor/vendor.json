@@ -129,6 +129,30 @@
 			"revision": "b84e30acd515aadc4b783ad4ff83aff3299bdfe0"
 		},
 		{
+			"checksumSHA1": "Ckkk75h7Xhrc3b+QJ3oqbIrGsaY=",
+			"path": "github.com/mailru/easyjson",
+			"revision": "3fdea8d05856a0c8df22ed4bc71b3219245e4485",
+			"revisionTime": "2018-06-06T16:35:43Z"
+		},
+		{
+			"checksumSHA1": "T8soMJArSZrYnhmdpAnq1bVxQ6Q=",
+			"path": "github.com/mailru/easyjson/buffer",
+			"revision": "3fdea8d05856a0c8df22ed4bc71b3219245e4485",
+			"revisionTime": "2018-06-06T16:35:43Z"
+		},
+		{
+			"checksumSHA1": "r2z0mW+SLfGn93Psm3tvEs3WQDM=",
+			"path": "github.com/mailru/easyjson/jlexer",
+			"revision": "3fdea8d05856a0c8df22ed4bc71b3219245e4485",
+			"revisionTime": "2018-06-06T16:35:43Z"
+		},
+		{
+			"checksumSHA1": "4BAeeJ7JywEQyR6GqRrxfSfN2/Q=",
+			"path": "github.com/mailru/easyjson/jwriter",
+			"revision": "3fdea8d05856a0c8df22ed4bc71b3219245e4485",
+			"revisionTime": "2018-06-06T16:35:43Z"
+		},
+		{
 			"checksumSHA1": "LuFv4/jlrmFNnDb/5SCSEPAM9vU=",
 			"path": "github.com/pmezard/go-difflib/difflib",
 			"revision": "792786c7400a136282c1664665ae0a8db921c6c2"
