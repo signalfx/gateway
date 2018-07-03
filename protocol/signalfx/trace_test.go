@@ -1421,4 +1421,10 @@ func TestTraceConversion(t *testing.T) {
 		_, err := span.fromZipkinV1()
 		So(err.Error(), ShouldContainSubstring, "invalid binary annotation type")
 	})
+
+	Convey("test traceErrs", t, func() {
+		var t *traceErrs
+		t = t.Append(nil)
+		So(t, ShouldBeNil)
+	})
 }

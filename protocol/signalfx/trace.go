@@ -496,11 +496,13 @@ type traceErrs struct {
 	lastErr error
 }
 
-// ErrorOrNil returns a non-typed nil error if te is nil or else a non-nil
-// traceErrs instance.
-func (te *traceErrs) ErrorOrNil() error {
+// ToError returns the err object if the it has not been instantiated, and itself if it has
+// we do this because err is possibly a response from sbingest which could be a json response
+// and we want to pass this on unmolested but encoding errors are more important so send them
+// if they exist
+func (te *traceErrs) ToError(err error) error {
 	if te == nil {
-		return nil
+		return err
 	}
 	return te
 }
@@ -571,7 +573,7 @@ func (decoder *JSONTraceDecoderV1) Read(ctx context.Context, req *http.Request) 
 	}
 
 	err := decoder.Sink.AddSpans(ctx, spans)
-	return conversionErrs.Append(err).ErrorOrNil()
+	return conversionErrs.ToError(err)
 }
 
 func setupJSONTraceV1(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, httpChain web.NextConstructor) sfxclient.Collector {
