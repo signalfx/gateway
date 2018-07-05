@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
+	"github.com/mailru/easyjson"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
@@ -16,6 +17,7 @@ import (
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/logkey"
+	"github.com/signalfx/metricproxy/protocol/signalfx/format"
 	"io"
 	"net/http"
 	"strings"
@@ -23,6 +25,15 @@ import (
 	"sync/atomic"
 	"time"
 )
+
+// JSONDatapointV1 is an alias
+type JSONDatapointV1 signalfxformat.JSONDatapointV1
+
+// JSONDatapointV2 is an alias
+type JSONDatapointV2 signalfxformat.JSONDatapointV2
+
+// BodySendFormatV2 is an alias
+type BodySendFormatV2 signalfxformat.BodySendFormatV2
 
 // ProtobufDecoderV1 creates datapoints out of the V1 protobuf definition
 type ProtobufDecoderV1 struct {
@@ -158,7 +169,7 @@ type JSONDecoderV2 struct {
 	invalidValue      int64
 }
 
-func appendProperties(dp *datapoint.Datapoint, Properties map[string]ValueToSend) {
+func appendProperties(dp *datapoint.Datapoint, Properties map[string]signalfxformat.ValueToSend) {
 	for name, p := range Properties {
 		v := valueToRaw(p)
 		if v == nil {
@@ -179,9 +190,8 @@ func (decoder *JSONDecoderV2) Datapoints() []*datapoint.Datapoint {
 }
 
 func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error {
-	dec := json.NewDecoder(req.Body)
-	var d JSONDatapointV2
-	if err := dec.Decode(&d); err != nil {
+	var d signalfxformat.JSONDatapointV2
+	if err := easyjson.UnmarshalFromReader(req.Body, &d); err != nil {
 		return errInvalidJSONFormat
 	}
 	dps := make([]*datapoint.Datapoint, 0, len(d))
@@ -221,7 +231,7 @@ func SetupProtobufV2ByPaths(r *mux.Router, handler http.Handler, path string) {
 }
 
 func setupJSONV2(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor) sfxclient.Collector {
-	additionalConstructors := []web.Constructor{}
+	var additionalConstructors []web.Constructor
 	if debugContext != nil {
 		additionalConstructors = append(additionalConstructors, debugContext)
 	}
@@ -271,7 +281,7 @@ func SetupJSONV1Paths(r *mux.Router, handler http.Handler) {
 }
 
 func setupProtobufV2(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor) sfxclient.Collector {
-	additionalConstructors := []web.Constructor{}
+	var additionalConstructors []web.Constructor
 	if debugContext != nil {
 		additionalConstructors = append(additionalConstructors, debugContext)
 	}

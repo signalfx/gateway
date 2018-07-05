@@ -11,6 +11,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/metricproxy/protocol/signalfx/format"
 	"math"
 )
 
@@ -180,7 +181,7 @@ func TestPropertyAsRawType(t *testing.T) {
 
 func TestBodySendFormatV2(t *testing.T) {
 	Convey("BodySendFormatV2 should String()-ify", t, func() {
-		x := BodySendFormatV2{
+		x := signalfxformat.BodySendFormatV2{
 			Metric: "hi",
 		}
 		So(x.String(), ShouldContainSubstring, "hi")

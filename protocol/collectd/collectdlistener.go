@@ -11,9 +11,8 @@ import (
 
 	"strings"
 
-	"encoding/json"
-
 	"context"
+	"github.com/mailru/easyjson"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
@@ -23,6 +22,7 @@ import (
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/protocol"
+	"github.com/signalfx/metricproxy/protocol/collectd/format"
 	"github.com/signalfx/metricproxy/protocol/zipper"
 )
 
@@ -91,16 +91,15 @@ func newEvent(f *JSONWriteFormat, defaultDims map[string]string) *event.Event {
 
 func (decoder *JSONDecoder) Read(ctx context.Context, req *http.Request) error {
 	defaultDims := decoder.defaultDims(req)
-	var d JSONWriteBody
-	err := json.NewDecoder(req.Body).Decode(&d)
-	if err != nil {
+	var d collectdformat.JSONWriteBody
+	if err := easyjson.UnmarshalFromReader(req.Body, &d); err != nil {
 		return err
 	}
 	es := make([]*event.Event, 0, len(d)*2)
 	dps := make([]*datapoint.Datapoint, 0, len(d)*2)
 	for _, f := range d {
-		if e := newEvent(f, defaultDims); e == nil {
-			dps = append(dps, newDataPoints(f, defaultDims)...)
+		if e := newEvent((*JSONWriteFormat)(f), defaultDims); e == nil {
+			dps = append(dps, newDataPoints((*JSONWriteFormat)(f), defaultDims)...)
 		} else {
 			es = append(es, e)
 		}
