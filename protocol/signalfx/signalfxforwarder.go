@@ -89,7 +89,7 @@ func NewForwarder(conf *ForwarderConfig) (*Forwarder, error) {
 	}
 	sendingSink := sfxclient.NewHTTPSink()
 	sendingSink.DisableCompression = *conf.DisableCompression
-	sendingSink.Client = http.Client{
+	sendingSink.Client = &http.Client{
 		Transport: tr,
 		Timeout:   *conf.Timeout,
 	}
@@ -102,7 +102,7 @@ func NewForwarder(conf *ForwarderConfig) (*Forwarder, error) {
 		defaultAuthToken: sendingSink.AuthToken,
 		userAgent:        sendingSink.UserAgent,
 		tr:               tr,
-		client:           &sendingSink.Client,
+		client:           sendingSink.Client,
 		jsonMarshal:      conf.JSONMarshal,
 		sink:             sendingSink,
 		Logger:           conf.Logger,
