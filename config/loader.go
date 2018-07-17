@@ -201,6 +201,7 @@ func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) 
 		AuthToken:        conf.DefaultAuthToken,
 		Logger:           s.logger,
 		Filters:          conf.Filters,
+		TraceSample:      conf.TraceSample,
 	}
 	return signalfx.NewForwarder(&sfConf)
 }

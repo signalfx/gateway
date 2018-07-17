@@ -12,6 +12,7 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol/filtering"
+	"github.com/signalfx/metricproxy/sampling"
 	"github.com/signalfx/xdgbasedir"
 	"os"
 )
@@ -38,6 +39,7 @@ type ForwardTo struct {
 	FormatVersion     *uint32              `json:",omitempty"`
 	DimensionsOrder   []string             `json:",omitempty"`
 	Filters           *filtering.FilterObj `json:",omitempty"`
+	TraceSample       *sampling.SampleObj  `json:",omitempty"`
 }
 
 // ListenFrom configures how we listen for datapoints to forward
