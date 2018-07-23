@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/golang/protobuf/proto"
@@ -198,14 +200,22 @@ func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error
 	for metricType, datapoints := range d {
 		mt, ok := com_signalfx_metrics_protobuf.MetricType_value[strings.ToUpper(metricType)]
 		if !ok {
-			decoder.Logger.Log(logkey.MetricType, metricType, "Unknown metric type")
+			message := make([]interface{}, 0, 7)
+			message = append(message, logkey.MetricType, metricType)
+			message = append(message, getTokenLogFormat(req)...)
+			message = append(message, "Unknown metric type")
+			decoder.Logger.Log(message...)
 			atomic.AddInt64(&decoder.unknownMetricType, int64(len(datapoints)))
 			continue
 		}
 		for _, jsonDatapoint := range datapoints {
 			v, err := ValueToValue(jsonDatapoint.Value)
 			if err != nil {
-				decoder.Logger.Log(log.Err, err, logkey.Struct, jsonDatapoint, logkey.Caller, req.Header.Get(TokenHeaderName), "Unable to get value for datapoint")
+				message := make([]interface{}, 0, 7)
+				message = append(message, logkey.Struct, jsonDatapoint, log.Err, err)
+				message = append(message, getTokenLogFormat(req)...)
+				message = append(message, "Unable to get value for datapoint")
+				decoder.Logger.Log(message...)
 				atomic.AddInt64(&decoder.invalidValue, 1)
 				continue
 			}
@@ -218,6 +228,17 @@ func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error
 		return nil
 	}
 	return decoder.Sink.AddDatapoints(ctx, dps)
+}
+
+func getTokenLogFormat(req *http.Request) (ret []interface{}) {
+	h := sha1.New()
+	head := req.Header.Get(TokenHeaderName)
+	if _, err := io.WriteString(h, head); err != nil || head == "" {
+		return ret
+	}
+	ret = append(ret, logkey.SHA1, base64.StdEncoding.EncodeToString(h.Sum(nil)))
+	length := len(head) / 2
+	return append(ret, logkey.Caller, head[:length])
 }
 
 // SetupProtobufV2DatapointPaths tells the router which paths the given handler (which should handle v2 protobufs)
