@@ -72,6 +72,7 @@ type BufferedForwarder struct {
 	identifier                  string
 
 	sendTo      signalfx.Sink
+	closeSender func() error
 	stopContext context.Context
 	stopFunc    context.CancelFunc
 }
@@ -252,7 +253,7 @@ func (forwarder *BufferedForwarder) blockingDrainSpansUpTo() []*trace.Span {
 func (forwarder *BufferedForwarder) Close() error {
 	forwarder.stopFunc()
 	forwarder.threadsWaitingToDie.Wait()
-	return nil
+	return forwarder.closeSender()
 }
 
 func (forwarder *BufferedForwarder) doData(drainIndex int64) {
@@ -348,7 +349,7 @@ func logEvIfFlag(l log.Logger, checker flagChecker, ev []*event.Event, msg strin
 
 // NewBufferedForwarder is used only by this package to create a forwarder that buffers its
 // datapoint channel
-func NewBufferedForwarder(ctx context.Context, config *Config, sendTo signalfx.Sink, logger log.Logger) *BufferedForwarder {
+func NewBufferedForwarder(ctx context.Context, config *Config, sendTo signalfx.Sink, closeIt func() error, logger log.Logger) *BufferedForwarder {
 	config = pointer.FillDefaultFrom(config, DefaultConfig).(*Config)
 	logCtx := log.NewContext(logger).With(logkey.Struct, "BufferedForwarder")
 	logCtx.Log(logkey.Config, config)
@@ -361,6 +362,7 @@ func NewBufferedForwarder(ctx context.Context, config *Config, sendTo signalfx.S
 		tChan:       make(chan []*trace.Span, *config.BufferSize),
 		config:      config,
 		sendTo:      sendTo,
+		closeSender: closeIt,
 		logger:      logCtx,
 		checker:     config.Checker,
 		cdim:        config.Cdim,
