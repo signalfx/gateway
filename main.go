@@ -165,7 +165,7 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 			Name:               forwardConfig.Name,
 			Cdim:               cdim,
 		}
-		bf := dpbuffered.NewBufferedForwarder(ctx, bconf, endingSink, limitedLogger)
+		bf := dpbuffered.NewBufferedForwarder(ctx, bconf, endingSink, forwarder.Close, limitedLogger)
 		allForwarders = append(allForwarders, bf)
 
 		groupName := fmt.Sprintf("%s_f_%d", name, idx)
@@ -296,15 +296,11 @@ func (p *proxy) gracefulShutdown() (err error) {
 
 	// defer close of listeners and forwarders till we exit
 	defer func() {
+		p.logger.Log("close listeners")
 		for _, l := range p.listeners {
 			errs = append(errs, l.Close())
 		}
-		for _, f := range p.forwarders {
-			errs = append(errs, f.Close())
-		}
-
-		errs = append(errs, p.Close())
-		err = errors.NewMultiErr(errs)
+		log.IfErr(p.logger, errors.NewMultiErr(errs))
 		p.logger.Log("Graceful shutdown done")
 	}()
 
@@ -314,7 +310,9 @@ func (p *proxy) gracefulShutdown() (err error) {
 		select {
 		case <-totalWaitTime:
 			totalPipeline := p.Pipeline()
-			p.logger.Log(logkey.TotalPipeline, totalPipeline, "Connections never drained.  This could be bad ...")
+			if totalPipeline > 0 {
+				p.logger.Log(logkey.TotalPipeline, totalPipeline, "Connections never drained.  This could be bad ...")
+			}
 			return
 
 		case <-p.tk.After(*p.config.GracefulCheckIntervalDuration):
@@ -343,7 +341,7 @@ func (p *proxy) Pipeline() int64 {
 }
 
 func (p *proxy) Close() error {
-	errs := make([]error, len(p.forwarders)+1)
+	errs := make([]error, 0, len(p.forwarders)+1)
 	for _, f := range p.forwarders {
 		errs = append(errs, f.Close())
 	}
