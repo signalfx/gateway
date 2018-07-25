@@ -21,7 +21,7 @@ package stats
 import (
 	"net"
 
-	"context"
+	"golang.org/x/net/context"
 )
 
 // ConnTagInfo defines the relevant information needed by connection context tagger.

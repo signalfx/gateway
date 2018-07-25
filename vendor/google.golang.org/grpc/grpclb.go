@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"context"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	lbmpb "google.golang.org/grpc/grpclb/grpc_lb_v1/messages"
 	"google.golang.org/grpc/grpclog"

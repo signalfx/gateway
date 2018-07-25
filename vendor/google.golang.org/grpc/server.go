@@ -34,7 +34,7 @@ import (
 
 	"io/ioutil"
 
-	"context"
+	"golang.org/x/net/context"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc/codes"

@@ -28,7 +28,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 
-	"context"
+	"golang.org/x/net/context"
 )
 
 var (

@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"strings"
 
-	"context"
+	"golang.org/x/net/context"
 )
 
 // DecodeKeyValue returns k, v, nil.  It is deprecated and should not be used.

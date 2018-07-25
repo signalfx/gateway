@@ -60,9 +60,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Rewrite context -> context imports (see grpc/grpc-go#1484).
+# Rewrite golang.org/x/net/context -> context imports (see grpc/grpc-go#1484).
 # TODO: Remove this mangling once "context" is imported directly (grpc/grpc-go#711).
-git ls-files "*.go" | xargs sed -i 's:"context":"context":'
+git ls-files "*.go" | xargs sed -i 's:"golang.org/x/net/context":"context":'
 set +o pipefail
 # TODO: Stop filtering pb.go files once golang/protobuf#214 is fixed.
 go tool vet -all . 2>&1 | grep -vF '.pb.go:' | tee /dev/stderr | (! read)

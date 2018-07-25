@@ -22,7 +22,7 @@ import (
 	"io"
 	"time"
 
-	"context"
+	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/codes"

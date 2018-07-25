@@ -28,7 +28,7 @@ import (
 	"net/http"
 	"os"
 
-	netctx "context"
+	netctx "golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/transport"
