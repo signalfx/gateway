@@ -10,6 +10,7 @@ import (
 
 	"bytes"
 	"context"
+
 	"github.com/gorilla/mux"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/golib/datapoint"
@@ -203,6 +204,7 @@ func NewListener(sink Sink, conf *ListenerConfig) (*ListenerServer, error) {
 		setupJSONV2(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain),
 		setupJSONEventV2(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain),
 		setupCollectd(conf.RootContext, r, sink, conf.DebugContext, conf.HTTPChain, conf.Logger),
+		setupThriftTraceV1(conf.RootContext, r, sink, conf.Logger, conf.HTTPChain),
 		setupJSONTraceV1(conf.RootContext, r, sink, conf.Logger, conf.HTTPChain),
 	)
 

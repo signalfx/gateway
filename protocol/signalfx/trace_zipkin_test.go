@@ -25,7 +25,7 @@ func (s *fakeSink) AddSpans(ctx context.Context, spans []*trace.Span) error {
 }
 
 // Benchmark the case where all spans are Zipkin v2.
-func BenchmarkTraceDecoder(b *testing.B) {
+func BenchmarkZipkinV2TraceDecoder(b *testing.B) {
 	spanJSON := `
 	 {
        "traceId": "0123456789abcdef",
@@ -99,7 +99,7 @@ func interfaceAddr(i interface{}) *interface{} {
 
 var falseVar = false
 
-func TestTraceDecoder(t *testing.T) {
+func TestZipkinTraceDecoder(t *testing.T) {
 	reqBody := ioutil.NopCloser(bytes.NewBufferString(`[
 	 {
        "traceId": "0123456789abcdef",
@@ -268,7 +268,7 @@ func TestTraceDecoder(t *testing.T) {
 
 // Tests converted from
 // https://github.com/openzipkin/zipkin/blob/2.8.4/zipkin/src/test/java/zipkin/internal/V2SpanConverterTest.java
-func TestTraceConversion(t *testing.T) {
+func TestZipkinTraceConversion(t *testing.T) {
 	frontend := &trace.Endpoint{
 		ServiceName: pointer.String("frontend"),
 		Ipv4:        pointer.String("127.0.0.1"),
