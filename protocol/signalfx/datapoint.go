@@ -198,30 +198,32 @@ func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error
 	}
 	dps := make([]*datapoint.Datapoint, 0, len(d))
 	for metricType, datapoints := range d {
-		mt, ok := com_signalfx_metrics_protobuf.MetricType_value[strings.ToUpper(metricType)]
-		if !ok {
-			message := make([]interface{}, 0, 7)
-			message = append(message, logkey.MetricType, metricType)
-			message = append(message, getTokenLogFormat(req)...)
-			message = append(message, "Unknown metric type")
-			decoder.Logger.Log(message...)
-			atomic.AddInt64(&decoder.unknownMetricType, int64(len(datapoints)))
-			continue
-		}
-		for _, jsonDatapoint := range datapoints {
-			v, err := ValueToValue(jsonDatapoint.Value)
-			if err != nil {
+		if len(datapoints) > 0 {
+			mt, ok := com_signalfx_metrics_protobuf.MetricType_value[strings.ToUpper(metricType)]
+			if !ok {
 				message := make([]interface{}, 0, 7)
-				message = append(message, logkey.Struct, jsonDatapoint, log.Err, err)
+				message = append(message, logkey.MetricType, metricType, logkey.Struct, datapoints[0])
 				message = append(message, getTokenLogFormat(req)...)
-				message = append(message, "Unable to get value for datapoint")
+				message = append(message, "Unknown metric type")
 				decoder.Logger.Log(message...)
-				atomic.AddInt64(&decoder.invalidValue, 1)
+				atomic.AddInt64(&decoder.unknownMetricType, int64(len(datapoints)))
 				continue
 			}
-			dp := datapoint.New(jsonDatapoint.Metric, jsonDatapoint.Dimensions, v, fromMT(com_signalfx_metrics_protobuf.MetricType(mt)), fromTs(jsonDatapoint.Timestamp))
-			appendProperties(dp, jsonDatapoint.Properties)
-			dps = append(dps, dp)
+			for _, jsonDatapoint := range datapoints {
+				v, err := ValueToValue(jsonDatapoint.Value)
+				if err != nil {
+					message := make([]interface{}, 0, 7)
+					message = append(message, logkey.Struct, jsonDatapoint, log.Err, err)
+					message = append(message, getTokenLogFormat(req)...)
+					message = append(message, "Unable to get value for datapoint")
+					decoder.Logger.Log(message...)
+					atomic.AddInt64(&decoder.invalidValue, 1)
+					continue
+				}
+				dp := datapoint.New(jsonDatapoint.Metric, jsonDatapoint.Dimensions, v, fromMT(com_signalfx_metrics_protobuf.MetricType(mt)), fromTs(jsonDatapoint.Timestamp))
+				appendProperties(dp, jsonDatapoint.Properties)
+				dps = append(dps, dp)
+			}
 		}
 	}
 	if len(dps) == 0 {
