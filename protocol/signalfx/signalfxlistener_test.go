@@ -436,7 +436,7 @@ func TestSignalfxListener(t *testing.T) {
 			So(len(sendTo.PointsChan), ShouldEqual, 0)
 		})
 		Convey("Should ignore invalid types or value on /v2/datapoint", func() {
-			v2Body := `{"gauge": [{"metric":"bob"}], "UNKNOWN":[]}`
+			v2Body := `{"gauge": [{"metric":"bob"}], "UNKNOWN":[{"metric":"bob"}]}`
 			So(len(sendTo.PointsChan), ShouldEqual, 0)
 			trySend(v2Body, "application/json", "/v2/datapoint")
 			So(len(sendTo.PointsChan), ShouldEqual, 0)
