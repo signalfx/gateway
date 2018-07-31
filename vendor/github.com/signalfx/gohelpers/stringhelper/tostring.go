@@ -29,3 +29,4 @@ func GenericFromString(object interface{}) string {
 	}
 	return reflect.TypeOf(object).String() + "[" + strings.Join(parts, "|") + "]"
 }
+

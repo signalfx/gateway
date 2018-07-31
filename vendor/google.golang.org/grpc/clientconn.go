@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"context"
+	"golang.org/x/net/context"
 	"golang.org/x/net/trace"
 	"google.golang.org/grpc/balancer"
 	_ "google.golang.org/grpc/balancer/roundrobin" // To register roundrobin.

@@ -21,7 +21,7 @@ package grpc
 import (
 	"sync"
 
-	"context"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/grpclog"

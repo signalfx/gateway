@@ -5,6 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"runtime"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/golib/datapoint"
@@ -18,14 +27,6 @@ import (
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/protocol/filtering"
 	. "github.com/smartystreets/goconvey/convey"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"runtime"
-	"strings"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 var errReadErr = errors.New("could not read")
@@ -394,7 +395,7 @@ func TestSignalfxListener(t *testing.T) {
 			verifyStatusCode("INVALID_PROTOBUF", "application/x-protobuf", "/v2/datapoint", http.StatusBadRequest)
 			dps = listener.Datapoints()
 			So(dptest.ExactlyOneDims(dps, "total_errors", map[string]string{"http_endpoint": "sfx_protobuf_v2"}).Value.String(), ShouldEqual, "1")
-			So(len(dps), ShouldEqual, 147)
+			So(len(dps), ShouldEqual, 165)
 			So(dptest.ExactlyOneDims(dps, "dropped_points", map[string]string{"protocol": "sfx_json_v2", "reason": "unknown_metric_type"}).Value.String(), ShouldEqual, "0")
 			So(dptest.ExactlyOneDims(dps, "dropped_points", map[string]string{"protocol": "sfx_json_v2", "reason": "invalid_value"}).Value.String(), ShouldEqual, "0")
 		})
@@ -494,6 +495,7 @@ func TestSignalfxListener(t *testing.T) {
 				{"trivial", "[]", "application/json", "/v1/trace", 200},
 				{"valid1", trace.ValidJSON, "application/json", "/v1/trace", 200},
 				{"just an object", "{}", "application/json", "/v1/trace", 400},
+				{"not thrift", "{}", "application/x-thrift", "/v1/trace", 400},
 			} {
 				Convey(v.desc, func() {
 					verifyStatusCode(v.body, v.content, v.path, v.expected)

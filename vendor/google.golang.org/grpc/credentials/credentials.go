@@ -31,7 +31,7 @@ import (
 	"net"
 	"strings"
 
-	"context"
+	"golang.org/x/net/context"
 )
 
 // alpnProtoStr are the specified application level protocols for gRPC.

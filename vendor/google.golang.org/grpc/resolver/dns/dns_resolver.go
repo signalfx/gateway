@@ -32,7 +32,7 @@ import (
 	"sync"
 	"time"
 
-	"context"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/resolver"
 )

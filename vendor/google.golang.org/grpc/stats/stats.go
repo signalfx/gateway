@@ -27,7 +27,7 @@ import (
 	"net"
 	"time"
 
-	"context"
+	"golang.org/x/net/context"
 )
 
 // RPCStats contains stats information about RPCs.

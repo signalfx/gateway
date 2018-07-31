@@ -23,7 +23,7 @@ package naming
 import (
 	"net"
 
-	"context"
+	"golang.org/x/net/context"
 )
 
 var (
