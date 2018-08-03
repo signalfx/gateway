@@ -58,10 +58,14 @@ func setupThriftTraceV1(ctx context.Context, r *mux.Router, sink Sink, logger lo
 		return NewJaegerThriftTraceDecoderV1(logger, sink)
 	}, httpChain, logger)
 
-	r.Path(DefaultTracePathV1).Methods("POST").Headers("Content-Type", "application/x-thrift").Handler(handler)
-	r.Path(DefaultTracePathV1).Methods("POST").Headers("Content-Type", "application/vnd.apache.thrift.binary").Handler(handler)
-
+	SetupThriftByPaths(r, handler, DefaultTracePathV1)
 	return st
+}
+
+// SetupThriftByPaths tells the router which paths the given handler (which should handle the given endpoint) should see
+func SetupThriftByPaths(r *mux.Router, handler http.Handler, endpoint string) {
+	r.Path(endpoint).Methods("POST").Headers("Content-Type", "application/x-thrift").Handler(handler)
+	r.Path(endpoint).Methods("POST").Headers("Content-Type", "application/vnd.apache.thrift.binary").Handler(handler)
 }
 
 // Code inspired by
