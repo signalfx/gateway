@@ -158,6 +158,10 @@ endpoint can listen on all the signalfx protocols in both "Protocol Buffers"
 and "JSON" for events and datapoints (e.g. /v2/datapoint, /v2/event). It can
 also listen on the collectd protocol (/v1/collectd).
 
+Additionally, this listener will expose a /v1/trace endpoint to ingest trace
+spans. Both Jaeger's Thrift wire format and Zipkin's JSON formats (v1 and v2)
+are supported.
+
 For this, you will need to specify which port to bind to.  An example config:
 
 ```
