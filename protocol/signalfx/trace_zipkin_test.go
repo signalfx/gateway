@@ -177,7 +177,7 @@ func TestZipkinTraceDecoder(t *testing.T) {
 	 {
        "traceId": "abcdef0123456789",
        "name": "span3",
-       "parentId": "0123456789abcdef",
+       "parentId": "0000000000000000",
        "id": "oldspan",
        "timestamp": 2000,
        "duration": 200,
@@ -253,7 +253,7 @@ func TestZipkinTraceDecoder(t *testing.T) {
 			},
 			{
 				TraceID:   "abcdef0123456789",
-				ParentID:  pointer.String("0123456789abcdef"),
+				ParentID:  nil,
 				ID:        "oldspan",
 				Name:      pointer.String("span3"),
 				Timestamp: pointer.Float64(2000),
