@@ -11,7 +11,6 @@ import (
 	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/metricproxy/sampling/bloom"
-	"github.com/signalfx/metricproxy/sampling/leakybucket"
 	"github.com/signalfx/sfxinternalgo/lib/logkey"
 	"math/rand"
 	"os"
@@ -136,9 +135,8 @@ type SampleForwarder struct {
 		sampled       int64
 		notSampled    int64
 		droppedClosed int64
-		droppedSpm    int64
 	}
-	throttle *leakybucket.LeakyBucket
+	tk timekeeper.TimeKeeper
 }
 
 // AddSpans samples based on TraceId and forwards those onto the next sink
@@ -149,12 +147,7 @@ func (f *SampleForwarder) AddSpans(ctx context.Context, spans []*trace.Span, nex
 		}
 		sample := f.sampleTraces(ctx, spans)
 		if len(sample) > 0 {
-			if err = f.throttle.CheckAction(int64(len(spans))); err == nil {
-				f.throttle.Deduct(int64(len(spans)))
-				err = next.AddSpans(ctx, sample)
-			} else {
-				atomic.AddInt64(&f.stats.droppedSpm, int64(len(spans)))
-			}
+			err = next.AddSpans(ctx, sample)
 		}
 	}
 	return err
@@ -166,7 +159,6 @@ func (f *SampleForwarder) Datapoints() (dps []*datapoint.Datapoint) {
 		dps = []*datapoint.Datapoint{
 			sfxclient.Cumulative("trace.sampled", nil, atomic.LoadInt64(&f.stats.sampled)),
 			sfxclient.Cumulative("trace.notSampled", nil, atomic.LoadInt64(&f.stats.notSampled)),
-			sfxclient.Cumulative("span.sampler.dropped_maxspm", nil, atomic.LoadInt64(&f.stats.droppedSpm)),
 		}
 	}
 	return dps
@@ -240,7 +232,7 @@ func (f *SampleForwarder) tickTock() {
 			close(f.rotate)
 			f.wg.Done()
 			return
-		case <-time.After(f.memory):
+		case <-f.tk.After(f.memory):
 			c := make(chan struct{})
 			f.rotate <- c
 			<-c
@@ -260,6 +252,10 @@ func (f *SampleForwarder) Close() {
 
 // New gets you a new Sampler
 func New(conf *SampleObj, logger log.Logger) (ret *SampleForwarder, err error) {
+	return newSampler(&timekeeper.RealTime{}, conf, logger)
+}
+
+func newSampler(tk timekeeper.TimeKeeper, conf *SampleObj, logger log.Logger) (ret *SampleForwarder, err error) {
 	if conf != nil {
 		conf = pointer.FillDefaultFrom(conf, defaultSampleObj).(*SampleObj)
 		memory, err := time.ParseDuration(*conf.CyclePeriod)
@@ -273,12 +269,12 @@ func New(conf *SampleObj, logger log.Logger) (ret *SampleForwarder, err error) {
 			capacity:          uint64(*conf.Capacity),
 			falsePositiveRate: *conf.FalsePositiveRate,
 			memory:            memory,
+			tk:                tk,
 		}
-		ret.throttle = leakybucket.New(timekeeper.RealTime{}, *conf.MaxSPM, time.Minute)
 
 		ret.sampledSet = newBloomSet(path.Join(*conf.BackupLocation, "sampledBloomSet"), ret.capacity, ret.falsePositiveRate, *conf.Adapt, logger)
 		ret.notSampledSet = newBloomSet(path.Join(*conf.BackupLocation, "notSampledBloomSet"), ret.capacity, ret.falsePositiveRate, *conf.Adapt, logger)
-		ret.randit = rand.New(rand.NewSource(time.Now().UnixNano()))
+		ret.randit = rand.New(rand.NewSource(tk.Now().UnixNano()))
 		ret.wg.Add(1)
 		go ret.tickTock()
 	}

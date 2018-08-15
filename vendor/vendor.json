@@ -3,9 +3,10 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "B6ZUzckOOwd699eDnJIPqDiWB0I=",
-			"path": "github.com/apache/thrift/lib/go/thrift",
-			"revision": "858809fad01dba7318c33dc30f6cc92a6e2ac7b1"
+			"checksumSHA1": "X5Sx0Uux6I+7YhVroCbj2End9zI=",
+			"path": "git.apache.org/thrift.git/lib/go/thrift",
+			"revision": "6e67faa92827ece022380b211c2caaadd6145bf5",
+			"revisionTime": "2018-08-06T21:31:38Z"
 		},
 		{
 			"checksumSHA1": "5rPfda8jFccr3A6heL+JAmi9K9g=",
@@ -200,6 +201,12 @@
 			"revision": "71af5e29e815795e9dd14742ee7725682fa14b7b"
 		},
 		{
+			"checksumSHA1": "an5RM8wjgPPloolUUYkvEncbHu4=",
+			"path": "github.com/rcrowley/go-metrics",
+			"revision": "e2704e165165ec55d062f5919b4b29494e9fa790",
+			"revisionTime": "2018-05-03T17:46:38Z"
+		},
+		{
 			"checksumSHA1": "Vvm9cKGBDDKO6BHHDvyQ4ME3//o=",
 			"path": "github.com/signalfx/com_signalfx_metrics_protobuf",
 			"revision": "1477d7f5730360be99fcaf7e7d7c56e03be2eabc"
@@ -310,6 +317,12 @@
 			"revisionTime": "2018-07-11T15:39:54Z"
 		},
 		{
+			"checksumSHA1": "LGiqYL4IfW+l/4h1A08VkfFM/AY=",
+			"path": "github.com/signalfx/golib/timekeeper/timekeepertest",
+			"revision": "1898f6b955089aaa6f87fea3acf583a3f7439568",
+			"revisionTime": "2018-07-23T22:36:26Z"
+		},
+		{
 			"checksumSHA1": "QyrS9Irp3MAHmdAaywZdG9/0Oig=",
 			"path": "github.com/signalfx/golib/trace",
 			"revision": "271e7b77c46c2cb201be901a302cb181a9d1645a",
@@ -362,6 +375,12 @@
 			"comment": "1.6.1-20-gcc5d85f",
 			"path": "github.com/smartystreets/goconvey/convey/reporting",
 			"revision": "cc5d85f4f15bd2163abf0fe6e6753356dde72aa2"
+		},
+		{
+			"checksumSHA1": "jAzqolwnRJhHsKXmmvKNrHqxqAw=",
+			"path": "github.com/spaolacci/murmur3",
+			"revision": "f09979ecbc725b9e6d41a297405f65e7e8804acc",
+			"revisionTime": "2018-01-18T20:28:30Z"
 		},
 		{
 			"checksumSHA1": "Bn333k9lTndxU3D6n/G5c+GMcYY=",

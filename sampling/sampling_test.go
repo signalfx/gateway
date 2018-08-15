@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/timekeeper/timekeepertest"
 	"github.com/signalfx/golib/trace"
 	. "github.com/smartystreets/goconvey/convey"
 	"io/ioutil"
@@ -49,34 +50,27 @@ func Test(t *testing.T) {
 		}
 		Convey("test non empty json", func() {
 			var obj SampleObj
+			tk := timekeepertest.NewStubClock(time.Now())
 			So(json.Unmarshal([]byte(fmt.Sprintf(`{"BaseRate": 0.07, "FalsePositiveRate": 0.0002, "Capacity": 10000, "CyclePeriod":"1s", "Adapt":true, "BackupLocation":"%s", "MaxSPM":1000000}`, dir)), &obj), ShouldBeNil)
 			So(*obj.BaseRate, ShouldEqual, 0.07)
 			So(*obj.FalsePositiveRate, ShouldEqual, 0.0002)
 			So(*obj.Capacity, ShouldEqual, 10000)
 			So(*obj.CyclePeriod, ShouldEqual, "1s")
 			So(*obj.Adapt, ShouldEqual, true)
-			sample, err := New(&obj, log.DefaultLogger)
+			sample, err := newSampler(tk, &obj, log.DefaultLogger)
 			So(err, ShouldBeNil)
 			So(sample.memory, ShouldEqual, 1*time.Second)
+			tk.Incr(time.Second)
 			runtime.Gosched()
 			So(f(sample, 100000), ShouldBeNil)
-			So(len(sample.Datapoints()), ShouldEqual, 3)
+			So(len(sample.Datapoints()), ShouldEqual, 2)
+			tk.Incr(time.Second * 3)
+			runtime.Gosched()
+			So(f(sample, 10), ShouldBeNil) // needs at least one span to rotate
 			sample.Close()
 		})
-		Convey("test throttling", func() {
-			var obj SampleObj
-			So(json.Unmarshal([]byte(fmt.Sprintf(`{"BaseRate": 0.07, "FalsePositiveRate": 0.0002, "Capacity": 10000, "CyclePeriod":"1s", "Adapt":true, "BackupLocation":"%s", "MaxSPM":100}`, dir)), &obj), ShouldBeNil)
-			sample, err := New(&obj, log.DefaultLogger)
-			for x := 0; x < 100000; x++ {
-				traceIDLow := fmt.Sprintf("%08x", x)
-				traceIDHigh := fmt.Sprintf("%08x", x)
-				if err = sample.AddSpans(context.Background(), []*trace.Span{{TraceID: traceIDLow + traceIDHigh}}, next); err != nil {
-					break
-				}
-			}
-			So(err, ShouldNotBeNil)
-			runtime.Gosched()
-			So(atomic.LoadInt64(&sample.stats.droppedSpm), ShouldBeGreaterThan, 0)
+		Convey("test sampling rotation", func() {
+
 		})
 		Convey("test nil", func() {
 			var sample *SampleForwarder
