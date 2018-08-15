@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/mailru/easyjson"
@@ -14,7 +16,6 @@ import (
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/protocol/signalfx/format"
-	"reflect"
 )
 
 const (
@@ -60,6 +61,7 @@ func (is *InputSpan) fromZipkinV2() (*trace.Span, error) {
 			is.Span.Annotations[i] = is.Annotations[i].ToV2()
 		}
 	}
+	is.Span.ParentID = normalizeParentSpanID(is.Span.ParentID)
 
 	return &is.Span, nil
 }
@@ -75,6 +77,8 @@ func (is *InputSpan) fromZipkinV1() ([]*trace.Span, error) {
 	if is.Span.Tags == nil {
 		is.Span.Tags = map[string]string{}
 	}
+
+	is.Span.ParentID = normalizeParentSpanID(is.Span.ParentID)
 
 	spanCopy := is.Span
 	spanBuilder := &spanBuilder{
@@ -524,6 +528,14 @@ func (te *traceErrs) Append(err error) *traceErrs {
 	out.lastErr = err
 
 	return out
+}
+
+// A parentSpanID of all hex 0s should be normalized to nil.
+func normalizeParentSpanID(parentSpanID *string) *string {
+	if parentSpanID != nil && strings.Count(*parentSpanID, "0") == len(*parentSpanID) {
+		return nil
+	}
+	return parentSpanID
 }
 
 // JSONTraceDecoderV1 decodes json to structs
