@@ -16,22 +16,41 @@ import (
 // BuffTrace buffers traces until we send them along or clean them up
 // TODO do we want to add a way to limit cache size clean up oldest traces if we run out?
 type BuffTrace struct {
-	traces   map[string][]*trace.Span // buffer of spans by trace id
-	last     map[string]time.Time     // last time we saw a span for this trace id
-	remember map[string]time.Time     // cache of traceIDs we keep around when draining ch
-	expiry   time.Duration
-	interval time.Duration
-	sink     trace.Sink
-	ch       chan *trace.Span
-	sampleCh chan *samplePayload
-	done     chan struct{}
-	dps      chan chan []*datapoint.Datapoint
-	wg       sync.WaitGroup
-	logger   log.Logger
-	stats    struct {
-		dropsBuffFull int64
+	traces    map[string][]*trace.Span // buffer of spans by trace id
+	last      map[string]time.Time     // last time we saw a span for this trace id
+	remember  map[string]time.Time     // cache of traceIDs we keep around when draining ch
+	expiry    time.Duration
+	interval  time.Duration
+	sink      trace.Sink
+	ch        chan *trace.Span
+	releaseCh chan *samplePayload
+	done      chan struct{}
+	cleanCh   chan struct{}
+	dps       chan chan []*datapoint.Datapoint
+	wg        sync.WaitGroup
+	logger    log.Logger
+	stats     struct {
+		dropsBuffFull     int64
+		numSpans          int64
+		numSpansReleased  int64
+		numTracesReleased int64
+		numSpansAgedOut   int64
+		numTracesAgedOut  int64
 	}
 	tk timekeeper.TimeKeeper
+}
+
+func (b *BuffTrace) cleanCycle() {
+	defer b.wg.Done()
+	for {
+		select {
+		case <-b.done:
+			return
+		case <-b.tk.After(b.interval):
+			b.cleanCh <- struct{}{}
+		}
+	}
+
 }
 
 func (b *BuffTrace) drain() {
@@ -43,9 +62,9 @@ func (b *BuffTrace) drain() {
 			return
 		case s := <-b.ch:
 			b.chInner(s)
-		case p := <-b.sampleCh:
-			b.sampleInner(p)
-		case <-b.tk.After(b.interval):
+		case p := <-b.releaseCh:
+			b.releaseInner(p)
+		case <-b.cleanCh:
 			b.cleanInner()
 		case resp := <-b.dps:
 			resp <- b.dpsInner()
@@ -58,8 +77,8 @@ func (b *BuffTrace) drainFinal() {
 		select {
 		case s := <-b.ch:
 			b.chInner(s)
-		case p := <-b.sampleCh:
-			b.sampleInner(p)
+		case p := <-b.releaseCh:
+			b.releaseInner(p)
 		default:
 			return
 		}
@@ -78,25 +97,37 @@ func (b *BuffTrace) cleanInner() {
 	// remove buffered spans after the expiry
 	for k, v := range b.last {
 		if razor.After(v) {
-			delete(b.traces, k)
-			delete(b.last, k)
+			b.cleanBufferOfTrace(&k, true)
 		}
 	}
 }
 
-func (b *BuffTrace) sampleInner(p *samplePayload) {
+func (b *BuffTrace) releaseInner(p *samplePayload) {
 	var err error
 	// this trace has been released for some reason, send them all along
 	// remove from our buffer so they can be cleaned up, and remember the decision
 	if spans, ok := b.traces[*p.traceID]; ok {
 		err = b.sink.AddSpans(context.Background(), spans)
-		delete(b.traces, *p.traceID)
-		delete(b.last, *p.traceID)
+		b.cleanBufferOfTrace(p.traceID, false)
 	}
 	p.resp <- err
 	// there's a possibility that there are spans for this traceID in b.ch
 	// we need to remember for a while spans we've released
 	b.remember[*p.traceID] = b.tk.Now()
+}
+
+func (b *BuffTrace) cleanBufferOfTrace(id *string, clean bool) {
+	num := int64(len(b.traces[*id]))
+	b.stats.numSpans -= num
+	if clean {
+		b.stats.numSpansAgedOut += num
+		b.stats.numTracesAgedOut++
+	} else {
+		b.stats.numSpansReleased += num
+		b.stats.numTracesReleased++
+	}
+	delete(b.traces, *id)
+	delete(b.last, *id)
 }
 
 func (b *BuffTrace) chInner(s *trace.Span) {
@@ -108,6 +139,7 @@ func (b *BuffTrace) chInner(s *trace.Span) {
 	} else {
 		b.last[s.TraceID] = now
 		b.traces[s.TraceID] = append(b.traces[s.TraceID], s)
+		b.stats.numSpans++
 	}
 }
 
@@ -123,7 +155,7 @@ func (b *BuffTrace) Release(traceID *string) error {
 		traceID: traceID,
 		resp:    make(chan error),
 	}
-	b.sampleCh <- resp
+	b.releaseCh <- resp
 	return <-resp.resp
 }
 
@@ -157,10 +189,16 @@ func (b *BuffTrace) Datapoints() []*datapoint.Datapoint {
 	b.dps <- resp
 	return <-resp
 }
+
 func (b *BuffTrace) dpsInner() []*datapoint.Datapoint {
 	return []*datapoint.Datapoint{
 		sfxclient.Cumulative("proxy.tracing.buffer.spansDroppedBufferFull", nil, atomic.LoadInt64(&b.stats.dropsBuffFull)),
-		sfxclient.Gauge("proxy.tracing.buffer.numTraces", nil, int64(len(b.traces))),
+		sfxclient.Gauge("proxy.tracing.buffer.totalBufferedTraces", nil, int64(len(b.traces))),
+		sfxclient.Gauge("proxy.tracing.buffer.totalBufferedSpans", nil, b.stats.numSpans),
+		sfxclient.Cumulative("proxy.tracing.buffer.numTracesAgedOut", nil, b.stats.numTracesAgedOut),
+		sfxclient.Cumulative("proxy.tracing.buffer.numSpansAgedOut", nil, b.stats.numSpansAgedOut),
+		sfxclient.Cumulative("proxy.tracing.buffer.numTracesReleased", nil, b.stats.numTracesReleased),
+		sfxclient.Cumulative("proxy.tracing.buffer.numSpansReleased", nil, b.stats.numSpansReleased),
 	}
 }
 
@@ -169,22 +207,25 @@ func New(expiry time.Duration, sink trace.Sink, logger log.Logger) *BuffTrace {
 	return newBuff(timekeeper.RealTime{}, expiry, time.Minute, sink, logger, 100000, 100000)
 }
 
+// TODO need to save and restore on clean shutdown
 func newBuff(tk timekeeper.TimeKeeper, expiry, rotation time.Duration, sink trace.Sink, logger log.Logger, sampleChanSize, spanChanSize int) *BuffTrace {
 	ret := &BuffTrace{
-		traces:   make(map[string][]*trace.Span),
-		last:     make(map[string]time.Time),
-		remember: make(map[string]time.Time),
-		expiry:   expiry,   // how long till a trace that hasn't been released is garbage collected
-		interval: rotation, // how often we iterate through and garbage collect stuff
-		sink:     sink,
-		ch:       make(chan *trace.Span, spanChanSize),
-		sampleCh: make(chan *samplePayload, sampleChanSize),
-		done:     make(chan struct{}),
-		dps:      make(chan chan []*datapoint.Datapoint, 10),
-		logger:   logger,
-		tk:       tk,
+		traces:    make(map[string][]*trace.Span),
+		last:      make(map[string]time.Time),
+		remember:  make(map[string]time.Time),
+		expiry:    expiry,   // how long till a trace that hasn't been released is garbage collected
+		interval:  rotation, // how often we iterate through and garbage collect stuff
+		sink:      sink,
+		ch:        make(chan *trace.Span, spanChanSize),
+		releaseCh: make(chan *samplePayload, sampleChanSize),
+		done:      make(chan struct{}),
+		cleanCh:   make(chan struct{}, 2),
+		dps:       make(chan chan []*datapoint.Datapoint, 2),
+		logger:    logger,
+		tk:        tk,
 	}
-	ret.wg.Add(1)
+	ret.wg.Add(2)
+	go ret.cleanCycle()
 	go ret.drain()
 	return ret
 }

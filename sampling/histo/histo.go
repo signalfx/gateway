@@ -34,14 +34,28 @@ type SpanHistoBag struct {
 	alphaFactor   float64
 	ch            chan *payload
 	done          chan struct{}
+	cleanCh       chan struct{}
 	dpsCh         chan chan []*datapoint.Datapoint
 	quantiles     []float64
 	stats         struct {
 		dropsBufferFull int64
 		totalSamples    int64
+		numCleaned      int64
 	}
 	wg sync.WaitGroup
 	tk timekeeper.TimeKeeper
+}
+
+func (b *SpanHistoBag) cleanCycle() {
+	defer b.wg.Done()
+	for {
+		select {
+		case <-b.done:
+			return
+		case <-b.tk.After(b.interval):
+			b.cleanCh <- struct{}{}
+		}
+	}
 }
 
 func (b *SpanHistoBag) drainFinal() {
@@ -63,7 +77,7 @@ func (b *SpanHistoBag) drain() {
 			// drain internal channel before exiting
 			b.drainFinal()
 			return
-		case <-b.tk.After(b.interval):
+		case <-b.cleanCh:
 			b.cleanInner()
 		case s := <-b.ch:
 			b.payloadInner(s)
@@ -86,12 +100,13 @@ func (b *SpanHistoBag) dpsInner() []*datapoint.Datapoint {
 		}...)
 		qv := v.Percentiles(b.quantiles)
 		for i, q := range b.quantiles {
-			dps = append(dps, sfxclient.GaugeF(fmt.Sprintf("proxy.tracing.%f", q), dims, qv[i]))
+			dps = append(dps, sfxclient.GaugeF(fmt.Sprintf("proxy.tracing.p%d", int(q*100)), dims, qv[i]))
 		}
 	}
 	dps = append(dps, sfxclient.Cumulative("proxy.tracing.droppedSamples", map[string]string{"reason": "buffer_full"}, atomic.LoadInt64(&b.stats.dropsBufferFull)))
 	dps = append(dps, sfxclient.Cumulative("proxy.tracing.totalSamples", nil, b.stats.totalSamples))
 	dps = append(dps, sfxclient.Gauge("proxy.tracing.totalUnique", nil, int64(len(b.digests))))
+	dps = append(dps, sfxclient.Cumulative("proxy.tracing.numCleaned", nil, b.stats.numCleaned))
 	return dps
 }
 
@@ -100,6 +115,7 @@ func (b *SpanHistoBag) cleanInner() {
 	razor := b.tk.Now().Add(-b.expiry)
 	for k, v := range b.last {
 		if razor.After(v) {
+			b.stats.numCleaned++
 			delete(b.digests, k)
 			delete(b.last, k)
 		}
@@ -167,13 +183,16 @@ var DefaultQuantiles = []float64{0.50, 0.90, 0.99}
 func New(spanExpiry time.Duration, quantiles []float64) *SpanHistoBag {
 	return newBag(timekeeper.RealTime{}, spanExpiry, time.Minute, 100000, DefaultMetricsReservoirSize, DefaultMetricsAlphaFactor, quantiles)
 }
+
+// TODO need to save and restore on clean shutdown
 func newBag(tk timekeeper.TimeKeeper, digestExpiry, cleanInterval time.Duration, chanSize, metricsReservoirSize int, metricsAlphaFactor float64, quantiles []float64) *SpanHistoBag {
 	bag := &SpanHistoBag{
 		digests:       make(map[SpanIdentity]metrics.Histogram),
 		last:          make(map[SpanIdentity]time.Time),
 		ch:            make(chan *payload, chanSize),
 		done:          make(chan struct{}),
-		dpsCh:         make(chan chan []*datapoint.Datapoint, 10),
+		cleanCh:       make(chan struct{}, 2),
+		dpsCh:         make(chan chan []*datapoint.Datapoint, 2),
 		expiry:        digestExpiry,
 		interval:      cleanInterval,
 		reservoirSize: metricsReservoirSize,
@@ -181,7 +200,8 @@ func newBag(tk timekeeper.TimeKeeper, digestExpiry, cleanInterval time.Duration,
 		quantiles:     quantiles,
 		tk:            tk,
 	}
-	bag.wg.Add(1)
+	bag.wg.Add(2)
+	go bag.cleanCycle()
 	go bag.drain()
 	return bag
 }

@@ -36,7 +36,23 @@ func Test(t *testing.T) {
 			for x := 0; x < n; x++ {
 				traceIDLow := fmt.Sprintf("%08x", x)
 				traceIDHigh := fmt.Sprintf("%08x", x)
-				if err := sample.AddSpans(context.Background(), []*trace.Span{{TraceID: traceIDLow + traceIDHigh}}, next); err != nil {
+				var err error
+				if x == 0 {
+					err = sample.AddSpans(context.Background(), []*trace.Span{
+						{TraceID: traceIDLow + traceIDHigh,
+							Duration: pointer.Float64(float64(x) / 100),
+						},
+					}, next)
+				} else {
+					err = sample.AddSpans(context.Background(), []*trace.Span{
+						{
+							TraceID:       traceIDLow + traceIDHigh,
+							Name:          pointer.String("component"),
+							LocalEndpoint: &trace.Endpoint{ServiceName: pointer.String("service")},
+							Duration:      pointer.Float64(float64(x) / 100)},
+					}, next)
+				}
+				if err != nil {
 					return err
 				}
 			}
@@ -57,13 +73,13 @@ func Test(t *testing.T) {
 			So(*obj.Capacity, ShouldEqual, 10000)
 			So(*obj.CyclePeriod, ShouldEqual, "1s")
 			So(*obj.Adapt, ShouldEqual, true)
-			sample, err := newSampler(tk, &obj, log.DefaultLogger)
+			sample, err := newSampler(tk, &obj, log.DefaultLogger, next)
 			So(err, ShouldBeNil)
 			So(sample.memory, ShouldEqual, 1*time.Second)
 			tk.Incr(time.Second)
 			runtime.Gosched()
 			So(f(sample, 100000), ShouldBeNil)
-			So(len(sample.Datapoints()), ShouldEqual, 2)
+			So(len(sample.Datapoints()), ShouldEqual, 25)
 			tk.Incr(time.Second * 3)
 			runtime.Gosched()
 			So(f(sample, 10), ShouldBeNil) // needs at least one span to rotate
@@ -81,7 +97,7 @@ func Test(t *testing.T) {
 			obj := SampleObj{
 				CyclePeriod: pointer.String("foo"),
 			}
-			_, err := New(&obj, log.DefaultLogger)
+			_, err := New(&obj, log.DefaultLogger, next)
 			So(err, ShouldNotBeNil)
 		})
 		Reset(func() {
@@ -92,6 +108,7 @@ func Test(t *testing.T) {
 
 func TestSamples(t *testing.T) {
 	dir, err := ioutil.TempDir("", "testing")
+	next := &end{}
 	tests := []struct {
 		name, id string
 		answer   bool
@@ -101,7 +118,7 @@ func TestSamples(t *testing.T) {
 	}
 	Convey("test samples", t, func() {
 		So(err, ShouldBeNil)
-		sample, err := New(&SampleObj{BaseRate: pointer.Float64(0.5), BackupLocation: &dir}, log.DefaultLogger)
+		sample, err := New(&SampleObj{BaseRate: pointer.Float64(0.5), BackupLocation: &dir}, log.DefaultLogger, next)
 		So(err, ShouldBeNil)
 		Convey("test that once sampled or not sampled, they stay that way", func() {
 			var sampled, notsampled string
@@ -109,7 +126,7 @@ func TestSamples(t *testing.T) {
 				traceIDLow := fmt.Sprintf("%016x", x)
 				traceIDHigh := fmt.Sprintf("%016x", x)
 				id := traceIDLow + traceIDHigh
-				if sample.sample(id) {
+				if sample.baseSample(id) {
 					sampled = id
 				} else {
 					notsampled = id
@@ -120,14 +137,14 @@ func TestSamples(t *testing.T) {
 			}
 
 			for x := 0; x < 100; x++ {
-				So(sample.sample(sampled), ShouldBeTrue)
-				So(sample.sample(notsampled), ShouldBeFalse)
+				So(sample.baseSample(sampled), ShouldBeTrue)
+				So(sample.baseSample(notsampled), ShouldBeFalse)
 			}
 
 			Convey("test error stuff", func() {
 				for _, test := range tests {
 					Convey(test.name, func() {
-						So(sample.sample(test.id), ShouldEqual, test.answer)
+						So(sample.baseSample(test.id), ShouldEqual, test.answer)
 					})
 				}
 			})

@@ -11,6 +11,9 @@ import (
 	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/metricproxy/sampling/bloom"
+	"github.com/signalfx/metricproxy/sampling/buffer"
+	"github.com/signalfx/metricproxy/sampling/histo"
+	"github.com/signalfx/sfxinternalgo/cmd/sbingest/common"
 	"github.com/signalfx/sfxinternalgo/lib/logkey"
 	"math/rand"
 	"os"
@@ -23,23 +26,23 @@ import (
 
 // SampleObj is the json config object
 type SampleObj struct {
-	BaseRate          *float64 `json:",omitempty"`
-	MaxSPM            *int64   `json:",omitempty"`
-	FalsePositiveRate *float64 `json:",omitempty"`
-	Capacity          *int64   `json:",omitempty"`
-	CyclePeriod       *string  `json:",omitempty"` // this is half how long we'll remember a trace
-	Adapt             *bool    `json:",omitempty"`
-	BackupLocation    *string  `json:",omitempty"`
+	BaseRate          *float64  `json:",omitempty"`
+	FalsePositiveRate *float64  `json:",omitempty"`
+	Capacity          *int64    `json:",omitempty"`
+	CyclePeriod       *string   `json:",omitempty"` // this is half how long we'll remember a trace
+	Adapt             *bool     `json:",omitempty"`
+	BackupLocation    *string   `json:",omitempty"`
+	ReportQuantiles   []float64 `json:",omitempty"`
 }
 
 var defaultSampleObj = &SampleObj{
 	BaseRate:          pointer.Float64(0.01),
-	MaxSPM:            pointer.Int64(10000),
 	Capacity:          pointer.Int64(1000000),
 	CyclePeriod:       pointer.String("5m"),
 	FalsePositiveRate: pointer.Float64(0.0001),
 	Adapt:             pointer.Bool(false),
 	BackupLocation:    pointer.String("/tmp"),
+	ReportQuantiles:   histo.DefaultQuantiles,
 }
 
 // not thread safe when it comes to rotations vs has and add
@@ -136,21 +139,25 @@ type SampleForwarder struct {
 		notSampled    int64
 		droppedClosed int64
 	}
-	tk timekeeper.TimeKeeper
+	tk     timekeeper.TimeKeeper
+	histo  *histo.SpanHistoBag
+	buffer *buffer.BuffTrace
 }
 
 // AddSpans samples based on TraceId and forwards those onto the next sink
 func (f *SampleForwarder) AddSpans(ctx context.Context, spans []*trace.Span, next trace.Sink) (err error) {
+	var err1 error
+	var sample []*trace.Span
 	if len(spans) > 0 {
 		if f == nil {
 			return next.AddSpans(ctx, spans)
 		}
-		sample := f.sampleTraces(ctx, spans)
+		sample, err1 = f.sampleTraces(ctx, spans)
 		if len(sample) > 0 {
 			err = next.AddSpans(ctx, sample)
 		}
 	}
-	return err
+	return common.FirstNonNil(err, err1)
 }
 
 // Datapoints returns the stats
@@ -160,14 +167,16 @@ func (f *SampleForwarder) Datapoints() (dps []*datapoint.Datapoint) {
 			sfxclient.Cumulative("trace.sampled", nil, atomic.LoadInt64(&f.stats.sampled)),
 			sfxclient.Cumulative("trace.notSampled", nil, atomic.LoadInt64(&f.stats.notSampled)),
 		}
+		dps = append(dps, f.histo.Datapoints()...)
+		dps = append(dps, f.buffer.Datapoints()...)
 	}
 	return dps
 }
 
-// get the unique traceIds from the list of spans, then iterate through them deciding whether or not to sample them
+// get the unique traceIds from the list of spans, then iterate through them deciding whether or not to baseSample them
 // if we don't already know about them
 // also check if we need to rotate first
-func (f *SampleForwarder) sampleTraces(ctx context.Context, spans []*trace.Span) (allowed []*trace.Span) {
+func (f *SampleForwarder) sampleTraces(ctx context.Context, spans []*trace.Span) (allowed []*trace.Span, err error) {
 	select {
 	case c := <-f.rotate:
 		f.sampledSet.rotateBlooms()
@@ -177,6 +186,11 @@ func (f *SampleForwarder) sampleTraces(ctx context.Context, spans []*trace.Span)
 	}
 	ids := make(map[string][]*trace.Span, len(spans)) // start from zero better perf? test it.
 	for _, s := range spans {
+		// TODO this is where we want to pick out interesting spans, before we update histograms
+		// TODO use sync.pool
+		if s.Duration != nil {
+			f.histo.Update(f.getSpanIdentity(s), *s.Duration)
+		}
 		i, ok := ids[s.TraceID]
 		if !ok {
 			i = make([]*trace.Span, 0, 1)
@@ -184,16 +198,31 @@ func (f *SampleForwarder) sampleTraces(ctx context.Context, spans []*trace.Span)
 		i = append(i, s)
 		ids[s.TraceID] = i
 	}
+	var errs []error
 	for i, ss := range ids {
-		if f.sample(i) {
+		if f.baseSample(i) {
 			allowed = append(allowed, ss...)
+		} else {
+			errs = append(errs, f.buffer.AddSpans(ctx, ss))
 		}
 	}
 
-	return allowed
+	return allowed, common.FirstNonNil(errs...)
 }
 
-func (f *SampleForwarder) sample(id string) (ret bool) {
+func (f *SampleForwarder) getSpanIdentity(s *trace.Span) *histo.SpanIdentity {
+	ser := pointer.String("unknown")
+	name := pointer.String("unknown")
+	if s.LocalEndpoint != nil && s.LocalEndpoint.ServiceName != nil {
+		ser = s.LocalEndpoint.ServiceName
+	}
+	if s.Name != nil {
+		name = s.Name
+	}
+	return &histo.SpanIdentity{Operation: *name, Service: *ser}
+}
+
+func (f *SampleForwarder) baseSample(id string) (ret bool) {
 	size := len(id)
 	var high, low uint64
 	var err1, err2 error
@@ -215,7 +244,7 @@ func (f *SampleForwarder) sample(id string) (ret bool) {
 	if f.notSampledSet.has(low, high) {
 		return false
 	}
-	if f.randit.Float64() < f.baseRate {
+	if f.decision() {
 		f.sampledSet.add(low, high)
 		atomic.AddInt64(&f.stats.sampled, 1)
 		return true
@@ -223,6 +252,11 @@ func (f *SampleForwarder) sample(id string) (ret bool) {
 	f.notSampledSet.add(low, high)
 	atomic.AddInt64(&f.stats.notSampled, 1)
 	return false
+}
+
+// TODO replace this with something better
+func (f *SampleForwarder) decision() bool {
+	return f.randit.Float64() < f.baseRate
 }
 
 func (f *SampleForwarder) tickTock() {
@@ -251,12 +285,13 @@ func (f *SampleForwarder) Close() {
 }
 
 // New gets you a new Sampler
-func New(conf *SampleObj, logger log.Logger) (ret *SampleForwarder, err error) {
-	return newSampler(&timekeeper.RealTime{}, conf, logger)
+func New(conf *SampleObj, logger log.Logger, sink trace.Sink) (ret *SampleForwarder, err error) {
+	return newSampler(&timekeeper.RealTime{}, conf, logger, sink)
 }
 
-func newSampler(tk timekeeper.TimeKeeper, conf *SampleObj, logger log.Logger) (ret *SampleForwarder, err error) {
+func newSampler(tk timekeeper.TimeKeeper, conf *SampleObj, inlog log.Logger, sink trace.Sink) (ret *SampleForwarder, err error) {
 	if conf != nil {
+		logger := log.NewContext(inlog).With(logkey.Instance, "Sampler")
 		conf = pointer.FillDefaultFrom(conf, defaultSampleObj).(*SampleObj)
 		memory, err := time.ParseDuration(*conf.CyclePeriod)
 		if err != nil {
@@ -268,8 +303,10 @@ func newSampler(tk timekeeper.TimeKeeper, conf *SampleObj, logger log.Logger) (r
 			baseRate:          *conf.BaseRate,
 			capacity:          uint64(*conf.Capacity),
 			falsePositiveRate: *conf.FalsePositiveRate,
-			memory:            memory,
+			memory:            memory, // halflife of bloom set's memory
 			tk:                tk,
+			buffer:            buffer.New(memory*2, sink, logger),
+			histo:             histo.New(memory*2, conf.ReportQuantiles),
 		}
 
 		ret.sampledSet = newBloomSet(path.Join(*conf.BackupLocation, "sampledBloomSet"), ret.capacity, ret.falsePositiveRate, *conf.Adapt, logger)

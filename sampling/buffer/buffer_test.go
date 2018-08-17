@@ -32,9 +32,9 @@ func Test(t *testing.T) {
 			{TraceID: "1"}, {TraceID: "1"},
 			{TraceID: "2"}, {TraceID: "2"}, {TraceID: "2"},
 		})
-		getMetric(buf, "proxy.tracing.buffer.numTraces", 2)
+		getMetric(buf, "proxy.tracing.buffer.totalBufferedTraces", 2)
 		buf.Release(pointer.String("2"))
-		getMetric(buf, "proxy.tracing.buffer.numTraces", 1)
+		getMetric(buf, "proxy.tracing.buffer.totalBufferedTraces", 1)
 		So(len(sendTo.TracesChan), ShouldEqual, 1)
 		buf.AddSpans(context.Background(), []*trace.Span{
 			{TraceID: "1"}, {TraceID: "1"},
@@ -44,9 +44,9 @@ func Test(t *testing.T) {
 			runtime.Gosched()
 		}
 		tk.Incr(time.Minute * 2) // long enough to run a clean, but nothing will expire
-		getMetric(buf, "proxy.tracing.buffer.numTraces", 1)
+		getMetric(buf, "proxy.tracing.buffer.totalBufferedTraces", 1)
 		tk.Incr(time.Minute * 4) // long enough for traces to expire
-		getMetric(buf, "proxy.tracing.buffer.numTraces", 0)
+		getMetric(buf, "proxy.tracing.buffer.totalBufferedTraces", 0)
 		Reset(func() {
 			buf.Close()
 		})
@@ -58,18 +58,18 @@ func TestBad(t *testing.T) {
 		sendTo := dptest.NewBasicSink()
 		sendTo.Resize(10)
 		ret := &BuffTrace{
-			traces:   make(map[string][]*trace.Span),
-			last:     make(map[string]time.Time),
-			remember: make(map[string]time.Time),
-			expiry:   time.Minute,
-			interval: time.Minute,
-			sink:     sendTo,
-			ch:       make(chan *trace.Span, 1),
-			sampleCh: make(chan *samplePayload, 2),
-			done:     make(chan struct{}),
-			dps:      make(chan chan []*datapoint.Datapoint, 10),
-			logger:   log.DefaultLogger,
-			tk:       &timekeeper.RealTime{},
+			traces:    make(map[string][]*trace.Span),
+			last:      make(map[string]time.Time),
+			remember:  make(map[string]time.Time),
+			expiry:    time.Minute,
+			interval:  time.Minute,
+			sink:      sendTo,
+			ch:        make(chan *trace.Span, 1),
+			releaseCh: make(chan *samplePayload, 2),
+			done:      make(chan struct{}),
+			dps:       make(chan chan []*datapoint.Datapoint, 10),
+			logger:    log.DefaultLogger,
+			tk:        &timekeeper.RealTime{},
 		}
 		So(atomic.LoadInt64(&ret.stats.dropsBuffFull), ShouldEqual, 0)
 		ret.AddSpans(context.Background(), []*trace.Span{
@@ -80,7 +80,7 @@ func TestBad(t *testing.T) {
 			traceID: pointer.String("1"),
 			resp:    make(chan error, 1),
 		}
-		ret.sampleCh <- resp
+		ret.releaseCh <- resp
 		ret.drainFinal()
 		So(len(resp.resp), ShouldEqual, 1)
 	})

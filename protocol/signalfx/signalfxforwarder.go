@@ -121,7 +121,7 @@ func NewForwarder(conf *ForwarderConfig) (ret *Forwarder, err error) {
 			}),
 		},
 	}
-	ret.sampler, err = sampling.New(conf.TraceSample, conf.Logger)
+	ret.sampler, err = sampling.New(conf.TraceSample, conf.Logger, sendingSink)
 	if err == nil {
 		err = ret.Setup(conf.Filters)
 		if err == nil {
