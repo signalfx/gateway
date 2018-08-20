@@ -275,13 +275,15 @@ func (f *SampleForwarder) tickTock() {
 }
 
 // Close closes the obj
-func (f *SampleForwarder) Close() {
+func (f *SampleForwarder) Close() (err error) {
 	if f != nil {
 		close(f.done)
 		f.wg.Wait()
 		f.sampledSet.write()
 		f.notSampledSet.write()
+		err = common.FirstNonNil(f.buffer.Close(), f.histo.Close())
 	}
+	return err
 }
 
 // New gets you a new Sampler
@@ -305,7 +307,7 @@ func newSampler(tk timekeeper.TimeKeeper, conf *SampleObj, inlog log.Logger, sin
 			falsePositiveRate: *conf.FalsePositiveRate,
 			memory:            memory, // halflife of bloom set's memory
 			tk:                tk,
-			buffer:            buffer.New(memory*2, sink, logger),
+			buffer:            buffer.New(path.Join(*conf.BackupLocation, "buffer"), memory*2, sink, logger),
 			histo:             histo.New(memory*2, conf.ReportQuantiles),
 		}
 

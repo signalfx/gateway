@@ -67,7 +67,7 @@ func Test(t *testing.T) {
 		Convey("test non empty json", func() {
 			var obj SampleObj
 			tk := timekeepertest.NewStubClock(time.Now())
-			So(json.Unmarshal([]byte(fmt.Sprintf(`{"BaseRate": 0.07, "FalsePositiveRate": 0.0002, "Capacity": 10000, "CyclePeriod":"1s", "Adapt":true, "BackupLocation":"%s", "MaxSPM":1000000}`, dir)), &obj), ShouldBeNil)
+			So(json.Unmarshal([]byte(fmt.Sprintf(`{"BaseRate": 0.07, "FalsePositiveRate": 0.0002, "Capacity": 10000, "CyclePeriod":"1s", "Adapt":true, "BackupLocation":"%s"}`, dir)), &obj), ShouldBeNil)
 			So(*obj.BaseRate, ShouldEqual, 0.07)
 			So(*obj.FalsePositiveRate, ShouldEqual, 0.0002)
 			So(*obj.Capacity, ShouldEqual, 10000)
@@ -78,7 +78,7 @@ func Test(t *testing.T) {
 			So(sample.memory, ShouldEqual, 1*time.Second)
 			tk.Incr(time.Second)
 			runtime.Gosched()
-			So(f(sample, 100000), ShouldBeNil)
+			So(f(sample, 10000), ShouldBeNil)
 			So(len(sample.Datapoints()), ShouldEqual, 25)
 			tk.Incr(time.Second * 3)
 			runtime.Gosched()

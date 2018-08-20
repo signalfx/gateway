@@ -10,7 +10,11 @@ import (
 	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/golib/timekeeper/timekeepertest"
 	"github.com/signalfx/golib/trace"
+	"github.com/signalfx/metricproxy/sampling/buffer/encoding"
 	. "github.com/smartystreets/goconvey/convey"
+	"io/ioutil"
+	"os"
+	"path"
 	"runtime"
 	"strconv"
 	"sync/atomic"
@@ -20,13 +24,38 @@ import (
 
 func Test(t *testing.T) {
 	sendTo := dptest.NewBasicSink()
+	sendTo.Resize(10000)
 	Convey("test buff", t, func() {
-		buf := New(time.Minute*10, sendTo, log.DefaultLogger)
-		buf.Close()
+		dir, err := ioutil.TempDir("", "testing")
+		So(err, ShouldBeNil)
+		buf := New(path.Join(dir, "buffer"), time.Minute*10, sendTo, log.DefaultLogger)
+		n := 10
+		s := 55
+		for i := 0; i < n; i++ {
+			var spans []*trace.Span
+			for j := 0; j < i+1; j++ {
+				spans = append(spans, &trace.Span{TraceID: strconv.Itoa(j)})
+			}
+			buf.AddSpans(context.Background(), spans)
+			runtime.Gosched()
+		}
+		getMetric(buf, "proxy.tracing.buffer.totalBufferedTraces", n)
+		getMetric(buf, "proxy.tracing.buffer.totalBufferedSpans", s)
+		err = buf.Close()
+		So(err, ShouldBeNil)
+		// do it again to read in
+		buf = New(path.Join(dir, "buffer"), time.Minute*10, sendTo, log.DefaultLogger)
+		getMetric(buf, "proxy.tracing.buffer.totalBufferedTraces", n)
+		getMetric(buf, "proxy.tracing.buffer.totalBufferedSpans", s)
+		err = buf.Close()
+		So(err, ShouldBeNil)
+		os.RemoveAll(dir)
 	})
 	Convey("test buff", t, func() {
 		tk := timekeepertest.NewStubClock(time.Now())
-		buf := newBuff(tk, time.Minute*5, time.Minute, sendTo, log.DefaultLogger, 100, 100)
+		dir, err := ioutil.TempDir("", "testing")
+		So(err, ShouldBeNil)
+		buf := newBuff(path.Join(dir, "buffer"), tk, time.Minute*5, time.Minute, sendTo, log.DefaultLogger, 100, 100)
 		sendTo.Resize(10)
 		buf.AddSpans(context.Background(), []*trace.Span{
 			{TraceID: "1"}, {TraceID: "1"},
@@ -45,10 +74,12 @@ func Test(t *testing.T) {
 		}
 		tk.Incr(time.Minute * 2) // long enough to run a clean, but nothing will expire
 		getMetric(buf, "proxy.tracing.buffer.totalBufferedTraces", 1)
-		tk.Incr(time.Minute * 4) // long enough for traces to expire
+		tk.Incr(time.Minute * 4) // long enough for Traces to expire
 		getMetric(buf, "proxy.tracing.buffer.totalBufferedTraces", 0)
 		Reset(func() {
-			buf.Close()
+			err = buf.Close()
+			So(err, ShouldBeNil)
+			os.RemoveAll(dir)
 		})
 	})
 }
@@ -58,9 +89,11 @@ func TestBad(t *testing.T) {
 		sendTo := dptest.NewBasicSink()
 		sendTo.Resize(10)
 		ret := &BuffTrace{
-			traces:    make(map[string][]*trace.Span),
-			last:      make(map[string]time.Time),
-			remember:  make(map[string]time.Time),
+			OnDisk: encoding.OnDisk{
+				Traces:   make(map[string][]*trace.Span),
+				Last:     make(map[string]time.Time),
+				Remember: make(map[string]time.Time),
+			},
 			expiry:    time.Minute,
 			interval:  time.Minute,
 			sink:      sendTo,
@@ -91,7 +124,7 @@ func getMetric(buff *BuffTrace, metric string, value int) {
 	var last datapoint.Value
 	for {
 		if i > 0 && i%100000 == 0 {
-			fmt.Println("looking for ", metric, "with", value, "last", last)
+			fmt.Println("looking for ", metric, "with", value, "Last", last)
 			panic("oops")
 		}
 		runtime.Gosched()

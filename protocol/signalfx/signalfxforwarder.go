@@ -143,9 +143,8 @@ func (connector *Forwarder) Datapoints() []*datapoint.Datapoint {
 // Close will terminate idle HTTP client connections
 func (connector *Forwarder) Close() error {
 	fmt.Println("close is called")
-	connector.sampler.Close()
 	connector.tr.CloseIdleConnections()
-	return nil
+	return connector.sampler.Close()
 }
 
 // TokenHeaderName is the header key for the auth token in the HTTP request
