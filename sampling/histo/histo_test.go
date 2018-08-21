@@ -1,12 +1,18 @@
 package histo
 
 import (
-	"github.com/rcrowley/go-metrics"
+	"fmt"
+	"github.com/signalfx/go-metrics"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/golib/timekeeper/timekeepertest"
+	"github.com/signalfx/metricproxy/sampling/histo/encoding"
 	. "github.com/smartystreets/goconvey/convey"
+	"io/ioutil"
+	"os"
+	"path"
 	"runtime"
 	"strconv"
 	"sync/atomic"
@@ -14,8 +20,8 @@ import (
 	"time"
 )
 
-func getSi() *SpanIdentity {
-	return &SpanIdentity{
+func getSi() *encoding.SpanIdentity {
+	return &encoding.SpanIdentity{
 		Service:   "service",
 		Operation: "operation",
 	}
@@ -23,25 +29,41 @@ func getSi() *SpanIdentity {
 
 func Test(t *testing.T) {
 	Convey("test existence", t, func() {
-		histo := New(time.Millisecond*100, []float64{0.50})
+		dir, err := ioutil.TempDir("", "testing")
+		So(err, ShouldBeNil)
+		histo := New(path.Join(dir, "histo"), log.DefaultLogger, time.Millisecond*100, []float64{0.50})
+		histo.Update(getSi(), 4.0)
+		getMetric(histo, "proxy.tracing.totalUnique", 1)
 		So(histo, ShouldNotBeNil)
-		histo.Close()
+		err = histo.Close()
+		So(err, ShouldBeNil)
+		// Do it again so it reads from the file
+		histo = New(path.Join(dir, "histo"), log.DefaultLogger, time.Millisecond*100, []float64{0.50})
+		getMetric(histo, "proxy.tracing.totalUnique", 1)
+		So(histo, ShouldNotBeNil)
+		err = histo.Close()
+		So(err, ShouldBeNil)
+		os.RemoveAll(dir)
 	})
 	Convey("test stuff", t, func() {
 		tk := timekeepertest.NewStubClock(time.Now())
-		histo := newBag(tk, time.Millisecond*10, time.Millisecond, 1000, DefaultMetricsReservoirSize, DefaultMetricsAlphaFactor, []float64{0.50})
+		dir, err := ioutil.TempDir("", "testing")
+		So(err, ShouldBeNil)
+		histo := newBag(path.Join(dir, "histo"), log.DefaultLogger, tk, time.Millisecond*10, time.Millisecond, 1000, DefaultMetricsReservoirSize, DefaultMetricsAlphaFactor, []float64{0.50})
 		So(histo, ShouldNotBeNil)
 		getMetric(histo, "proxy.tracing.totalSamples", 0)
 		histo.Update(getSi(), 4.0)
 		getMetric(histo, "proxy.tracing.totalSamples", 1)
-
-		tk.Incr(time.Millisecond * 2) // enough time for clean to run but not long enough to expire anything
+		Println("incr time by 2 milliseconds, enough time for clean to run but not long enough for expire anything")
+		tk.Incr(time.Millisecond * 2)
 		getMetric(histo, "proxy.tracing.totalUnique", 1)
 
-		tk.Incr(time.Millisecond * 20) // clean should have occured
+		Println("incr time by a enough time for clean to run and expire things")
+		tk.Incr(time.Second)
 		getMetric(histo, "proxy.tracing.totalUnique", 0)
 		Reset(func() {
 			histo.Close()
+			os.RemoveAll(dir)
 		})
 	})
 }
@@ -49,8 +71,8 @@ func Test(t *testing.T) {
 func TestBad(t *testing.T) {
 	Convey("test bad stuff", t, func() {
 		histo := &SpanHistoBag{
-			digests:       make(map[SpanIdentity]metrics.Histogram),
-			last:          make(map[SpanIdentity]time.Time),
+			digests:       make(map[encoding.SpanIdentity]metrics.Histogram),
+			last:          make(map[encoding.SpanIdentity]time.Time),
 			ch:            make(chan *payload, 1),
 			done:          make(chan struct{}),
 			dpsCh:         make(chan chan []*datapoint.Datapoint, 10),
@@ -60,6 +82,7 @@ func TestBad(t *testing.T) {
 			alphaFactor:   DefaultMetricsAlphaFactor,
 			quantiles:     []float64{0.50},
 			tk:            timekeeper.RealTime{},
+			logger:        log.DefaultLogger,
 		}
 		So(atomic.LoadInt64(&histo.stats.dropsBufferFull), ShouldEqual, 0)
 		histo.Update(getSi(), 4)
@@ -70,12 +93,17 @@ func TestBad(t *testing.T) {
 }
 
 func getMetric(histo *SpanHistoBag, metric string, value int) {
-	for {
+	var last datapoint.Value
+	for i := 0; ; i++ {
 		runtime.Gosched()
+		if i > 1000000 {
+			panic(fmt.Sprintf("unable to find metric %s with value %d; found Value %s", metric, value, last))
+		}
 		dps := histo.Datapoints()
 		dp := dptest.ExactlyOne(dps, metric)
 		if dp.Value.String() == strconv.Itoa(value) {
 			break
 		}
+		last = dp.Value
 	}
 }

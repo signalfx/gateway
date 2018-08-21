@@ -1,33 +1,28 @@
 package histo
 
 import (
+	"compress/gzip"
 	"fmt"
-	"github.com/rcrowley/go-metrics"
+	"github.com/mailru/easyjson"
+	"github.com/signalfx/go-metrics"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/errors"
+	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/timekeeper"
+	"github.com/signalfx/metricproxy/sampling/histo/encoding"
+	"github.com/signalfx/sfxinternalgo/cmd/sbingest/common"
+	"io"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
-// SpanIdentity is a tuple of Service and Operation
-type SpanIdentity struct {
-	Service   string
-	Operation string
-}
-
-func (k *SpanIdentity) dims() map[string]string {
-	return map[string]string{
-		"service":   k.Service,
-		"operation": k.Operation,
-	}
-}
-
 // SpanHistoBag emits metrics for spans/identities
 type SpanHistoBag struct {
-	digests       map[SpanIdentity]metrics.Histogram
-	last          map[SpanIdentity]time.Time
+	digests       map[encoding.SpanIdentity]metrics.Histogram
+	last          map[encoding.SpanIdentity]time.Time
 	expiry        time.Duration
 	interval      time.Duration
 	reservoirSize int
@@ -36,6 +31,8 @@ type SpanHistoBag struct {
 	done          chan struct{}
 	cleanCh       chan struct{}
 	dpsCh         chan chan []*datapoint.Datapoint
+	location      string
+	logger        log.Logger
 	quantiles     []float64
 	stats         struct {
 		dropsBufferFull int64
@@ -59,6 +56,7 @@ func (b *SpanHistoBag) cleanCycle() {
 }
 
 func (b *SpanHistoBag) drainFinal() {
+	defer b.logger.Log("finishing drainFinal")
 	for {
 		select {
 		case s := <-b.ch:
@@ -69,6 +67,7 @@ func (b *SpanHistoBag) drainFinal() {
 	}
 }
 
+// this is lockless, so all things that modify or read from those things being modified are done via channels read from here
 func (b *SpanHistoBag) drain() {
 	defer b.wg.Done()
 	for {
@@ -90,7 +89,7 @@ func (b *SpanHistoBag) drain() {
 func (b *SpanHistoBag) dpsInner() []*datapoint.Datapoint {
 	dps := make([]*datapoint.Datapoint, 0, len(b.digests)*(3+len(b.quantiles))+2)
 	for k, v := range b.digests {
-		dims := k.dims()
+		dims := k.Dims()
 		// TODO these are temporary names
 		// TODO where does the sf_metricized get added?
 		dps = append(dps, []*datapoint.Datapoint{
@@ -120,7 +119,6 @@ func (b *SpanHistoBag) cleanInner() {
 			delete(b.last, k)
 		}
 	}
-
 }
 
 // update last time we saw a span for this traceId, create a histogram if necessary and update it
@@ -139,12 +137,12 @@ func (b *SpanHistoBag) payloadInner(s *payload) {
 
 // TODO sync.pool me?
 type payload struct {
-	identity *SpanIdentity
+	identity *encoding.SpanIdentity
 	sample   float64
 }
 
 // Update adds a sample to channel, don't block
-func (b *SpanHistoBag) Update(identity *SpanIdentity, sample float64) {
+func (b *SpanHistoBag) Update(identity *encoding.SpanIdentity, sample float64) {
 	select {
 	case b.ch <- &payload{
 		identity: identity,
@@ -159,7 +157,42 @@ func (b *SpanHistoBag) Update(identity *SpanIdentity, sample float64) {
 func (b *SpanHistoBag) Close() error {
 	close(b.done)
 	b.wg.Wait()
-	return nil
+	return b.writeOut()
+}
+
+func (b *SpanHistoBag) getFromFile(storage string) (ret *encoding.OnDisk, err error) {
+	var f *os.File
+	if f, err = os.Open(storage); err == nil {
+		var rr io.ReadCloser
+		rr, err = gzip.NewReader(f)
+		ret = &encoding.OnDisk{}
+		if err == nil {
+			err = easyjson.UnmarshalFromReader(rr, ret)
+			log.IfErr(b.logger, rr.Close())
+		}
+		log.IfErr(b.logger, f.Close())
+	}
+	return ret, err
+}
+
+func (b *SpanHistoBag) writeOut() error {
+	var err error
+	var f io.WriteCloser
+	if f, err = os.Create(b.location); err == nil {
+		zw := gzip.NewWriter(f)
+		og := encoding.OnDisk{
+			Digests:              make(map[encoding.SpanIdentity][]int64, len(b.digests)),
+			Last:                 b.last,
+			MetricsAlphaFactor:   b.alphaFactor,
+			MetricsReservoirSize: b.reservoirSize,
+		}
+		for k, v := range b.digests {
+			og.Digests[k] = v.Values()
+		}
+		_, err = easyjson.MarshalToWriter(&og, zw)
+		log.IfErr(b.logger, common.FirstNonNil(zw.Close(), f.Close()))
+	}
+	return err
 }
 
 // Datapoints returns datapoins for all histograms, but lockless requires a request
@@ -180,15 +213,12 @@ const (
 var DefaultQuantiles = []float64{0.50, 0.90, 0.99}
 
 // New gets you one
-func New(spanExpiry time.Duration, quantiles []float64) *SpanHistoBag {
-	return newBag(timekeeper.RealTime{}, spanExpiry, time.Minute, 100000, DefaultMetricsReservoirSize, DefaultMetricsAlphaFactor, quantiles)
+func New(storageLocation string, logger log.Logger, spanExpiry time.Duration, quantiles []float64) *SpanHistoBag {
+	return newBag(storageLocation, logger, timekeeper.RealTime{}, spanExpiry, time.Minute, 100000, DefaultMetricsReservoirSize, DefaultMetricsAlphaFactor, quantiles)
 }
 
-// TODO need to save and restore on clean shutdown
-func newBag(tk timekeeper.TimeKeeper, digestExpiry, cleanInterval time.Duration, chanSize, metricsReservoirSize int, metricsAlphaFactor float64, quantiles []float64) *SpanHistoBag {
+func newBag(location string, logger log.Logger, tk timekeeper.TimeKeeper, digestExpiry, cleanInterval time.Duration, chanSize, metricsReservoirSize int, metricsAlphaFactor float64, quantiles []float64) *SpanHistoBag {
 	bag := &SpanHistoBag{
-		digests:       make(map[SpanIdentity]metrics.Histogram),
-		last:          make(map[SpanIdentity]time.Time),
 		ch:            make(chan *payload, chanSize),
 		done:          make(chan struct{}),
 		cleanCh:       make(chan struct{}, 2),
@@ -199,9 +229,28 @@ func newBag(tk timekeeper.TimeKeeper, digestExpiry, cleanInterval time.Duration,
 		alphaFactor:   metricsAlphaFactor,
 		quantiles:     quantiles,
 		tk:            tk,
+		location:      location,
+		logger:        logger,
 	}
+	bag.updateFromDisk(location)
+
 	bag.wg.Add(2)
 	go bag.cleanCycle()
 	go bag.drain()
 	return bag
+}
+
+func (b *SpanHistoBag) updateFromDisk(location string) {
+	od, err := b.getFromFile(location)
+	log.IfErr(b.logger, errors.Annotate(err, "Error reading from disk, using new structure"))
+	if od != nil && len(od.Digests) > 0 {
+		b.digests = make(map[encoding.SpanIdentity]metrics.Histogram, len(od.Digests))
+		b.last = od.Last
+		for k, v := range od.Digests {
+			b.digests[k] = metrics.NewHistogram(metrics.NewExpDecaySampleWithValues(od.MetricsReservoirSize, od.MetricsAlphaFactor, v))
+		}
+	} else {
+		b.digests = make(map[encoding.SpanIdentity]metrics.Histogram)
+		b.last = make(map[encoding.SpanIdentity]time.Time)
+	}
 }

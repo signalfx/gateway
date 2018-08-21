@@ -13,6 +13,7 @@ import (
 	"github.com/signalfx/metricproxy/sampling/bloom"
 	"github.com/signalfx/metricproxy/sampling/buffer"
 	"github.com/signalfx/metricproxy/sampling/histo"
+	"github.com/signalfx/metricproxy/sampling/histo/encoding"
 	"github.com/signalfx/sfxinternalgo/cmd/sbingest/common"
 	"github.com/signalfx/sfxinternalgo/lib/logkey"
 	"math/rand"
@@ -138,10 +139,12 @@ type SampleForwarder struct {
 		sampled       int64
 		notSampled    int64
 		droppedClosed int64
+		oversampled   int64
 	}
 	tk     timekeeper.TimeKeeper
 	histo  *histo.SpanHistoBag
 	buffer *buffer.BuffTrace
+	logger log.Logger
 }
 
 // AddSpans samples based on TraceId and forwards those onto the next sink
@@ -152,6 +155,7 @@ func (f *SampleForwarder) AddSpans(ctx context.Context, spans []*trace.Span, nex
 		if f == nil {
 			return next.AddSpans(ctx, spans)
 		}
+		defer f.updateHistos(spans) // do this after we make sampling decisions
 		sample, err1 = f.sampleTraces(ctx, spans)
 		if len(sample) > 0 {
 			err = next.AddSpans(ctx, sample)
@@ -166,6 +170,7 @@ func (f *SampleForwarder) Datapoints() (dps []*datapoint.Datapoint) {
 		dps = []*datapoint.Datapoint{
 			sfxclient.Cumulative("trace.sampled", nil, atomic.LoadInt64(&f.stats.sampled)),
 			sfxclient.Cumulative("trace.notSampled", nil, atomic.LoadInt64(&f.stats.notSampled)),
+			sfxclient.Cumulative("trace.oversampled", nil, atomic.LoadInt64(&f.stats.oversampled)),
 		}
 		dps = append(dps, f.histo.Datapoints()...)
 		dps = append(dps, f.buffer.Datapoints()...)
@@ -173,9 +178,18 @@ func (f *SampleForwarder) Datapoints() (dps []*datapoint.Datapoint) {
 	return dps
 }
 
+func (f *SampleForwarder) updateHistos(spans []*trace.Span) {
+	for _, s := range spans {
+		// TODO use sync.pool
+		if s.Duration != nil {
+			f.histo.Update(f.getSpanIdentity(s), *s.Duration)
+		}
+	}
+}
+
 // get the unique traceIds from the list of spans, then iterate through them deciding whether or not to baseSample them
-// if we don't already know about them
-// also check if we need to rotate first
+// if we don't already know about them. what is returned are the spans to be immediately sent to the sink, buffer
+// everything else. also check if we need to rotate first
 func (f *SampleForwarder) sampleTraces(ctx context.Context, spans []*trace.Span) (allowed []*trace.Span, err error) {
 	select {
 	case c := <-f.rotate:
@@ -185,11 +199,10 @@ func (f *SampleForwarder) sampleTraces(ctx context.Context, spans []*trace.Span)
 	default:
 	}
 	ids := make(map[string][]*trace.Span, len(spans)) // start from zero better perf? test it.
+	oversampled := make(map[string]bool)
 	for _, s := range spans {
-		// TODO this is where we want to pick out interesting spans, before we update histograms
-		// TODO use sync.pool
-		if s.Duration != nil {
-			f.histo.Update(f.getSpanIdentity(s), *s.Duration)
+		if f.overSample(s, oversampled) {
+			continue
 		}
 		i, ok := ids[s.TraceID]
 		if !ok {
@@ -210,7 +223,7 @@ func (f *SampleForwarder) sampleTraces(ctx context.Context, spans []*trace.Span)
 	return allowed, common.FirstNonNil(errs...)
 }
 
-func (f *SampleForwarder) getSpanIdentity(s *trace.Span) *histo.SpanIdentity {
+func (f *SampleForwarder) getSpanIdentity(s *trace.Span) *encoding.SpanIdentity {
 	ser := pointer.String("unknown")
 	name := pointer.String("unknown")
 	if s.LocalEndpoint != nil && s.LocalEndpoint.ServiceName != nil {
@@ -219,7 +232,7 @@ func (f *SampleForwarder) getSpanIdentity(s *trace.Span) *histo.SpanIdentity {
 	if s.Name != nil {
 		name = s.Name
 	}
-	return &histo.SpanIdentity{Operation: *name, Service: *ser}
+	return &encoding.SpanIdentity{Operation: *name, Service: *ser}
 }
 
 func (f *SampleForwarder) baseSample(id string) (ret bool) {
@@ -259,12 +272,26 @@ func (f *SampleForwarder) decision() bool {
 	return f.randit.Float64() < f.baseRate
 }
 
+func (f *SampleForwarder) overSample(span *trace.Span, oversampled map[string]bool) bool {
+	if oversampled[span.TraceID] {
+		return true
+	}
+	// TODO figure out if we oversample span, this is just so i have data to test the rest
+	if f.decision() && f.decision() {
+		log.IfErr(f.logger, f.buffer.Release(&span.TraceID))
+		oversampled[span.TraceID] = true
+		atomic.AddInt64(&f.stats.oversampled, 1)
+		return true
+	}
+	return false
+}
+
 func (f *SampleForwarder) tickTock() {
+	defer f.wg.Done()
 	for {
 		select {
 		case <-f.done:
 			close(f.rotate)
-			f.wg.Done()
 			return
 		case <-f.tk.After(f.memory):
 			c := make(chan struct{})
@@ -308,7 +335,8 @@ func newSampler(tk timekeeper.TimeKeeper, conf *SampleObj, inlog log.Logger, sin
 			memory:            memory, // halflife of bloom set's memory
 			tk:                tk,
 			buffer:            buffer.New(path.Join(*conf.BackupLocation, "buffer"), memory*2, sink, logger),
-			histo:             histo.New(memory*2, conf.ReportQuantiles),
+			histo:             histo.New(path.Join(*conf.BackupLocation, "histo"), logger, memory*2, conf.ReportQuantiles),
+			logger:            logger,
 		}
 
 		ret.sampledSet = newBloomSet(path.Join(*conf.BackupLocation, "sampledBloomSet"), ret.capacity, ret.falsePositiveRate, *conf.Adapt, logger)

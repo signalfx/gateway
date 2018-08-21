@@ -79,10 +79,11 @@ func Test(t *testing.T) {
 			tk.Incr(time.Second)
 			runtime.Gosched()
 			So(f(sample, 10000), ShouldBeNil)
-			So(len(sample.Datapoints()), ShouldEqual, 25)
+			So(len(sample.Datapoints()), ShouldEqual, 26)
 			tk.Incr(time.Second * 3)
 			runtime.Gosched()
 			So(f(sample, 10), ShouldBeNil) // needs at least one span to rotate
+			So(sample.overSample(&trace.Span{TraceID: "blarg"}, map[string]bool{"blarg": true}), ShouldBeTrue)
 			sample.Close()
 		})
 		Convey("test sampling rotation", func() {
