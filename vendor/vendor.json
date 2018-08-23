@@ -212,6 +212,12 @@
 			"revision": "1477d7f5730360be99fcaf7e7d7c56e03be2eabc"
 		},
 		{
+			"checksumSHA1": "6KNsuqYJLOju7ikmJILY6Q9mgqA=",
+			"path": "github.com/signalfx/go-metrics",
+			"revision": "6c45b3830dccb80b68bcf28b5932bdd3ddfc9d2c",
+			"revisionTime": "2018-08-23T18:35:18Z"
+		},
+		{
 			"checksumSHA1": "l9am2jOCG3AsRMZF6yHUJguPWYU=",
 			"path": "github.com/signalfx/gohelpers/stringhelper",
 			"revision": "ac9f0e053f1594a6565e3c6778ce2ef56900ec98"
