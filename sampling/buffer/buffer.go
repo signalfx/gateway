@@ -3,7 +3,6 @@ package buffer
 import (
 	"compress/gzip"
 	"context"
-	"fmt"
 	"github.com/mailru/easyjson"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/errors"
@@ -214,7 +213,7 @@ func (b *BuffTrace) writeOut() error {
 	if f, err = os.Create(b.storageLocation); err == nil {
 		zw := gzip.NewWriter(f)
 		_, err = easyjson.MarshalToWriter(b, zw)
-		fmt.Println("num spans out", b.NumSpans)
+		b.logger.Log(logkey.ContentLength, b.NumSpans, "num spans out")
 		log.IfErr(b.logger, common.FirstNonNil(zw.Close(), f.Close()))
 	}
 	return err
@@ -236,7 +235,7 @@ func getFromFile(storage string, logger log.Logger) (ret *encoding.OnDisk) {
 			err = easyjson.UnmarshalFromReader(rr, ret)
 			if err == nil {
 				logger.Log(logkey.Filename, storage, "Successfully read buffer from file")
-				fmt.Println("num spans in", ret.NumSpans)
+				logger.Log(logkey.ContentLength, ret.NumSpans, "num spans in")
 			}
 			log.IfErr(logger, rr.Close())
 		}

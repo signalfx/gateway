@@ -142,7 +142,6 @@ func (connector *Forwarder) Datapoints() []*datapoint.Datapoint {
 
 // Close will terminate idle HTTP client connections
 func (connector *Forwarder) Close() error {
-	fmt.Println("close is called")
 	connector.tr.CloseIdleConnections()
 	return connector.sampler.Close()
 }

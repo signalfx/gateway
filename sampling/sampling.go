@@ -180,7 +180,6 @@ func (f *SampleForwarder) Datapoints() (dps []*datapoint.Datapoint) {
 
 func (f *SampleForwarder) updateHistos(spans []*trace.Span) {
 	for _, s := range spans {
-		// TODO use sync.pool
 		if s.Duration != nil {
 			f.histo.Update(f.getSpanIdentity(s), *s.Duration)
 		}
@@ -199,9 +198,10 @@ func (f *SampleForwarder) sampleTraces(ctx context.Context, spans []*trace.Span)
 	default:
 	}
 	ids := make(map[string][]*trace.Span, len(spans)) // start from zero better perf? test it.
-	oversampled := make(map[string]bool)
+	overSampleMap := make(map[string]bool)
 	for _, s := range spans {
-		if f.overSample(s, oversampled) {
+		if f.overSample(s, overSampleMap) {
+			allowed = append(allowed, s)
 			continue
 		}
 		i, ok := ids[s.TraceID]
@@ -223,6 +223,7 @@ func (f *SampleForwarder) sampleTraces(ctx context.Context, spans []*trace.Span)
 	return allowed, common.FirstNonNil(errs...)
 }
 
+// TODO use sync.pool?
 func (f *SampleForwarder) getSpanIdentity(s *trace.Span) *encoding.SpanIdentity {
 	ser := pointer.String("unknown")
 	name := pointer.String("unknown")
@@ -267,7 +268,7 @@ func (f *SampleForwarder) baseSample(id string) (ret bool) {
 	return false
 }
 
-// TODO replace this with something better
+// TODO replace this with something from joe
 func (f *SampleForwarder) decision() bool {
 	return f.randit.Float64() < f.baseRate
 }
@@ -276,7 +277,7 @@ func (f *SampleForwarder) overSample(span *trace.Span, oversampled map[string]bo
 	if oversampled[span.TraceID] {
 		return true
 	}
-	// TODO figure out if we oversample span, this is just so i have data to test the rest
+	// TODO more from joe
 	if f.decision() && f.decision() {
 		log.IfErr(f.logger, f.buffer.Release(&span.TraceID))
 		oversampled[span.TraceID] = true
