@@ -10,12 +10,12 @@ import (
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/golib/trace"
+	"github.com/signalfx/metricproxy/common"
+	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/sampling/bloom"
 	"github.com/signalfx/metricproxy/sampling/buffer"
 	"github.com/signalfx/metricproxy/sampling/histo"
 	"github.com/signalfx/metricproxy/sampling/histo/encoding"
-	"github.com/signalfx/sfxinternalgo/cmd/sbingest/common"
-	"github.com/signalfx/sfxinternalgo/lib/logkey"
 	"math/rand"
 	"os"
 	"path"
@@ -63,7 +63,7 @@ func (set *bloomSet) rotateBlooms() {
 	newCap := uint64(atomic.LoadInt64(&set.newCap) * 2) // the life of any bloom filter is twice the cycle period
 	if set.adapt && newCap > capacity {
 		capacity = newCap
-		set.logger.Log(logkey.Size, capacity, "adapting to new size")
+		set.logger.Log(logkey.Capacity, capacity, "adapting to new size")
 		atomic.StoreInt64(&set.newCap, 0)
 	}
 
@@ -321,7 +321,7 @@ func New(conf *SampleObj, logger log.Logger, sink trace.Sink) (ret *SampleForwar
 
 func newSampler(tk timekeeper.TimeKeeper, conf *SampleObj, inlog log.Logger, sink trace.Sink) (ret *SampleForwarder, err error) {
 	if conf != nil {
-		logger := log.NewContext(inlog).With(logkey.Instance, "Sampler")
+		logger := log.NewContext(inlog).With(logkey.Name, "Sampler")
 		conf = pointer.FillDefaultFrom(conf, defaultSampleObj).(*SampleObj)
 		memory, err := time.ParseDuration(*conf.CyclePeriod)
 		if err != nil {
