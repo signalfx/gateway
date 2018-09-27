@@ -8,6 +8,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/mailru/easyjson"
@@ -20,12 +27,6 @@ import (
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/logkey"
 	"github.com/signalfx/metricproxy/protocol/signalfx/format"
-	"io"
-	"net/http"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 // JSONDatapointV1 is an alias
@@ -259,7 +260,7 @@ func setupJSONV2(ctx context.Context, r *mux.Router, sink Sink, logger log.Logge
 		additionalConstructors = append(additionalConstructors, debugContext)
 	}
 	var j2 *JSONDecoderV2
-	handler, st := setupChain(ctx, sink, "json_v2", func(s Sink) ErrorReader {
+	handler, st := SetupChain(ctx, sink, "json_v2", func(s Sink) ErrorReader {
 		j2 = &JSONDecoderV2{Sink: s, Logger: logger}
 		return j2
 	}, httpChain, logger, additionalConstructors...)
@@ -274,7 +275,7 @@ func SetupJSONV2DatapointPaths(r *mux.Router, handler http.Handler) {
 }
 
 func setupProtobufV1(ctx context.Context, r *mux.Router, sink Sink, typeGetter MericTypeGetter, logger log.Logger, httpChain web.NextConstructor) sfxclient.Collector {
-	handler, st := setupChain(ctx, sink, "protobuf_v1", func(s Sink) ErrorReader {
+	handler, st := SetupChain(ctx, sink, "protobuf_v1", func(s Sink) ErrorReader {
 		return &ProtobufDecoderV1{Sink: s, TypeGetter: typeGetter, Logger: logger}
 	}, httpChain, logger)
 
@@ -289,7 +290,7 @@ func SetupProtobufV1Paths(r *mux.Router, handler http.Handler) {
 }
 
 func setupJSONV1(ctx context.Context, r *mux.Router, sink Sink, typeGetter MericTypeGetter, logger log.Logger, httpChain web.NextConstructor) sfxclient.Collector {
-	handler, st := setupChain(ctx, sink, "json_v1", func(s Sink) ErrorReader {
+	handler, st := SetupChain(ctx, sink, "json_v1", func(s Sink) ErrorReader {
 		return &JSONDecoderV1{Sink: s, TypeGetter: typeGetter, Logger: logger}
 	}, httpChain, logger)
 	SetupJSONV1Paths(r, handler)
@@ -308,7 +309,7 @@ func setupProtobufV2(ctx context.Context, r *mux.Router, sink Sink, logger log.L
 	if debugContext != nil {
 		additionalConstructors = append(additionalConstructors, debugContext)
 	}
-	handler, st := setupChain(ctx, sink, "protobuf_v2", func(s Sink) ErrorReader {
+	handler, st := SetupChain(ctx, sink, "protobuf_v2", func(s Sink) ErrorReader {
 		return &ProtobufDecoderV2{Sink: s, Logger: logger}
 	}, httpChain, logger, additionalConstructors...)
 	SetupProtobufV2DatapointPaths(r, handler)

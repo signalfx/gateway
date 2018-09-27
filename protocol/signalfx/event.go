@@ -3,6 +3,8 @@ package signalfx
 import (
 	"bytes"
 	"context"
+	"net/http"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/mailru/easyjson"
@@ -14,7 +16,6 @@ import (
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/web"
 	"github.com/signalfx/metricproxy/protocol/signalfx/format"
-	"net/http"
 )
 
 // ProtobufEventDecoderV2 decodes protocol buffers in signalfx's v2 format and sends them to Sink
@@ -80,7 +81,7 @@ func setupJSONEventV2(ctx context.Context, r *mux.Router, sink Sink, logger log.
 	if debugContext != nil {
 		additionalConstructors = append(additionalConstructors, debugContext)
 	}
-	handler, st := setupChain(ctx, sink, "json_event_v2", func(s Sink) ErrorReader {
+	handler, st := SetupChain(ctx, sink, "json_event_v2", func(s Sink) ErrorReader {
 		return &JSONEventDecoderV2{Sink: s, Logger: logger}
 	}, httpChain, logger, additionalConstructors...)
 	SetupJSONV2EventPaths(r, handler)
@@ -97,7 +98,7 @@ func setupProtobufEventV2(ctx context.Context, r *mux.Router, sink Sink, logger 
 	if debugContext != nil {
 		additionalConstructors = append(additionalConstructors, debugContext)
 	}
-	handler, st := setupChain(ctx, sink, "protobuf_event_v2", func(s Sink) ErrorReader {
+	handler, st := SetupChain(ctx, sink, "protobuf_event_v2", func(s Sink) ErrorReader {
 		return &ProtobufEventDecoderV2{Sink: s, Logger: logger}
 	}, httpChain, logger, additionalConstructors...)
 	SetupProtobufV2EventPaths(r, handler)
