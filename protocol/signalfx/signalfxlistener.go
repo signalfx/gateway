@@ -65,7 +65,7 @@ type ErrorReader interface {
 // ErrorTrackerHandler behaves like a http handler, but tracks error returns from a ErrorReader
 type ErrorTrackerHandler struct {
 	TotalErrors int64
-	reader      ErrorReader
+	Reader      ErrorReader
 	Logger      log.Logger
 }
 
@@ -79,7 +79,7 @@ func (e *ErrorTrackerHandler) Datapoints() []*datapoint.Datapoint {
 // ServeHTTPC will serve the wrapped ErrorReader and return the error (if any) to rw if ErrorReader
 // fails
 func (e *ErrorTrackerHandler) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, req *http.Request) {
-	if err := e.reader.Read(ctx, req); err != nil {
+	if err := e.Reader.Read(ctx, req); err != nil {
 		atomic.AddInt64(&e.TotalErrors, 1)
 		rw.WriteHeader(http.StatusBadRequest)
 		_, err = rw.Write([]byte(err.Error()))
@@ -234,7 +234,7 @@ func setupChain(ctx context.Context, sink Sink, chainType string, getReader func
 	finalSink := FromChain(sink, NextWrap(ucount))
 	errReader := getReader(finalSink)
 	errorTracker := ErrorTrackerHandler{
-		reader: errReader,
+		Reader: errReader,
 		Logger: logger,
 	}
 	metricTracking := web.RequestCounter{}
