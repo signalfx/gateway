@@ -223,7 +223,9 @@ func setupNotFoundHandler(ctx context.Context, r *mux.Router) sfxclient.Collecto
 	}
 }
 
-func setupChain(ctx context.Context, sink Sink, chainType string, getReader func(Sink) ErrorReader, httpChain web.NextConstructor, logger log.Logger, moreConstructors ...web.Constructor) (http.Handler, sfxclient.Collector) {
+// SetupChain wraps the reader returned by getReader in an http.Handler along
+// with some middleware that calculates internal metrics about requests.
+func SetupChain(ctx context.Context, sink Sink, chainType string, getReader func(Sink) ErrorReader, httpChain web.NextConstructor, logger log.Logger, moreConstructors ...web.Constructor) (http.Handler, sfxclient.Collector) {
 	zippers := zipper.NewZipper()
 
 	counter := &dpsink.Counter{

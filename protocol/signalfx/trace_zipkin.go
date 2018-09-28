@@ -589,7 +589,7 @@ func (decoder *JSONTraceDecoderV1) Read(ctx context.Context, req *http.Request) 
 }
 
 func setupJSONTraceV1(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, httpChain web.NextConstructor) sfxclient.Collector {
-	handler, st := setupChain(ctx, sink, ZipkinV1, func(s Sink) ErrorReader {
+	handler, st := SetupChain(ctx, sink, ZipkinV1, func(s Sink) ErrorReader {
 		return &JSONTraceDecoderV1{Logger: logger, Sink: sink}
 	}, httpChain, logger)
 	SetupJSONByPaths(r, handler, DefaultTracePathV1)

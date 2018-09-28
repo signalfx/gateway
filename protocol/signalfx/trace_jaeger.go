@@ -54,7 +54,7 @@ const (
 )
 
 func setupThriftTraceV1(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, httpChain web.NextConstructor) sfxclient.Collector {
-	handler, st := setupChain(ctx, sink, JaegerV1, func(s Sink) ErrorReader {
+	handler, st := SetupChain(ctx, sink, JaegerV1, func(s Sink) ErrorReader {
 		return NewJaegerThriftTraceDecoderV1(logger, sink)
 	}, httpChain, logger)
 
