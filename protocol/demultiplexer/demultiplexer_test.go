@@ -40,7 +40,7 @@ func TestNew(t *testing.T) {
 	es := []*event.Event{dptest.E(), dptest.E()}
 	es[0].Timestamp = late
 	es[1].Timestamp = future
-	traces := []*trace.Span{{Timestamp: pointer.Float64(float64(late.UnixNano() / 1000))}, {Timestamp: pointer.Float64(float64(future.UnixNano() / 1000))}}
+	traces := []*trace.Span{{Timestamp: pointer.Float64(float64(late.UnixNano() / 1000)), Tags: map[string]string{"foo": "bar"}}, {Timestamp: pointer.Float64(float64(future.UnixNano() / 1000))}}
 	ctx2, cancelFunc := context.WithTimeout(ctx, time.Millisecond)
 	assert.Error(t, demux.AddDatapoints(ctx2, pts))
 	assert.Error(t, demux.AddEvents(ctx2, es))

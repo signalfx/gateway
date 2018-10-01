@@ -23,6 +23,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/sfxclient/spanfilter"
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/trace/format"
 	"unsafe"
@@ -375,24 +376,9 @@ func mapToProperties(properties map[string]interface{}) []*com_signalfx_metrics_
 	return response
 }
 
-type spanResponse struct {
-	Valid   uint64              `json:"valid"`
-	Invalid map[string][]string `json:"invalid"`
-}
-
 func spanResponseValidator(respBody []byte) error {
 	if string(respBody) != `"OK"` {
-		var respObj spanResponse
-
-		if err := json.Unmarshal(respBody, &respObj); err != nil {
-			return errors.Annotatef(err, "cannot unmarshal response body %s", respBody)
-		}
-
-		for _, v := range respObj.Invalid {
-			if len(v) > 0 {
-				return errors.Errorf("some spans were invalid: %v", respObj.Invalid)
-			}
-		}
+		return spanfilter.ReturnInvalidOrError(respBody)
 	}
 
 	return nil

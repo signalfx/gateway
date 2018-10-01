@@ -10,25 +10,26 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/timekeeper"
-	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/logkey"
-	"github.com/signalfx/metricproxy/protocol"
-
 	"context"
 	"expvar"
 	"fmt"
+	_ "github.com/signalfx/go-metrics"
+	"github.com/signalfx/golib/datapoint/dpsink"
+	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/eventcounter"
 	"github.com/signalfx/golib/httpdebug"
+	"github.com/signalfx/golib/log"
+	"github.com/signalfx/golib/sfxclient"
+	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
+	"github.com/signalfx/metricproxy/config"
 	"github.com/signalfx/metricproxy/dp/dpbuffered"
+	"github.com/signalfx/metricproxy/logkey"
+	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/demultiplexer"
 	"github.com/signalfx/metricproxy/protocol/signalfx"
+	_ "github.com/signalfx/ondiskencoding"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"net"
 	"net/http"
@@ -160,6 +161,7 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 			BufferSize:         forwardConfig.BufferSize,
 			MaxTotalDatapoints: forwardConfig.BufferSize,
 			MaxTotalEvents:     forwardConfig.BufferSize,
+			MaxTotalSpans:      forwardConfig.BufferSize,
 			MaxDrainSize:       forwardConfig.MaxDrainSize,
 			NumDrainingThreads: forwardConfig.DrainingThreads,
 			Name:               forwardConfig.Name,

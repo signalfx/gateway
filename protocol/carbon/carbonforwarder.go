@@ -40,11 +40,11 @@ type ForwarderConfig struct {
 }
 
 var defaultForwarderConfig = &ForwarderConfig{
-	Filters: &filtering.FilterObj{},
-	Timeout: pointer.Duration(time.Second * 30),
-	Port:    pointer.Uint16(2003),
+	Filters:                &filtering.FilterObj{},
+	Timeout:                pointer.Duration(time.Second * 30),
+	Port:                   pointer.Uint16(2003),
 	IdleConnectionPoolSize: pointer.Int64(5),
-	Timer: &timekeeper.RealTime{},
+	Timer:                  &timekeeper.RealTime{},
 }
 
 // NewForwarder creates a new unbuffered forwarder for sending points to carbon

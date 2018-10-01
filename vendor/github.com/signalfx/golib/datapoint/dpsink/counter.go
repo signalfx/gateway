@@ -9,6 +9,7 @@ import (
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
+	"github.com/signalfx/golib/sfxclient/spanfilter"
 	"github.com/signalfx/golib/trace"
 )
 
@@ -96,7 +97,7 @@ func (c *Counter) AddSpans(ctx context.Context, spans []*trace.Span, next trace.
 	err := next.AddSpans(ctx, spans)
 	atomic.AddInt64(&c.TotalProcessTimeNs, time.Since(start).Nanoseconds())
 	atomic.AddInt64(&c.CallsInFlight, -1)
-	if err != nil {
+	if err != nil && spanfilter.IsInvalid(err) {
 		atomic.AddInt64(&c.TotalProcessErrors, 1)
 		atomic.AddInt64(&c.ProcessErrorSpans, int64(len(spans)))
 		c.logger().Log(log.Err, err, "Unable to process spans")
