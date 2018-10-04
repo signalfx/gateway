@@ -26,7 +26,7 @@ func TestNew(t *testing.T) {
 	demux := Demultiplexer{
 		DatapointSinks: []dpsink.DSink{sendTo1},
 		EventSinks:     []dpsink.ESink{sendTo2},
-		TraceSinks:     []trace.Sink{sendTo3},
+		TraceSinks:     []trace.Sink{sendTo2, sendTo3},
 		Logger:         c,
 		LateDuration:   &second,
 		FutureDuration: &second,
