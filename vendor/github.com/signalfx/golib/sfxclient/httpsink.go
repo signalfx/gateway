@@ -56,6 +56,8 @@ type HTTPSink struct {
 	EventEndpoint      string
 	DatapointEndpoint  string
 	TraceEndpoint      string
+	AdditionalHeaders  map[string]string
+	ResponseCallback   func(resp *http.Response, responseBody []byte)
 	Client             *http.Client
 	protoMarshaler     func(pb proto.Message) ([]byte, error)
 	jsonMarshal        func(v []*trace.Span) ([]byte, error)
@@ -96,7 +98,9 @@ func (h *HTTPSink) handleResponse(resp *http.Response, respValidator responseVal
 			ResponseBody: string(respBody),
 		}
 	}
-
+	if h.ResponseCallback != nil {
+		h.ResponseCallback(resp, respBody)
+	}
 	return respValidator(respBody)
 }
 
@@ -119,6 +123,10 @@ func (h *HTTPSink) doBottom(ctx context.Context, f func() (io.Reader, bool, erro
 		return errors.Annotatef(err, "cannot parse new HTTP request to %s", endpoint)
 	}
 	req = req.WithContext(ctx)
+	for k, v := range h.AdditionalHeaders {
+		req.Header.Set(k, v)
+	}
+	// set these below so if someone accidentally uses the same as below we wil override appropriately
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set(TokenHeaderName, h.AuthToken)
 	req.Header.Set("User-Agent", h.UserAgent)

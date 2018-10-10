@@ -223,116 +223,116 @@
 		{
 			"checksumSHA1": "mCET1srTLXKFPE5jYIEy6CIsgBs=",
 			"path": "github.com/signalfx/golib/datapoint",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "/9YIkXFBubhkNTrqitKaEPnFuHI=",
 			"path": "github.com/signalfx/golib/datapoint/dpsink",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "e95O2kFV1Tjw2oByCd7h903zFUo=",
 			"path": "github.com/signalfx/golib/datapoint/dptest",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "GuSggAzlI13Uu1yZ9rM8puMTEi8=",
 			"path": "github.com/signalfx/golib/errors",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "wDOXoGg2ALYhvV4GVZEeMqXP7SE=",
 			"path": "github.com/signalfx/golib/event",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "TVb+/MOLmMBr4ZJ2qLQUbsyL5is=",
 			"path": "github.com/signalfx/golib/eventcounter",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "OFrPOY5sCUCxCJwS9EDWACTNksQ=",
 			"path": "github.com/signalfx/golib/explorable",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "DvU/T1x0ZHIfKOdK/T6uzauh/+Y=",
 			"path": "github.com/signalfx/golib/expvar2",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "9u1IVJSTnAac1Ugd/9Hcu3nONiE=",
 			"path": "github.com/signalfx/golib/httpdebug",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "qEBu8kYCpwf8bBsqwQrpaE5+T8Q=",
 			"path": "github.com/signalfx/golib/log",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "Jww4G7329IP9YYR4AW7RBurVTdw=",
 			"path": "github.com/signalfx/golib/logkey",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "Rp9SRtpmfC8hbM2DH4Hu/bEYwAM=",
 			"path": "github.com/signalfx/golib/nettest",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "e437Xftv3lq51VGANp9KcH7cD8U=",
 			"path": "github.com/signalfx/golib/pointer",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
-			"checksumSHA1": "pM4ESciAHTyfMtetjMfv4QbKI6o=",
+			"checksumSHA1": "xkZE3o9xxaHHbdMaN538a5DczUM=",
 			"path": "github.com/signalfx/golib/sfxclient",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "S66r/9t8lohMFtLcHxGifO/09pY=",
 			"path": "github.com/signalfx/golib/sfxclient/spanfilter",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "kLiclgZJImywtHf9fXdY7D0PsvY=",
 			"path": "github.com/signalfx/golib/timekeeper",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "QyrS9Irp3MAHmdAaywZdG9/0Oig=",
 			"path": "github.com/signalfx/golib/trace",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "tAsAvH06fmkx0+p6/52NYKsPFf0=",
 			"path": "github.com/signalfx/golib/trace/format",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "GLnZRaIECOpsjLGByW1k9dnDwA0=",
 			"path": "github.com/signalfx/golib/web",
-			"revision": "94c3d43c83d93f190681adf1b2e8510c5f053ba1",
-			"revisionTime": "2018-08-24T22:26:02Z"
+			"revision": "e7548d9fa30a163b988295e422e15d18e0c5a9d3",
+			"revisionTime": "2018-10-08T22:05:07Z"
 		},
 		{
 			"checksumSHA1": "5ZWT8pqtB72DIrfvRgkCN6havqY=",
