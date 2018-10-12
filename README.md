@@ -31,19 +31,19 @@ Ubuntu must be executed before running the install script.
 ```
 sudo add-apt-repository ppa:gophers/archive
 sudo apt-get update
-sudo apt-get install golang-1.10
+sudo apt-get install golang-1.11.1
 ```
 
 If /usr/bin/go does NOT exist then create a symbolic link
 
 ```
-sudo ln /usr/lib/go-1.10/bin/go /usr/bin/go
+sudo ln /usr/lib/go-1.11.1/bin/go /usr/bin/go
 ```
 
 Or if /usr/bin/go does exist, then overwrite the older binary
 
 ```
-sudo cp /usr/lib/go-1.10/bin/go /usr/bin/go
+sudo cp /usr/lib/go-1.11.1/bin/go /usr/bin/go
 ```
 
 ## Running

@@ -40,6 +40,8 @@ func (t *threadSafeWriter) Write(p []byte) (n int, err error) {
 	return t.Writer.Write(p)
 }
 
+func c() error { return nil }
+
 // TODO figure out why this test is flaky, should be > 2, but change to >= 2 so it passes
 func TestBufferedForwarderBasic(t *testing.T) {
 	Convey("Basic forwarder setup", t, func() {
@@ -63,7 +65,7 @@ func TestBufferedForwarderBasic(t *testing.T) {
 		buf := &bytes.Buffer{}
 		threadWriter := &threadSafeWriter{Writer: buf}
 		l := log.NewLogfmtLogger(threadWriter, log.Panic)
-		bf := NewBufferedForwarder(ctx, config, sendTo, l)
+		bf := NewBufferedForwarder(ctx, config, sendTo, c, l)
 		datas := []*datapoint.Datapoint{
 			dptest.DP(),
 			dptest.DP(),
@@ -194,7 +196,7 @@ func TestBufferedForwarderContexts(t *testing.T) {
 	}
 
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
+	bf := NewBufferedForwarder(ctx, config, sendTo, c, log.Discard)
 	assert.NoError(t, bf.AddDatapoints(ctx, datas))
 	canceledContext, cancelFunc := context.WithCancel(ctx)
 	waiter := make(chan struct{})
@@ -263,7 +265,7 @@ func TestBufferedForwarderContextsEvent(t *testing.T) {
 	spans := []*trace.Span{{}}
 
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
+	bf := NewBufferedForwarder(ctx, config, sendTo, c, log.Discard)
 	assert.NoError(t, bf.AddEvents(ctx, events))
 	assert.NoError(t, bf.AddSpans(ctx, spans))
 	canceledContext, cancelFunc := context.WithCancel(ctx)
@@ -311,7 +313,7 @@ func TestBufferedForwarderMaxTotalDatapoints(t *testing.T) {
 	}
 	ctx := context.Background()
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
+	bf := NewBufferedForwarder(ctx, config, sendTo, c, log.Discard)
 	defer func() {
 		assert.NoError(t, bf.Close())
 	}()
@@ -346,7 +348,7 @@ func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
 	}
 	ctx := context.Background()
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo, log.Discard)
+	bf := NewBufferedForwarder(ctx, config, sendTo, c, log.Discard)
 	defer func() {
 		assert.NoError(t, bf.Close())
 	}()

@@ -280,10 +280,10 @@ func (listener *Listener) getServer(conf *ListenerConfig) error {
 func NewListener(sendTo dpsink.Sink, passedConf *ListenerConfig) (*Listener, error) {
 	conf := pointer.FillDefaultFrom(passedConf, defaultListenerConfig).(*ListenerConfig)
 	receiver := Listener{
-		sink:                 sendTo,
-		serverAcceptDeadline: *conf.ServerAcceptDeadline,
-		connectionTimeout:    *conf.ConnectionTimeout,
-		logger:               log.NewContext(conf.Logger).With(logkey.Protocol, "wavefront", logkey.Direction, "listener"),
+		sink:                      sendTo,
+		serverAcceptDeadline:      *conf.ServerAcceptDeadline,
+		connectionTimeout:         *conf.ConnectionTimeout,
+		logger:                    log.NewContext(conf.Logger).With(logkey.Protocol, "wavefront", logkey.Direction, "listener"),
 		extractCollectdDimensions: *conf.ExtractCollectdDimensions,
 	}
 	err := receiver.getServer(conf)

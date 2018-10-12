@@ -99,33 +99,65 @@ func (streamer *Demultiplexer) handleLateOrFutureEvents(events []*event.Event) {
 }
 
 // AddSpans forwards all traces to each sentTo sink. Returns the error of the last sink to have an error.
+// to avoid conflicts with adding tags in forwarders, each span needs to be a copy to avoid concurrent modification issues
 func (streamer *Demultiplexer) AddSpans(ctx context.Context, spans []*trace.Span) error {
 	if len(spans) == 0 {
 		return nil
 	}
 	streamer.handleLateOrFutureSpans(spans)
 	var errs []error
-	for _, sendTo := range streamer.TraceSinks {
-		if err := sendTo.AddSpans(ctx, spans); err != nil {
+	for i, sendTo := range streamer.TraceSinks {
+		toSend := spans
+		if i > 0 {
+			toSend = deepCopySpans(spans)
+		}
+		if err := sendTo.AddSpans(ctx, toSend); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return errors.NewMultiErr(errs)
 }
 
+func deepCopySpans(spans []*trace.Span) []*trace.Span {
+	retSpans := make([]*trace.Span, len(spans))
+	for i, s := range spans {
+		tags := make(map[string]string, len(s.Tags))
+		for k, v := range s.Tags {
+			tags[k] = v
+		}
+		retSpans[i] = &trace.Span{
+			TraceID:        s.TraceID,
+			Name:           s.Name,
+			ParentID:       s.ParentID,
+			ID:             s.ID,
+			Kind:           s.Kind,
+			Timestamp:      s.Timestamp,
+			Duration:       s.Duration,
+			Debug:          s.Debug,
+			Shared:         s.Shared,
+			LocalEndpoint:  s.LocalEndpoint,
+			RemoteEndpoint: s.RemoteEndpoint,
+			Annotations:    s.Annotations,
+			Tags:           tags,
+		}
+	}
+	return retSpans
+}
+
 func (streamer *Demultiplexer) handleLateOrFutureSpans(spans []*trace.Span) {
 	if streamer.FutureDuration != nil || streamer.LateDuration != nil {
 		now := time.Now()
 		for _, d := range spans {
-			//now.Sub(time.Unix(0, int64(*d.Timestamp)*int64(time.Microsecond)))
-			if streamer.FutureDuration != nil && time.Unix(0, int64(*d.Timestamp)*int64(time.Microsecond)).After(now.Add(*streamer.FutureDuration)) {
+			if d.Timestamp != nil {
+				if streamer.FutureDuration != nil && time.Unix(0, int64(*d.Timestamp)*int64(time.Microsecond)).After(now.Add(*streamer.FutureDuration)) {
 
-				atomic.AddInt64(&streamer.stats.futureSpans, 1)
-				streamer.Logger.Log(logkey.Name, d.ID, logkey.Delta, time.Unix(0, int64(*d.Timestamp)*int64(time.Microsecond)).Sub(now), "trace received too far into the future")
-			} else if streamer.LateDuration != nil && time.Unix(0, int64(*d.Timestamp)*int64(time.Microsecond)).Before(now.Add(-*streamer.LateDuration)) {
+					atomic.AddInt64(&streamer.stats.futureSpans, 1)
+					streamer.Logger.Log(logkey.Name, d.ID, logkey.Delta, time.Unix(0, int64(*d.Timestamp)*int64(time.Microsecond)).Sub(now), "trace received too far into the future")
+				} else if streamer.LateDuration != nil && time.Unix(0, int64(*d.Timestamp)*int64(time.Microsecond)).Before(now.Add(-*streamer.LateDuration)) {
 
-				atomic.AddInt64(&streamer.stats.lateSpans, 1)
-				streamer.Logger.Log(logkey.Name, d.ID, logkey.Delta, now.Sub(time.Unix(0, int64(*d.Timestamp)*int64(time.Microsecond))), "trace received too far into the past")
+					atomic.AddInt64(&streamer.stats.lateSpans, 1)
+					streamer.Logger.Log(logkey.Name, d.ID, logkey.Delta, now.Sub(time.Unix(0, int64(*d.Timestamp)*int64(time.Microsecond))), "trace received too far into the past")
+				}
 			}
 		}
 	}

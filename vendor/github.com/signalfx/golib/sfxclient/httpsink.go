@@ -23,6 +23,7 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/sfxclient/spanfilter"
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/trace/format"
 	"unsafe"
@@ -55,6 +56,8 @@ type HTTPSink struct {
 	EventEndpoint      string
 	DatapointEndpoint  string
 	TraceEndpoint      string
+	AdditionalHeaders  map[string]string
+	ResponseCallback   func(resp *http.Response, responseBody []byte)
 	Client             *http.Client
 	protoMarshaler     func(pb proto.Message) ([]byte, error)
 	jsonMarshal        func(v []*trace.Span) ([]byte, error)
@@ -95,7 +98,9 @@ func (h *HTTPSink) handleResponse(resp *http.Response, respValidator responseVal
 			ResponseBody: string(respBody),
 		}
 	}
-
+	if h.ResponseCallback != nil {
+		h.ResponseCallback(resp, respBody)
+	}
 	return respValidator(respBody)
 }
 
@@ -118,6 +123,10 @@ func (h *HTTPSink) doBottom(ctx context.Context, f func() (io.Reader, bool, erro
 		return errors.Annotatef(err, "cannot parse new HTTP request to %s", endpoint)
 	}
 	req = req.WithContext(ctx)
+	for k, v := range h.AdditionalHeaders {
+		req.Header.Set(k, v)
+	}
+	// set these below so if someone accidentally uses the same as below we wil override appropriately
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set(TokenHeaderName, h.AuthToken)
 	req.Header.Set("User-Agent", h.UserAgent)
@@ -375,24 +384,9 @@ func mapToProperties(properties map[string]interface{}) []*com_signalfx_metrics_
 	return response
 }
 
-type spanResponse struct {
-	Valid   uint64              `json:"valid"`
-	Invalid map[string][]string `json:"invalid"`
-}
-
 func spanResponseValidator(respBody []byte) error {
 	if string(respBody) != `"OK"` {
-		var respObj spanResponse
-
-		if err := json.Unmarshal(respBody, &respObj); err != nil {
-			return errors.Annotatef(err, "cannot unmarshal response body %s", respBody)
-		}
-
-		for _, v := range respObj.Invalid {
-			if len(v) > 0 {
-				return errors.Errorf("some spans were invalid: %v", respObj.Invalid)
-			}
-		}
+		return spanfilter.ReturnInvalidOrError(respBody)
 	}
 
 	return nil
