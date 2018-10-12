@@ -124,6 +124,7 @@ func NewForwarder(conf *ForwarderConfig) (ret *Forwarder, err error) {
 	err = ret.Setup(conf.Filters)
 	if err == nil {
 		ret.sampler, err = sampling.New(conf.TraceSample, conf.Logger, sendingSink)
+		ret.sampler.ConfigureHTTPSink(sendingSink)
 		return ret, err
 	}
 	return nil, err

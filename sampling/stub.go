@@ -14,18 +14,22 @@ type SmartSampleConfig struct{}
 type SmartSampler struct{}
 
 // AddSpans does nothing
-func (forwarder *SmartSampler) AddSpans(context context.Context, spans []*trace.Span, sink trace.Sink) error {
+func (f *SmartSampler) AddSpans(context context.Context, spans []*trace.Span, sink trace.Sink) error {
 	return nil
 }
 
 // Close does nothing
-func (forwarder *SmartSampler) Close() error {
+func (f *SmartSampler) Close() error {
 	return nil
 }
 
 type dtsink interface {
 	sfxclient.Sink
 	trace.Sink
+}
+
+// ConfigureHTTPSink does nothing
+func (f *SmartSampler) ConfigureHTTPSink(sink *sfxclient.HTTPSink) {
 }
 
 // New returns you nothing
