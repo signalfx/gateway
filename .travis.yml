@@ -14,6 +14,9 @@ before_install:
   - gometalinter --install
   - gem install mdl --version 0.4.0
 
+install:
+  - echo "override the generic go get -t ./... that travis does durring the install phase by default"
+
 script:
   - export PATH=$HOME/gopath/bin:$PATH
   - export GOCOVERDIR_DIR="."
