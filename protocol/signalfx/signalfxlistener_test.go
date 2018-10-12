@@ -111,7 +111,7 @@ func TestSignalfxProtobufV1Decoder(t *testing.T) {
 			req := &http.Request{
 				Body: ioutil.NopCloser(bytes.NewReader(append(varintBytes, []byte("01234567890123456789")...))),
 			}
-			So(decoder.Read(ctx, req).Error(), ShouldContainSubstring, "proto")
+			So(decoder.Read(ctx, req).Error(), ShouldEqual, io.ErrUnexpectedEOF.Error())
 		})
 	})
 }

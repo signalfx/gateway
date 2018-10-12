@@ -13,6 +13,15 @@ import (
 	"context"
 	"expvar"
 	"fmt"
+	"net"
+	"net/http"
+	"os/signal"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+
+	"github.com/quentin-m/etcd-cloud-operator/pkg/etcd"
 	_ "github.com/signalfx/go-metrics"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
@@ -31,13 +40,6 @@ import (
 	"github.com/signalfx/metricproxy/protocol/signalfx"
 	_ "github.com/signalfx/ondiskencoding"
 	"gopkg.in/natefinch/lumberjack.v2"
-	"net"
-	"net/http"
-	"os/signal"
-	"strings"
-	"sync"
-	"syscall"
-	"time"
 )
 
 var (
@@ -56,6 +58,104 @@ type proxyFlags struct {
 	configFileName string
 }
 
+type etcdManager struct {
+	etcd.ServerConfig
+	logger             log.Logger
+	removeTimeout      int64
+	unhealthyMemberTTL int64
+	operation          string
+	targetCluster      string
+	server             *etcd.Server
+	client             *etcd.Client
+}
+
+func (mgr *etcdManager) start() (err error) {
+	mgr.ServerConfig.UnhealthyMemberTTL = time.Duration(mgr.unhealthyMemberTTL) * time.Millisecond
+
+	// use a default server name if one is not provided
+	if mgr.ServerConfig.Name == "" {
+		mgr.ServerConfig.Name = fmt.Sprintf("%s@%d", mgr.ServerConfig.ACAddress, time.Now().Unix())
+	}
+
+	mgr.server = etcd.NewServer(mgr.ServerConfig)
+	switch strings.ToLower(mgr.operation) {
+	case "": // this is a valid option and means we shouldn't run etcd
+		return
+
+	case "seed":
+		mgr.logger.Log(fmt.Sprintf("starting etcd server %s to seed cluster", mgr.ServerConfig.Name))
+		if err = mgr.server.Seed(nil); err == nil {
+			mgr.client, err = etcd.NewClient([]string{mgr.AdvertisedClientAddress()}, etcd.SecurityConfig{}, true)
+		}
+
+	case "join":
+		mgr.logger.Log(fmt.Sprintf("joining cluster with etcd server name: %s", mgr.ServerConfig.Name))
+		if mgr.client, err = etcd.NewClient([]string{mgr.targetCluster}, etcd.SecurityConfig{}, true); err == nil {
+			mgr.logger.Log(fmt.Sprintf("joining etcd cluster @ %s", mgr.client.Endpoints()))
+			if err = mgr.server.Join(mgr.client); err == nil {
+				mgr.logger.Log(fmt.Sprintf("successfully joined cluster at %s", mgr.targetCluster))
+			}
+		}
+
+	default:
+		err = fmt.Errorf("unsupported cluster-op specified \"%s\"", mgr.operation)
+	}
+
+	return err
+}
+
+func (mgr *etcdManager) getMemberID() (uint64, error) {
+	var memberID uint64
+	// use the client to retrieve this instance's member id
+	members, err := mgr.client.MemberList(context.Background())
+	for _, m := range members.Members {
+		if m.Name == mgr.Name {
+			memberID = m.ID
+		}
+	}
+	return memberID, err
+}
+
+func (mgr *etcdManager) removeMember() error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(mgr.removeTimeout)*time.Millisecond)
+	defer cancel()
+	var err error
+	var memberID uint64
+	// only remove yourself from the cluster if the server is running
+	if mgr.server.IsRunning() {
+		if memberID, err = mgr.getMemberID(); err == nil {
+			removed := make(chan error, 1)
+			go func() {
+				select {
+				case removed <- mgr.client.RemoveMember(mgr.Name, memberID):
+					err = <-removed
+					cancel()
+					return
+				case <-ctx.Done():
+					return
+				}
+			}()
+			<-ctx.Done()
+			if ctx.Err() != nil {
+				err = ctx.Err()
+			}
+		}
+	}
+	return err
+}
+
+func (mgr *etcdManager) shutdown(graceful bool) (err error) {
+	if mgr.server.IsRunning() {
+		// stop the etcd server
+		mgr.server.Stop(graceful, false) // graceful shutdown true, snapshot false
+	}
+	if mgr.client != nil {
+		// close the client if applicable
+		err = mgr.client.Close()
+	}
+	return err
+}
+
 type proxy struct {
 	flags               proxyFlags
 	listeners           []protocol.Listener
@@ -72,6 +172,7 @@ type proxy struct {
 	ctxDims             log.CtxDimensions
 	signalChan          chan os.Signal
 	config              *config.ProxyConfig
+	etcdMgr             *etcdManager
 }
 
 var mainInstance = proxy{
@@ -87,10 +188,22 @@ var mainInstance = proxy{
 		MetricDimensionName: "sf_metric",
 	},
 	signalChan: make(chan os.Signal, 1),
+	etcdMgr:    &etcdManager{ServerConfig: etcd.ServerConfig{}, logger: log.DefaultLogger.CreateChild()},
 }
 
 func init() {
 	flag.StringVar(&mainInstance.flags.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
+	flag.StringVar(&mainInstance.etcdMgr.operation, "cluster-op", "", "operation to perform if running in cluster mode [\"seed\", \"join\", \"\"]")
+	flag.StringVar(&mainInstance.etcdMgr.Name, "etcd-member-name", "", "the member name used when starting or joining the etcd cluster")
+	flag.StringVar(&mainInstance.etcdMgr.DataDir, "etcd-data-dir", "./etcd-data", "the path to the etcd data directory")
+	flag.StringVar(&mainInstance.etcdMgr.targetCluster, "target-client", "", "the target client address to use when joining a cluster")
+	flag.StringVar(&mainInstance.etcdMgr.APAddress, "advertise-peer-url", "127.0.0.1:2380", "initial peer address to advertise")
+	flag.StringVar(&mainInstance.etcdMgr.LPAddress, "listen-peer-url", "127.0.0.1:2380", "address to listen on for peer connections")
+	flag.StringVar(&mainInstance.etcdMgr.ACAddress, "advertise-client-url", "127.0.0.1:2379", "address to advertise for client connections")
+	flag.StringVar(&mainInstance.etcdMgr.LCAddress, "listen-client-url", "127.0.0.1:2379", "address to listen on for client connection")
+	flag.StringVar(&mainInstance.etcdMgr.MAddress, "etcd-metrics-url", "127.0.0.1:2381", "address to serve etcd metrics on")
+	flag.Int64Var(&mainInstance.etcdMgr.unhealthyMemberTTL, "unhealthyHostTTL", 5000, "number of milliseconds to wait before removing an unhealthy cluster member")
+	flag.Int64Var(&mainInstance.etcdMgr.removeTimeout, "removeMemberTimeout", 1000, "number of milliseconds timeout to use when removing instance from the cluster")
 }
 
 func (p *proxy) getLogOutput(loadedConfig *config.ProxyConfig) io.Writer {
@@ -290,6 +403,7 @@ func (p *proxy) gracefulShutdown() (err error) {
 	p.logger.Log("Starting graceful shutdown")
 	totalWaitTime := p.tk.After(*p.config.MaxGracefulWaitTimeDuration)
 	errs := make([]error, len(p.listeners)+len(p.forwarders)+1)
+	errs = append(errs, p.etcdMgr.removeMember())
 
 	// close health checks on all first
 	for _, l := range p.listeners {
@@ -326,6 +440,7 @@ func (p *proxy) gracefulShutdown() (err error) {
 				startingTimeGood = now
 				continue
 			}
+			errs = append(errs, p.etcdMgr.shutdown(true)) // shutdown the etcd server and close the client
 			if now.Sub(startingTimeGood) >= *p.config.SilentGracefulTimeDuration {
 				p.logger.Log(logkey.TotalPipeline, totalPipeline, "I've been silent.  Graceful shutdown done")
 				return
@@ -394,7 +509,36 @@ func (p *proxy) createCommonHTTPChain(loadedConfig *config.ProxyConfig) web.Next
 	})
 }
 
+func (p *proxy) setupScheduler(hostname string) *sfxclient.Scheduler {
+	scheduler := sfxclient.NewScheduler()
+	scheduler.AddCallback(sfxclient.GoMetricsSource)
+	scheduler.DefaultDimensions(map[string]string{
+		"source": "proxy",
+		"host":   hostname,
+	})
+	return scheduler
+}
+
+func (p *proxy) scheduleStatCollection(ctx context.Context, scheduler *sfxclient.Scheduler, loadedConfig *config.ProxyConfig, multiplexer signalfx.Sink) (context.Context, context.CancelFunc) {
+	// We still want to schedule stat collection so people can debug the server if they want
+	scheduler.Sink = dpsink.Discard
+	scheduler.ReportingDelayNs = (time.Second * 30).Nanoseconds()
+	finishedContext, cancelFunc := context.WithCancel(ctx)
+	defer cancelFunc()
+	if loadedConfig.StatsDelayDuration != nil && *loadedConfig.StatsDelayDuration != 0 {
+		scheduler.Sink = multiplexer
+		scheduler.ReportingDelayNs = loadedConfig.StatsDelayDuration.Nanoseconds()
+	} else {
+		p.logger.Log("skipping stat keeping")
+	}
+	return finishedContext, cancelFunc
+}
+
 func (p *proxy) run(ctx context.Context) error {
+	if err := p.etcdMgr.start(); err != nil {
+		p.logger.Log(log.Err, "unable to start etcd server", err)
+		return err
+	}
 	p.debugSink.CtxFlagCheck = &p.debugContext
 	hostname := getHostname(os.Hostname)
 	p.logger.Log(logkey.ConfigFile, p.flags.configFileName, "Looking for config file")
@@ -414,12 +558,8 @@ func (p *proxy) run(ctx context.Context) error {
 
 	chain := p.createCommonHTTPChain(loadedConfig)
 	loader := config.NewLoader(ctx, logger, Version, &p.debugContext, &p.debugSink, &p.ctxDims, chain)
-	scheduler := sfxclient.NewScheduler()
-	scheduler.AddCallback(sfxclient.GoMetricsSource)
-	scheduler.DefaultDimensions(map[string]string{
-		"source": "proxy",
-		"host":   hostname,
-	})
+
+	scheduler := p.setupScheduler(hostname)
 
 	forwarders, err := setupForwarders(ctx, hostname, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims)
 	if err != nil {
@@ -446,20 +586,10 @@ func (p *proxy) run(ctx context.Context) error {
 	}
 	p.listeners = listeners
 
-	// We still want to schedule stat collection so people can debug the server if they want
-	scheduler.Sink = dpsink.Discard
-	scheduler.ReportingDelayNs = (time.Second * 30).Nanoseconds()
-	wg := sync.WaitGroup{}
-	finishedContext, cancelFunc := context.WithCancel(ctx)
-	defer cancelFunc()
-	if loadedConfig.StatsDelayDuration != nil && *loadedConfig.StatsDelayDuration != 0 {
-		scheduler.Sink = multiplexer
-		scheduler.ReportingDelayNs = loadedConfig.StatsDelayDuration.Nanoseconds()
-	} else {
-		logger.Log("skipping stat keeping")
-	}
+	finishedContext, cancelFunc := p.scheduleStatCollection(ctx, scheduler, loadedConfig, multiplexer)
 
 	// Schedule datapoint collection to a Discard sink so we can get the stats in Expvar()
+	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		err := scheduler.Schedule(finishedContext)
