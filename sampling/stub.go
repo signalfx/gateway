@@ -2,6 +2,7 @@ package sampling
 
 import (
 	"context"
+	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
@@ -16,6 +17,11 @@ type SmartSampler struct{}
 // AddSpans does nothing
 func (f *SmartSampler) AddSpans(context context.Context, spans []*trace.Span, sink trace.Sink) error {
 	return nil
+}
+
+// Datapoints adheres to the sfxclient.Collector interface
+func (f *SmartSampler) Datapoints() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{}
 }
 
 // Close does nothing

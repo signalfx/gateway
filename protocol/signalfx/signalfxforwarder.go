@@ -135,6 +135,7 @@ func (connector *Forwarder) Datapoints() []*datapoint.Datapoint {
 	dps := connector.stats.requests.Datapoints()
 	dps = append(dps, connector.stats.drainSize.Datapoints()...)
 	dps = append(dps, connector.GetFilteredDatapoints()...)
+	dps = append(dps, connector.sampler.Datapoints()...)
 	return dps
 }
 
