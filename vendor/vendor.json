@@ -377,6 +377,12 @@
 			"revision": "cc5d85f4f15bd2163abf0fe6e6753356dde72aa2"
 		},
 		{
+			"checksumSHA1": "jAzqolwnRJhHsKXmmvKNrHqxqAw=",
+			"path": "github.com/spaolacci/murmur3",
+			"revision": "f09979ecbc725b9e6d41a297405f65e7e8804acc",
+			"revisionTime": "2018-01-18T20:28:30Z"
+		},
+		{
 			"checksumSHA1": "Bn333k9lTndxU3D6n/G5c+GMcYY=",
 			"comment": "v1.1.3-12-gc5d7a69",
 			"path": "github.com/stretchr/testify/assert",
