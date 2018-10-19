@@ -48,9 +48,18 @@ type HistoOnDisk struct {
 }
 
 //easyjson:json
+type BufferEntry struct {
+	Spans              []*trace.Span `json:",omitempty"` // buffer of spans by trace id
+	Last               time.Time     `json:",omitempty"` // Last time we saw a span for this trace id
+	ToBeReleased       bool          `json:",omitempty"` // spans that have been selected to be released
+	ReleaseImmediately bool          `json:",omitempty"` // release spans as we've already found parent
+	LatestEndTime      float64       `json:",omitempty"` // Latest end time we've seen for any span
+	StartTime          float64       `json:",omitempty"` // Start time of initiating span if found
+	Initiating         *trace.Span   `json:",omitempty"` // initiating span
+}
+
+//easyjson:json
 type BufferOnDisk struct {
-	Traces       map[string][]*trace.Span `json:",omitempty"` // buffer of spans by trace id
-	Last         map[string]time.Time     `json:",omitempty"` // Last time we saw a span for this trace id
-	NumSpans     int64                    `json:",omitempty"` // num spans buffered in Traces
-	ToBeReleased map[string]bool          `json:",omitempty"` // spans that have been selected to be released
+	Traces   map[string]*BufferEntry `json:",omitempty"`
+	NumSpans int64                   `json:",omitempty"` // num spans buffered in Traces
 }
