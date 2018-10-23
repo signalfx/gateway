@@ -146,7 +146,7 @@ func (h *HTTPSink) doBottom(ctx context.Context, f func() (io.Reader, bool, erro
 
 // AddDatapoints forwards the datapoints to SignalFx.
 func (h *HTTPSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) (err error) {
-	if len(points) == 0 {
+	if len(points) == 0 || h.DatapointEndpoint == "" {
 		return nil
 	}
 	return h.doBottom(ctx, func() (io.Reader, bool, error) {
@@ -326,7 +326,7 @@ func (h *HTTPSink) encodePostBodyProtobufV2(datapoints []*datapoint.Datapoint) (
 
 // AddEvents forwards the events to SignalFx.
 func (h *HTTPSink) AddEvents(ctx context.Context, events []*event.Event) (err error) {
-	if len(events) == 0 {
+	if len(events) == 0 || h.EventEndpoint == "" {
 		return nil
 	}
 	return h.doBottom(ctx, func() (io.Reader, bool, error) {
@@ -394,7 +394,7 @@ func spanResponseValidator(respBody []byte) error {
 
 // AddSpans forwards the traces to SignalFx.
 func (h *HTTPSink) AddSpans(ctx context.Context, traces []*trace.Span) (err error) {
-	if len(traces) == 0 {
+	if len(traces) == 0 || h.TraceEndpoint == "" {
 		return nil
 	}
 	return h.doBottom(ctx, func() (io.Reader, bool, error) {
