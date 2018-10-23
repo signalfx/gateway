@@ -423,8 +423,10 @@ func (p *proxy) run(ctx context.Context) error {
 
 	forwarders, err := setupForwarders(ctx, hostname, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims)
 	if err != nil {
+		p.logger.Log(log.Err, err, "Unable to setup forwarders")
 		return errors.Annotate(err, "unable to setup forwarders")
 	}
+
 	p.forwarders = forwarders
 	dpSinks, eSinks, tSinks := splitSinks(forwarders)
 
@@ -442,6 +444,7 @@ func (p *proxy) run(ctx context.Context) error {
 
 	listeners, err := setupListeners(p.tk, hostname, loader, loadedConfig.ListenFrom, multiplexer, logger, scheduler)
 	if err != nil {
+		p.logger.Log(log.Err, err, "Unable to setup listeners")
 		return errors.Annotate(err, "cannot setup listeners from configuration")
 	}
 	p.listeners = listeners
