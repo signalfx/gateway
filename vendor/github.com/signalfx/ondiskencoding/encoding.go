@@ -48,18 +48,28 @@ type HistoOnDisk struct {
 }
 
 //easyjson:json
-type BufferEntry struct {
-	Spans              []*trace.Span `json:",omitempty"` // buffer of spans by trace id
-	Last               time.Time     `json:",omitempty"` // Last time we saw a span for this trace id
-	ToBeReleased       bool          `json:",omitempty"` // spans that have been selected to be released
-	ReleaseImmediately bool          `json:",omitempty"` // release spans as we've already found parent
-	LatestEndTime      float64       `json:",omitempty"` // Latest end time we've seen for any span
-	StartTime          float64       `json:",omitempty"` // Start time of initiating span if found
-	Initiating         *trace.Span   `json:",omitempty"` // initiating span
+type ExpiredBufferEntry struct {
+	BufferEntry
+	NewSpanSeen bool `json:",omitempty"` // we've seen a new span
+	Released bool `json:",omitempty"`
 }
 
 //easyjson:json
+type BufferEntry struct {
+	Spans         []*trace.Span `json:",omitempty"` // buffer of spans by trace id
+	Last          time.Time     `json:",omitempty"` // Last time we saw a span for this trace id
+	LatestEndTime float64       `json:",omitempty"` // Latest end time we've seen for any span
+	StartTime     float64       `json:",omitempty"` // Start time of initiating span if found
+	Initiating    *trace.Span   `json:",omitempty"` // initiating span
+	ToBeReleased  bool          `json:",omitempty"` // spans that have been selected to be released
+}
+
+//easyjson:json
+type BufferEntries []*BufferEntry
+
+//easyjson:json
 type BufferOnDisk struct {
-	Traces   map[string]*BufferEntry `json:",omitempty"`
-	NumSpans int64                   `json:",omitempty"` // num spans buffered in Traces
+	Traces        map[string]*BufferEntry        `json:",omitempty"` // map of tracid to buffer entry
+	NumSpans      int64                          `json:",omitempty"` // num spans buffered in Traces
+	ExpiredTraces map[string]*ExpiredBufferEntry `json:",omitempty"` // map of traceid to expired buffer entry
 }
