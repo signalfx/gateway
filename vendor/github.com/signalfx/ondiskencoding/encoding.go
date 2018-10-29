@@ -55,6 +55,9 @@ type ExpiredBufferEntry struct {
 }
 
 //easyjson:json
+type ExpiredBufferEntries []*ExpiredBufferEntry
+
+//easyjson:json
 type BufferEntry struct {
 	Spans         []*trace.Span `json:",omitempty"` // buffer of spans by trace id
 	Last          time.Time     `json:",omitempty"` // Last time we saw a span for this trace id
@@ -69,7 +72,7 @@ type BufferEntries []*BufferEntry
 
 //easyjson:json
 type BufferOnDisk struct {
-	Traces        map[string]*BufferEntry        `json:",omitempty"` // map of tracid to buffer entry
+	Traces        map[string]*BufferEntry        `json:",omitempty"` // map of trace id to buffer entry
 	NumSpans      int64                          `json:",omitempty"` // num spans buffered in Traces
-	ExpiredTraces map[string]*ExpiredBufferEntry `json:",omitempty"` // map of traceid to expired buffer entry
+	ExpiredTraces map[string]*ExpiredBufferEntry `json:",omitempty"` // map of trace id to expired buffer entry
 }
