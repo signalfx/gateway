@@ -36,12 +36,12 @@ func (c *Config) String() string {
 
 // DefaultConfig are default values for buffered forwarders
 var DefaultConfig = &Config{
-	BufferSize:         pointer.Int64(10000),
-	MaxTotalDatapoints: pointer.Int64(10000),
-	MaxTotalEvents:     pointer.Int64(10000),
-	MaxDrainSize:       pointer.Int64(1000),
-	MaxTotalSpans:      pointer.Int64(10000),
-	NumDrainingThreads: pointer.Int64(5),
+	BufferSize:         pointer.Int64(1000000),
+	MaxTotalDatapoints: pointer.Int64(1000000),
+	MaxTotalEvents:     pointer.Int64(1000000),
+	MaxTotalSpans:      pointer.Int64(1000000),
+	MaxDrainSize:       pointer.Int64(30000),
+	NumDrainingThreads: pointer.Int64(10),
 	Name:               pointer.String(""),
 }
 
