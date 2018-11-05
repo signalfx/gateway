@@ -1136,7 +1136,7 @@
 			"path": "github.com/spaolacci/murmur3",
 			"revision": "f09979ecbc725b9e6d41a297405f65e7e8804acc",
 			"revisionTime": "2018-01-18T20:28:30Z"
-        },
+		},
 		{
 			"checksumSHA1": "1nDHkiFm79ufUiLc80zG1Y/L9cg=",
 			"path": "github.com/spf13/cobra",
@@ -1586,6 +1586,12 @@
 			"path": "gopkg.in/yaml.v2",
 			"revision": "5420a8b6744d3b0345ab293f6fcba19c978f1183",
 			"revisionTime": "2018-03-28T19:50:20Z"
+		},
+		{
+			"checksumSHA1": "IaJ9sf/1xMXDVNEDpby7jcy7x9M=",
+			"path": "stathat.com/c/consistent",
+			"revision": "ad91dc4a3a642859730ff3d65929fce009bfdc23",
+			"revisionTime": "2017-07-26T18:26:18Z"
 		}
 	],
 	"rootPath": "github.com/signalfx/metricproxy"

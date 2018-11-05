@@ -203,6 +203,10 @@ func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) 
 		Filters:          conf.Filters,
 		TraceSample:      conf.TraceSample,
 	}
+	if sfConf.TraceSample != nil {
+		sfConf.TraceSample.EtcdServer = conf.Server
+		sfConf.TraceSample.EtcdClient = conf.Client
+	}
 	return signalfx.NewForwarder(&sfConf)
 }
 

@@ -248,10 +248,12 @@ func getHostname(osHostname func() (string, error)) string {
 	return name
 }
 
-func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions) ([]protocol.Forwarder, error) {
+func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, manager *etcdManager) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, forwardConfig.Type, logkey.Direction, "forwarder")
+		forwardConfig.Server = manager.server
+		forwardConfig.Client = manager.client
 		forwarder, err := loader.Forwarder(forwardConfig)
 		if err != nil {
 			return nil, err
@@ -562,7 +564,7 @@ func (p *proxy) run(ctx context.Context) error {
 
 	scheduler := p.setupScheduler(hostname)
 
-	forwarders, err := setupForwarders(ctx, hostname, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims)
+	forwarders, err := setupForwarders(ctx, hostname, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims, p.etcdMgr)
 	if err != nil {
 		p.logger.Log(log.Err, err, "Unable to setup forwarders")
 		return errors.Annotate(err, "unable to setup forwarders")
