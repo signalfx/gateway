@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"expvar"
+	"github.com/quentin-m/etcd-cloud-operator/pkg/etcd"
 	"github.com/signalfx/gohelpers/stringhelper"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
@@ -40,6 +41,8 @@ type ForwardTo struct {
 	DimensionsOrder   []string                    `json:",omitempty"`
 	Filters           *filtering.FilterObj        `json:",omitempty"`
 	TraceSample       *sampling.SmartSampleConfig `json:",omitempty"`
+	Server            *etcd.Server                `json:"-"`
+	Client            *etcd.Client                `json:"-"`
 }
 
 // ListenFrom configures how we listen for datapoints to forward
