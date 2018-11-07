@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/quentin-m/etcd-cloud-operator/pkg/etcd"
+	_ "github.com/signalfx/go-metrics"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/eventcounter"
@@ -36,10 +37,9 @@ import (
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/demultiplexer"
 	"github.com/signalfx/metricproxy/protocol/signalfx"
-	"gopkg.in/natefinch/lumberjack.v2"
-	_ "github.com/signalfx/go-metrics"
 	_ "github.com/signalfx/ondiskencoding"
 	_ "github.com/spaolacci/murmur3"
+	"gopkg.in/natefinch/lumberjack.v2"
 	_ "net/http/pprof"
 )
 
@@ -62,12 +62,26 @@ type proxyFlags struct {
 type etcdManager struct {
 	etcd.ServerConfig
 	logger             log.Logger
-	removeTimeout      int64
+	removeTimeout      time.Duration
 	unhealthyMemberTTL int64
 	operation          string
-	targetCluster      string
+	targetCluster      []string
 	server             *etcd.Server
 	client             *etcd.Client
+}
+
+func (mgr *etcdManager) setup(conf *config.ProxyConfig) {
+	mgr.LPAddress = *conf.ListenOnPeerAddress
+	mgr.APAddress = *conf.AdvertisePeerAddress
+	mgr.LCAddress = *conf.ListenOnClientAddress
+	mgr.ACAddress = *conf.AdvertiseClientAddress
+	mgr.MAddress = *conf.ETCDMetricsAddress
+	mgr.UnhealthyMemberTTL = *conf.UnhealthyMemberTTL
+	mgr.removeTimeout = *conf.RemoveMemberTimeout
+	mgr.DataDir = *conf.ClusterDataDir
+	mgr.Name = *conf.ClusterMemberName
+	mgr.operation = *conf.ClusterOperation
+	mgr.targetCluster = conf.TargetClusterAddresses
 }
 
 func (mgr *etcdManager) start() (err error) {
@@ -91,7 +105,7 @@ func (mgr *etcdManager) start() (err error) {
 
 	case "join":
 		mgr.logger.Log(fmt.Sprintf("joining cluster with etcd server name: %s", mgr.ServerConfig.Name))
-		if mgr.client, err = etcd.NewClient([]string{mgr.targetCluster}, etcd.SecurityConfig{}, true); err == nil {
+		if mgr.client, err = etcd.NewClient(mgr.targetCluster, etcd.SecurityConfig{}, true); err == nil {
 			mgr.logger.Log(fmt.Sprintf("joining etcd cluster @ %s", mgr.client.Endpoints()))
 			if err = mgr.server.Join(mgr.client); err == nil {
 				mgr.logger.Log(fmt.Sprintf("successfully joined cluster at %s", mgr.targetCluster))
@@ -105,38 +119,38 @@ func (mgr *etcdManager) start() (err error) {
 	return err
 }
 
-func (mgr *etcdManager) getMemberID() (uint64, error) {
+func (mgr *etcdManager) getMemberID(ctx context.Context) (uint64, error) {
 	var memberID uint64
 	// use the client to retrieve this instance's member id
-	members, err := mgr.client.MemberList(context.Background())
-	for _, m := range members.Members {
-		if m.Name == mgr.Name {
-			memberID = m.ID
+	members, err := mgr.client.MemberList(ctx)
+	if members != nil {
+		for _, m := range members.Members {
+			if m.Name == mgr.Name {
+				memberID = m.ID
+			}
 		}
 	}
 	return memberID, err
 }
 
 func (mgr *etcdManager) removeMember() error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(mgr.removeTimeout)*time.Millisecond)
-	defer cancel()
 	var err error
 	var memberID uint64
+	ctx, cancel := context.WithTimeout(context.Background(), mgr.removeTimeout)
+	defer cancel()
 	// only remove yourself from the cluster if the server is running
 	if mgr.server.IsRunning() {
-		if memberID, err = mgr.getMemberID(); err == nil {
+		if memberID, err = mgr.getMemberID(ctx); err == nil {
 			removed := make(chan error, 1)
 			go func() {
-				select {
-				case removed <- mgr.client.RemoveMember(mgr.Name, memberID):
-					err = <-removed
-					cancel()
-					return
-				case <-ctx.Done():
-					return
-				}
+				defer close(removed)
+				removed <- mgr.client.RemoveMember(mgr.Name, memberID)
 			}()
-			<-ctx.Done()
+			select {
+			case err = <-removed:
+				cancel()
+			case <-ctx.Done():
+			}
 			if ctx.Err() != nil {
 				err = ctx.Err()
 			}
@@ -194,17 +208,6 @@ var mainInstance = proxy{
 
 func init() {
 	flag.StringVar(&mainInstance.flags.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
-	flag.StringVar(&mainInstance.etcdMgr.operation, "cluster-op", "", "operation to perform if running in cluster mode [\"seed\", \"join\", \"\"]")
-	flag.StringVar(&mainInstance.etcdMgr.Name, "etcd-member-name", "", "the member name used when starting or joining the etcd cluster")
-	flag.StringVar(&mainInstance.etcdMgr.DataDir, "etcd-data-dir", "./etcd-data", "the path to the etcd data directory")
-	flag.StringVar(&mainInstance.etcdMgr.targetCluster, "target-client", "", "the target client address to use when joining a cluster")
-	flag.StringVar(&mainInstance.etcdMgr.APAddress, "advertise-peer-url", "127.0.0.1:2380", "initial peer address to advertise")
-	flag.StringVar(&mainInstance.etcdMgr.LPAddress, "listen-peer-url", "127.0.0.1:2380", "address to listen on for peer connections")
-	flag.StringVar(&mainInstance.etcdMgr.ACAddress, "advertise-client-url", "127.0.0.1:2379", "address to advertise for client connections")
-	flag.StringVar(&mainInstance.etcdMgr.LCAddress, "listen-client-url", "127.0.0.1:2379", "address to listen on for client connection")
-	flag.StringVar(&mainInstance.etcdMgr.MAddress, "etcd-metrics-url", "127.0.0.1:2381", "address to serve etcd metrics on")
-	flag.Int64Var(&mainInstance.etcdMgr.unhealthyMemberTTL, "unhealthyHostTTL", 5000, "number of milliseconds to wait before removing an unhealthy cluster member")
-	flag.Int64Var(&mainInstance.etcdMgr.removeTimeout, "removeMemberTimeout", 1000, "number of milliseconds timeout to use when removing instance from the cluster")
 }
 
 func (p *proxy) getLogOutput(loadedConfig *config.ProxyConfig) io.Writer {
@@ -538,10 +541,6 @@ func (p *proxy) scheduleStatCollection(ctx context.Context, scheduler *sfxclient
 }
 
 func (p *proxy) run(ctx context.Context) error {
-	if err := p.etcdMgr.start(); err != nil {
-		p.logger.Log(log.Err, "unable to start etcd server", err)
-		return err
-	}
 	p.debugSink.CtxFlagCheck = &p.debugContext
 	hostname := getHostname(os.Hostname)
 	p.logger.Log(logkey.ConfigFile, p.flags.configFileName, "Looking for config file")
@@ -550,6 +549,11 @@ func (p *proxy) run(ctx context.Context) error {
 	loadedConfig, err := config.Load(p.flags.configFileName, p.logger)
 	if err != nil {
 		p.logger.Log(log.Err, err, "Unable to load config")
+		return err
+	}
+	p.etcdMgr.setup(loadedConfig)
+	if err := p.etcdMgr.start(); err != nil {
+		p.logger.Log(log.Err, "unable to start etcd server", err)
 		return err
 	}
 	p.setup(loadedConfig)
