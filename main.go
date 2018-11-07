@@ -4,7 +4,6 @@ import (
 	"flag"
 	"io"
 	"io/ioutil"
-	_ "net/http/pprof"
 	"os"
 	"path"
 	"runtime"
@@ -13,7 +12,6 @@ import (
 	"context"
 	"expvar"
 	"fmt"
-	_ "github.com/signalfx/go-metrics"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/eventcounter"
@@ -29,7 +27,6 @@ import (
 	"github.com/signalfx/metricproxy/protocol"
 	"github.com/signalfx/metricproxy/protocol/demultiplexer"
 	"github.com/signalfx/metricproxy/protocol/signalfx"
-	_ "github.com/signalfx/ondiskencoding"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"net"
 	"net/http"
@@ -38,6 +35,11 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	_ "github.com/signalfx/go-metrics"
+	_ "github.com/signalfx/ondiskencoding"
+	_ "github.com/spaolacci/murmur3"
+	_ "net/http/pprof"
 )
 
 var (
