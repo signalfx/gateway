@@ -80,7 +80,9 @@ func (mgr *etcdManager) setup(conf *config.ProxyConfig) {
 	mgr.removeTimeout = *conf.RemoveMemberTimeout
 	mgr.DataDir = *conf.ClusterDataDir
 	mgr.Name = *conf.ClusterMemberName
-	mgr.operation = *conf.ClusterOperation
+	if mgr.operation == "" {
+		mgr.operation = *conf.ClusterOperation
+	}
 	mgr.targetCluster = conf.TargetClusterAddresses
 }
 
@@ -208,6 +210,7 @@ var mainInstance = proxy{
 
 func init() {
 	flag.StringVar(&mainInstance.flags.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
+	flag.StringVar(&mainInstance.etcdMgr.operation, "cluster-op", "", "operation to perform if running in cluster mode [\"seed\", \"join\", \"\"] this overrides the ClusterOperation set in the config file")
 }
 
 func (p *proxy) getLogOutput(loadedConfig *config.ProxyConfig) io.Writer {
