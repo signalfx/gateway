@@ -56,7 +56,19 @@ const configEtcd = `
 		"MaxGracefulWaitTime":     "<<MAX>>ms",
 		"GracefulCheckInterval":   "<<CHECK>>ms",
 		"MinimalGracefulWaitTime": "<<MIN>>ms",
-		"SilentGracefulTime": "50ms"
+		"SilentGracefulTime": "50ms",
+		"ListenOnPeerAddress": "<<LPADDRESS>>",
+		"AdvertisePeerAddress": "<<APADDRESS>>",
+		"ListenOnClientAddress": "<<LCADDRESS>>",
+		"AdvertiseClientAddress": "<<ACADDRESS>>",
+		"ETCDMetricsAddress": "<<MADDRESS>>",
+		"UnhealthyMemberTTL": "<<UNHEALTHYTTL>>ms",
+		"RemoveMemberTimeout": "<<REMOVEMEMBERTIMEOUT>>ms",
+		"ClusterDataDir": "<<DATADIR>>",
+		"ClusterOperation": "<<CLUSTEROP>>",
+		"TargetClusterAddresses": [
+			<<TARGETADDRESSES>>
+		]
 	}
 `
 
@@ -153,6 +165,17 @@ const emptyConfig = `
   }
 `
 
+const invalidClusterOpConfig = `
+  {
+    "ListenFrom":[
+    ],
+    "ForwardTo":[
+    ],
+    "StatsDelay": "5s",
+	"ClusterOperation": "woohoo"
+  }
+`
+
 const invalidDebugServerAddr = `
   {
     "LogDir": "-",
@@ -203,7 +226,7 @@ func (c *ConcurrentByteBuffer) Write(p []byte) (n int, err error) {
 	return c.Buffer.Write(p)
 }
 
-func failingTestRun(t *testing.T, c string, closeAfterSetup bool, clusterOp string, expectedLog string, expectedErr string) context.CancelFunc {
+func failingTestRun(t *testing.T, c string, closeAfterSetup bool, expectedLog string, expectedErr string) context.CancelFunc {
 	var cc context.CancelFunc
 	Convey("failing config test", t, func() {
 		logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
@@ -225,7 +248,7 @@ func failingTestRun(t *testing.T, c string, closeAfterSetup bool, clusterOp stri
 			setupDoneSignal: make(chan struct{}),
 			stdout:          logBuf,
 			gomaxprocs:      (&goMaxProcs{}).Set,
-			etcdMgr:         &etcdManager{ServerConfig: etcd.ServerConfig{}, operation: clusterOp, logger: logger.CreateChild()},
+			etcdMgr:         &etcdManager{ServerConfig: etcd.ServerConfig{}, logger: logger.CreateChild()},
 		}
 		if closeAfterSetup {
 			go func() {
@@ -250,31 +273,31 @@ func failingTestRun(t *testing.T, c string, closeAfterSetup bool, clusterOp stri
 }
 
 func TestEmptyConfig(t *testing.T) {
-	failingTestRun(t, emptyConfig, true, "", "", "")
+	failingTestRun(t, emptyConfig, true, "", "")
 }
 
 func TestInvalidConfigForwarder(t *testing.T) {
-	failingTestRun(t, invalidForwarderConfig, false, "", "", "cannot find config unkndfdown")
+	failingTestRun(t, invalidForwarderConfig, false, "", "cannot find config unkndfdown")
 }
 
 func TestInvalidConfigJSON(t *testing.T) {
-	failingTestRun(t, "__INVALID__JSON__", false, "", "", "cannot unmarshal config JSON")
+	failingTestRun(t, "__INVALID__JSON__", false, "", "cannot unmarshal config JSON")
 }
 
 func TestInvalidConfigListener(t *testing.T) {
-	failingTestRun(t, invalidListenerConfig, false, "", "", "cannot setup listeners from configuration")
+	failingTestRun(t, invalidListenerConfig, false, "", "cannot setup listeners from configuration")
 }
 
 func TestInvalidConfigDebugAddr(t *testing.T) {
-	failingTestRun(t, invalidDebugServerAddr, false, "", "", "cannot setup debug server")
+	failingTestRun(t, invalidDebugServerAddr, false, "", "cannot setup debug server")
 }
 
 func TestInvalidConfigPIDFile(t *testing.T) {
-	failingTestRun(t, invalidPIDfile, true, "", "cannot store pid in pid file", "")
+	failingTestRun(t, invalidPIDfile, true, "cannot store pid in pid file", "")
 }
 
 func TestInvalidClusterOperation(t *testing.T) {
-	failingTestRun(t, emptyConfig, true, "woohoo", "", "unsupported cluster-op specified \"woohoo\"")
+	failingTestRun(t, invalidClusterOpConfig, true, "", "unsupported cluster-op specified \"woohoo\"")
 }
 
 func TestForwarderName(t *testing.T) {
@@ -436,18 +459,14 @@ func TestProxy1(t *testing.T) {
 	})
 }
 
-func startProxies(ctx context.Context, proxies []*proxy, filename string, etcdDataDir string, logger *log.Hierarchy) ([]*proxy, []chan error) {
+func startProxies(ctx context.Context, proxies []*proxy, logger *log.Hierarchy) ([]*proxy, []chan error) {
 	ps := make([]*proxy, 0, len(proxies))
 	mainDoneChans := make([]chan error, 0, len(proxies))
 	gmp := &goMaxProcs{}
 	for _, p := range proxies {
-		p.flags = proxyFlags{
-			configFileName: filename,
-		}
 		p.gomaxprocs = gmp.Set
 		p.logger = logger.CreateChild()
 		p.etcdMgr.logger = logger.CreateChild()
-		p.etcdMgr.DataDir = filepath.Join(etcdDataDir, p.etcdMgr.DataDir)
 	retry:
 		mainDoneChan := make(chan error)
 		go func(p *proxy, mainDoneChan chan error) {
@@ -469,16 +488,27 @@ func startProxies(ctx context.Context, proxies []*proxy, filename string, etcdDa
 	return ps, mainDoneChans
 }
 
+func formatTargetAddresses(targetClusters []string) (targetAddresses string) {
+	for index, address := range targetClusters {
+		targetAddresses += fmt.Sprintf("\"%s\"", address)
+		if index < (len(targetClusters) - 1) {
+			targetAddresses += ","
+		}
+		targetAddresses += "\n"
+	}
+	return
+}
+
 func TestProxyCluster(t *testing.T) {
 	Convey("a setup proxy cluster", t, func() {
 		ctx, cancelfunc := context.WithCancel(context.Background())
 		var ps []*proxy
-		var filename string
+		filenames := make([]string, 0, 0)
 		var mainDoneChans []chan error
 		logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
 		checkError := false
 
-		setUp := func(max int, min int, check int, proxies []*proxy) {
+		setUp := func(max int, min int, check int, etcdConfigs []*etcdManager) {
 			go func() {
 				for {
 					ln, _ := net.Listen("tcp", "localhost:9999")
@@ -489,55 +519,58 @@ func TestProxyCluster(t *testing.T) {
 					}
 				}
 			}()
-			fileObj, err := ioutil.TempFile("", "TestProxyCluster")
-			So(err, ShouldBeNil)
-			etcdDataDir, err := ioutil.TempDir("", "TestProxyCluster")
-			So(err, ShouldBeNil)
-			So(os.RemoveAll(etcdDataDir), ShouldBeNil)
-			filename = fileObj.Name()
-			So(os.Remove(filename), ShouldBeNil)
-			proxyConf := configEtcd
-			proxyConf = strings.Replace(proxyConf, "<<MAX>>", strconv.FormatInt(int64(max), 10), -1)
-			proxyConf = strings.Replace(proxyConf, "<<MIN>>", strconv.FormatInt(int64(min), 10), -1)
-			proxyConf = strings.Replace(proxyConf, "<<CHECK>>", strconv.FormatInt(int64(check), 10), -1)
-			So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
+			var proxies = make([]*proxy, 0, len(etcdConfigs))
+			for _, etcdConf := range etcdConfigs {
+				fileObj, err := ioutil.TempFile("", "TestProxyCluster")
+				So(err, ShouldBeNil)
+				etcdDataDir, err := ioutil.TempDir("", "TestProxyCluster")
+				So(err, ShouldBeNil)
+				So(os.RemoveAll(etcdDataDir), ShouldBeNil)
+				filename := fileObj.Name()
+				filenames = append(filenames, filename)
+				So(os.Remove(filename), ShouldBeNil)
+				proxyConf := configEtcd
+				proxyConf = strings.Replace(proxyConf, "<<MAX>>", strconv.FormatInt(int64(max), 10), -1)
+				proxyConf = strings.Replace(proxyConf, "<<MIN>>", strconv.FormatInt(int64(min), 10), -1)
+				proxyConf = strings.Replace(proxyConf, "<<CHECK>>", strconv.FormatInt(int64(check), 10), -1)
+				proxyConf = strings.Replace(proxyConf, "<<CHECK>>", strconv.FormatInt(int64(check), 10), -1)
+				proxyConf = strings.Replace(proxyConf, "<<LPADDRESS>>", etcdConf.LPAddress, -1)
+				proxyConf = strings.Replace(proxyConf, "<<APADDRESS>>", etcdConf.APAddress, -1)
+				proxyConf = strings.Replace(proxyConf, "<<LCADDRESS>>", etcdConf.LCAddress, -1)
+				proxyConf = strings.Replace(proxyConf, "<<ACADDRESS>>", etcdConf.ACAddress, -1)
+				proxyConf = strings.Replace(proxyConf, "<<MADDRESS>>", etcdConf.MAddress, -1)
+				proxyConf = strings.Replace(proxyConf, "<<UNHEALTHYTTL>>", strconv.FormatInt(int64(etcdConf.unhealthyMemberTTL), 10), -1)
+				proxyConf = strings.Replace(proxyConf, "<<REMOVEMEMBERTIMEOUT>>", strconv.FormatInt(int64(etcdConf.removeTimeout), 10), -1)
+				proxyConf = strings.Replace(proxyConf, "<<DATADIR>>", filepath.Join(etcdDataDir, etcdConf.DataDir), -1)
+				proxyConf = strings.Replace(proxyConf, "<<CLUSTEROP>>", etcdConf.operation, -1)
+				proxyConf = strings.Replace(proxyConf, "<<TARGETADDRESSES>>", formatTargetAddresses(etcdConf.targetCluster), -1)
+
+				So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
+
+				proxies = append(proxies, &proxy{
+					stdout:          os.Stdout,
+					tk:              timekeeper.RealTime{},
+					setupDoneSignal: make(chan struct{}),
+					signalChan:      make(chan os.Signal),
+					flags: proxyFlags{
+						configFileName: filename,
+					},
+					etcdMgr: &etcdManager{ServerConfig: etcd.ServerConfig{}},
+				})
+			}
 			logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
 			fmt.Println("Launching servers...")
-			ps, mainDoneChans = startProxies(ctx, proxies, filename, etcdDataDir, logger)
+			ps, mainDoneChans = startProxies(ctx, proxies, logger)
 		}
 
 		Convey("the etcd cluster should be aware of all members", func() {
-			proxies := []*proxy{
-				{
-					stdout:          os.Stdout,
-					tk:              timekeeper.RealTime{},
-					setupDoneSignal: make(chan struct{}),
-					signalChan:      make(chan os.Signal),
-					etcdMgr:         &etcdManager{unhealthyMemberTTL: 1000, removeTimeout: 3000, ServerConfig: etcd.ServerConfig{DataDir: "etcd-data", LCAddress: "127.0.0.1:2379", ACAddress: "127.0.0.1:2379", LPAddress: "127.0.0.1:2380", APAddress: "127.0.0.1:2380", MAddress: "127.0.0.1:2381"}, operation: "seed"},
-				},
-				{
-					stdout:          os.Stdout,
-					tk:              timekeeper.RealTime{},
-					setupDoneSignal: make(chan struct{}),
-					signalChan:      make(chan os.Signal),
-					etcdMgr:         &etcdManager{unhealthyMemberTTL: 1000, removeTimeout: 3000, ServerConfig: etcd.ServerConfig{DataDir: "etcd-data1", LCAddress: "127.0.0.1:2479", ACAddress: "127.0.0.1:2479", LPAddress: "127.0.0.1:2480", APAddress: "127.0.0.1:2480", MAddress: "127.0.0.1:2481"}, targetCluster: "127.0.0.1:2379", operation: "join"},
-				},
-				{
-					stdout:          os.Stdout,
-					tk:              timekeeper.RealTime{},
-					setupDoneSignal: make(chan struct{}),
-					signalChan:      make(chan os.Signal),
-					etcdMgr:         &etcdManager{unhealthyMemberTTL: 1000, removeTimeout: 0, ServerConfig: etcd.ServerConfig{DataDir: "etcd-data2", LCAddress: "127.0.0.1:2579", ACAddress: "127.0.0.1:2579", LPAddress: "127.0.0.1:2580", APAddress: "127.0.0.1:2580", MAddress: "127.0.0.1:2581"}, targetCluster: "127.0.0.1:2379", operation: "join"},
-				},
-				{
-					stdout:          os.Stdout,
-					tk:              timekeeper.RealTime{},
-					setupDoneSignal: make(chan struct{}),
-					signalChan:      make(chan os.Signal),
-					etcdMgr:         &etcdManager{unhealthyMemberTTL: 1000, removeTimeout: 0, ServerConfig: etcd.ServerConfig{DataDir: "etcd-data3", LCAddress: "127.0.0.1:2679", ACAddress: "127.0.0.1:2679", LPAddress: "127.0.0.1:2680", APAddress: "127.0.0.1:2680", MAddress: "127.0.0.1:2681"}, targetCluster: "127.0.0.1:2379", operation: "join"},
-				},
+			etcdConfs := []*etcdManager{
+				{unhealthyMemberTTL: 1000, removeTimeout: 3000, ServerConfig: etcd.ServerConfig{DataDir: "etcd-data", LCAddress: "127.0.0.1:2379", ACAddress: "127.0.0.1:2379", LPAddress: "127.0.0.1:2380", APAddress: "127.0.0.1:2380", MAddress: "127.0.0.1:2381"}, operation: "seed"},
+				{unhealthyMemberTTL: 1000, removeTimeout: 3000, ServerConfig: etcd.ServerConfig{DataDir: "etcd-data1", LCAddress: "127.0.0.1:2479", ACAddress: "127.0.0.1:2479", LPAddress: "127.0.0.1:2480", APAddress: "127.0.0.1:2480", MAddress: "127.0.0.1:2481"}, targetCluster: []string{"127.0.0.1:2379"}, operation: "join"},
+				{unhealthyMemberTTL: 1000, removeTimeout: -1, ServerConfig: etcd.ServerConfig{DataDir: "etcd-data2", LCAddress: "127.0.0.1:2579", ACAddress: "127.0.0.1:2579", LPAddress: "127.0.0.1:2580", APAddress: "127.0.0.1:2580", MAddress: "127.0.0.1:2581"}, targetCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479"}, operation: "join"},
+				{unhealthyMemberTTL: 1000, removeTimeout: 3000, ServerConfig: etcd.ServerConfig{DataDir: "etcd-data3", LCAddress: "127.0.0.1:2679", ACAddress: "127.0.0.1:2679", LPAddress: "127.0.0.1:2680", APAddress: "127.0.0.1:2680", MAddress: "127.0.0.1:2681"}, targetCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479", "127.0.0.1:2579"}, operation: "join"},
 			}
-			setUp(15000, 0, 25, proxies)
+			setUp(15000, 0, 25, etcdConfs)
 			So(ps[0].etcdMgr.server.IsRunning(), ShouldBeTrue)
 			for _, p := range ps {
 				memberList, err := p.etcdMgr.client.MemberList(context.Background())
@@ -556,7 +589,9 @@ func TestProxyCluster(t *testing.T) {
 					checkError = false
 				}
 			}
-			So(os.Remove(filename), ShouldBeNil)
+			for _, filename := range filenames {
+				So(os.Remove(filename), ShouldBeNil)
+			}
 			if cancelfunc != nil {
 				cancelfunc()
 			}

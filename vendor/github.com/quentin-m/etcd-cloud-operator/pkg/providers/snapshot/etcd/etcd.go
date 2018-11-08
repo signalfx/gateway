@@ -1,5 +1,7 @@
 // Copyright 2017 Quentin Machu & eco authors
 //
+// Modifications copyright (C) 2018 SignalFx, Inc.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -23,7 +25,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/coreos/bbolt"
+	bolt "github.com/coreos/bbolt"
 
 	"github.com/quentin-m/etcd-cloud-operator/pkg/providers"
 	"github.com/quentin-m/etcd-cloud-operator/pkg/providers/snapshot"
@@ -60,7 +62,7 @@ func (f *etcd) Info() (*snapshot.Metadata, error) {
 		return nil, snapshot.ErrNoSnapshot
 	}
 
-	db, err := bbolt.Open(dbPath, 0400, &bbolt.Options{ReadOnly: true})
+	db, err := bolt.Open(dbPath, 0400, &bolt.Options{ReadOnly: true})
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +70,7 @@ func (f *etcd) Info() (*snapshot.Metadata, error) {
 
 	var revision int64
 	var size int64
-	err = db.View(func(tx *bbolt.Tx) error {
+	err = db.View(func(tx *bolt.Tx) error {
 		size = tx.Size()
 		c := tx.Cursor()
 		for next, _ := c.First(); next != nil; next, _ = c.Next() {

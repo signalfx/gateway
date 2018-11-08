@@ -97,6 +97,17 @@ type ProxyConfig struct {
 	FutureThreshold               *string        `json:",omitempty"`
 	LateThresholdDuration         *time.Duration `json:"-"`
 	FutureThresholdDuration       *time.Duration `json:"-"`
+	ClusterOperation              *string        `json:",omitempty"`
+	ClusterMemberName             *string        `json:",omitempty"`
+	ClusterDataDir                *string        `json:",omitempty"`
+	TargetClusterAddresses        []string       `json:",omitempty"`
+	AdvertisePeerAddress          *string        `json:",omitempty"`
+	ListenOnPeerAddress           *string        `json:",omitempty"`
+	AdvertiseClientAddress        *string        `json:",omitempty"`
+	ListenOnClientAddress         *string        `json:",omitempty"`
+	ETCDMetricsAddress            *string        `json:",omitempty"`
+	UnhealthyMemberTTL            *time.Duration `json:"-"`
+	RemoveMemberTimeout           *time.Duration `json:"-"`
 }
 
 // DefaultProxyConfig is default values for the proxy config
@@ -110,6 +121,17 @@ var DefaultProxyConfig = &ProxyConfig{
 	MaxGracefulWaitTimeDuration:   pointer.Duration(time.Second),
 	GracefulCheckIntervalDuration: pointer.Duration(time.Second),
 	SilentGracefulTimeDuration:    pointer.Duration(2 * time.Second),
+	ListenOnPeerAddress:           pointer.String("127.0.0.1:2380"),
+	AdvertisePeerAddress:          pointer.String("127.0.0.1:2380"),
+	ListenOnClientAddress:         pointer.String("127.0.0.1:2379"),
+	AdvertiseClientAddress:        pointer.String("127.0.0.1:2379"),
+	ETCDMetricsAddress:            pointer.String("127.0.0.1:2381"),
+	UnhealthyMemberTTL:            pointer.Duration(time.Second * 5),
+	RemoveMemberTimeout:           pointer.Duration(time.Second),
+	ClusterDataDir:                pointer.String("./etcd-data"),
+	ClusterMemberName:             pointer.String(""),
+	ClusterOperation:              pointer.String(""),
+	TargetClusterAddresses:        []string{},
 }
 
 func getDefaultName(osHostname func() (string, error)) string {

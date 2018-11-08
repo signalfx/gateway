@@ -1,5 +1,7 @@
 // Copyright 2017 Quentin Machu & eco authors
 //
+// Modifications copyright (C) 2018 SignalFx, Inc.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -125,6 +127,9 @@ func URL2Address(pURL string) string {
 }
 
 func metricsURLs(address string) []url.URL {
+	if address == "" {
+		return []url.URL{}
+	}
 	u, _ := url.Parse(fmt.Sprintf("http://%s", address))
 	if u.Port() == "" {
 		u, _ = url.Parse(fmt.Sprintf("http://%s:%d", address, defaultMetricsPort))
