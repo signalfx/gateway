@@ -252,16 +252,16 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding2(in *jlexer.Lexer, ou
 				in.Delim('[')
 				if out.Samples == nil {
 					if !in.IsDelim(']') {
-						out.Samples = make([]int64, 0, 8)
+						out.Samples = make([]float64, 0, 8)
 					} else {
-						out.Samples = []int64{}
+						out.Samples = []float64{}
 					}
 				} else {
 					out.Samples = (out.Samples)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v4 int64
-					v4 = int64(in.Int64())
+					var v4 float64
+					v4 = float64(in.Float64())
 					out.Samples = append(out.Samples, v4)
 					in.WantComma()
 				}
@@ -305,7 +305,7 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding2(out *jwriter.Writer,
 				if v5 > 0 {
 					out.RawByte(',')
 				}
-				out.Int64(int64(v6))
+				out.Float64(float64(v6))
 			}
 			out.RawByte(']')
 		}

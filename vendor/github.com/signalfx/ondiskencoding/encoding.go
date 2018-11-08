@@ -85,7 +85,7 @@ type SampleList []*SampleEntry
 //easyjson:json
 type SampleEntry struct {
 	ID      *SpanIdentity `json:",omitempty"`
-	Samples []int64      `json:",omitempty"`
+	Samples []float64      `json:",omitempty"`
 }
 
 //easyjson:json
