@@ -22,6 +22,8 @@ func (k *SpanIdentity) Dims() map[string]string {
 	}
 	if k.Error {
 		m["error"] = "true"
+	} else {
+		m["error"] = "false"
 	}
 	if k.HttpMethod != "" {
 		m["httpMethod"] = k.HttpMethod
@@ -51,7 +53,7 @@ type HistoOnDisk struct {
 type ExpiredBufferEntry struct {
 	BufferEntry
 	NewSpanSeen bool `json:",omitempty"` // we've seen a new span
-	Released bool `json:",omitempty"`
+	Released    bool `json:",omitempty"`
 }
 
 //easyjson:json
@@ -75,4 +77,20 @@ type BufferOnDisk struct {
 	Traces        map[string]*BufferEntry        `json:",omitempty"` // map of trace id to buffer entry
 	NumSpans      int64                          `json:",omitempty"` // num spans buffered in Traces
 	ExpiredTraces map[string]*ExpiredBufferEntry `json:",omitempty"` // map of trace id to expired buffer entry
+}
+
+//easyjson:json
+type SampleList []*SampleEntry
+
+//easyjson:json
+type SampleEntry struct {
+	ID      *SpanIdentity `json:",omitempty"`
+	Samples []float64      `json:",omitempty"`
+}
+
+//easyjson:json
+type EtcdConfig struct {
+	RebalanceAddress *string `json:",omitempty"`
+	IngestAddress    *string `json:",omitempty"`
+	ID               *string `json:",omitempty"`
 }
