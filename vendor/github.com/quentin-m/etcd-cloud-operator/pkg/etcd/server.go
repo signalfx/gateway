@@ -1,5 +1,7 @@
 // Copyright 2017 Quentin Machu & eco authors
 //
+// Modifications copyright (C) 2018 SignalFx, Inc.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -380,7 +382,7 @@ func (c *Server) startServer(ctx context.Context) error {
 	etcdCfg.LCUrls, _ = types.NewURLs([]string{ClientURL(c.cfg.ListenOnClientAddress(), c.cfg.ClientSC.TLSEnabled())})
 	etcdCfg.ACUrls, _ = types.NewURLs([]string{ClientURL(c.cfg.AdvertisedClientAddress(), c.cfg.ClientSC.TLSEnabled())})
 	etcdCfg.ListenMetricsUrls = metricsURLs(c.cfg.MetricsAddress())
-	etcdCfg.Metrics = "extensive"
+	etcdCfg.Metrics = "basic"
 	etcdCfg.QuotaBackendBytes = c.cfg.DataQuota
 
 	// Start the server.
