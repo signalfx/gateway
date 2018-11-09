@@ -50,6 +50,13 @@ type HistoOnDisk struct {
 }
 
 //easyjson:json
+type Histo struct {
+	Error HistoOnDisk `json:",omitempty"`
+	Span  HistoOnDisk `json:",omitempty"`
+	Trace HistoOnDisk `json:",omitempty"`
+}
+
+//easyjson:json
 type ExpiredBufferEntry struct {
 	BufferEntry
 	NewSpanSeen bool `json:",omitempty"` // we've seen a new span
@@ -85,7 +92,7 @@ type SampleList []*SampleEntry
 //easyjson:json
 type SampleEntry struct {
 	ID      *SpanIdentity `json:",omitempty"`
-	Samples []float64      `json:",omitempty"`
+	Samples []float64     `json:",omitempty"`
 }
 
 //easyjson:json
