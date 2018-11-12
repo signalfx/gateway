@@ -63,7 +63,6 @@ type etcdManager struct {
 	etcd.ServerConfig
 	logger             log.Logger
 	removeTimeout      time.Duration
-	unhealthyMemberTTL int64
 	operation          string
 	targetCluster      []string
 	server             *etcd.Server
@@ -87,7 +86,6 @@ func (mgr *etcdManager) setup(conf *config.ProxyConfig) {
 }
 
 func (mgr *etcdManager) start() (err error) {
-	mgr.ServerConfig.UnhealthyMemberTTL = time.Duration(mgr.unhealthyMemberTTL) * time.Millisecond
 
 	// use a default server name if one is not provided
 	if mgr.ServerConfig.Name == "" {
