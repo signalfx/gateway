@@ -61,13 +61,12 @@ type proxyFlags struct {
 
 type etcdManager struct {
 	etcd.ServerConfig
-	logger             log.Logger
-	removeTimeout      time.Duration
-	unhealthyMemberTTL int64
-	operation          string
-	targetCluster      []string
-	server             *etcd.Server
-	client             *etcd.Client
+	logger        log.Logger
+	removeTimeout time.Duration
+	operation     string
+	targetCluster []string
+	server        *etcd.Server
+	client        *etcd.Client
 }
 
 func (mgr *etcdManager) setup(conf *config.ProxyConfig) {
@@ -87,7 +86,6 @@ func (mgr *etcdManager) setup(conf *config.ProxyConfig) {
 }
 
 func (mgr *etcdManager) start() (err error) {
-	mgr.ServerConfig.UnhealthyMemberTTL = time.Duration(mgr.unhealthyMemberTTL) * time.Millisecond
 
 	// use a default server name if one is not provided
 	if mgr.ServerConfig.Name == "" {

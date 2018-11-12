@@ -539,7 +539,7 @@ func TestProxyCluster(t *testing.T) {
 				proxyConf = strings.Replace(proxyConf, "<<LCADDRESS>>", etcdConf.LCAddress, -1)
 				proxyConf = strings.Replace(proxyConf, "<<ACADDRESS>>", etcdConf.ACAddress, -1)
 				proxyConf = strings.Replace(proxyConf, "<<MADDRESS>>", etcdConf.MAddress, -1)
-				proxyConf = strings.Replace(proxyConf, "<<UNHEALTHYTTL>>", strconv.FormatInt(int64(etcdConf.unhealthyMemberTTL), 10), -1)
+				proxyConf = strings.Replace(proxyConf, "<<UNHEALTHYTTL>>", strconv.FormatFloat(etcdConf.UnhealthyMemberTTL.Seconds()*1000, 'f', 2, 64), -1)
 				proxyConf = strings.Replace(proxyConf, "<<REMOVEMEMBERTIMEOUT>>", strconv.FormatInt(int64(etcdConf.removeTimeout), 10), -1)
 				proxyConf = strings.Replace(proxyConf, "<<DATADIR>>", filepath.Join(etcdDataDir, etcdConf.DataDir), -1)
 				proxyConf = strings.Replace(proxyConf, "<<CLUSTEROP>>", etcdConf.operation, -1)
@@ -565,10 +565,10 @@ func TestProxyCluster(t *testing.T) {
 
 		Convey("the etcd cluster should be aware of all members", func() {
 			etcdConfs := []*etcdManager{
-				{unhealthyMemberTTL: 1000, removeTimeout: 3000, ServerConfig: etcd.ServerConfig{DataDir: "etcd-data", LCAddress: "127.0.0.1:2379", ACAddress: "127.0.0.1:2379", LPAddress: "127.0.0.1:2380", APAddress: "127.0.0.1:2380", MAddress: "127.0.0.1:2381"}, operation: "seed"},
-				{unhealthyMemberTTL: 1000, removeTimeout: 3000, ServerConfig: etcd.ServerConfig{DataDir: "etcd-data1", LCAddress: "127.0.0.1:2479", ACAddress: "127.0.0.1:2479", LPAddress: "127.0.0.1:2480", APAddress: "127.0.0.1:2480", MAddress: "127.0.0.1:2481"}, targetCluster: []string{"127.0.0.1:2379"}, operation: "join"},
-				{unhealthyMemberTTL: 1000, removeTimeout: -1, ServerConfig: etcd.ServerConfig{DataDir: "etcd-data2", LCAddress: "127.0.0.1:2579", ACAddress: "127.0.0.1:2579", LPAddress: "127.0.0.1:2580", APAddress: "127.0.0.1:2580", MAddress: "127.0.0.1:2581"}, targetCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479"}, operation: "join"},
-				{unhealthyMemberTTL: 1000, removeTimeout: 3000, ServerConfig: etcd.ServerConfig{DataDir: "etcd-data3", LCAddress: "127.0.0.1:2679", ACAddress: "127.0.0.1:2679", LPAddress: "127.0.0.1:2680", APAddress: "127.0.0.1:2680", MAddress: "127.0.0.1:2681"}, targetCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479", "127.0.0.1:2579"}, operation: "join"},
+				{removeTimeout: 3000, ServerConfig: etcd.ServerConfig{UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data", LCAddress: "127.0.0.1:2379", ACAddress: "127.0.0.1:2379", LPAddress: "127.0.0.1:2380", APAddress: "127.0.0.1:2380", MAddress: "127.0.0.1:2381"}, operation: "seed"},
+				{removeTimeout: 3000, ServerConfig: etcd.ServerConfig{UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data1", LCAddress: "127.0.0.1:2479", ACAddress: "127.0.0.1:2479", LPAddress: "127.0.0.1:2480", APAddress: "127.0.0.1:2480", MAddress: "127.0.0.1:2481"}, targetCluster: []string{"127.0.0.1:2379"}, operation: "join"},
+				{removeTimeout: -1, ServerConfig: etcd.ServerConfig{UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data2", LCAddress: "127.0.0.1:2579", ACAddress: "127.0.0.1:2579", LPAddress: "127.0.0.1:2580", APAddress: "127.0.0.1:2580", MAddress: "127.0.0.1:2581"}, targetCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479"}, operation: "join"},
+				{removeTimeout: 3000, ServerConfig: etcd.ServerConfig{UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data3", LCAddress: "127.0.0.1:2679", ACAddress: "127.0.0.1:2679", LPAddress: "127.0.0.1:2680", APAddress: "127.0.0.1:2680", MAddress: "127.0.0.1:2681"}, targetCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479", "127.0.0.1:2579"}, operation: "join"},
 			}
 			setUp(15000, 0, 25, etcdConfs)
 			So(ps[0].etcdMgr.server.IsRunning(), ShouldBeTrue)
