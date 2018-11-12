@@ -61,12 +61,12 @@ type proxyFlags struct {
 
 type etcdManager struct {
 	etcd.ServerConfig
-	logger             log.Logger
-	removeTimeout      time.Duration
-	operation          string
-	targetCluster      []string
-	server             *etcd.Server
-	client             *etcd.Client
+	logger        log.Logger
+	removeTimeout time.Duration
+	operation     string
+	targetCluster []string
+	server        *etcd.Server
+	client        *etcd.Client
 }
 
 func (mgr *etcdManager) setup(conf *config.ProxyConfig) {
