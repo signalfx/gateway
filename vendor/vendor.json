@@ -1042,6 +1042,12 @@
 			"revisionTime": "2018-10-22T19:35:28Z"
 		},
 		{
+			"checksumSHA1": "N+OiKDJ+L5TSeYLgbIOfeKDaTo4=",
+			"path": "github.com/signalfx/golib/reportsha",
+			"revision": "83dade6332771d10205602f9077fb048f0db9435",
+			"revisionTime": "2018-10-22T19:35:28Z"
+		},
+		{
 			"checksumSHA1": "fmJWH3jv3uaaevbAmTjPI+qoglQ=",
 			"path": "github.com/signalfx/golib/sfxclient",
 			"revision": "83dade6332771d10205602f9077fb048f0db9435",
