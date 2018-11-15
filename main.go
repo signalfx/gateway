@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"encoding/json"
 	"github.com/quentin-m/etcd-cloud-operator/pkg/etcd"
 	_ "github.com/signalfx/go-metrics"
 	"github.com/signalfx/golib/datapoint/dpsink"
@@ -242,14 +243,6 @@ func forwarderName(f *config.ForwardTo) string {
 		return *f.Name
 	}
 	return f.Type
-}
-
-func getHostname(osHostname func() (string, error)) string {
-	name, err := osHostname()
-	if err != nil {
-		return "unknown"
-	}
-	return name
 }
 
 func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, manager *etcdManager) ([]protocol.Forwarder, error) {
@@ -542,7 +535,6 @@ func (p *proxy) scheduleStatCollection(ctx context.Context, scheduler *sfxclient
 
 func (p *proxy) run(ctx context.Context) error {
 	p.debugSink.CtxFlagCheck = &p.debugContext
-	hostname := getHostname(os.Hostname)
 	p.logger.Log(logkey.ConfigFile, p.flags.configFileName, "Looking for config file")
 	p.logger.Log(logkey.Env, strings.Join(os.Environ(), "-"), "Looking for config file")
 
@@ -559,16 +551,19 @@ func (p *proxy) run(ctx context.Context) error {
 	p.setup(loadedConfig)
 	logger := p.logger
 
-	logger.Log(logkey.Config, loadedConfig, logkey.Env, strings.Join(os.Environ(), "-"), "config loaded")
+	var bb []byte
+	if bb, err = json.Marshal(loadedConfig); err == nil {
+		logger.Log(logkey.Config, string(bb), logkey.Env, strings.Join(os.Environ(), "-"), "config loaded")
+	}
 
 	setupGoMaxProcs(loadedConfig.NumProcs, p.gomaxprocs)
 
 	chain := p.createCommonHTTPChain(loadedConfig)
 	loader := config.NewLoader(ctx, logger, Version, &p.debugContext, &p.debugSink, &p.ctxDims, chain)
 
-	scheduler := p.setupScheduler(hostname)
+	scheduler := p.setupScheduler(*loadedConfig.ServerName)
 
-	forwarders, err := setupForwarders(ctx, hostname, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims, p.etcdMgr)
+	forwarders, err := setupForwarders(ctx, *loadedConfig.ServerName, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims, p.etcdMgr)
 	if err != nil {
 		p.logger.Log(log.Err, err, "Unable to setup forwarders")
 		return errors.Annotate(err, "unable to setup forwarders")
@@ -589,7 +584,7 @@ func (p *proxy) run(ctx context.Context) error {
 
 	multiplexer := signalfx.FromChain(dmux, signalfx.NextWrap(signalfx.UnifyNextSinkWrap(&p.debugSink)))
 
-	listeners, err := setupListeners(p.tk, hostname, loader, loadedConfig.ListenFrom, multiplexer, logger, scheduler)
+	listeners, err := setupListeners(p.tk, *loadedConfig.ServerName, loader, loadedConfig.ListenFrom, multiplexer, logger, scheduler)
 	if err != nil {
 		p.logger.Log(log.Err, err, "Unable to setup listeners")
 		return errors.Annotate(err, "cannot setup listeners from configuration")

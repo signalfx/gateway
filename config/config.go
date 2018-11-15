@@ -242,10 +242,13 @@ func (p *ProxyConfig) Var() expvar.Var {
 // Load loads proxy configuration from a filename that is in an xdg configuration location
 func Load(configFile string, logger log.Logger) (*ProxyConfig, error) {
 	p, err := loadNoDefault(configFile, logger)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		c := pointer.FillDefaultFrom(p, DefaultProxyConfig).(*ProxyConfig)
+		if err = os.Setenv("proxyServerName", *c.ServerName); err == nil {
+			return c, nil
+		}
 	}
-	return pointer.FillDefaultFrom(p, DefaultProxyConfig).(*ProxyConfig), nil
+	return nil, err
 }
 
 func loadNoDefault(configFile string, logger log.Logger) (*ProxyConfig, error) {
