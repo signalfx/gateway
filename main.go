@@ -245,8 +245,11 @@ func forwarderName(f *config.ForwardTo) string {
 	return f.Type
 }
 
+var errDupeForwarder = errors.New("cannot duplicate forwarder names or types without names")
+
 func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, manager *etcdManager) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
+	nameMap := make(map[string]bool)
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, forwardConfig.Type, logkey.Direction, "forwarder")
 		forwardConfig.Server = manager.server
@@ -256,6 +259,11 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 			return nil, err
 		}
 		name := forwarderName(forwardConfig)
+		if nameMap[name] {
+			logger.Log(fmt.Sprintf("Cannot add two forwarders with name '%s' or two unnamed forwarders of same type", name))
+			return nil, errDupeForwarder
+		}
+		nameMap[name] = true
 		logCtx = logCtx.With(logkey.Name, name)
 		// Buffering -> counting -> (forwarder)
 		limitedLogger := &log.RateLimitedLogger{
@@ -299,8 +307,11 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 	return allForwarders, nil
 }
 
+var errDupeListener = errors.New("cannot duplicate listener names or types without names")
+
 func setupListeners(tk timekeeper.TimeKeeper, hostname string, loader *config.Loader, listenFrom []*config.ListenFrom, multiplexer signalfx.Sink, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Listener, error) {
 	listeners := make([]protocol.Listener, 0, len(listenFrom))
+	nameMap := make(map[string]bool)
 	for idx, listenConfig := range listenFrom {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, listenConfig.Type, logkey.Direction, "listener")
 		name := func() string {
@@ -309,6 +320,11 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loader *config.Lo
 			}
 			return listenConfig.Type
 		}()
+		if nameMap[name] {
+			logger.Log(fmt.Sprintf("Cannot add two listeners with name '%s' or two unnamed listners of same type", name))
+			return nil, errDupeListener
+		}
+		nameMap[name] = true
 		count := &dpsink.Counter{
 			Logger: &log.RateLimitedLogger{
 				EventCounter: eventcounter.New(tk.Now(), time.Second),
