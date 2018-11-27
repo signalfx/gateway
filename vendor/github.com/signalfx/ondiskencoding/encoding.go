@@ -101,3 +101,9 @@ type EtcdConfig struct {
 	IngestAddress    *string `json:",omitempty"`
 	ID               *string `json:",omitempty"`
 }
+
+//easyjson:json
+type Rebalance struct {
+	Buffers map[string]*BufferEntry 			  `json:",omitempty"` // map of trace id to buffer entry
+	ExpiredBuffers map[string]*ExpiredBufferEntry `json:",omitempty"` // map of trace id to expired buffer entry
+}
