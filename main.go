@@ -28,6 +28,7 @@ import (
 	"github.com/signalfx/golib/eventcounter"
 	"github.com/signalfx/golib/httpdebug"
 	"github.com/signalfx/golib/log"
+	"github.com/signalfx/golib/reportsha"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/golib/trace"
@@ -189,6 +190,7 @@ type proxy struct {
 	signalChan          chan os.Signal
 	config              *config.ProxyConfig
 	etcdMgr             *etcdManager
+	versionMetric       reportsha.SHA1Reporter
 }
 
 var mainInstance = proxy{
@@ -550,6 +552,7 @@ func (p *proxy) run(ctx context.Context) error {
 	}
 	p.setup(loadedConfig)
 	logger := p.logger
+	p.versionMetric.Logger = p.logger
 
 	var bb []byte
 	if bb, err = json.Marshal(loadedConfig); err == nil {
@@ -581,6 +584,10 @@ func (p *proxy) run(ctx context.Context) error {
 		FutureDuration: loadedConfig.FutureThresholdDuration,
 	}
 	scheduler.AddCallback(dmux)
+
+	p.versionMetric.RepoURL = "https://github.com/signalfx/metricproxy"
+	p.versionMetric.FileName = "/buildInfo.json"
+	scheduler.AddCallback(&p.versionMetric)
 
 	multiplexer := signalfx.FromChain(dmux, signalfx.NextWrap(signalfx.UnifyNextSinkWrap(&p.debugSink)))
 
