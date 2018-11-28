@@ -702,7 +702,9 @@ simultaniously with each thread sending no more than 5,000 points in a single
 call.
 
 StatsDelay being set to 1s means every 1s we'll emit metrics out all forwarders
-about the running metric proxy.
+about the running metric proxy.  These metrics are emitted with a host dimension
+that will be set to the value of the ServerName set in the config file or to
+the hostname of the machine by default.
 
 Also note that we're setting LateThreshold and FutureThreshold to 1s.  This means
 we'll count datapoints, events and spans that exceed those thresholds (if set) and
@@ -713,6 +715,7 @@ data that was late or in the future respectively.
 ```
 {
   "StatsDelay": "1s",
+  "ServerName": "metricproxy-us-east1",
   "LateThreshold": "1s",
   "FutureThreshold": "1s",
   "ListenFrom": [
