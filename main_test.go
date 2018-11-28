@@ -143,6 +143,35 @@ const invalidListenerConfig = `
     ]
   }
 `
+const dupeForwarder = `
+  {
+    "LogDir": "-",
+    "ForwardTo":[
+    	{
+    		"Type":"signalfx"
+		},
+    	{
+    		"Type":"signalfx"
+		}
+    ]
+  }
+`
+
+const dupeListener = `
+  {
+    "LogDir": "-",
+    "ListenFrom":[
+    	{
+    		"Type":"signalfx"
+		},
+    	{
+    		"Type":"signalfx"
+		}
+    ],
+    "ForwardTo":[
+    ]
+  }
+`
 
 const invalidPIDfile = `
   {
@@ -261,32 +290,29 @@ func failingTestRun(t *testing.T, c string, closeAfterSetup bool, expectedLog st
 	return cc
 }
 
-func TestEmptyConfig(t *testing.T) {
-	failingTestRun(t, emptyConfig, true, "", "")
-}
-
-func TestInvalidConfigForwarder(t *testing.T) {
-	failingTestRun(t, invalidForwarderConfig, false, "", "cannot find config unkndfdown")
-}
-
-func TestInvalidConfigJSON(t *testing.T) {
-	failingTestRun(t, "__INVALID__JSON__", false, "", "cannot unmarshal config JSON")
-}
-
-func TestInvalidConfigListener(t *testing.T) {
-	failingTestRun(t, invalidListenerConfig, false, "", "cannot setup listeners from configuration")
-}
-
-func TestInvalidConfigDebugAddr(t *testing.T) {
-	failingTestRun(t, invalidDebugServerAddr, false, "", "cannot setup debug server")
-}
-
-func TestInvalidConfigPIDFile(t *testing.T) {
-	failingTestRun(t, invalidPIDfile, true, "cannot store pid in pid file", "")
-}
-
-func TestInvalidClusterOperation(t *testing.T) {
-	failingTestRun(t, invalidClusterOpConfig, true, "", "unsupported cluster-op specified \"woohoo\"")
+func TestConfigs(t *testing.T) {
+	tests := []struct {
+		name            string
+		config          string
+		closeAfterSetup bool
+		expectedLog     string
+		expectedErr     string
+	}{
+		{name: "empty", config: emptyConfig, closeAfterSetup: true, expectedLog: "", expectedErr: ""},
+		{name: "invalidForwarderConfig", config: invalidForwarderConfig, closeAfterSetup: false, expectedLog: "", expectedErr: "cannot find config unkndfdown"},
+		{name: "invalidDebugAddr", config: invalidDebugServerAddr, closeAfterSetup: false, expectedLog: "", expectedErr: "cannot setup debug server"},
+		{name: "invalidJSON", config: "__INVALID__JSON__", closeAfterSetup: false, expectedLog: "", expectedErr: "cannot unmarshal config JSON"},
+		{name: "invalidListenerConfig", config: invalidListenerConfig, closeAfterSetup: false, expectedLog: "", expectedErr: "cannot setup listeners from configuration"},
+		{name: "invalidPIDfile", config: invalidPIDfile, closeAfterSetup: true, expectedLog: "cannot store pid in pid file", expectedErr: ""},
+		{name: "invalidPIDfile", config: invalidClusterOpConfig, closeAfterSetup: true, expectedLog: "", expectedErr: "unsupported cluster-op specified \"woohoo\""},
+		{name: "dupeForwarder", config: dupeForwarder, closeAfterSetup: false, expectedLog: "", expectedErr: errDupeForwarder.Error()},
+		{name: "dupeListener", config: dupeListener, closeAfterSetup: false, expectedLog: "", expectedErr: errDupeListener.Error()},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			failingTestRun(t, test.config, test.closeAfterSetup, test.expectedLog, test.expectedErr)
+		})
+	}
 }
 
 func TestForwarderName(t *testing.T) {
