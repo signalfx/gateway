@@ -96,21 +96,25 @@ func ClientsURLs(addresses []string, tlsEnabled bool) (cURLs []string) {
 	return
 }
 
-func ClientURL(address string, tlsEnabled bool) string {
-	url := fmt.Sprintf("%s://%s", scheme(tlsEnabled), address)
+func BuildURL(address string, tlsEnabled bool, defaultPort int) string {
+	url := address
+	// add the scheme if one does not exist
+	if !strings.Contains(url, "://"){
+		url = fmt.Sprintf("%s://%s", scheme(tlsEnabled), url)
+	}
+	// add a default port if one does not exist
 	if _, port := URL2Components(url); port == "" {
-		url = fmt.Sprintf("%s://%s:%d", scheme(tlsEnabled), address, defaultClientPort)
+		url = fmt.Sprintf("%s:%d", url, defaultPort)
 	}
 	return url
+}
 
+func ClientURL(address string, tlsEnabled bool) string {
+	return BuildURL(address, tlsEnabled, defaultClientPort)
 }
 
 func peerURL(address string, tlsEnabled bool) string {
-	url := fmt.Sprintf("%s://%s", scheme(tlsEnabled), address)
-	if _, port := URL2Components(url); port == "" {
-		url = fmt.Sprintf("%s://%s:%d", scheme(tlsEnabled), address, defaultPeerPort)
-	}
-	return url
+	return BuildURL(address, tlsEnabled, defaultPeerPort)
 }
 
 func URL2Components(inURL string) (string, string) {
@@ -120,10 +124,16 @@ func URL2Components(inURL string) (string, string) {
 
 func URL2Address(pURL string) string {
 	pURLu, _ := url.Parse(pURL)
+	address := pURLu.Host
+	// strips the scheme from the host
 	if i := strings.Index(pURLu.Host, ":"); i > 0 {
-		return pURLu.Host[:i]
+		address = pURLu.Host[:i]
 	}
-	return pURLu.Host
+	// add port if it exists
+	if pURLu.Port() != "" {
+		address = fmt.Sprintf("%s:%s", address, pURLu.Port())
+	}
+	return address
 }
 
 func metricsURLs(address string) []url.URL {
