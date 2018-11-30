@@ -421,7 +421,6 @@ func (p *proxy) gracefulShutdown() (err error) {
 	p.logger.Log("Starting graceful shutdown")
 	totalWaitTime := p.tk.After(*p.config.MaxGracefulWaitTimeDuration)
 	errs := make([]error, len(p.listeners)+len(p.forwarders)+1)
-	errs = append(errs, p.etcdMgr.removeMember())
 
 	// close health checks on all first
 	for _, l := range p.listeners {
@@ -458,7 +457,6 @@ func (p *proxy) gracefulShutdown() (err error) {
 				startingTimeGood = now
 				continue
 			}
-			errs = append(errs, p.etcdMgr.shutdown(true)) // shutdown the etcd server and close the client
 			if now.Sub(startingTimeGood) >= *p.config.SilentGracefulTimeDuration {
 				p.logger.Log(logkey.TotalPipeline, totalPipeline, "I've been silent.  Graceful shutdown done")
 				return
@@ -479,6 +477,10 @@ func (p *proxy) Close() error {
 	errs := make([]error, 0, len(p.forwarders)+1)
 	for _, f := range p.forwarders {
 		errs = append(errs, f.Close())
+	}
+	if p.etcdMgr != nil && p.etcdMgr.server != nil {
+		errs = append(errs, p.etcdMgr.removeMember())
+		errs = append(errs, p.etcdMgr.shutdown(true)) // shutdown the etcd server and close the client
 	}
 	if p.debugServer != nil {
 		errs = append(errs, p.debugServerListener.Close())
