@@ -8,7 +8,6 @@ import (
 	"time"
 	"bytes"
 	"encoding/gob"
-	"fmt"
 )
 
 const rescaleThreshold = time.Hour
@@ -491,7 +490,6 @@ func SampleVariance(values []int64) float64 {
 	var sum float64
 	for _, v := range values {
 		d := float64(v) - m
-		fmt.Println( "SampleVariance", d, v, m)
 		sum += d * d
 	}
 	return sum / float64(len(values))
@@ -656,7 +654,7 @@ type expDecaySampleHeap struct {
 
 func (h *expDecaySampleHeap) Sum() int64 {
 	sum := int64(0)
-	for _,v := range h.s {
+	for _, v := range h.s {
 		sum += v.v
 	}
 	return sum
