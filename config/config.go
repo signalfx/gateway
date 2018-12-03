@@ -98,7 +98,6 @@ type ProxyConfig struct {
 	LateThresholdDuration         *time.Duration `json:"-"`
 	FutureThresholdDuration       *time.Duration `json:"-"`
 	ClusterOperation              *string        `json:",omitempty"`
-	ClusterMemberName             *string        `json:",omitempty"`
 	ClusterDataDir                *string        `json:",omitempty"`
 	TargetClusterAddresses        []string       `json:",omitempty"`
 	AdvertisePeerAddress          *string        `json:",omitempty"`
@@ -129,7 +128,6 @@ var DefaultProxyConfig = &ProxyConfig{
 	UnhealthyMemberTTL:            pointer.Duration(time.Second * 5),
 	RemoveMemberTimeout:           pointer.Duration(time.Second),
 	ClusterDataDir:                pointer.String("./etcd-data"),
-	ClusterMemberName:             pointer.String(""),
 	ClusterOperation:              pointer.String(""),
 	TargetClusterAddresses:        []string{},
 }

@@ -57,6 +57,7 @@ const configEtcd = `
 		"GracefulCheckInterval":   "<<CHECK>>ms",
 		"MinimalGracefulWaitTime": "<<MIN>>ms",
 		"SilentGracefulTime": "50ms",
+		"ServerName": "<<SERVERNAME>>",
 		"ListenOnPeerAddress": "<<LPADDRESS>>",
 		"AdvertisePeerAddress": "<<APADDRESS>>",
 		"ListenOnClientAddress": "<<LCADDRESS>>",
@@ -559,6 +560,7 @@ func TestProxyCluster(t *testing.T) {
 				proxyConf = strings.Replace(proxyConf, "<<DATADIR>>", filepath.Join(etcdDataDir, etcdConf.DataDir), -1)
 				proxyConf = strings.Replace(proxyConf, "<<CLUSTEROP>>", etcdConf.operation, -1)
 				proxyConf = strings.Replace(proxyConf, "<<TARGETADDRESSES>>", formatTargetAddresses(etcdConf.targetCluster), -1)
+				proxyConf = strings.Replace(proxyConf, "<<SERVERNAME>>", etcdConf.Name, -1)
 
 				So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
 
@@ -580,10 +582,10 @@ func TestProxyCluster(t *testing.T) {
 
 		Convey("the etcd cluster should be aware of all members", func() {
 			etcdConfs := []*etcdManager{
-				{removeTimeout: 3000, ServerConfig: etcd.ServerConfig{UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data", LCAddress: "127.0.0.1:2379", ACAddress: "127.0.0.1:2379", LPAddress: "127.0.0.1:2380", APAddress: "127.0.0.1:2380", MAddress: "127.0.0.1:2381"}, operation: "seed"},
-				{removeTimeout: 3000, ServerConfig: etcd.ServerConfig{UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data1", LCAddress: "127.0.0.1:2479", ACAddress: "127.0.0.1:2479", LPAddress: "127.0.0.1:2480", APAddress: "127.0.0.1:2480", MAddress: "127.0.0.1:2481"}, targetCluster: []string{"127.0.0.1:2379"}, operation: "join"},
-				{removeTimeout: -1, ServerConfig: etcd.ServerConfig{UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data2", LCAddress: "127.0.0.1:2579", ACAddress: "127.0.0.1:2579", LPAddress: "127.0.0.1:2580", APAddress: "127.0.0.1:2580", MAddress: "127.0.0.1:2581"}, targetCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479"}, operation: "join"},
-				{removeTimeout: 3000, ServerConfig: etcd.ServerConfig{UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data3", LCAddress: "127.0.0.1:2679", ACAddress: "127.0.0.1:2679", LPAddress: "127.0.0.1:2680", APAddress: "127.0.0.1:2680", MAddress: "127.0.0.1:2681"}, targetCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479", "127.0.0.1:2579"}, operation: "join"},
+				{removeTimeout: 3000, ServerConfig: etcd.ServerConfig{Name: "instance1", UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data", LCAddress: "127.0.0.1:2379", ACAddress: "127.0.0.1:2379", LPAddress: "127.0.0.1:2380", APAddress: "127.0.0.1:2380", MAddress: "127.0.0.1:2381"}, operation: "seed"},
+				{removeTimeout: 3000, ServerConfig: etcd.ServerConfig{Name: "instance2", UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data1", LCAddress: "127.0.0.1:2479", ACAddress: "127.0.0.1:2479", LPAddress: "127.0.0.1:2480", APAddress: "127.0.0.1:2480", MAddress: "127.0.0.1:2481"}, targetCluster: []string{"127.0.0.1:2379"}, operation: "join"},
+				{removeTimeout: -1, ServerConfig: etcd.ServerConfig{Name: "instance3", UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data2", LCAddress: "127.0.0.1:2579", ACAddress: "127.0.0.1:2579", LPAddress: "127.0.0.1:2580", APAddress: "127.0.0.1:2580", MAddress: "127.0.0.1:2581"}, targetCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479"}, operation: "join"},
+				{removeTimeout: 3000, ServerConfig: etcd.ServerConfig{Name: "", UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data3", LCAddress: "127.0.0.1:2679", ACAddress: "127.0.0.1:2679", LPAddress: "127.0.0.1:2680", APAddress: "127.0.0.1:2680", MAddress: "127.0.0.1:2681"}, targetCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479", "127.0.0.1:2579"}, operation: "join"},
 			}
 			setUp(15000, 0, 25, etcdConfs)
 			So(ps[0].etcdMgr.server.IsRunning(), ShouldBeTrue)
@@ -610,6 +612,46 @@ func TestProxyCluster(t *testing.T) {
 			if cancelfunc != nil {
 				cancelfunc()
 			}
+		})
+	})
+}
+
+func TestEnvVarFuncs(t *testing.T) {
+	testKey := "SFX_TEST_ENV_VAR"
+	Convey("test the following environment variable helper functions", t, func() {
+		Convey("getCommaSeparatedStringEnvVar should parses comma separated strings", func() {
+			testVal := []string{"127.0.0.1:9999", "127.0.0.2:9999", "127.0.0.3:9999"}
+			os.Setenv(testKey, strings.Join(testVal, ","))
+			loaded := getCommaSeparatedStringEnvVar(testKey, []string{})
+			So(len(loaded), ShouldEqual, 3)
+			So(strings.Join(loaded, ","), ShouldEqual, strings.Join(testVal, ","))
+		})
+		Convey("getStringEnvVar", func() {
+			Convey("should return the value if the environment variable is set", func() {
+				testVal := "testStringValue"
+				os.Setenv(testKey, testVal)
+				loaded := getStringEnvVar(testKey, "defaultVal")
+				So(loaded, ShouldEqual, testVal)
+			})
+			Convey("should return the default value if the environment variable is not set", func() {
+				loaded := getStringEnvVar(testKey, "defaultVal")
+				So(loaded, ShouldEqual, "defaultVal")
+			})
+		})
+		Convey("getDurationEnvVar", func() {
+			Convey("should return the value if the environment variable is set", func() {
+				testVal := "5s"
+				os.Setenv(testKey, testVal)
+				loaded := getDurationEnvVar(testKey, 0*time.Second)
+				So(loaded, ShouldEqual, time.Second*5)
+			})
+			Convey("should return the default value if the environment variable is not set", func() {
+				loaded := getDurationEnvVar(testKey, 1*time.Second)
+				So(loaded, ShouldEqual, time.Second*1)
+			})
+		})
+		Reset(func() {
+			os.Unsetenv(testKey)
 		})
 	})
 }

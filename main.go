@@ -57,6 +57,35 @@ func writePidFile(pidFileName string) error {
 	return ioutil.WriteFile(pidFileName, []byte(strconv.FormatInt(int64(pid), 10)), os.FileMode(0644))
 }
 
+// getCommaSeparatedStringEnvVar returns the given env var key's value split by comma or the default values
+func getCommaSeparatedStringEnvVar(envVar string, def []string) []string {
+	if val := os.Getenv(envVar); val != "" {
+		def = def[:0]
+		for _, addr := range strings.Split(strings.Replace(val, " ", "", -1), ",") {
+			def = append(def, addr)
+		}
+	}
+	return def
+}
+
+// getStringEnvVar returns the given env var key's value or the default value
+func getStringEnvVar(envVar string, def string) string {
+	if val := os.Getenv(envVar); val != "" {
+		return val
+	}
+	return def
+}
+
+// getDurationEnvVar returns the given env var key's value or the default value
+func getDurationEnvVar(envVar string, def time.Duration) time.Duration {
+	if strVal := os.Getenv(envVar); strVal != "" {
+		if dur, err := time.ParseDuration(strVal); err == nil {
+			return dur
+		}
+	}
+	return def
+}
+
 type proxyFlags struct {
 	configFileName string
 }
@@ -72,26 +101,30 @@ type etcdManager struct {
 }
 
 func (mgr *etcdManager) setup(conf *config.ProxyConfig) {
-	mgr.LPAddress = *conf.ListenOnPeerAddress
-	mgr.APAddress = *conf.AdvertisePeerAddress
-	mgr.LCAddress = *conf.ListenOnClientAddress
-	mgr.ACAddress = *conf.AdvertiseClientAddress
-	mgr.MAddress = *conf.ETCDMetricsAddress
-	mgr.UnhealthyMemberTTL = *conf.UnhealthyMemberTTL
-	mgr.removeTimeout = *conf.RemoveMemberTimeout
-	mgr.DataDir = *conf.ClusterDataDir
-	mgr.Name = *conf.ClusterMemberName
+	mgr.LPAddress = getStringEnvVar("SFX_LISTEN_ON_PEER_ADDRESS", *conf.ListenOnPeerAddress)
+	mgr.APAddress = getStringEnvVar("SFX_ADVERTISE_PEER_ADDRESS", *conf.AdvertisePeerAddress)
+	mgr.LCAddress = getStringEnvVar("SFX_LISTEN_ON_CLIENT_ADDRESS", *conf.ListenOnClientAddress)
+	mgr.ACAddress = getStringEnvVar("SFX_ADVERTISE_CLIENT_ADDRESS", *conf.AdvertiseClientAddress)
+	mgr.MAddress = getStringEnvVar("SFX_ETCD_METRICS_ADDRESS", *conf.ETCDMetricsAddress)
+	mgr.UnhealthyMemberTTL = getDurationEnvVar("SFX_UNHEALTHY_MEMBER_TTL", *conf.UnhealthyMemberTTL)
+	mgr.removeTimeout = getDurationEnvVar("SFX_REMOVE_MEMBER_TIMEOUT", *conf.RemoveMemberTimeout)
+	mgr.DataDir = getStringEnvVar("SFX_CLUSTER_DATA_DIR", *conf.ClusterDataDir)
+	mgr.Name = getStringEnvVar("SFX_SERVER_NAME", *conf.ServerName)
+	mgr.ServerConfig.Name = mgr.Name
+
+	// if already set, then a command line flag was provided and takes precedence
 	if mgr.operation == "" {
-		mgr.operation = *conf.ClusterOperation
+		mgr.operation = getStringEnvVar("SFX_CLUSTER_OPERATION", *conf.ClusterOperation)
 	}
-	mgr.targetCluster = conf.TargetClusterAddresses
+
+	mgr.targetCluster = getCommaSeparatedStringEnvVar("SFX_TARGET_CLUSTER_ADDRESS", conf.TargetClusterAddresses)
 }
 
 func (mgr *etcdManager) start() (err error) {
 
 	// use a default server name if one is not provided
 	if mgr.ServerConfig.Name == "" {
-		mgr.ServerConfig.Name = fmt.Sprintf("%s@%d", mgr.ServerConfig.ACAddress, time.Now().Unix())
+		mgr.ServerConfig.Name = fmt.Sprintf("%s", mgr.ServerConfig.ACAddress)
 	}
 
 	mgr.server = etcd.NewServer(mgr.ServerConfig)
