@@ -117,7 +117,7 @@ func (mgr *etcdManager) setup(conf *config.ProxyConfig) {
 		mgr.operation = getStringEnvVar("SFX_CLUSTER_OPERATION", *conf.ClusterOperation)
 	}
 
-	mgr.targetCluster = getCommaSeparatedStringEnvVar("SFX_TARGET_CLUSTER_ADDRESS", conf.TargetClusterAddresses)
+	mgr.targetCluster = getCommaSeparatedStringEnvVar("SFX_TARGET_CLUSTER_ADDRESSES", conf.TargetClusterAddresses)
 }
 
 func (mgr *etcdManager) start() (err error) {
