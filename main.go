@@ -88,7 +88,7 @@ func getDurationEnvVar(envVar string, def time.Duration) time.Duration {
 
 func isStringInSlice(target string, strs []string) bool {
 	for _, addr := range strs {
-		if addr == target{
+		if addr == target {
 			return true
 		}
 	}
