@@ -616,6 +616,19 @@ func TestProxyCluster(t *testing.T) {
 	})
 }
 
+func TestStringIsInSlice(t *testing.T) {
+	Convey("stringIsInSlice", t, func() {
+		testData := []string{"hello", "world"}
+		Convey("should return true if the string is in the slice", func() {
+			So(isStringInSlice("hello", testData), ShouldBeTrue)
+		})
+		Convey("should return false if the string is not in the slice", func() {
+			So(isStringInSlice("goodbye", []string{}), ShouldBeFalse)
+			So(isStringInSlice("goodbye", testData), ShouldBeFalse)
+		})
+	})
+}
+
 func TestEnvVarFuncs(t *testing.T) {
 	testKey := "SFX_TEST_ENV_VAR"
 	Convey("test the following environment variable helper functions", t, func() {
