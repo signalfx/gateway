@@ -86,6 +86,15 @@ func getDurationEnvVar(envVar string, def time.Duration) time.Duration {
 	return def
 }
 
+func isStringInSlice(target string, strs []string) bool {
+	for _, addr := range strs {
+		if addr == target{
+			return true
+		}
+	}
+	return false
+}
+
 type proxyFlags struct {
 	configFileName string
 }
@@ -135,7 +144,10 @@ func (mgr *etcdManager) start() (err error) {
 	case "seed":
 		mgr.logger.Log(fmt.Sprintf("starting etcd server %s to seed cluster", mgr.ServerConfig.Name))
 		if err = mgr.server.Seed(nil); err == nil {
-			mgr.client, err = etcd.NewClient([]string{mgr.AdvertisedClientAddress()}, etcd.SecurityConfig{}, true)
+			if !isStringInSlice(mgr.AdvertisedClientAddress(), mgr.targetCluster) {
+				mgr.targetCluster = append(mgr.targetCluster, mgr.AdvertisedClientAddress())
+			}
+			mgr.client, err = etcd.NewClient(mgr.targetCluster, etcd.SecurityConfig{}, true)
 		}
 
 	case "join":
