@@ -910,32 +910,32 @@
 			"revision": "71af5e29e815795e9dd14742ee7725682fa14b7b"
 		},
 		{
-			"checksumSHA1": "SJ6AoM3vt2GFd0ZhfPrVflsu4o8=",
+			"checksumSHA1": "GEXgy2fv3p6Uyo5Vv8mENzfIr7U=",
 			"origin": "github.com/signalfx/etcd-cloud-operator/pkg/etcd",
 			"path": "github.com/quentin-m/etcd-cloud-operator/pkg/etcd",
-			"revision": "70cd042aedfa1a98a359051f1d3482aaaa18e804",
-			"revisionTime": "2018-11-29T17:27:41Z"
+			"revision": "b18fdd887d97ccf755e4737d14d8a9b9e97bbc9e",
+			"revisionTime": "2018-12-05T19:54:29Z"
 		},
 		{
 			"checksumSHA1": "wVbJXjvzwm/nFFCVl/SOwywtD2Q=",
 			"origin": "github.com/signalfx/etcd-cloud-operator/pkg/providers",
 			"path": "github.com/quentin-m/etcd-cloud-operator/pkg/providers",
-			"revision": "70cd042aedfa1a98a359051f1d3482aaaa18e804",
-			"revisionTime": "2018-11-29T17:27:41Z"
+			"revision": "b18fdd887d97ccf755e4737d14d8a9b9e97bbc9e",
+			"revisionTime": "2018-12-05T19:54:29Z"
 		},
 		{
 			"checksumSHA1": "cUmCKDeSRSttcs5hzgjiFJ4dnc8=",
 			"origin": "github.com/signalfx/etcd-cloud-operator/pkg/providers/snapshot",
 			"path": "github.com/quentin-m/etcd-cloud-operator/pkg/providers/snapshot",
-			"revision": "70cd042aedfa1a98a359051f1d3482aaaa18e804",
-			"revisionTime": "2018-11-29T17:27:41Z"
+			"revision": "b18fdd887d97ccf755e4737d14d8a9b9e97bbc9e",
+			"revisionTime": "2018-12-05T19:54:29Z"
 		},
 		{
 			"checksumSHA1": "+VFVQbqEeB9gMfP38nmMIapJyBE=",
 			"origin": "github.com/signalfx/etcd-cloud-operator/pkg/providers/snapshot/etcd",
 			"path": "github.com/quentin-m/etcd-cloud-operator/pkg/providers/snapshot/etcd",
-			"revision": "70cd042aedfa1a98a359051f1d3482aaaa18e804",
-			"revisionTime": "2018-11-29T17:27:41Z"
+			"revision": "b18fdd887d97ccf755e4737d14d8a9b9e97bbc9e",
+			"revisionTime": "2018-12-05T19:54:29Z"
 		},
 		{
 			"checksumSHA1": "Vvm9cKGBDDKO6BHHDvyQ4ME3//o=",
