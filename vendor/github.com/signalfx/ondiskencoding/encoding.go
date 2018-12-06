@@ -87,7 +87,12 @@ type BufferOnDisk struct {
 }
 
 //easyjson:json
-type SampleList []*SampleEntry
+type SamplePayload struct {
+	SampleList []*SampleEntry
+	Total int64
+	Sent int64
+}
+
 
 //easyjson:json
 type SampleEntry struct {
