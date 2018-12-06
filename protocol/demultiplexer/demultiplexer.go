@@ -108,7 +108,7 @@ func (streamer *Demultiplexer) AddSpans(ctx context.Context, spans []*trace.Span
 	var errs []error
 	for i, sendTo := range streamer.TraceSinks {
 		toSend := spans
-		if i > 0 {
+		if i < len(streamer.TraceSinks)-1 {
 			toSend = deepCopySpans(spans)
 		}
 		if err := sendTo.AddSpans(ctx, toSend); err != nil {
