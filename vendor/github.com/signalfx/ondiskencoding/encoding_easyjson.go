@@ -137,143 +137,82 @@ func (v *SpanIdentity) UnmarshalJSON(data []byte) error {
 func (v *SpanIdentity) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding(l, v)
 }
-func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding1(in *jlexer.Lexer, out *SamplePayload) {
+func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding1(in *jlexer.Lexer, out *SampleList) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
-		if isTopLevel {
-			in.Consumed()
-		}
 		in.Skip()
-		return
-	}
-	in.Delim('{')
-	for !in.IsDelim('}') {
-		key := in.UnsafeString()
-		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
+		*out = nil
+	} else {
+		in.Delim('[')
+		if *out == nil {
+			if !in.IsDelim(']') {
+				*out = make(SampleList, 0, 8)
+			} else {
+				*out = SampleList{}
+			}
+		} else {
+			*out = (*out)[:0]
 		}
-		switch key {
-		case "SampleList":
+		for !in.IsDelim(']') {
+			var v1 *SampleEntry
 			if in.IsNull() {
 				in.Skip()
-				out.SampleList = nil
+				v1 = nil
 			} else {
-				in.Delim('[')
-				if out.SampleList == nil {
-					if !in.IsDelim(']') {
-						out.SampleList = make([]*SampleEntry, 0, 8)
-					} else {
-						out.SampleList = []*SampleEntry{}
-					}
-				} else {
-					out.SampleList = (out.SampleList)[:0]
+				if v1 == nil {
+					v1 = new(SampleEntry)
 				}
-				for !in.IsDelim(']') {
-					var v1 *SampleEntry
-					if in.IsNull() {
-						in.Skip()
-						v1 = nil
-					} else {
-						if v1 == nil {
-							v1 = new(SampleEntry)
-						}
-						(*v1).UnmarshalEasyJSON(in)
-					}
-					out.SampleList = append(out.SampleList, v1)
-					in.WantComma()
-				}
-				in.Delim(']')
+				(*v1).UnmarshalEasyJSON(in)
 			}
-		case "Total":
-			out.Total = int64(in.Int64())
-		case "Sent":
-			out.Sent = int64(in.Int64())
-		default:
-			in.SkipRecursive()
+			*out = append(*out, v1)
+			in.WantComma()
 		}
-		in.WantComma()
+		in.Delim(']')
 	}
-	in.Delim('}')
 	if isTopLevel {
 		in.Consumed()
 	}
 }
-func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding1(out *jwriter.Writer, in SamplePayload) {
-	out.RawByte('{')
-	first := true
-	_ = first
-	{
-		const prefix string = ",\"SampleList\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		if in.SampleList == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
-			out.RawString("null")
-		} else {
-			out.RawByte('[')
-			for v2, v3 := range in.SampleList {
-				if v2 > 0 {
-					out.RawByte(',')
-				}
-				if v3 == nil {
-					out.RawString("null")
-				} else {
-					(*v3).MarshalEasyJSON(out)
-				}
+func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding1(out *jwriter.Writer, in SampleList) {
+	if in == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
+		out.RawString("null")
+	} else {
+		out.RawByte('[')
+		for v2, v3 := range in {
+			if v2 > 0 {
+				out.RawByte(',')
 			}
-			out.RawByte(']')
+			if v3 == nil {
+				out.RawString("null")
+			} else {
+				(*v3).MarshalEasyJSON(out)
+			}
 		}
+		out.RawByte(']')
 	}
-	{
-		const prefix string = ",\"Total\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		out.Int64(int64(in.Total))
-	}
-	{
-		const prefix string = ",\"Sent\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		out.Int64(int64(in.Sent))
-	}
-	out.RawByte('}')
 }
 
 // MarshalJSON supports json.Marshaler interface
-func (v SamplePayload) MarshalJSON() ([]byte, error) {
+func (v SampleList) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
 	easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding1(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
-func (v SamplePayload) MarshalEasyJSON(w *jwriter.Writer) {
+func (v SampleList) MarshalEasyJSON(w *jwriter.Writer) {
 	easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding1(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
-func (v *SamplePayload) UnmarshalJSON(data []byte) error {
+func (v *SampleList) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
 	easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding1(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
-func (v *SamplePayload) UnmarshalEasyJSON(l *jlexer.Lexer) {
+func (v *SampleList) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding1(l, v)
 }
 func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding2(in *jlexer.Lexer, out *SampleEntry) {
