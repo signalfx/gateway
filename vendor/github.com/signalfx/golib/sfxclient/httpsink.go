@@ -294,7 +294,7 @@ func (h *HTTPSink) coreDatapointToProtobuf(point *datapoint.Datapoint) *com_sign
 func (h *HTTPSink) getReader(b []byte) (io.Reader, bool, error) {
 	var err error
 	if !h.DisableCompression && len(b) > 1500 {
-		buf := new(bytes.Buffer)
+		buf := new(bytes.Buffer) // TODO use a pool for this too?
 		w := h.zippers.Get().(*gzip.Writer)
 		defer h.zippers.Put(w)
 		w.Reset(buf)

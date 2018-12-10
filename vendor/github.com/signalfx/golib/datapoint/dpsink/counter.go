@@ -29,6 +29,8 @@ type Counter struct {
 	TotalProcessTimeNs int64
 	CallsInFlight      int64
 	Logger             log.Logger
+	LoggerFunc         func(context.Context) string
+	LoggerKey          log.Key
 }
 
 // Datapoints returns counter stats
@@ -47,6 +49,18 @@ func (c *Counter) Datapoints() []*datapoint.Datapoint {
 	}
 }
 
+func (c *Counter) logErrMsg(ctx context.Context, err error, msg string) {
+	var ret []interface{}
+	if c.LoggerFunc != nil && c.LoggerKey != "" {
+		value := c.LoggerFunc(ctx)
+		if value != "" {
+			ret = append(ret, c.LoggerKey, value)
+		}
+	}
+	ret = append(ret, log.Err, err, msg)
+	c.logger().Log(ret...)
+}
+
 // AddDatapoints will send points to the next sink and track points send to the next sink
 func (c *Counter) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint, next Sink) error {
 	atomic.AddInt64(&c.TotalDatapoints, int64(len(points)))
@@ -59,7 +73,7 @@ func (c *Counter) AddDatapoints(ctx context.Context, points []*datapoint.Datapoi
 	if err != nil {
 		atomic.AddInt64(&c.TotalProcessErrors, 1)
 		atomic.AddInt64(&c.ProcessErrorPoints, int64(len(points)))
-		c.logger().Log(log.Err, err, "Unable to process datapoints")
+		c.logErrMsg(ctx, err, "Unable to process datapoints")
 	}
 	return err
 }
@@ -83,7 +97,7 @@ func (c *Counter) AddEvents(ctx context.Context, events []*event.Event, next Sin
 	if err != nil {
 		atomic.AddInt64(&c.TotalProcessErrors, 1)
 		atomic.AddInt64(&c.ProcessErrorEvents, int64(len(events)))
-		c.logger().Log(log.Err, err, "Unable to process datapoints")
+		c.logErrMsg(ctx, err, "Unable to process events")
 	}
 	return err
 }
@@ -100,7 +114,7 @@ func (c *Counter) AddSpans(ctx context.Context, spans []*trace.Span, next trace.
 	if err != nil && spanfilter.IsInvalid(err) {
 		atomic.AddInt64(&c.TotalProcessErrors, 1)
 		atomic.AddInt64(&c.ProcessErrorSpans, int64(len(spans)))
-		c.logger().Log(log.Err, err, "Unable to process spans")
+		c.logErrMsg(ctx, err, "Unable to process spans")
 	}
 	return err
 }
