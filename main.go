@@ -608,14 +608,22 @@ func (p *proxy) run(ctx context.Context) error {
 		p.logger.Log(log.Err, err, "Unable to load config")
 		return err
 	}
+
+	p.setup(loadedConfig)
+	p.versionMetric.Logger = p.logger
+
+	logger := p.logger
+	scheduler := p.setupScheduler(*loadedConfig.ServerName)
+
+	if err := p.setupDebugServer(loadedConfig, logger, scheduler); err != nil {
+		return err
+	}
+
 	p.etcdMgr.setup(loadedConfig)
 	if err := p.etcdMgr.start(); err != nil {
 		p.logger.Log(log.Err, "unable to start etcd server", err)
 		return err
 	}
-	p.setup(loadedConfig)
-	logger := p.logger
-	p.versionMetric.Logger = p.logger
 
 	var bb []byte
 	if bb, err = json.Marshal(loadedConfig); err == nil {
@@ -626,8 +634,6 @@ func (p *proxy) run(ctx context.Context) error {
 
 	chain := p.createCommonHTTPChain(loadedConfig)
 	loader := config.NewLoader(ctx, logger, Version, &p.debugContext, &p.debugSink, &p.ctxDims, chain)
-
-	scheduler := p.setupScheduler(*loadedConfig.ServerName)
 
 	forwarders, err := setupForwarders(ctx, *loadedConfig.ServerName, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims, p.etcdMgr)
 	if err != nil {
@@ -672,9 +678,6 @@ func (p *proxy) run(ctx context.Context) error {
 		logger.Log(log.Err, err, logkey.Struct, "scheduler", "Schedule finished")
 		wg.Done()
 	}()
-	if err := p.setupDebugServer(loadedConfig, logger, scheduler); err != nil {
-		return err
-	}
 	logger.Log("Setup done.  Blocking!")
 	if p.setupDoneSignal != nil {
 		close(p.setupDoneSignal)
