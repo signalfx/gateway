@@ -205,6 +205,7 @@ const jaegerBatchJSON = `
       ]
     }
   ]
+
 }
 `
 
@@ -268,10 +269,12 @@ func TestJaegerTraceDecoder(t *testing.T) {
 					{Timestamp: pointer.Float64(1485467191639875), Value: pointer.String("nothing")},
 				},
 				Tags: map[string]string{
-					"http.url":      "http://127.0.0.1:15598/client_transactions",
-					"someBool":      "true",
-					"someFalseBool": "false",
-					"someDouble":    "129.8",
+					"http.url":       "http://127.0.0.1:15598/client_transactions",
+					"someBool":       "true",
+					"someFalseBool":  "false",
+					"someDouble":     "129.8",
+					"hostname":       "api246-sjc1",
+					"jaeger.version": "Python-3.1.0",
 				},
 			},
 			{
@@ -293,7 +296,10 @@ func TestJaegerTraceDecoder(t *testing.T) {
 				Debug:       nil,
 				Shared:      nil,
 				Annotations: []*trace.Annotation{},
-				Tags:        map[string]string{},
+				Tags: map[string]string{
+					"hostname":       "api246-sjc1",
+					"jaeger.version": "Python-3.1.0",
+				},
 			},
 			{
 				TraceID:  "52969a8955571a3f",
@@ -311,7 +317,10 @@ func TestJaegerTraceDecoder(t *testing.T) {
 				Debug:          nil,
 				Shared:         nil,
 				Annotations:    []*trace.Annotation{},
-				Tags:           map[string]string{},
+				Tags: map[string]string{
+					"hostname":       "api246-sjc1",
+					"jaeger.version": "Python-3.1.0",
+				},
 			},
 			{
 				TraceID:  "52969a8955571a3f",
@@ -332,7 +341,9 @@ func TestJaegerTraceDecoder(t *testing.T) {
 				Shared:      nil,
 				Annotations: []*trace.Annotation{},
 				Tags: map[string]string{
-					"elements": "100",
+					"elements":       "100",
+					"hostname":       "api246-sjc1",
+					"jaeger.version": "Python-3.1.0",
 				},
 			},
 		})
