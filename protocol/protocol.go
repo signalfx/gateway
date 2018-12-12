@@ -24,6 +24,7 @@ type Forwarder interface {
 	Pipeline
 	sfxclient.Collector
 	io.Closer
+	StartupHook
 }
 
 // Listener is the basic interface anything that listens for new metrics must implement
@@ -38,6 +39,11 @@ type HealthChecker interface {
 	CloseHealthCheck()
 }
 
+// StartupHook interface allows a forwarder to present a callback after startup if it needs to do something that requires a fully running metricproxy
+type StartupHook interface {
+	StartupFinished() error
+}
+
 // Pipeline returns the number of items still in flight that need to be drained
 type Pipeline interface {
 	Pipeline() int64
@@ -46,6 +52,11 @@ type Pipeline interface {
 // UneventfulForwarder converts a datapoint only forwarder into a datapoint/event forwarder
 type UneventfulForwarder struct {
 	DatapointForwarder
+}
+
+// StartupFinished is to be called after startup is finished
+func (u *UneventfulForwarder) StartupFinished() error {
+	return nil
 }
 
 // AddEvents does nothing and returns nil

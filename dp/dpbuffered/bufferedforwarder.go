@@ -71,10 +71,11 @@ type BufferedForwarder struct {
 	cdim                        *log.CtxDimensions
 	identifier                  string
 
-	sendTo      signalfx.Sink
-	closeSender func() error
-	stopContext context.Context
-	stopFunc    context.CancelFunc
+	sendTo       signalfx.Sink
+	stopContext  context.Context
+	stopFunc     context.CancelFunc
+	closeSender  func() error
+	afterStartup func() error
 }
 
 var _ dpsink.Sink = &BufferedForwarder{}
@@ -347,26 +348,32 @@ func logEvIfFlag(l log.Logger, checker flagChecker, ev []*event.Event, msg strin
 	}
 }
 
+// StartupFinished runs the afterStartup method on the forwarder
+func (forwarder *BufferedForwarder) StartupFinished() error {
+	return forwarder.afterStartup()
+}
+
 // NewBufferedForwarder is used only by this package to create a forwarder that buffers its
 // datapoint channel
-func NewBufferedForwarder(ctx context.Context, config *Config, sendTo signalfx.Sink, closeIt func() error, logger log.Logger) *BufferedForwarder {
+func NewBufferedForwarder(ctx context.Context, config *Config, sendTo signalfx.Sink, closeIt, afterStartup func() error, logger log.Logger) *BufferedForwarder {
 	config = pointer.FillDefaultFrom(config, DefaultConfig).(*Config)
 	logCtx := log.NewContext(logger).With(logkey.Struct, "BufferedForwarder")
 	logCtx.Log(logkey.Config, config)
 	context, cancel := context.WithCancel(ctx)
 	ret := &BufferedForwarder{
-		stopFunc:    cancel,
-		stopContext: context,
-		dpChan:      make(chan []*datapoint.Datapoint, *config.BufferSize),
-		eChan:       make(chan []*event.Event, *config.BufferSize),
-		tChan:       make(chan []*trace.Span, *config.BufferSize),
-		config:      config,
-		sendTo:      sendTo,
-		closeSender: closeIt,
-		logger:      logCtx,
-		checker:     config.Checker,
-		cdim:        config.Cdim,
-		identifier:  *config.Name,
+		stopFunc:     cancel,
+		stopContext:  context,
+		dpChan:       make(chan []*datapoint.Datapoint, *config.BufferSize),
+		eChan:        make(chan []*event.Event, *config.BufferSize),
+		tChan:        make(chan []*trace.Span, *config.BufferSize),
+		config:       config,
+		sendTo:       sendTo,
+		closeSender:  closeIt,
+		afterStartup: afterStartup,
+		logger:       logCtx,
+		checker:      config.Checker,
+		cdim:         config.Cdim,
+		identifier:   *config.Name,
 	}
 	ret.start()
 	return ret

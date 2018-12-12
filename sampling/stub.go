@@ -18,6 +18,11 @@ type SmartSampleConfig struct {
 // SmartSampler is not here
 type SmartSampler struct{}
 
+// StartupFinished does nothing
+func (f *SmartSampler) StartupFinished() error {
+	return nil
+}
+
 // AddSpans does nothing
 func (f *SmartSampler) AddSpans(context context.Context, spans []*trace.Span, sink trace.Sink) error {
 	return nil

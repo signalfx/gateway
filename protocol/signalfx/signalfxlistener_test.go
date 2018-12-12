@@ -251,6 +251,7 @@ func TestSignalfxListener(t *testing.T) {
 				TraceURL:     pointer.String(fmt.Sprintf("%s/v1/trace", baseURI)),
 			}
 			forwarder, err := NewForwarder(forwardConfig)
+			So(forwarder.StartupFinished(), ShouldBeNil)
 			So(err, ShouldBeNil)
 			So(len(forwarder.Datapoints()), ShouldEqual, 7)
 			So(forwarder.Pipeline(), ShouldEqual, 0)

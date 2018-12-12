@@ -47,6 +47,11 @@ type Forwarder struct {
 
 var _ dpsink.Sink = &Forwarder{}
 
+// StartupFinished can be called if you want to do something after startup is complete
+func (f *Forwarder) StartupFinished() error {
+	return nil
+}
+
 // Datapoints returns nothing and exists to satisfy the protocol.Forwarder interface
 func (f *Forwarder) Datapoints() []*datapoint.Datapoint {
 	return f.GetFilteredDatapoints()
