@@ -7,13 +7,13 @@ import (
 
 	"expvar"
 	"github.com/quentin-m/etcd-cloud-operator/pkg/etcd"
+	"github.com/signalfx/gateway/logkey"
+	"github.com/signalfx/gateway/protocol/filtering"
+	"github.com/signalfx/gateway/sampling"
 	"github.com/signalfx/gohelpers/stringhelper"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/metricproxy/logkey"
-	"github.com/signalfx/metricproxy/protocol/filtering"
-	"github.com/signalfx/metricproxy/sampling"
 	"github.com/signalfx/xdgbasedir"
 	"os"
 )
@@ -111,7 +111,7 @@ type ProxyConfig struct {
 
 // DefaultProxyConfig is default values for the proxy config
 var DefaultProxyConfig = &ProxyConfig{
-	PidFilename:                   pointer.String("metricproxy.pid"),
+	PidFilename:                   pointer.String("gateway.pid"),
 	LogDir:                        pointer.String(os.TempDir()),
 	LogMaxSize:                    pointer.Int(100),
 	LogMaxBackups:                 pointer.Int(10),

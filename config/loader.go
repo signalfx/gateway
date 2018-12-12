@@ -2,18 +2,18 @@ package config
 
 import (
 	"context"
+	"github.com/signalfx/gateway/protocol"
+	"github.com/signalfx/gateway/protocol/carbon"
+	"github.com/signalfx/gateway/protocol/carbon/metricdeconstructor"
+	"github.com/signalfx/gateway/protocol/collectd"
+	"github.com/signalfx/gateway/protocol/csv"
+	"github.com/signalfx/gateway/protocol/prometheus"
+	"github.com/signalfx/gateway/protocol/signalfx"
+	"github.com/signalfx/gateway/protocol/wavefront"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/web"
-	"github.com/signalfx/metricproxy/protocol"
-	"github.com/signalfx/metricproxy/protocol/carbon"
-	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
-	"github.com/signalfx/metricproxy/protocol/collectd"
-	"github.com/signalfx/metricproxy/protocol/csv"
-	"github.com/signalfx/metricproxy/protocol/prometheus"
-	"github.com/signalfx/metricproxy/protocol/signalfx"
-	"github.com/signalfx/metricproxy/protocol/wavefront"
 )
 
 type forwarderLoader interface {

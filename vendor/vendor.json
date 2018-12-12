@@ -1600,5 +1600,5 @@
 			"revisionTime": "2017-07-26T18:26:18Z"
 		}
 	],
-	"rootPath": "github.com/signalfx/metricproxy"
+	"rootPath": "github.com/signalfx/gateway"
 }

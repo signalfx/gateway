@@ -20,6 +20,9 @@ import (
 	"time"
 
 	"github.com/quentin-m/etcd-cloud-operator/pkg/etcd"
+	"github.com/signalfx/gateway/config"
+	"github.com/signalfx/gateway/protocol/carbon"
+	"github.com/signalfx/gateway/protocol/signalfx"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/errors"
@@ -27,9 +30,6 @@ import (
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/timekeeper"
-	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/protocol/carbon"
-	"github.com/signalfx/metricproxy/protocol/signalfx"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 )

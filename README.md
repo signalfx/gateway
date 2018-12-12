@@ -1,6 +1,6 @@
-# metricproxy [![Circle CI](https://circleci.com/gh/signalfx/metricproxy.svg?style=svg)](https://circleci.com/gh/signalfx/metricproxy)
+# Gateway [![Circle CI](https://circleci.com/gh/signalfx/gateway.svg?style=svg)](https://circleci.com/gh/signalfx/gateway)
 
-The SignalFx Metricproxy lets you aggregate metrics and send them to
+The SignalFx Gateway lets you aggregate metrics and send them to
 SignalFx. It is a multilingual datapoint demultiplexer that can accept
 time series data from the carbon (Graphite), collectd or SignalFx protocols
 and emit those datapoints to a series of servers using the carbon, collectd
@@ -12,18 +12,47 @@ is already receiving datapoints, such as Graphite's carbon database.
 
 ```
 $ curl -s \
-https://raw.githubusercontent.com/signalfx/metricproxy/master/install.sh\
+https://raw.githubusercontent.com/signalfx/gateway/master/install.sh\
 | sudo sh
 
-# Config at    /etc/sfdbconfig.conf
-# Binary at    /opt/sfproxy/bin/metricproxy
-# Logs at      /var/log/sfproxy
-# PID file at  /var/run/metricproxy.pid
+# Config at    /etc/gateway.conf
+# Binary at    /opt/gateway/bin/gateway
+# Logs at      /var/log/gateway
+# PID file at  /var/run/gateway.pid
 ```
+
+### Migration from metricproxy
+
+Additional steps are required if you're upgrading from a version that was from
+the metricproxy repo.  You'll want to do the following renaming:
+
+```
+/etc/sfdbconfig.conf -> /etc/gateway.conf
+/var/log/sfproxy -> /var/log/gateway
+```
+
+You'll also want to expect that some files will also have changed names:
+
+```
+/var/log/sfprpoxy/metricproxy.log -> /var/log/gateway/gateway.log
+/var/run/metricproxy.pid -> /var/run/gateway.pid
+```
+
+If you were running the metricproxy using our docker container, you'll want
+to notice that the paths and filenames have also changed there, so you'll
+want to update any infrastructure you have around that:
+
+```
+/var/log/sfproxy -> /var/log/gateway
+/var/config/sfproxy -> /var/config/gateway
+/var/config/sfproxy/sfdbproxy.conf ->  /var/config/gateway/gateway.conf
+```
+
+No changes to the contents of the gateway.conf are required.
 
 ### Go Dependency
 
-Additional Steps are required to install the metricproxy on Ubuntu machines
+Additional Steps are required to install the gateway on Ubuntu machines
 because the golang package in Ubuntu is not up to date. The following steps
 to [update](https://github.com/golang/go/wiki/Ubuntu) the golang package on
 Ubuntu must be executed before running the install script.
@@ -49,19 +78,19 @@ sudo cp /usr/lib/go-1.11.1/bin/go /usr/bin/go
 ## Running
 
 ```
-/etc/init.d/metricproxy start
+/etc/init.d/gateway start
 ```
 
 ## Stopping the daemon
 
 ```
-/etc/init.d/metricproxy stop
+/etc/init.d/gateway stop
 ```
 
 ## Debugging
 
 ```
-cd /var/log/sfproxy
+cd /var/log/gateway
 tail -F *
 ```
 
@@ -77,7 +106,7 @@ server.
 ## Http Proxy Support
 
 The go http code supports the use of an http proxy through the environment
-variable `HTTP_PROXY="http://proxyhost:proxyport"`. With this the metricproxy
+variable `HTTP_PROXY="http://proxyhost:proxyport"`. With this the gateway
 will proxy all http connections through that host and port. This can be put
 into the start script, or as part of the environment sent into the container
 if using a container solution like maestro.
@@ -122,9 +151,9 @@ env variable is set correctly.
 ## Docker
 
 The proxy comes with a [docker image](Dockerfile) that is built and deployed
-to [quay.io](https://quay.io/repository/signalfx/metricproxy).  It assumes
-you will have a sfdbproxy.conf file cross mounted to
-/var/config/sfproxy/sfdbproxy.conf for the docker container.
+to [quay.io](https://quay.io/repository/signalfx/gateway).  It assumes
+you will have a gateway.conf file cross mounted to
+/var/config/gateway/gateway.conf for the docker container.
 
 ## Config file format
 
@@ -196,7 +225,7 @@ to the default of TCP).
 
 #### prometheus
 
-You can use the metricproxy as prometheus remote storage. To do this, you will
+You can use the gateway as prometheus remote storage. To do this, you will
 need to specify the port to bind to.  An example config:
 
 ```
@@ -343,7 +372,7 @@ to signalfx at 1s intervals
 ```
 {
   "StatsDelay": "1s",
-  "LogDir": "/var/log/sfproxy",
+  "LogDir": "/var/log/gateway",
   "ListenFrom": [
     {
       "Type": "carbon",
@@ -702,7 +731,7 @@ simultaniously with each thread sending no more than 5,000 points in a single
 call.
 
 StatsDelay being set to 1s means every 1s we'll emit metrics out all forwarders
-about the running metric proxy.  These metrics are emitted with a host dimension
+about the running Gateway.  These metrics are emitted with a host dimension
 that will be set to the value of the ServerName set in the config file or to
 the hostname of the machine by default.
 
@@ -715,7 +744,7 @@ data that was late or in the future respectively.
 ```
 {
   "StatsDelay": "1s",
-  "ServerName": "metricproxy-us-east1",
+  "ServerName": "gateway-us-east1",
   "LateThreshold": "1s",
   "FutureThreshold": "1s",
   "ListenFrom": [

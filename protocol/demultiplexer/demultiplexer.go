@@ -2,6 +2,7 @@ package demultiplexer
 
 import (
 	"context"
+	"github.com/signalfx/gateway/logkey"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
@@ -9,7 +10,6 @@ import (
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
-	"github.com/signalfx/metricproxy/logkey"
 	"sync/atomic"
 	"time"
 )

@@ -2,10 +2,10 @@ FROM scratch
 MAINTAINER Matthew Pound <mwp@signalfx.com>
 
 COPY ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt
-COPY metricproxy /metricproxy
+COPY gateway /gateway
 COPY buildInfo.json /buildInfo.json
 
-VOLUME /var/log/sfproxy
-VOLUME /var/config/sfproxy
+VOLUME /var/log/gateway
+VOLUME /var/config/gateway
 
-CMD ["/metricproxy", "-configfile", "/var/config/sfproxy/sfdbproxy.conf"]
+CMD ["/gateway", "-configfile", "/var/config/gateway/gateway.conf"]

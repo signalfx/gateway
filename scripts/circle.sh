@@ -16,7 +16,7 @@ GO_COMPILER_PATH="$HOME/gover"
 SRC_PATH="$GOPATH/src/$IMPORT_PATH"
 
 function docker_url() {
-  echo -n "quay.io/signalfx/metricproxy:$(docker_tag)"
+  echo -n "quay.io/signalfx/gateway:$(docker_tag)"
 }
 
 # Cache phase of circleci
@@ -38,13 +38,25 @@ function do_cache() {
   install_shellcheck "$GOPATH_INTO"
   copy_local_to_path "$SRC_PATH"
   BUILD_VERSION=$(git describe --tags HEAD)
+  if [ -z  "$COMMIT_SHA" ]; then
+    COMMIT_SHA=$(git log -n1 --pretty=format:%H)
+  fi
+  if [ -z  "$BUILDER" ]; then
+    BUILDER=circle
+  fi
   (
     cd "$SRC_PATH"
     load_docker_images
     LD_FLAGS="-X main.Version=$BUILD_VERSION -X main.BuildDate=$(date --rfc-3339=seconds | sed 's/ /T/') -s -w"
-    CGO_ENABLED=0 go build -ldflags "$LD_FLAGS" -v -installsuffix .
+    CGO_ENABLED=0 go build -ldflags "$LD_FLAGS" -v -installsuffix . -o gateway
+    echo "{
+      \"name\": \"gateway\",
+      \"version\": \"$BUILD_VERSION\",
+      \"builder\": \"$BUILDER\",
+      \"commit\": \"$COMMIT_SHA\"
+    }" > buildInfo.json
     docker build -t "$(docker_url)" .
-    cache_docker_image "$(docker_url)" metricproxy
+    cache_docker_image "$(docker_url)" gateway
   )
 }
 
@@ -55,9 +67,9 @@ function do_test() {
     cd "$SRC_PATH"
     shellcheck install.sh
     shellcheck scripts/circle.sh
-    shellcheck metricproxy_initd
+    shellcheck gateway_initd
     echo -e "# Ignore Header" > /tmp/ignore_header.md
-    python -m json.tool < exampleSfdbproxy.conf > /dev/null
+    python -m json.tool < exampleGateway.conf > /dev/null
   )
   install_go_version "$GO_COMPILER_PATH" "$DEFAULT_GOLANG_VERSION"
   gometalinter --install --update
@@ -74,7 +86,7 @@ function do_test() {
       go test -race -timeout 15s ./...
     )
   done
-  install_go_version "$GO_COMPILER_PATH" "$GO_VERSION"
+  install_go_version "$GO_COMPILER_PATH" "$GOLANG_VERSION"
   (
     cd "$SRC_PATH"
     go clean -x ./...

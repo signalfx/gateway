@@ -2,6 +2,8 @@ package config
 
 import (
 	"context"
+	"github.com/signalfx/gateway/protocol/carbon"
+	"github.com/signalfx/gateway/sampling"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/datapoint/dptest"
@@ -9,8 +11,6 @@ import (
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/web"
-	"github.com/signalfx/metricproxy/protocol/carbon"
-	"github.com/signalfx/metricproxy/sampling"
 	. "github.com/smartystreets/goconvey/convey"
 	"os"
 	"testing"

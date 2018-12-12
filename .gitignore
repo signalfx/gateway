@@ -1,8 +1,10 @@
 metricproxy.pid
+gateway.pid
 /.arcconfig
 /*.iml
 /sfproxytest.json
 /metricproxy
+/gateway
 /sf
 /.go
 /.idea

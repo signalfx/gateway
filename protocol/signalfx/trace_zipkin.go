@@ -10,12 +10,12 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/mailru/easyjson"
+	"github.com/signalfx/gateway/protocol/signalfx/format"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
-	"github.com/signalfx/metricproxy/protocol/signalfx/format"
 )
 
 const (

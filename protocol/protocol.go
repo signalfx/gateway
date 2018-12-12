@@ -39,7 +39,7 @@ type HealthChecker interface {
 	CloseHealthCheck()
 }
 
-// StartupHook interface allows a forwarder to present a callback after startup if it needs to do something that requires a fully running metricproxy
+// StartupHook interface allows a forwarder to present a callback after startup if it needs to do something that requires a fully running gateway
 type StartupHook interface {
 	StartupFinished() error
 }

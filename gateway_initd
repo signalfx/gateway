@@ -5,16 +5,16 @@
 # Required-Stop:     $remote_fs $syslog
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: Start metricproxy
-# Description:       Enable metricproxy provided by daemon.
+# Short-Description: Start Gateway
+# Description:       Enable Gateway provided by daemon.
 ### END INIT INFO
 
-dir="/opt/sfproxy"
+dir="/opt/gateway"
 user="root"
-configfile="/etc/sfdbconfig.conf"
-binary="/opt/sfproxy/bin/metricproxy"
+configfile="/etc/gateway.conf"
+binary="/opt/gateway/bin/gateway"
 
-name="metricproxy"
+name="gateway"
 pid_file="/var/run/$name.pid"
 stdout_log="/var/log/$name.stdout.log"
 stderr_log="/var/log/$name.stderr.log"

@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"context"
+	"github.com/signalfx/gateway/dp/dpdimsort"
+	"github.com/signalfx/gateway/protocol/filtering"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/timekeeper"
-	"github.com/signalfx/metricproxy/dp/dpdimsort"
-	"github.com/signalfx/metricproxy/protocol/filtering"
 )
 
 // Forwarder is a sink that forwards points to a carbon endpoint

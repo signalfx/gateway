@@ -4,9 +4,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/signalfx/gateway/protocol/collectd/format"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
-	"github.com/signalfx/metricproxy/protocol/collectd/format"
 )
 
 var dsTypeToMetricType = map[string]datapoint.MetricType{

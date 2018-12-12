@@ -19,14 +19,14 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/mailru/easyjson"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
+	"github.com/signalfx/gateway/logkey"
+	"github.com/signalfx/gateway/protocol/signalfx/format"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/web"
-	"github.com/signalfx/metricproxy/logkey"
-	"github.com/signalfx/metricproxy/protocol/signalfx/format"
 )
 
 // JSONDatapointV1 is an alias

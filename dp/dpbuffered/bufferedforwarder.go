@@ -6,6 +6,8 @@ import (
 
 	"context"
 	"fmt"
+	"github.com/signalfx/gateway/logkey"
+	"github.com/signalfx/gateway/protocol/signalfx"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/event"
@@ -13,8 +15,6 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
-	"github.com/signalfx/metricproxy/logkey"
-	"github.com/signalfx/metricproxy/protocol/signalfx"
 )
 
 // Config controls BufferedForwarder limits
