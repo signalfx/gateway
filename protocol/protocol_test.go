@@ -11,6 +11,7 @@ func TestUneventfulForwarder(t *testing.T) {
 	assert.Equal(t, u.AddEvents(nil, nil), nil)
 	assert.Equal(t, u.AddSpans(nil, nil), nil)
 	assert.Equal(t, int64(0), u.Pipeline())
+	assert.Equal(t, u.StartupFinished(), nil)
 }
 
 func TestDimMakers(t *testing.T) {

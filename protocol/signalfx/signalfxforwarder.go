@@ -192,3 +192,8 @@ func (connector *Forwarder) AddSpans(ctx context.Context, spans []*trace.Span) e
 func (connector *Forwarder) Pipeline() int64 {
 	return atomic.LoadInt64(&connector.stats.pipeline)
 }
+
+// StartupFinished calls the same interface on the sampler as a hook called by run() after the proxy is up and running
+func (connector *Forwarder) StartupFinished() error {
+	return connector.sampler.StartupFinished()
+}

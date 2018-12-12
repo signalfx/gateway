@@ -294,7 +294,7 @@ func forwarderName(f *config.ForwardTo) string {
 
 var errDupeForwarder = errors.New("cannot duplicate forwarder names or types without names")
 
-func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, manager *etcdManager) ([]protocol.Forwarder, error) {
+func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, manager *etcdManager) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	nameMap := make(map[string]bool)
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
@@ -335,7 +335,7 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 			Name:               forwardConfig.Name,
 			Cdim:               cdim,
 		}
-		bf := dpbuffered.NewBufferedForwarder(ctx, bconf, endingSink, forwarder.Close, limitedLogger)
+		bf := dpbuffered.NewBufferedForwarder(ctx, bconf, endingSink, forwarder.Close, forwarder.StartupFinished, limitedLogger)
 		allForwarders = append(allForwarders, bf)
 
 		groupName := fmt.Sprintf("%s_f_%d", name, idx)
@@ -347,7 +347,7 @@ func setupForwarders(ctx context.Context, hostname string, tk timekeeper.TimeKee
 			"name":      name,
 			"direction": "forwarder",
 			"source":    "proxy",
-			"host":      hostname,
+			"host":      *loadedConfig.ServerName,
 			"type":      forwardConfig.Type,
 		})
 	}
@@ -598,6 +598,47 @@ func (p *proxy) scheduleStatCollection(ctx context.Context, scheduler *sfxclient
 	return finishedContext, cancelFunc
 }
 
+func (p *proxy) setupForwardersAndListeners(ctx context.Context, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler) (signalfx.Sink, error) {
+	var err error
+	p.forwarders, err = setupForwarders(ctx, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims, p.etcdMgr)
+	if err != nil {
+		p.logger.Log(log.Err, err, "Unable to setup forwarders")
+		return nil, errors.Annotate(err, "unable to setup forwarders")
+	}
+
+	dpSinks, eSinks, tSinks := splitSinks(p.forwarders)
+
+	dmux := &demultiplexer.Demultiplexer{
+		DatapointSinks: dpSinks,
+		EventSinks:     eSinks,
+		TraceSinks:     tSinks,
+		Logger:         log.NewOnePerSecond(logger),
+		LateDuration:   loadedConfig.LateThresholdDuration,
+		FutureDuration: loadedConfig.FutureThresholdDuration,
+	}
+	scheduler.AddCallback(dmux)
+
+	p.versionMetric.RepoURL = "https://github.com/signalfx/metricproxy"
+	p.versionMetric.FileName = "/buildInfo.json"
+	scheduler.AddCallback(&p.versionMetric)
+
+	multiplexer := signalfx.FromChain(dmux, signalfx.NextWrap(signalfx.UnifyNextSinkWrap(&p.debugSink)))
+
+	p.listeners, err = setupListeners(p.tk, *loadedConfig.ServerName, loader, loadedConfig.ListenFrom, multiplexer, logger, scheduler)
+	if err != nil {
+		p.logger.Log(log.Err, err, "Unable to setup listeners")
+		return nil, errors.Annotate(err, "cannot setup listeners from configuration")
+	}
+
+	var errs []error
+	for _, f := range p.forwarders {
+		err = f.StartupFinished()
+		errs = append(errs, err)
+		log.IfErr(logger, err)
+	}
+	return multiplexer, FirstNonNil(errs...)
+}
+
 func (p *proxy) run(ctx context.Context) error {
 	p.debugSink.CtxFlagCheck = &p.debugContext
 	p.logger.Log(logkey.ConfigFile, p.flags.configFileName, "Looking for config file")
@@ -616,10 +657,12 @@ func (p *proxy) run(ctx context.Context) error {
 	scheduler := p.setupScheduler(*loadedConfig.ServerName)
 
 	if err := p.setupDebugServer(loadedConfig, logger, scheduler); err != nil {
+		p.logger.Log(log.Err, "debug server failed", err)
 		return err
 	}
 
 	p.etcdMgr.setup(loadedConfig)
+
 	if err := p.etcdMgr.start(); err != nil {
 		p.logger.Log(log.Err, "unable to start etcd server", err)
 		return err
@@ -635,60 +678,31 @@ func (p *proxy) run(ctx context.Context) error {
 	chain := p.createCommonHTTPChain(loadedConfig)
 	loader := config.NewLoader(ctx, logger, Version, &p.debugContext, &p.debugSink, &p.ctxDims, chain)
 
-	forwarders, err := setupForwarders(ctx, *loadedConfig.ServerName, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims, p.etcdMgr)
-	if err != nil {
-		p.logger.Log(log.Err, err, "Unable to setup forwarders")
-		return errors.Annotate(err, "unable to setup forwarders")
+	multiplexer, err := p.setupForwardersAndListeners(ctx, loader, loadedConfig, logger, scheduler)
+	if err == nil {
+		finishedContext, cancelFunc := p.scheduleStatCollection(ctx, scheduler, loadedConfig, multiplexer)
+
+		// Schedule datapoint collection to a Discard sink so we can get the stats in Expvar()
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			err := scheduler.Schedule(finishedContext)
+			logger.Log(log.Err, err, logkey.Struct, "scheduler", "Schedule finished")
+			wg.Done()
+		}()
+		if p.setupDoneSignal != nil {
+			close(p.setupDoneSignal)
+		}
+
+		logger.Log("Setup done.  Blocking!")
+		select {
+		case <-ctx.Done():
+		case <-p.signalChan:
+			err = p.gracefulShutdown()
+		}
+		cancelFunc()
+		wg.Wait()
 	}
-
-	p.forwarders = forwarders
-	dpSinks, eSinks, tSinks := splitSinks(forwarders)
-
-	dmux := &demultiplexer.Demultiplexer{
-		DatapointSinks: dpSinks,
-		EventSinks:     eSinks,
-		TraceSinks:     tSinks,
-		Logger:         log.NewOnePerSecond(logger),
-		LateDuration:   loadedConfig.LateThresholdDuration,
-		FutureDuration: loadedConfig.FutureThresholdDuration,
-	}
-	scheduler.AddCallback(dmux)
-
-	p.versionMetric.RepoURL = "https://github.com/signalfx/metricproxy"
-	p.versionMetric.FileName = "/buildInfo.json"
-	scheduler.AddCallback(&p.versionMetric)
-
-	multiplexer := signalfx.FromChain(dmux, signalfx.NextWrap(signalfx.UnifyNextSinkWrap(&p.debugSink)))
-
-	listeners, err := setupListeners(p.tk, *loadedConfig.ServerName, loader, loadedConfig.ListenFrom, multiplexer, logger, scheduler)
-	if err != nil {
-		p.logger.Log(log.Err, err, "Unable to setup listeners")
-		return errors.Annotate(err, "cannot setup listeners from configuration")
-	}
-	p.listeners = listeners
-
-	finishedContext, cancelFunc := p.scheduleStatCollection(ctx, scheduler, loadedConfig, multiplexer)
-	defer cancelFunc()
-
-	// Schedule datapoint collection to a Discard sink so we can get the stats in Expvar()
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		err := scheduler.Schedule(finishedContext)
-		logger.Log(log.Err, err, logkey.Struct, "scheduler", "Schedule finished")
-		wg.Done()
-	}()
-	logger.Log("Setup done.  Blocking!")
-	if p.setupDoneSignal != nil {
-		close(p.setupDoneSignal)
-	}
-	select {
-	case <-ctx.Done():
-	case <-p.signalChan:
-		err = p.gracefulShutdown()
-	}
-	cancelFunc()
-	wg.Wait()
 	return err
 }
 
@@ -698,4 +712,14 @@ func main() {
 	flagParse()
 	signal.Notify(mainInstance.signalChan, syscall.SIGTERM)
 	log.IfErr(log.DefaultLogger, mainInstance.main(context.Background()))
+}
+
+// FirstNonNil returns what it says it does
+func FirstNonNil(errs ...error) error {
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

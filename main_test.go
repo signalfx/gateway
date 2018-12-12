@@ -31,6 +31,7 @@ import (
 	"github.com/signalfx/metricproxy/protocol/carbon"
 	"github.com/signalfx/metricproxy/protocol/signalfx"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
 )
 
 const configEtcd = `
@@ -513,6 +514,12 @@ func formatTargetAddresses(targetClusters []string) (targetAddresses string) {
 		targetAddresses += "\n"
 	}
 	return
+}
+
+var errTest = errors.New("test")
+
+func Test_NonNil(t *testing.T) {
+	assert.Equal(t, FirstNonNil(errTest), errTest)
 }
 
 func TestProxyCluster(t *testing.T) {

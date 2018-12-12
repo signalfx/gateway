@@ -65,7 +65,8 @@ func TestBufferedForwarderBasic(t *testing.T) {
 		buf := &bytes.Buffer{}
 		threadWriter := &threadSafeWriter{Writer: buf}
 		l := log.NewLogfmtLogger(threadWriter, log.Panic)
-		bf := NewBufferedForwarder(ctx, config, sendTo, c, l)
+		bf := NewBufferedForwarder(ctx, config, sendTo, c, c, l)
+		So(bf.StartupFinished(), ShouldBeNil)
 		datas := []*datapoint.Datapoint{
 			dptest.DP(),
 			dptest.DP(),
@@ -196,7 +197,7 @@ func TestBufferedForwarderContexts(t *testing.T) {
 	}
 
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo, c, log.Discard)
+	bf := NewBufferedForwarder(ctx, config, sendTo, c, c, log.Discard)
 	assert.NoError(t, bf.AddDatapoints(ctx, datas))
 	canceledContext, cancelFunc := context.WithCancel(ctx)
 	waiter := make(chan struct{})
@@ -265,7 +266,7 @@ func TestBufferedForwarderContextsEvent(t *testing.T) {
 	spans := []*trace.Span{{}}
 
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo, c, log.Discard)
+	bf := NewBufferedForwarder(ctx, config, sendTo, c, c, log.Discard)
 	assert.NoError(t, bf.AddEvents(ctx, events))
 	assert.NoError(t, bf.AddSpans(ctx, spans))
 	canceledContext, cancelFunc := context.WithCancel(ctx)
@@ -313,7 +314,7 @@ func TestBufferedForwarderMaxTotalDatapoints(t *testing.T) {
 	}
 	ctx := context.Background()
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo, c, log.Discard)
+	bf := NewBufferedForwarder(ctx, config, sendTo, c, c, log.Discard)
 	defer func() {
 		assert.NoError(t, bf.Close())
 	}()
@@ -348,7 +349,7 @@ func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
 	}
 	ctx := context.Background()
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo, c, log.Discard)
+	bf := NewBufferedForwarder(ctx, config, sendTo, c, c, log.Discard)
 	defer func() {
 		assert.NoError(t, bf.Close())
 	}()

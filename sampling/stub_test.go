@@ -14,6 +14,7 @@ func Test(t *testing.T) {
 	assert.Nil(t, n)
 	assert.Nil(t, err)
 	assert.Nil(t, n.AddSpans(context.Background(), []*trace.Span{}, nil))
+	assert.Nil(t, n.StartupFinished())
 	assert.Nil(t, n.Close())
 	assert.True(t, len(n.Datapoints()) == 0)
 }
