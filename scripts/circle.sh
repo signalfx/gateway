@@ -43,6 +43,20 @@ function do_cache() {
     load_docker_images
     LD_FLAGS="-X main.Version=$BUILD_VERSION -X main.BuildDate=$(date --rfc-3339=seconds | sed 's/ /T/') -s -w"
     CGO_ENABLED=0 go build -ldflags "$LD_FLAGS" -v -installsuffix .
+    if [ -z  "$COMMIT_SHA" ]; then
+      COMMIT_SHA=$(git log -n1 --pretty=format:%H)
+    fi
+    if [ -z  "$BUILDER" ]; then
+      BUILDER=dev
+    fi
+
+    echo "{
+      \"name\": \"metricproxy\",
+      \"version\": \"1.0\",
+      \"builder\": \"$BUILDER\",
+      \"commit\": \"$COMMIT_SHA\"
+    }" > buildInfo.json
+
     docker build -t "$(docker_url)" .
     cache_docker_image "$(docker_url)" metricproxy
   )
