@@ -31,7 +31,7 @@ function do_cache() {
   . "$HOME/circleutil/scripts/common.sh"
   mkdir -p "$GO_COMPILER_PATH"
   install_all_go_versions "$GO_COMPILER_PATH"
-  install_go_version "$GO_COMPILER_PATH" "$DEFAULT_GOLANG_VERSION"
+  install_go_version "$GO_COMPILER_PATH" "$GOLANG_VERSION"
   go get -u github.com/signalfx/gobuild
   go get -u github.com/alecthomas/gometalinter
   mkdir -p "$GOPATH_INTO"
