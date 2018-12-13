@@ -341,8 +341,8 @@ configuration by setting the `url`, `eventURL` and `TraceURL` parameters:
 ```json
 {
   "type": "signalfx",
-  "url": "https://ingest.<realm>.signalfx.com/v2/datapoint",
-  "eventURL": "https://ingest.<realm>.signalfx.com/v2/event",
+  "URL": "https://ingest.<realm>.signalfx.com/v2/datapoint",
+  "EventURL": "https://ingest.<realm>.signalfx.com/v2/event",
   "TraceURL": "https://ingest.<realm>.signalfx.com/v1/trace",
   "DefaultAuthToken": "___AUTH_TOKEN___",
   "Name": "testproxy"
