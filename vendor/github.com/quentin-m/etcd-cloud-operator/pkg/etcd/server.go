@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/embed"
 	"github.com/coreos/etcd/pkg/types"
 	log "github.com/sirupsen/logrus"
@@ -45,9 +46,16 @@ const (
 
 type Server struct {
 	server        *embed.Etcd
+	client 		  *Client
 	isRunning     bool
+	// isRunningLock protects attempts to query the isRunning
+	// boolean reflecting the status of the server
 	isRunningLock sync.RWMutex
+	// memberKeyLock protects operations against the server's cancelLease and client
+	// which may be replaced at anytime by addMember and refreshClientForServer
+	memberKeyLock sync.RWMutex
 	cfg           ServerConfig
+	cancelLease context.CancelFunc
 }
 
 type ServerConfig struct {
@@ -115,6 +123,7 @@ func (cfg *ServerConfig) MetricsAddress() string {
 func NewServer(cfg ServerConfig) *Server {
 	return &Server{
 		isRunningLock: sync.RWMutex{},
+		memberKeyLock: sync.RWMutex{},
 		cfg:           cfg,
 	}
 }
@@ -164,6 +173,11 @@ func (c *Server) Join(cluster *Client) error {
 
 	// Verify whether we have local data that would allow us to rejoin.
 	data, localSnapErr := localSnapshotProvider(c.cfg.DataDir).Info()
+
+	// name changes in the config invalidate previous data
+	if data != nil && data.Name != c.cfg.Name {
+		data = nil
+	}
 
 	// Check if we are listed as a member, and save the member ID if so.
 	var memberID uint64
@@ -347,6 +361,12 @@ func (c *Server) snapshot(minRevision int64) (io.ReadCloser, int64, error) {
 	return pr, revision, nil
 }
 
+func (c *Server) setIsRunning(in bool) {
+	c.isRunningLock.Lock()
+	c.isRunning = in
+	c.isRunningLock.Unlock()
+}
+
 func (c *Server) IsRunning() bool {
 	c.isRunningLock.RLock()
 	defer c.isRunningLock.RUnlock()
@@ -354,8 +374,18 @@ func (c *Server) IsRunning() bool {
 }
 
 func (c *Server) Stop(graceful, snapshot bool) {
+	c.memberKeyLock.Lock()
+	defer c.memberKeyLock.Unlock()
 	if !c.IsRunning() {
 		return
+	}
+	// cancel context keeping lease alive for our cluster identity
+	if c.cancelLease != nil {
+		c.cancelLease()
+	}
+	// close the client on the server
+	if c.client != nil {
+		c.client.Close()
 	}
 	if snapshot {
 		if err := c.Snapshot(); err != nil {
@@ -367,10 +397,37 @@ func (c *Server) Stop(graceful, snapshot bool) {
 		c.server.Server = nil
 	}
 	c.server.Close()
-	c.isRunningLock.Lock()
-	c.isRunning = false
-	c.isRunningLock.Unlock()
+	c.setIsRunning(false)
 	return
+}
+
+// refresh the client pointed directly at this server instance
+func (c *Server) refreshClientForServer() (err error){
+	c.memberKeyLock.Lock()
+	defer c.memberKeyLock.Unlock()
+	c.client, err = NewClient([]string{c.cfg.AdvertisedClientAddress()}, c.cfg.ClientSC, true)
+	return err
+}
+
+// add member key creates a new lease for this instance
+func (c *Server) addMemberKey() (err error){
+	c.memberKeyLock.Lock()
+	defer c.memberKeyLock.Unlock()
+	if c.cancelLease != nil {
+		c.cancelLease()
+	}
+	var lease *clientv3.LeaseGrantResponse
+	// create a new lease with a 5 second ttl
+	if lease, err = c.client.Grant(context.Background(), 5); err == nil {
+		key := fmt.Sprintf("/eco/%s", c.cfg.Name)
+		// set the key for this smart sampler using the lease
+		if _, err = c.client.Put(context.Background(), key, key, clientv3.WithLease(lease.ID)); err == nil {
+			var ctx context.Context
+			ctx, c.cancelLease = context.WithCancel(context.Background())
+			_, err = c.client.KeepAlive(ctx, lease.ID)
+		}
+	}
+	return err
 }
 
 func (c *Server) startServer(ctx context.Context) error {
@@ -400,9 +457,7 @@ func (c *Server) startServer(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to start etcd: %s", err)
 	}
-	c.isRunningLock.Lock()
-	c.isRunning = true
-	c.isRunningLock.Unlock()
+	c.setIsRunning(true)
 
 	// Wait until the server announces its ready, or until the start timeout is exceeded.
 	//
@@ -415,28 +470,50 @@ func (c *Server) startServer(ctx context.Context) error {
 		// FIXME.
 		panic("server failed to start, and continuing might stale the application, exiting instead (github.com/coreos/etcd/issues/9533)")
 		c.Stop(false, false)
-		return fmt.Errorf("server failed to start: %s", err)
+		err = fmt.Errorf("server failed to start: %s", err)
 	case <-ctx.Done():
 		// FIXME.
 		panic("server failed to start, and continuing might stale the application, exiting instead (github.com/coreos/etcd/issues/9533)")
 		c.Stop(false, false)
-		return fmt.Errorf("server took too long to become ready")
+		err = fmt.Errorf("server took too long to become ready")
 	}
 
-	go c.runErrorWatcher()
-	go c.runMemberCleaner()
-	go c.runSnapshotter()
+	// set up client for server
+	if err == nil {
+		err = c.refreshClientForServer()
+	}
 
-	return nil
+	// add a leased key for the server and keep it alive
+	if err == nil {
+		err = c.addMemberKey()
+	}
+
+	// run the watcher
+	if err == nil {
+		go c.runErrorWatcher()
+		go c.runMemberCleaner()
+		go c.runSnapshotter()
+	}
+
+	return err
 }
 
 func (c *Server) runErrorWatcher() {
 	select {
 	case <-c.server.Server.StopNotify():
 		log.Warnf("etcd server is stopping")
-		c.isRunningLock.Lock()
-		c.isRunning = false
-		c.isRunningLock.Unlock()
+		c.setIsRunning(false)
+		c.memberKeyLock.Lock()
+		defer c.memberKeyLock.Unlock()
+
+		// cancel context keeping lease alive for our cluster identity
+		if c.cancelLease != nil {
+			c.cancelLease()
+		}
+		// close the client if it's still open
+		if c.client != nil {
+			c.client.Close()
+		}
 		return
 	case <-c.server.Err():
 		log.Warnf("etcd server has crashed")
@@ -480,9 +557,21 @@ func (c *Server) runMemberCleaner() {
 			}
 		}
 
+		// get the keys for members of the cluster
+		memberKeys := make(map[string]struct{}, 0)
+		if resp, err := c.client.Get(context.Background(), "/eco/", clientv3.WithPrefix()); err == nil {
+			for _, k := range resp.Kvs{
+				memberKeys[strings.Replace(string(k.Key), "/eco/", "", 1)] = struct{}{}
+			}
+		}
+
 		for id, member := range members {
 			if member.name == c.cfg.Name {
 				// don't clean up yourself if you're still running, let someone else do it if necessary
+				if _, ok := memberKeys[member.name]; !ok {
+					// add member key back if it's missing and we're still running
+					c.addMemberKey()
+				}
 				continue
 			}
 			// Give the member time to start if it's a new one.
@@ -493,6 +582,11 @@ func (c *Server) runMemberCleaner() {
 			if time.Since(member.lastSeenHealthy) < c.cfg.UnhealthyMemberTTL {
 				continue
 			}
+			// Wait for an unhealthy member to have it's key removed
+			if _, ok := memberKeys[member.name]; ok{
+				continue
+			}
+
 			log.Infof("removing member %q that's been unhealthy for %v", member.name, c.cfg.UnhealthyMemberTTL)
 
 			cl, err := NewClient([]string{c.cfg.ListenOnClientAddress()}, c.cfg.ClientSC, false)
