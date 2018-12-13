@@ -332,6 +332,23 @@ like this:
         }
 ```
 
+##### Sending data to another SignalFx realm or environment
+
+If you need to point to a specific SignalFx environment, you need to override
+the default SignalFx Ingest API endpoints in the `signalfx` forwarder
+configuration by setting the `url`, `eventURL` and `TraceURL` parameters:
+
+```json
+{
+  "type": "signalfx",
+  "url": "https://ingest.<realm>.signalfx.com/v2/datapoint",
+  "eventURL": "https://ingest.<realm>.signalfx.com/v2/event",
+  "TraceURL": "https://ingest.<realm>.signalfx.com/v1/trace",
+  "DefaultAuthToken": "___AUTH_TOKEN___",
+  "Name": "testproxy"
+}
+```
+
 ## Example configs
 
 ### Basic
