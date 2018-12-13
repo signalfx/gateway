@@ -38,17 +38,17 @@ function do_cache() {
   install_shellcheck "$GOPATH_INTO"
   copy_local_to_path "$SRC_PATH"
   BUILD_VERSION=$(git describe --tags HEAD)
+  if [ -z  "$COMMIT_SHA" ]; then
+    COMMIT_SHA=$(git log -n1 --pretty=format:%H)
+  fi
+  if [ -z  "$BUILDER" ]; then
+    BUILDER=dev
+  fi
   (
     cd "$SRC_PATH"
     load_docker_images
     LD_FLAGS="-X main.Version=$BUILD_VERSION -X main.BuildDate=$(date --rfc-3339=seconds | sed 's/ /T/') -s -w"
     CGO_ENABLED=0 go build -ldflags "$LD_FLAGS" -v -installsuffix .
-    if [ -z  "$COMMIT_SHA" ]; then
-      COMMIT_SHA=$(git log -n1 --pretty=format:%H)
-    fi
-    if [ -z  "$BUILDER" ]; then
-      BUILDER=dev
-    fi
 
     echo "{
       \"name\": \"metricproxy\",
