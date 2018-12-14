@@ -91,6 +91,9 @@ workflows:
   buildtest-and-deploy:
     jobs:
       - build
+          filters:
+            tags:
+              only: /.*/
       - deploy:
           filters:
             branches:
