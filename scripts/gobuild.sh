@@ -11,7 +11,7 @@ for y in $x; do
   gobuild check "$y" 2>&1
 done
 
-rm -f metricproxy
-CGO_ENABLED=0 go build -v -installsuffix . -ldflags="-s -w"
-file metricproxy | grep "statically linked"
-ls -lad metricproxy
+rm -f gateway
+CGO_ENABLED=0 go build -v -installsuffix . -ldflags="-s -w" -o gateway
+file gateway | grep "statically linked"
+ls -lad gateway
