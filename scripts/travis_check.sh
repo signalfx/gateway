@@ -5,7 +5,7 @@ set -x
 # ---- Check shell scripts
 # 
 shellcheck install.sh || exit 1
-shellcheck metricproxy_initd || exit 1
+shellcheck gateway_initd || exit 1
 shellcheck scripts/build.sh || exit 1
 shellcheck scripts/gobuild.sh || exit 1
 # Yo dawg
@@ -24,6 +24,6 @@ cat /tmp/ignore_header.md README.md | grep -av 'Circle CI' | grep -av curl | mdl
 #
 set -e
 # Want example config file to be valid json
-python -m json.tool < exampleSfdbproxy.conf > /dev/null
+python -m json.tool < exampleGateway.conf > /dev/null
 
 ./scripts/build.sh

@@ -8,12 +8,12 @@ import (
 	"errors"
 
 	"context"
+	"github.com/signalfx/gateway/protocol/filtering"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/trace"
-	"github.com/signalfx/metricproxy/protocol/filtering"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 )

@@ -19,7 +19,7 @@ if [ -z  "$BUILDER" ]; then
 fi
 
 echo "{
-  \"name\": \"metricproxy\",
+  \"name\": \"gateway\",
   \"version\": \"$BIN_VERSION\",
   \"builder\": \"$BUILDER\",
   \"commit\": \"$COMMIT_SHA\"

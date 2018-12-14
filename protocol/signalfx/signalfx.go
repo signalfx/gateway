@@ -8,9 +8,9 @@ import (
 	"errors"
 
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
+	"github.com/signalfx/gateway/protocol/signalfx/format"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
-	"github.com/signalfx/metricproxy/protocol/signalfx/format"
 )
 
 // ValueToSend is an alias

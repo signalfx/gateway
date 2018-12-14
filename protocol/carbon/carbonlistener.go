@@ -13,15 +13,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/signalfx/gateway/logkey"
+	"github.com/signalfx/gateway/protocol"
+	"github.com/signalfx/gateway/protocol/carbon/metricdeconstructor"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/metricproxy/logkey"
-	"github.com/signalfx/metricproxy/protocol"
-	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
 )
 
 // Listener once setup will listen for carbon protocol points to forward on

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/signalfx/gateway/protocol/signalfx/format"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/trace"
-	"github.com/signalfx/metricproxy/protocol/signalfx/format"
 	. "github.com/smartystreets/goconvey/convey"
 )
 

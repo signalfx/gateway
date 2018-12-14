@@ -22,6 +22,12 @@ import (
 
 	"encoding/json"
 	"github.com/quentin-m/etcd-cloud-operator/pkg/etcd"
+	"github.com/signalfx/gateway/config"
+	"github.com/signalfx/gateway/dp/dpbuffered"
+	"github.com/signalfx/gateway/logkey"
+	"github.com/signalfx/gateway/protocol"
+	"github.com/signalfx/gateway/protocol/demultiplexer"
+	"github.com/signalfx/gateway/protocol/signalfx"
 	_ "github.com/signalfx/go-metrics"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
@@ -33,12 +39,6 @@ import (
 	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
-	"github.com/signalfx/metricproxy/config"
-	"github.com/signalfx/metricproxy/dp/dpbuffered"
-	"github.com/signalfx/metricproxy/logkey"
-	"github.com/signalfx/metricproxy/protocol"
-	"github.com/signalfx/metricproxy/protocol/demultiplexer"
-	"github.com/signalfx/metricproxy/protocol/signalfx"
 	_ "github.com/signalfx/ondiskencoding"
 	_ "github.com/spaolacci/murmur3"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -255,7 +255,7 @@ var mainInstance = proxy{
 }
 
 func init() {
-	flag.StringVar(&mainInstance.flags.configFileName, "configfile", "sf/sfdbproxy.conf", "Name of the db proxy configuration file")
+	flag.StringVar(&mainInstance.flags.configFileName, "configfile", "sf/gateway.conf", "Name of the db proxy configuration file")
 	flag.StringVar(&mainInstance.etcdMgr.operation, "cluster-op", "", "operation to perform if running in cluster mode [\"seed\", \"join\", \"\"] this overrides the ClusterOperation set in the config file")
 }
 
@@ -268,7 +268,7 @@ func (p *proxy) getLogOutput(loadedConfig *config.ProxyConfig) io.Writer {
 	logMaxSize := *loadedConfig.LogMaxSize
 	logMaxBackups := *loadedConfig.LogMaxBackups
 	lumberjackLogger := &lumberjack.Logger{
-		Filename:   path.Join(logDir, "metricproxy.log"),
+		Filename:   path.Join(logDir, "gateway.log"),
 		MaxSize:    logMaxSize, // megabytes
 		MaxBackups: logMaxBackups,
 	}
@@ -443,7 +443,7 @@ func (p *proxy) setupDebugServer(conf *config.ProxyConfig, logger log.Logger, sc
 		return BuildDate
 	})
 	p.debugServer.Exp2.Exported["source"] = expvar.Func(func() interface{} {
-		return fmt.Sprintf("https://github.com/signalfx/metricproxy/tree/%s", Version)
+		return fmt.Sprintf("https://github.com/signalfx/gateway/tree/%s", Version)
 	})
 
 	go func() {
@@ -618,7 +618,7 @@ func (p *proxy) setupForwardersAndListeners(ctx context.Context, loader *config.
 	}
 	scheduler.AddCallback(dmux)
 
-	p.versionMetric.RepoURL = "https://github.com/signalfx/metricproxy"
+	p.versionMetric.RepoURL = "https://github.com/signalfx/gateway"
 	p.versionMetric.FileName = "/buildInfo.json"
 	scheduler.AddCallback(&p.versionMetric)
 

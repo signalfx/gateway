@@ -7,13 +7,13 @@ import (
 
 	"context"
 	"encoding/json"
+	"github.com/signalfx/gateway/protocol/filtering"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/trace"
-	"github.com/signalfx/metricproxy/protocol/filtering"
 	"sync/atomic"
 )
 

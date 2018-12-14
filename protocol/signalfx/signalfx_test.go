@@ -9,9 +9,9 @@ import (
 
 	"errors"
 	"github.com/golang/protobuf/proto"
+	"github.com/signalfx/gateway/protocol/signalfx/format"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/metricproxy/protocol/signalfx/format"
 	"math"
 )
 

@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/signalfx/gateway/protocol/filtering"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/metricproxy/protocol/filtering"
 	. "github.com/smartystreets/goconvey/convey"
 )
 

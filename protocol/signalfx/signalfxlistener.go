@@ -13,6 +13,10 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
+	"github.com/signalfx/gateway/logkey"
+	"github.com/signalfx/gateway/protocol"
+	"github.com/signalfx/gateway/protocol/collectd"
+	"github.com/signalfx/gateway/protocol/zipper"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
@@ -20,10 +24,6 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/web"
-	"github.com/signalfx/metricproxy/logkey"
-	"github.com/signalfx/metricproxy/protocol"
-	"github.com/signalfx/metricproxy/protocol/collectd"
-	"github.com/signalfx/metricproxy/protocol/zipper"
 )
 
 // ListenerServer controls listening on a socket for SignalFx connections

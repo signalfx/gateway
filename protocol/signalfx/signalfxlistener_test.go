@@ -16,6 +16,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
+	"github.com/signalfx/gateway/protocol/filtering"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/errors"
@@ -25,7 +26,6 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
-	"github.com/signalfx/metricproxy/protocol/filtering"
 	. "github.com/smartystreets/goconvey/convey"
 )
 

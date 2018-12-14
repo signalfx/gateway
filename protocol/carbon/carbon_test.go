@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/signalfx/gateway/protocol/carbon/metricdeconstructor"
 	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/metricproxy/protocol/carbon/metricdeconstructor"
 	"github.com/stretchr/testify/assert"
 )
 

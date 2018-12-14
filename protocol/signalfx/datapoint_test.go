@@ -1,7 +1,7 @@
 package signalfx
 
 import (
-	"github.com/signalfx/metricproxy/logkey"
+	"github.com/signalfx/gateway/logkey"
 	. "github.com/smartystreets/goconvey/convey"
 	"net/http/httptest"
 	"testing"
