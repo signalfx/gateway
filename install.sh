@@ -35,7 +35,7 @@ cd /opt/gateway/src/github.com/signalfx/gateway
 
 go install
 
-ln -s /opt/gateway/src/github.com/signalfx/gateway/gateway /etc/init.d/gateway
+ln -s /opt/gateway/src/github.com/signalfx/gateway/gateway_initd /etc/init.d/gateway
 if [ ! -f /opt/gateway/bin/gateway ]; then
     echo "Unable to install proxy"
     exit 1
