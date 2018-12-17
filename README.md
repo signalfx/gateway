@@ -4,7 +4,7 @@ The SignalFx Gateway lets you aggregate metrics and send them to
 SignalFx. It is a multilingual datapoint demultiplexer that can accept
 time series data from the carbon (Graphite), collectd or SignalFx protocols
 and emit those datapoints to a series of servers using the carbon, collectd
-or SignalFx protocols. We recommend placing the proxy either on the same
+or SignalFx protocols. We recommend placing the gateway either on the same
 server as another existing metrics aggregator or on a central server that
 is already receiving datapoints, such as Graphite's carbon database.
 
@@ -113,10 +113,10 @@ if using a container solution like maestro.
 
 ## Code layout
 
-You only need to read this if you want to develop the proxy or understand
-the proxy's code.
+You only need to read this if you want to develop the gateway or understand
+the gateway's code.
 
-The proxy is divided into two main components: [forwarder](protocol/carbon/carbonforwarder.go)
+The gateway is divided into two main components: [forwarder](protocol/carbon/carbonforwarder.go)
 and [listener](protocol/carbon/carbonlistener.go).  The forwarder and listener
 are glued together by the [demultiplexer](protocol/demultiplexer/demultiplexer.go).
 
@@ -142,7 +142,7 @@ happen on golang's built in channel abstraction.
 
 ## Development
 
-If you want to submit patches for the proxy, make sure your code passes
+If you want to submit patches for the gateway, make sure your code passes
 [travis_check.sh](travis_check.sh) with exit code 0.  For help setting
 up your development enviroment, it should be enough to mirror the install
 steps of [.travis.yml](.travis.yml).  You may need to make sure your GOPATH
@@ -150,20 +150,20 @@ env variable is set correctly.
 
 ## Docker
 
-The proxy comes with a [docker image](Dockerfile) that is built and deployed
+The gateway comes with a [docker image](Dockerfile) that is built and deployed
 to [quay.io](https://quay.io/repository/signalfx/gateway).  It assumes
 you will have a gateway.conf file cross mounted to
 /var/config/gateway/gateway.conf for the docker container.
 
 ## Config file format
 
-See the [example config](exampleSfdbproxy.conf) file for an example of how
+See the [example config](exampleGateway.conf) file for an example of how
 configuration looks.  Configuration is a JSON file with two important fields:
 ListenFrom and ForwardTo.
 
 ### ListenFrom
 
-ListenFrom is where you define what services the proxy will pretend to be and
+ListenFrom is where you define what services the gateway will pretend to be and
 what ports to listen for those services on.
 
 #### collectd
@@ -265,7 +265,7 @@ remote_write:
 
 #### wavefront
 
-You can send wavefront metrics to signalfx through our proxy in the same
+You can send wavefront metrics to signalfx through our gateway in the same
 fashion as you would have sent them to the wavefront proxy. You will need
 to specify the port to bind to.  An example config:
 
@@ -304,7 +304,7 @@ map(string => string) and adds the dimensions to all points sent.  For example:
 
 ### ForwardTo
 
-ForwardTo is where you define where the proxy should send datapoints.  Each datapoint
+ForwardTo is where you define where the gateway should send datapoints.  Each datapoint
 that comes from a ListenFrom definition will be send to each of these.
 
 #### csv
@@ -316,14 +316,14 @@ will need to specify the filename.
         {
             "Filename": "/tmp/filewrite.csv",
             "Name": "filelocal",
-            "type": "csv"
+            "Type": "csv"
         }
 ```
 
 #### carbon (for write)
 
 You can write datapoints to a carbon server.  If the point came from a carbon
-listener, it will write the same way the proxy saw it.  Host/Port define where
+listener, it will write the same way the gateway saw it.  Host/Port define where
 the carbon server is.
 
 ```
@@ -331,7 +331,7 @@ the carbon server is.
             "Name": "ourcarbon",
             "Host": "example.com",
             "Port": 2003,
-            "type": "carbon"
+            "Type": "carbon"
         }
 ```
 
@@ -342,9 +342,9 @@ configure your auth token inside DefaultAuthToken.
 
 ```
         {
-            "type": "signalfx",
+            "Type": "signalfx",
             "DefaultAuthToken": "___AUTH_TOKEN___",
-            "Name": "testproxy"
+            "Name": "testgateway"
         }
 ```
 
@@ -354,9 +354,9 @@ like this:
 
 ```
         {
-            "type": "signalfx",
+            "Type": "signalfx",
             "DefaultAuthToken": "___AUTH_TOKEN___",
-            "Name": "testproxy",
+            "Name": "testgateway",
             "DisableCompression" :true
         }
 ```
@@ -369,12 +369,12 @@ configuration by setting the `url`, `eventURL` and `TraceURL` parameters:
 
 ```json
 {
-  "type": "signalfx",
+  "Type": "signalfx",
   "URL": "https://ingest.<realm>.signalfx.com/v2/datapoint",
   "EventURL": "https://ingest.<realm>.signalfx.com/v2/event",
   "TraceURL": "https://ingest.<realm>.signalfx.com/v1/trace",
   "DefaultAuthToken": "___AUTH_TOKEN___",
-  "Name": "testproxy"
+  "Name": "testgateway"
 }
 ```
 
@@ -400,7 +400,7 @@ to signalfx at 1s intervals
 
   "ForwardTo": [
     {
-      "type": "signalfx",
+      "Type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
@@ -414,8 +414,8 @@ This config will listen using CollectD's HTTP protocol and forward
 all those metrics to a single graphite listener.  It will collect
 stats at 1s intervals.  It also signals to graphite that when it creates
 a graphite name for a metric, it should put the 'source' (which is usually
-proxy) and 'forwarder' (in this case 'graphite-west') first in the graphite
-dot delimited name.
+the gateway) and 'forwarder' (in this case 'graphite-west') first in the
+graphite dot delimited name.
 
 ```
 {
@@ -429,7 +429,7 @@ dot delimited name.
 
   "ForwardTo": [
     {
-      "type": "carbon",
+      "Type": "carbon",
       "DefaultAuthToken": "ABCD",
       "Host": "graphite.database.dc1.com",
       "DimensionsOrder": ["source", "forwarder"],
@@ -466,7 +466,7 @@ seconds.
 
   "ForwardTo": [
     {
-      "type": "signalfx",
+      "Type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
@@ -601,7 +601,7 @@ dimensions = {service=cassandra, instance=cassandra23, tier=production}
   ],
   "ForwardTo": [
     {
-      "type": "signalfx",
+      "Type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
@@ -698,7 +698,7 @@ dimensions = {customer=Acme, component=cassandra, identifier=bbac,
   ],
   "ForwardTo": [
     {
-      "type": "signalfx",
+      "Type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
@@ -773,7 +773,7 @@ data that was late or in the future respectively.
 
   "ForwardTo": [
     {
-      "type": "signalfx",
+      "Type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder",
       "BufferSize": 1000000,
@@ -802,7 +802,7 @@ the Dimensions attribute which expects a map of string => string.
 
   "ForwardTo": [
     {
-      "type": "carbon",
+      "Type": "carbon",
       "DefaultAuthToken": "ABCD",
       "Host": "graphite.database.dc1.com",
       "DimensionsOrder": ["source", "forwarder"],
@@ -829,7 +829,7 @@ points to signalfx.
 
   "ForwardTo": [
     {
-      "type": "signalfx",
+      "Type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
@@ -862,13 +862,13 @@ would be denied and those that were not would be allowed.
   ],
   "ForwardTo": [
     {
-      "type": "carbon",
+      "Type": "carbon",
       "Name": "ourcarbon",
       "Host": "example.com",
       "Port": 2003
     },
     {
-      "type": "signalfx",
+      "Type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder",
       "Filters": {
@@ -903,7 +903,7 @@ on [the pprof help page](http://golang.org/pkg/net/http/pprof/).
 Health checks are available on the listening port of any collectd or
 signalfx listener. E.g.  If you had a signalfx listener at 8080, the
 healthcheck would be located at `http://localhost:8080/healthz`.
-Healthchecks are useful when putting the proxy behind a loadbalancer.
+Healthchecks are useful when putting the gateway behind a loadbalancer.
 
 ### Graceful Shutdown
 
@@ -943,7 +943,7 @@ low like 1s.  The config below is this use case.
   ],
   "ForwardTo": [
     {
-      "type": "signalfx",
+      "Type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
@@ -960,7 +960,7 @@ Setup a debug config
   "DebugFlag": "secretdebug",
   "ForwardTo": [
     {
-      "type": "signalfx",
+      "Type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
@@ -976,7 +976,7 @@ curl -H "X-Debug-Id:secretdebug" -H "Content-Type: application/json" -XPOST \
 
 The config will tell the HTTP request to debug each datapoint sent with X-Debug-Id
 set to secretdebug and log statements will show when each item is through the
-proxy pipeline.
+gateway pipeline.
 
 ### Debugging connections via debug dimensions
 
@@ -988,7 +988,7 @@ logged out.
   "LocalDebugServer": "0.0.0.0:6060",
   "ForwardTo": [
     {
-      "type": "signalfx",
+      "Type": "signalfx",
       "DefaultAuthToken": "ABCD",
       "Name": "signalfxforwarder"
     }
