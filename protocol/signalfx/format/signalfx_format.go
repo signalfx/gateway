@@ -32,7 +32,7 @@ func (bodySendFormat *BodySendFormatV2) String() string {
 	return fmt.Sprintf("DP[metric=%s|time=%d|val=%s|dimensions=%s|props=%s]", bodySendFormat.Metric, bodySendFormat.Timestamp, bodySendFormat.Value, bodySendFormat.Dimensions, bodySendFormat.Properties)
 }
 
-// ValueToSend are values are sent from the proxy to a receiver for the datapoint
+// ValueToSend are values are sent from the gateway to a receiver for the datapoint
 type ValueToSend interface{}
 
 // JSONEventV2 is the V2 json event sending format

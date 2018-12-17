@@ -113,7 +113,7 @@ func (f *Forwarder) Close() error {
 	return f.file.Close()
 }
 
-//// ForwarderLoader loads a CSV forwarder forwarding points from proxy to a file
+//// ForwarderLoader loads a CSV forwarder forwarding points from gateway to a file
 //func ForwarderLoader(forwardTo *config.ForwardTo) (*Forwarder, error) {
 //	structdefaults.FillDefaultFrom(forwardTo, csvDefaultConfig)
 //	return NewForwarder(*forwardTo.Name, *forwardTo.Filename)
