@@ -71,19 +71,74 @@ jobs:
 
   deploy:
 
-    machine:
-      enabled: true
     working_directory: ~/signalfx/gateway
+    parallelism: 1
+    shell: /bin/bash --login
+
     environment:
       CIRCLE_ARTIFACTS: /tmp/circleci-artifacts
       CIRCLE_TEST_REPORTS: /tmp/circleci-test-results
       DOCKER_HOST: tcp://localhost:2375
       DOCKER_PUSH: 1
+
+    docker:
+      - image: circleci/build-image:ubuntu-14.04-XXL-upstart-1189-5614f37
+        command: /sbin/init
+
     steps:
       - checkout
+
+      - run: mkdir -p $CIRCLE_ARTIFACTS $CIRCLE_TEST_REPORTS
+
       - setup_remote_docker:
           docker_layer_caching: true
+
+      - run:
+          working_directory: ~/signalfx/gateway
+          command: echo 'DOCKER_OPTS="${DOCKER_OPTS} -H tcp://127.0.0.1:2375 -H unix:///var/run/docker.sock"' | sudo tee -a /etc/default/docker
+
+      - run:
+          working_directory: ~/signalfx/gateway
+          command: 'sudo docker info >/dev/null 2>&1 || sudo service docker start; '
+
+      - restore_cache:
+          keys:
+          # This branch if available
+            - v1-dep-{{ .Branch }}-
+          # Default branch if not
+            - v1-dep-master-
+          # Any branch if there are none on the default branch - this should be unnecessary if you have your default branch configured correctly
+            - v1-dep-
+
+      - run: ./scripts/circle.sh cache > >(tee $CIRCLE_ARTIFACTS/cache.stdout.txt) 2> >(tee $CIRCLE_ARTIFACTS/cache.stderr.txt >&2)
+
+      # Save dependency cache
+      - save_cache:
+          key: v1-dep-{{ .Branch }}-{{ epoch }}
+          paths:
+          - vendor/bundle
+          - ~/virtualenvs
+          - ~/.ivy2
+          - ~/.bundle
+          - ~/.go_workspace
+          # These cache paths were specified in the 1.0 config
+          - ~/gover
+          - ~/lints
+          - ~/docker_images
+
+      # Test
+      - run: ./scripts/circle.sh test > >(tee $CIRCLE_ARTIFACTS/test.stdout.txt) 2> >(tee $CIRCLE_ARTIFACTS/test.stderr.txt >&2)
+
+      - store_test_results:
+          path: /tmp/circleci-test-results
+      # Save artifacts
+      - store_artifacts:
+          path: /tmp/circleci-artifacts
+      - store_artifacts:
+          path: /tmp/circleci-test-results
+
       - run: docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS quay.io
+
       - run: ./scripts/circle.sh deploy > >(tee $CIRCLE_ARTIFACTS/cache.deploy.txt) 2> >(tee $CIRCLE_ARTIFACTS/cache.deploy.txt >&2)
 
 workflows:
