@@ -28,7 +28,7 @@ type listenSinkWrapper interface {
 	WrapSink(sink signalfx.Sink, conf *ListenFrom) signalfx.Sink
 }
 
-// NewLoader creates the default loader for proxy protocols
+// NewLoader creates the default loader for gateway protocols
 func NewLoader(ctx context.Context, logger log.Logger, version string, debugContext *web.HeaderCtxFlag, itemFlagger *dpsink.ItemFlagger, ctxdims *log.CtxDimensions, next web.NextConstructor) *Loader {
 	sfxL := &signalFxLoader{
 		logger:        logger,
@@ -196,7 +196,7 @@ func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) 
 		TraceURL:         conf.TraceURL,
 		Timeout:          conf.TimeoutDuration,
 		SourceDimensions: conf.SourceDimensions,
-		ProxyVersion:     &s.versionString,
+		GatewayVersion:   &s.versionString,
 		MaxIdleConns:     conf.DrainingThreads,
 		AuthToken:        conf.DefaultAuthToken,
 		Logger:           s.logger,

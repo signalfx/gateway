@@ -17,7 +17,7 @@ type DatapointForwarder interface {
 	dpsink.DSink
 }
 
-// Forwarder is the basic interface endpoints must support for the proxy to forward to them
+// Forwarder is the basic interface endpoints must support for the gateway to forward to them
 type Forwarder interface {
 	dpsink.Sink
 	trace.Sink

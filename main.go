@@ -95,7 +95,7 @@ func isStringInSlice(target string, strs []string) bool {
 	return false
 }
 
-type proxyFlags struct {
+type gatewayFlags struct {
 	configFileName string
 }
 
@@ -109,7 +109,7 @@ type etcdManager struct {
 	client        *etcd.Client
 }
 
-func (mgr *etcdManager) setup(conf *config.ProxyConfig) {
+func (mgr *etcdManager) setup(conf *config.GatewayConfig) {
 	mgr.LPAddress = getStringEnvVar("SFX_LISTEN_ON_PEER_ADDRESS", *conf.ListenOnPeerAddress)
 	mgr.APAddress = getStringEnvVar("SFX_ADVERTISE_PEER_ADDRESS", *conf.AdvertisePeerAddress)
 	mgr.LCAddress = getStringEnvVar("SFX_LISTEN_ON_CLIENT_ADDRESS", *conf.ListenOnClientAddress)
@@ -218,8 +218,8 @@ func (mgr *etcdManager) shutdown(graceful bool) (err error) {
 	return err
 }
 
-type proxy struct {
-	flags               proxyFlags
+type gateway struct {
+	flags               gatewayFlags
 	listeners           []protocol.Listener
 	forwarders          []protocol.Forwarder
 	logger              log.Logger
@@ -233,12 +233,12 @@ type proxy struct {
 	debugSink           dpsink.ItemFlagger
 	ctxDims             log.CtxDimensions
 	signalChan          chan os.Signal
-	config              *config.ProxyConfig
+	config              *config.GatewayConfig
 	etcdMgr             *etcdManager
 	versionMetric       reportsha.SHA1Reporter
 }
 
-var mainInstance = proxy{
+var mainInstance = gateway{
 	tk:         timekeeper.RealTime{},
 	logger:     log.DefaultLogger.CreateChild(),
 	stdout:     os.Stdout,
@@ -255,11 +255,11 @@ var mainInstance = proxy{
 }
 
 func init() {
-	flag.StringVar(&mainInstance.flags.configFileName, "configfile", "sf/gateway.conf", "Name of the db proxy configuration file")
+	flag.StringVar(&mainInstance.flags.configFileName, "configfile", "sf/gateway.conf", "Name of the db gateway configuration file")
 	flag.StringVar(&mainInstance.etcdMgr.operation, "cluster-op", "", "operation to perform if running in cluster mode [\"seed\", \"join\", \"\"] this overrides the ClusterOperation set in the config file")
 }
 
-func (p *proxy) getLogOutput(loadedConfig *config.ProxyConfig) io.Writer {
+func (p *gateway) getLogOutput(loadedConfig *config.GatewayConfig) io.Writer {
 	logDir := *loadedConfig.LogDir
 	if logDir == "-" {
 		p.logger.Log("Sending logging to stdout")
@@ -276,7 +276,7 @@ func (p *proxy) getLogOutput(loadedConfig *config.ProxyConfig) io.Writer {
 	return lumberjackLogger
 }
 
-func (p *proxy) getLogger(loadedConfig *config.ProxyConfig) log.Logger {
+func (p *gateway) getLogger(loadedConfig *config.GatewayConfig) log.Logger {
 	out := p.getLogOutput(loadedConfig)
 	useJSON := *loadedConfig.LogFormat == "json"
 	if useJSON {
@@ -294,7 +294,7 @@ func forwarderName(f *config.ForwardTo) string {
 
 var errDupeForwarder = errors.New("cannot duplicate forwarder names or types without names")
 
-func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, manager *etcdManager) ([]protocol.Forwarder, error) {
+func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, manager *etcdManager) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	nameMap := make(map[string]bool)
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
@@ -346,7 +346,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 		scheduler.GroupedDefaultDimensions(groupName, map[string]string{
 			"name":      name,
 			"direction": "forwarder",
-			"source":    "proxy",
+			"source":    "gateway",
 			"host":      *loadedConfig.ServerName,
 			"type":      forwardConfig.Type,
 		})
@@ -394,7 +394,7 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loader *config.Lo
 		scheduler.GroupedDefaultDimensions(groupName, map[string]string{
 			"name":      name,
 			"direction": "listener",
-			"source":    "proxy",
+			"source":    "gateway",
 			"host":      hostname,
 			"type":      listenConfig.Type,
 		})
@@ -415,7 +415,7 @@ func splitSinks(forwarders []protocol.Forwarder) ([]dpsink.DSink, []dpsink.ESink
 	return dsinks, esinks, tsinks
 }
 
-func (p *proxy) setupDebugServer(conf *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler) error {
+func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler) error {
 	if conf.LocalDebugServer == nil {
 		return nil
 	}
@@ -436,7 +436,7 @@ func (p *proxy) setupDebugServer(conf *config.ProxyConfig, logger log.Logger, sc
 		return runtime.Version()
 	})
 	p.debugServer.Exp2.Exported["debugdims"] = p.debugSink.Var()
-	p.debugServer.Exp2.Exported["proxy_version"] = expvar.Func(func() interface{} {
+	p.debugServer.Exp2.Exported["gateway_version"] = expvar.Func(func() interface{} {
 		return Version
 	})
 	p.debugServer.Exp2.Exported["build_date"] = expvar.Func(func() interface{} {
@@ -462,7 +462,7 @@ func setupGoMaxProcs(numProcs *int, gomaxprocs func(int) int) {
 	}
 }
 
-func (p *proxy) gracefulShutdown() (err error) {
+func (p *gateway) gracefulShutdown() (err error) {
 	p.logger.Log("Starting graceful shutdown")
 	totalWaitTime := p.tk.After(*p.config.MaxGracefulWaitTimeDuration)
 	errs := make([]error, len(p.listeners)+len(p.forwarders)+1)
@@ -510,7 +510,7 @@ func (p *proxy) gracefulShutdown() (err error) {
 	}
 }
 
-func (p *proxy) Pipeline() int64 {
+func (p *gateway) Pipeline() int64 {
 	var totalForwarded int64
 	for _, f := range p.forwarders {
 		totalForwarded += f.Pipeline()
@@ -518,7 +518,7 @@ func (p *proxy) Pipeline() int64 {
 	return totalForwarded
 }
 
-func (p *proxy) Close() error {
+func (p *gateway) Close() error {
 	errs := make([]error, 0, len(p.forwarders)+1)
 	for _, f := range p.forwarders {
 		errs = append(errs, f.Close())
@@ -533,13 +533,13 @@ func (p *proxy) Close() error {
 	return errors.NewMultiErr(errs)
 }
 
-func (p *proxy) main(ctx context.Context) error {
+func (p *gateway) main(ctx context.Context) error {
 	// Disable the default logger to make sure nobody else uses it
 	err := p.run(ctx)
 	return errors.NewMultiErr([]error{err, p.Close()})
 }
 
-func (p *proxy) setup(loadedConfig *config.ProxyConfig) {
+func (p *gateway) setup(loadedConfig *config.GatewayConfig) {
 	if loadedConfig.DebugFlag != nil && *loadedConfig.DebugFlag != "" {
 		p.debugContext.SetFlagStr(*loadedConfig.DebugFlag)
 	}
@@ -559,10 +559,10 @@ func (p *proxy) setup(loadedConfig *config.ProxyConfig) {
 	}()
 }
 
-func (p *proxy) createCommonHTTPChain(loadedConfig *config.ProxyConfig) web.NextConstructor {
+func (p *gateway) createCommonHTTPChain(loadedConfig *config.GatewayConfig) web.NextConstructor {
 	h := web.HeadersInRequest{
 		Headers: map[string]string{
-			"X-Proxy-Name": *loadedConfig.ServerName,
+			"X-Gateway-Name": *loadedConfig.ServerName,
 		},
 	}
 	cf := &web.CtxWithFlag{
@@ -574,17 +574,17 @@ func (p *proxy) createCommonHTTPChain(loadedConfig *config.ProxyConfig) web.Next
 	})
 }
 
-func (p *proxy) setupScheduler(hostname string) *sfxclient.Scheduler {
+func (p *gateway) setupScheduler(hostname string) *sfxclient.Scheduler {
 	scheduler := sfxclient.NewScheduler()
 	scheduler.AddCallback(sfxclient.GoMetricsSource)
 	scheduler.DefaultDimensions(map[string]string{
-		"source": "proxy",
+		"source": "gateway",
 		"host":   hostname,
 	})
 	return scheduler
 }
 
-func (p *proxy) scheduleStatCollection(ctx context.Context, scheduler *sfxclient.Scheduler, loadedConfig *config.ProxyConfig, multiplexer signalfx.Sink) (context.Context, context.CancelFunc) {
+func (p *gateway) scheduleStatCollection(ctx context.Context, scheduler *sfxclient.Scheduler, loadedConfig *config.GatewayConfig, multiplexer signalfx.Sink) (context.Context, context.CancelFunc) {
 	// We still want to schedule stat collection so people can debug the server if they want
 	scheduler.Sink = dpsink.Discard
 	scheduler.ReportingDelayNs = (time.Second * 30).Nanoseconds()
@@ -598,7 +598,7 @@ func (p *proxy) scheduleStatCollection(ctx context.Context, scheduler *sfxclient
 	return finishedContext, cancelFunc
 }
 
-func (p *proxy) setupForwardersAndListeners(ctx context.Context, loader *config.Loader, loadedConfig *config.ProxyConfig, logger log.Logger, scheduler *sfxclient.Scheduler) (signalfx.Sink, error) {
+func (p *gateway) setupForwardersAndListeners(ctx context.Context, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler) (signalfx.Sink, error) {
 	var err error
 	p.forwarders, err = setupForwarders(ctx, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims, p.etcdMgr)
 	if err != nil {
@@ -639,7 +639,7 @@ func (p *proxy) setupForwardersAndListeners(ctx context.Context, loader *config.
 	return multiplexer, FirstNonNil(errs...)
 }
 
-func (p *proxy) run(ctx context.Context) error {
+func (p *gateway) run(ctx context.Context) error {
 	p.debugSink.CtxFlagCheck = &p.debugContext
 	p.logger.Log(logkey.ConfigFile, p.flags.configFileName, "Looking for config file")
 	p.logger.Log(logkey.Env, strings.Join(os.Environ(), "-"), "Looking for config file")
