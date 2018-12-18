@@ -71,8 +71,8 @@ func (forwardTo *ForwardTo) String() string {
 	return stringhelper.GenericFromString(forwardTo)
 }
 
-// ProxyConfig is the full config as presented inside the proxy config file
-type ProxyConfig struct {
+// GatewayConfig is the full config as presented inside the gateway config file
+type GatewayConfig struct {
 	ForwardTo                     []*ForwardTo   `json:",omitempty"`
 	ListenFrom                    []*ListenFrom  `json:",omitempty"`
 	StatsDelay                    *string        `json:",omitempty"`
@@ -109,8 +109,8 @@ type ProxyConfig struct {
 	RemoveMemberTimeout           *time.Duration `json:"-"`
 }
 
-// DefaultProxyConfig is default values for the proxy config
-var DefaultProxyConfig = &ProxyConfig{
+// DefaultGatewayConfig is default values for the gateway config
+var DefaultGatewayConfig = &GatewayConfig{
 	PidFilename:                   pointer.String("gateway.pid"),
 	LogDir:                        pointer.String(os.TempDir()),
 	LogMaxSize:                    pointer.Int(100),
@@ -140,8 +140,8 @@ func getDefaultName(osHostname func() (string, error)) string {
 	return "unknown"
 }
 
-func decodeConfig(configBytes []byte) (*ProxyConfig, error) {
-	var config ProxyConfig
+func decodeConfig(configBytes []byte) (*GatewayConfig, error) {
+	var config GatewayConfig
 	if err := json.Unmarshal(configBytes, &config); err != nil {
 		return nil, errors.Annotate(err, "cannot unmarshal config JSON")
 	}
@@ -163,7 +163,7 @@ func decodeConfig(configBytes []byte) (*ProxyConfig, error) {
 	return &config, nil
 }
 
-func (p *ProxyConfig) decodeTimeouts() error {
+func (p *GatewayConfig) decodeTimeouts() error {
 	for _, f := range p.ForwardTo {
 		if f.Timeout != nil {
 			duration, err := time.ParseDuration(*f.Timeout)
@@ -196,7 +196,7 @@ func decodeDuration(str *string, dur **time.Duration) error {
 	return nil
 }
 
-func (p *ProxyConfig) decodeDurations() error {
+func (p *GatewayConfig) decodeDurations() error {
 	if err := decodeDuration(p.GracefulCheckInterval, &p.GracefulCheckIntervalDuration); err != nil {
 		return errors.Annotatef(err, "cannot parse graceful check interval %s", *p.GracefulCheckInterval)
 	}
@@ -215,7 +215,7 @@ func (p *ProxyConfig) decodeDurations() error {
 	return nil
 }
 
-func loadConfig(configFile string) (*ProxyConfig, error) {
+func loadConfig(configFile string) (*GatewayConfig, error) {
 	configBytes, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		return nil, errors.Annotatef(err, "cannot read from config file %s", configFile)
@@ -225,31 +225,31 @@ func loadConfig(configFile string) (*ProxyConfig, error) {
 
 var xdgbasedirGetConfigFileLocation = xdgbasedir.GetConfigFileLocation
 
-func (p *ProxyConfig) String() string {
+func (p *GatewayConfig) String() string {
 	// TODO: Format this
 	return "<config object>"
 }
 
-// Var returns the proxy config itself as an expvar
-func (p *ProxyConfig) Var() expvar.Var {
+// Var returns the gateway config itself as an expvar
+func (p *GatewayConfig) Var() expvar.Var {
 	return expvar.Func(func() interface{} {
 		return p
 	})
 }
 
-// Load loads proxy configuration from a filename that is in an xdg configuration location
-func Load(configFile string, logger log.Logger) (*ProxyConfig, error) {
+// Load loads gateway configuration from a filename that is in an xdg configuration location
+func Load(configFile string, logger log.Logger) (*GatewayConfig, error) {
 	p, err := loadNoDefault(configFile, logger)
 	if err == nil {
-		c := pointer.FillDefaultFrom(p, DefaultProxyConfig).(*ProxyConfig)
-		if err = os.Setenv("proxyServerName", *c.ServerName); err == nil {
+		c := pointer.FillDefaultFrom(p, DefaultGatewayConfig).(*GatewayConfig)
+		if err = os.Setenv("gatewayServerName", *c.ServerName); err == nil {
 			return c, nil
 		}
 	}
 	return nil, err
 }
 
-func loadNoDefault(configFile string, logger log.Logger) (*ProxyConfig, error) {
+func loadNoDefault(configFile string, logger log.Logger) (*GatewayConfig, error) {
 	logCtx := log.NewContext(logger).With(logkey.ConfigFile, configFile)
 	filename, err := xdgbasedirGetConfigFileLocation(configFile)
 	if err != nil {

@@ -55,7 +55,7 @@ type ForwarderConfig struct {
 	TraceURL           *string
 	Timeout            *time.Duration
 	SourceDimensions   *string
-	ProxyVersion       *string
+	GatewayVersion     *string
 	MaxIdleConns       *int64
 	AuthToken          *string
 	ProtoMarshal       func(pb proto.Message) ([]byte, error)
@@ -72,7 +72,7 @@ var defaultForwarderConfig = &ForwarderConfig{
 	TraceURL:           pointer.String("https://ingest.signalfx.com/v1/trace"),
 	AuthToken:          pointer.String(""),
 	Timeout:            pointer.Duration(time.Second * 30),
-	ProxyVersion:       pointer.String("UNKNOWN_VERSION"),
+	GatewayVersion:     pointer.String("UNKNOWN_VERSION"),
 	MaxIdleConns:       pointer.Int64(20),
 	JSONMarshal:        json.Marshal,
 	Logger:             log.Discard,
@@ -98,7 +98,7 @@ func NewForwarder(conf *ForwarderConfig) (ret *Forwarder, err error) {
 		Timeout:   *conf.Timeout,
 	}
 	sendingSink.AuthToken = *conf.AuthToken
-	sendingSink.UserAgent = fmt.Sprintf("SignalfxProxy/%s (gover %s)", *conf.ProxyVersion, runtime.Version())
+	sendingSink.UserAgent = fmt.Sprintf("SignalfxGateway/%s (gover %s)", *conf.GatewayVersion, runtime.Version())
 	sendingSink.DatapointEndpoint = *conf.DatapointURL
 	sendingSink.EventEndpoint = *conf.EventURL
 	sendingSink.TraceEndpoint = *conf.TraceURL
@@ -193,7 +193,7 @@ func (connector *Forwarder) Pipeline() int64 {
 	return atomic.LoadInt64(&connector.stats.pipeline)
 }
 
-// StartupFinished calls the same interface on the sampler as a hook called by run() after the proxy is up and running
+// StartupFinished calls the same interface on the sampler as a hook called by run() after the gateway is up and running
 func (connector *Forwarder) StartupFinished() error {
 	return connector.sampler.StartupFinished()
 }

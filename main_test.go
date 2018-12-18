@@ -259,8 +259,8 @@ func failingTestRun(t *testing.T, c string, closeAfterSetup bool, expectedLog st
 		So(os.Remove(filename), ShouldBeNil)
 		ctx, contextCancel := context.WithCancel(context.Background())
 		So(ioutil.WriteFile(filename, []byte(c), os.FileMode(0666)), ShouldBeNil)
-		p := proxy{
-			flags: proxyFlags{
+		p := gateway{
+			flags: gatewayFlags{
 				configFileName: filename,
 			},
 			logger:          logger,
@@ -326,11 +326,11 @@ func TestForwarderName(t *testing.T) {
 
 func TestProxy1(t *testing.T) {
 	var cancelfunc context.CancelFunc
-	Convey("a setup carbon proxy", t, func() {
+	Convey("a setup carbon gateway", t, func() {
 		sendTo := dptest.NewBasicSink()
 		var ctx context.Context
 		ctx, cancelfunc = context.WithCancel(context.Background())
-		var p *proxy
+		var p *gateway
 		var mainDoneChan chan error
 		var filename string
 		var cl *carbon.Listener
@@ -368,8 +368,8 @@ func TestProxy1(t *testing.T) {
 			So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
 			fmt.Println("Launching server...")
 			gmp := &goMaxProcs{}
-			p = &proxy{
-				flags: proxyFlags{
+			p = &gateway{
+				flags: gatewayFlags{
 					configFileName: filename,
 				},
 				stdout:          os.Stdout,
@@ -408,7 +408,7 @@ func TestProxy1(t *testing.T) {
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)
 		})
 
-		Convey("should proxy a carbon point", func() {
+		Convey("should gateway a carbon point", func() {
 			setUp(1000, 0, 25)
 			So(p, ShouldNotBeNil)
 			dp := dptest.DP()
@@ -422,15 +422,15 @@ func TestProxy1(t *testing.T) {
 		Convey("getLogOutput should work correctly", func() {
 			setUp(1000, 0, 25)
 			So(p, ShouldNotBeNil)
-			So(p.getLogOutput(&config.ProxyConfig{
+			So(p.getLogOutput(&config.GatewayConfig{
 				LogDir: pointer.String("-"),
 			}), ShouldEqual, os.Stdout)
-			So(p.getLogOutput(&config.ProxyConfig{
+			So(p.getLogOutput(&config.GatewayConfig{
 				LogDir:        pointer.String(""),
 				LogMaxSize:    pointer.Int(0),
 				LogMaxBackups: pointer.Int(0),
 			}), ShouldNotEqual, os.Stdout)
-			l := p.getLogger(&config.ProxyConfig{
+			l := p.getLogger(&config.GatewayConfig{
 				LogDir:    pointer.String("-"),
 				LogFormat: pointer.String("json"),
 			})
@@ -476,8 +476,8 @@ func TestProxy1(t *testing.T) {
 	})
 }
 
-func startProxies(ctx context.Context, proxies []*proxy, logger *log.Hierarchy) ([]*proxy, []chan error) {
-	ps := make([]*proxy, 0, len(proxies))
+func startProxies(ctx context.Context, proxies []*gateway, logger *log.Hierarchy) ([]*gateway, []chan error) {
+	ps := make([]*gateway, 0, len(proxies))
 	mainDoneChans := make([]chan error, 0, len(proxies))
 	gmp := &goMaxProcs{}
 	for _, p := range proxies {
@@ -486,7 +486,7 @@ func startProxies(ctx context.Context, proxies []*proxy, logger *log.Hierarchy) 
 		p.etcdMgr.logger = logger.CreateChild()
 	retry:
 		mainDoneChan := make(chan error)
-		go func(p *proxy, mainDoneChan chan error) {
+		go func(p *gateway, mainDoneChan chan error) {
 			mainDoneChan <- p.main(ctx)
 			close(mainDoneChan)
 		}(p, mainDoneChan)
@@ -524,9 +524,9 @@ func Test_NonNil(t *testing.T) {
 }
 
 func TestProxyCluster(t *testing.T) {
-	Convey("a setup proxy cluster", t, func() {
+	Convey("a setup gateway cluster", t, func() {
 		ctx, cancelfunc := context.WithCancel(context.Background())
-		var ps []*proxy
+		var ps []*gateway
 		filenames := make([]string, 0, 0)
 		var mainDoneChans []chan error
 		logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
@@ -543,7 +543,7 @@ func TestProxyCluster(t *testing.T) {
 					}
 				}
 			}()
-			var proxies = make([]*proxy, 0, len(etcdConfigs))
+			var proxies = make([]*gateway, 0, len(etcdConfigs))
 			for _, etcdConf := range etcdConfigs {
 				fileObj, err := ioutil.TempFile("", "TestProxyCluster")
 				So(err, ShouldBeNil)
@@ -572,12 +572,12 @@ func TestProxyCluster(t *testing.T) {
 
 				So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
 
-				proxies = append(proxies, &proxy{
+				proxies = append(proxies, &gateway{
 					stdout:          os.Stdout,
 					tk:              timekeeper.RealTime{},
 					setupDoneSignal: make(chan struct{}),
 					signalChan:      make(chan os.Signal),
-					flags: proxyFlags{
+					flags: gatewayFlags{
 						configFileName: filename,
 					},
 					etcdMgr: &etcdManager{ServerConfig: etcd.ServerConfig{}},
