@@ -90,7 +90,7 @@ workflows:
   version: 2
   buildtest-and-deploy:
     jobs:
-      - build
+      - build:
           filters:
             tags:
               only: /.*/
