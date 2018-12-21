@@ -867,6 +867,10 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding7(in *jlexer.Lexer, ou
 			out.NewSpanSeen = bool(in.Bool())
 		case "Released":
 			out.Released = bool(in.Bool())
+		case "TraceTooLarge":
+			out.TraceTooLarge = bool(in.Bool())
+		case "TraceID":
+			out.TraceID = string(in.String())
 		case "Spans":
 			if in.IsNull() {
 				in.Skip()
@@ -916,6 +920,8 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding7(in *jlexer.Lexer, ou
 				}
 				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in, &*out.Initiating)
 			}
+		case "SizeSoFar":
+			out.SizeSoFar = int64(in.Int64())
 		case "ToBeReleased":
 			out.ToBeReleased = bool(in.Bool())
 		default:
@@ -951,6 +957,26 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding7(out *jwriter.Writer,
 			out.RawString(prefix)
 		}
 		out.Bool(bool(in.Released))
+	}
+	if in.TraceTooLarge {
+		const prefix string = ",\"TraceTooLarge\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Bool(bool(in.TraceTooLarge))
+	}
+	if in.TraceID != "" {
+		const prefix string = ",\"TraceID\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.TraceID))
 	}
 	if len(in.Spans) != 0 {
 		const prefix string = ",\"Spans\":"
@@ -1014,6 +1040,16 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding7(out *jwriter.Writer,
 			out.RawString(prefix)
 		}
 		easyjsonE453ad8fEncodeGithubComSignalfxGolibTrace(out, *in.Initiating)
+	}
+	if in.SizeSoFar != 0 {
+		const prefix string = ",\"SizeSoFar\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int64(int64(in.SizeSoFar))
 	}
 	if in.ToBeReleased {
 		const prefix string = ",\"ToBeReleased\":"
@@ -2041,6 +2077,8 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding11(in *jlexer.Lexer, o
 			continue
 		}
 		switch key {
+		case "TraceID":
+			out.TraceID = string(in.String())
 		case "Spans":
 			if in.IsNull() {
 				in.Skip()
@@ -2090,6 +2128,8 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding11(in *jlexer.Lexer, o
 				}
 				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in, &*out.Initiating)
 			}
+		case "SizeSoFar":
+			out.SizeSoFar = int64(in.Int64())
 		case "ToBeReleased":
 			out.ToBeReleased = bool(in.Bool())
 		default:
@@ -2106,6 +2146,16 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding11(out *jwriter.Writer
 	out.RawByte('{')
 	first := true
 	_ = first
+	if in.TraceID != "" {
+		const prefix string = ",\"TraceID\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.TraceID))
+	}
 	if len(in.Spans) != 0 {
 		const prefix string = ",\"Spans\":"
 		if first {
@@ -2168,6 +2218,16 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding11(out *jwriter.Writer
 			out.RawString(prefix)
 		}
 		easyjsonE453ad8fEncodeGithubComSignalfxGolibTrace(out, *in.Initiating)
+	}
+	if in.SizeSoFar != 0 {
+		const prefix string = ",\"SizeSoFar\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int64(int64(in.SizeSoFar))
 	}
 	if in.ToBeReleased {
 		const prefix string = ",\"ToBeReleased\":"
