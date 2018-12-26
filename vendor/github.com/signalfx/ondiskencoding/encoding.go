@@ -59,8 +59,9 @@ type Histo struct {
 //easyjson:json
 type ExpiredBufferEntry struct {
 	BufferEntry
-	NewSpanSeen bool `json:",omitempty"` // we've seen a new span
-	Released    bool `json:",omitempty"`
+	NewSpanSeen   bool `json:",omitempty"` // we've seen a new span
+	Released      bool `json:",omitempty"`
+	TraceTooLarge bool `json:",omitempty"`
 }
 
 //easyjson:json
@@ -68,11 +69,13 @@ type ExpiredBufferEntries []*ExpiredBufferEntry
 
 //easyjson:json
 type BufferEntry struct {
+	TraceID       string        `json:",omitempty"` // id of the trace
 	Spans         []*trace.Span `json:",omitempty"` // buffer of spans by trace id
 	Last          time.Time     `json:",omitempty"` // Last time we saw a span for this trace id
 	LatestEndTime float64       `json:",omitempty"` // Latest end time we've seen for any span
 	StartTime     float64       `json:",omitempty"` // Start time of initiating span if found
 	Initiating    *trace.Span   `json:",omitempty"` // initiating span
+	SizeSoFar     int64         `json:",omitempty"` // size of the trace so far
 	ToBeReleased  bool          `json:",omitempty"` // spans that have been selected to be released
 }
 
@@ -104,6 +107,6 @@ type EtcdConfig struct {
 
 //easyjson:json
 type Rebalance struct {
-	Buffers map[string]*BufferEntry 			  `json:",omitempty"` // map of trace id to buffer entry
+	Buffers        map[string]*BufferEntry        `json:",omitempty"` // map of trace id to buffer entry
 	ExpiredBuffers map[string]*ExpiredBufferEntry `json:",omitempty"` // map of trace id to expired buffer entry
 }
