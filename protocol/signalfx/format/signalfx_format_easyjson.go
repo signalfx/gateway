@@ -18,7 +18,7 @@ var (
 	_ easyjson.Marshaler
 )
 
-func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat(in *jlexer.Lexer, out *JSONEventV2) {
+func easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat(in *jlexer.Lexer, out *JSONEventV2) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		in.Skip()
@@ -43,7 +43,9 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat(in
 				if v1 == nil {
 					v1 = new(EventSendFormatV2)
 				}
-				(*v1).UnmarshalEasyJSON(in)
+				if data := in.Raw(); in.Ok() {
+					in.AddError((*v1).UnmarshalJSON(data))
+				}
 			}
 			*out = append(*out, v1)
 			in.WantComma()
@@ -54,7 +56,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat(in
 		in.Consumed()
 	}
 }
-func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat(out *jwriter.Writer, in JSONEventV2) {
+func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat(out *jwriter.Writer, in JSONEventV2) {
 	if in == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
 		out.RawString("null")
 	} else {
@@ -66,7 +68,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat(ou
 			if v3 == nil {
 				out.RawString("null")
 			} else {
-				(*v3).MarshalEasyJSON(out)
+				out.Raw((*v3).MarshalJSON())
 			}
 		}
 		out.RawByte(']')
@@ -76,27 +78,27 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat(ou
 // MarshalJSON supports json.Marshaler interface
 func (v JSONEventV2) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat(&w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v JSONEventV2) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat(w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *JSONEventV2) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat(&r, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *JSONEventV2) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat(l, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat(l, v)
 }
-func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat1(in *jlexer.Lexer, out *JSONDatapointV2) {
+func easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat1(in *jlexer.Lexer, out *JSONDatapointV2) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		in.Skip()
@@ -134,7 +136,9 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat1(i
 						if v5 == nil {
 							v5 = new(BodySendFormatV2)
 						}
-						(*v5).UnmarshalEasyJSON(in)
+						if data := in.Raw(); in.Ok() {
+							in.AddError((*v5).UnmarshalJSON(data))
+						}
 					}
 					v4 = append(v4, v5)
 					in.WantComma()
@@ -150,7 +154,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat1(i
 		in.Consumed()
 	}
 }
-func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat1(out *jwriter.Writer, in JSONDatapointV2) {
+func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat1(out *jwriter.Writer, in JSONDatapointV2) {
 	if in == nil && (out.Flags&jwriter.NilMapAsEmpty) == 0 {
 		out.RawString(`null`)
 	} else {
@@ -175,7 +179,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat1(o
 					if v8 == nil {
 						out.RawString("null")
 					} else {
-						(*v8).MarshalEasyJSON(out)
+						out.Raw((*v8).MarshalJSON())
 					}
 				}
 				out.RawByte(']')
@@ -188,27 +192,27 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat1(o
 // MarshalJSON supports json.Marshaler interface
 func (v JSONDatapointV2) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat1(&w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat1(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v JSONDatapointV2) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat1(w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat1(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *JSONDatapointV2) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat1(&r, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat1(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *JSONDatapointV2) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat1(l, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat1(l, v)
 }
-func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat2(in *jlexer.Lexer, out *JSONDatapointV1) {
+func easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat2(in *jlexer.Lexer, out *JSONDatapointV1) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -243,7 +247,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat2(i
 		in.Consumed()
 	}
 }
-func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat2(out *jwriter.Writer, in JSONDatapointV1) {
+func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat2(out *jwriter.Writer, in JSONDatapointV1) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -283,27 +287,27 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat2(o
 // MarshalJSON supports json.Marshaler interface
 func (v JSONDatapointV1) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat2(&w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat2(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v JSONDatapointV1) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat2(w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat2(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *JSONDatapointV1) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat2(&r, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat2(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *JSONDatapointV1) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat2(l, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat2(l, v)
 }
-func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(in *jlexer.Lexer, out *InputSpanList) {
+func easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat3(in *jlexer.Lexer, out *InputSpanList) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		in.Skip()
@@ -328,7 +332,9 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(i
 				if v9 == nil {
 					v9 = new(InputSpan)
 				}
-				(*v9).UnmarshalEasyJSON(in)
+				if data := in.Raw(); in.Ok() {
+					in.AddError((*v9).UnmarshalJSON(data))
+				}
 			}
 			*out = append(*out, v9)
 			in.WantComma()
@@ -339,7 +345,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(i
 		in.Consumed()
 	}
 }
-func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(out *jwriter.Writer, in InputSpanList) {
+func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat3(out *jwriter.Writer, in InputSpanList) {
 	if in == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
 		out.RawString("null")
 	} else {
@@ -351,7 +357,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(o
 			if v11 == nil {
 				out.RawString("null")
 			} else {
-				(*v11).MarshalEasyJSON(out)
+				out.Raw((*v11).MarshalJSON())
 			}
 		}
 		out.RawByte(']')
@@ -361,27 +367,27 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(o
 // MarshalJSON supports json.Marshaler interface
 func (v InputSpanList) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(&w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat3(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v InputSpanList) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat3(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *InputSpanList) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(&r, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat3(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *InputSpanList) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat3(l, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat3(l, v)
 }
-func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(in *jlexer.Lexer, out *InputSpan) {
+func easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat4(in *jlexer.Lexer, out *InputSpan) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -424,7 +430,9 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(i
 						if v12 == nil {
 							v12 = new(InputAnnotation)
 						}
-						(*v12).UnmarshalEasyJSON(in)
+						if data := in.Raw(); in.Ok() {
+							in.AddError((*v12).UnmarshalJSON(data))
+						}
 					}
 					out.Annotations = append(out.Annotations, v12)
 					in.WantComma()
@@ -455,7 +463,9 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(i
 						if v13 == nil {
 							v13 = new(BinaryAnnotation)
 						}
-						(*v13).UnmarshalEasyJSON(in)
+						if data := in.Raw(); in.Ok() {
+							in.AddError((*v13).UnmarshalJSON(data))
+						}
 					}
 					out.BinaryAnnotations = append(out.BinaryAnnotations, v13)
 					in.WantComma()
@@ -502,9 +512,9 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(i
 				out.Timestamp = nil
 			} else {
 				if out.Timestamp == nil {
-					out.Timestamp = new(float64)
+					out.Timestamp = new(int64)
 				}
-				*out.Timestamp = float64(in.Float64())
+				*out.Timestamp = int64(in.Int64())
 			}
 		case "duration":
 			if in.IsNull() {
@@ -512,9 +522,9 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(i
 				out.Duration = nil
 			} else {
 				if out.Duration == nil {
-					out.Duration = new(float64)
+					out.Duration = new(int64)
 				}
-				*out.Duration = float64(in.Float64())
+				*out.Duration = int64(in.Int64())
 			}
 		case "debug":
 			if in.IsNull() {
@@ -544,7 +554,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(i
 				if out.LocalEndpoint == nil {
 					out.LocalEndpoint = new(trace.Endpoint)
 				}
-				easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(in, &*out.LocalEndpoint)
+				easyjson3b0ebf6aDecodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibTrace(in, &*out.LocalEndpoint)
 			}
 		case "remoteEndpoint":
 			if in.IsNull() {
@@ -554,7 +564,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(i
 				if out.RemoteEndpoint == nil {
 					out.RemoteEndpoint = new(trace.Endpoint)
 				}
-				easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(in, &*out.RemoteEndpoint)
+				easyjson3b0ebf6aDecodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibTrace(in, &*out.RemoteEndpoint)
 			}
 		case "tags":
 			if in.IsNull() {
@@ -586,7 +596,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(i
 		in.Consumed()
 	}
 }
-func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(out *jwriter.Writer, in InputSpan) {
+func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(out *jwriter.Writer, in InputSpan) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -609,7 +619,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(o
 				if v16 == nil {
 					out.RawString("null")
 				} else {
-					(*v16).MarshalEasyJSON(out)
+					out.Raw((*v16).MarshalJSON())
 				}
 			}
 			out.RawByte(']')
@@ -634,7 +644,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(o
 				if v18 == nil {
 					out.RawString("null")
 				} else {
-					(*v18).MarshalEasyJSON(out)
+					out.Raw((*v18).MarshalJSON())
 				}
 			}
 			out.RawByte(']')
@@ -713,7 +723,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(o
 		if in.Timestamp == nil {
 			out.RawString("null")
 		} else {
-			out.Float64(float64(*in.Timestamp))
+			out.Int64(int64(*in.Timestamp))
 		}
 	}
 	{
@@ -727,7 +737,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(o
 		if in.Duration == nil {
 			out.RawString("null")
 		} else {
-			out.Float64(float64(*in.Duration))
+			out.Int64(int64(*in.Duration))
 		}
 	}
 	{
@@ -769,7 +779,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(o
 		if in.LocalEndpoint == nil {
 			out.RawString("null")
 		} else {
-			easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(out, *in.LocalEndpoint)
+			easyjson3b0ebf6aEncodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibTrace(out, *in.LocalEndpoint)
 		}
 	}
 	{
@@ -783,7 +793,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(o
 		if in.RemoteEndpoint == nil {
 			out.RawString("null")
 		} else {
-			easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(out, *in.RemoteEndpoint)
+			easyjson3b0ebf6aEncodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibTrace(out, *in.RemoteEndpoint)
 		}
 	}
 	{
@@ -818,27 +828,27 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(o
 // MarshalJSON supports json.Marshaler interface
 func (v InputSpan) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(&w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v InputSpan) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *InputSpan) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(&r, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat4(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *InputSpan) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat4(l, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat4(l, v)
 }
-func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(in *jlexer.Lexer, out *trace.Endpoint) {
+func easyjson3b0ebf6aDecodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibTrace(in *jlexer.Lexer, out *trace.Endpoint) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -907,7 +917,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGo
 		in.Consumed()
 	}
 }
-func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(out *jwriter.Writer, in trace.Endpoint) {
+func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibTrace(out *jwriter.Writer, in trace.Endpoint) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -969,7 +979,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGo
 	}
 	out.RawByte('}')
 }
-func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(in *jlexer.Lexer, out *InputAnnotation) {
+func easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat5(in *jlexer.Lexer, out *InputAnnotation) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -996,7 +1006,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(i
 				if out.Endpoint == nil {
 					out.Endpoint = new(trace.Endpoint)
 				}
-				easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(in, &*out.Endpoint)
+				easyjson3b0ebf6aDecodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibTrace(in, &*out.Endpoint)
 			}
 		case "timestamp":
 			if in.IsNull() {
@@ -1004,9 +1014,9 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(i
 				out.Timestamp = nil
 			} else {
 				if out.Timestamp == nil {
-					out.Timestamp = new(float64)
+					out.Timestamp = new(int64)
 				}
-				*out.Timestamp = float64(in.Float64())
+				*out.Timestamp = int64(in.Int64())
 			}
 		case "value":
 			if in.IsNull() {
@@ -1028,7 +1038,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(i
 		in.Consumed()
 	}
 }
-func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(out *jwriter.Writer, in InputAnnotation) {
+func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat5(out *jwriter.Writer, in InputAnnotation) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1043,7 +1053,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(o
 		if in.Endpoint == nil {
 			out.RawString("null")
 		} else {
-			easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(out, *in.Endpoint)
+			easyjson3b0ebf6aEncodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibTrace(out, *in.Endpoint)
 		}
 	}
 	{
@@ -1057,7 +1067,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(o
 		if in.Timestamp == nil {
 			out.RawString("null")
 		} else {
-			out.Float64(float64(*in.Timestamp))
+			out.Int64(int64(*in.Timestamp))
 		}
 	}
 	{
@@ -1080,27 +1090,27 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(o
 // MarshalJSON supports json.Marshaler interface
 func (v InputAnnotation) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(&w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat5(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v InputAnnotation) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat5(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *InputAnnotation) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(&r, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat5(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *InputAnnotation) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat5(l, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat5(l, v)
 }
-func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat6(in *jlexer.Lexer, out *EventSendFormatV2) {
+func easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat6(in *jlexer.Lexer, out *EventSendFormatV2) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1197,7 +1207,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat6(i
 		in.Consumed()
 	}
 }
-func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat6(out *jwriter.Writer, in EventSendFormatV2) {
+func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat6(out *jwriter.Writer, in EventSendFormatV2) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1303,27 +1313,27 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat6(o
 // MarshalJSON supports json.Marshaler interface
 func (v EventSendFormatV2) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat6(&w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat6(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v EventSendFormatV2) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat6(w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat6(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *EventSendFormatV2) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat6(&r, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat6(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *EventSendFormatV2) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat6(l, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat6(l, v)
 }
-func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat7(in *jlexer.Lexer, out *BodySendFormatV2) {
+func easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat7(in *jlexer.Lexer, out *BodySendFormatV2) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1410,7 +1420,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat7(i
 		in.Consumed()
 	}
 }
-func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat7(out *jwriter.Writer, in BodySendFormatV2) {
+func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat7(out *jwriter.Writer, in BodySendFormatV2) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1514,27 +1524,27 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat7(o
 // MarshalJSON supports json.Marshaler interface
 func (v BodySendFormatV2) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat7(&w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat7(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v BodySendFormatV2) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat7(w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat7(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *BodySendFormatV2) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat7(&r, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat7(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *BodySendFormatV2) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat7(l, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat7(l, v)
 }
-func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(in *jlexer.Lexer, out *BinaryAnnotation) {
+func easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat8(in *jlexer.Lexer, out *BinaryAnnotation) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1561,7 +1571,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(i
 				if out.Endpoint == nil {
 					out.Endpoint = new(trace.Endpoint)
 				}
-				easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(in, &*out.Endpoint)
+				easyjson3b0ebf6aDecodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibTrace(in, &*out.Endpoint)
 			}
 		case "key":
 			if in.IsNull() {
@@ -1599,7 +1609,7 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(i
 		in.Consumed()
 	}
 }
-func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(out *jwriter.Writer, in BinaryAnnotation) {
+func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat8(out *jwriter.Writer, in BinaryAnnotation) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -1614,7 +1624,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(o
 		if in.Endpoint == nil {
 			out.RawString("null")
 		} else {
-			easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyVendorGithubComSignalfxGolibTrace(out, *in.Endpoint)
+			easyjson3b0ebf6aEncodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibTrace(out, *in.Endpoint)
 		}
 	}
 	{
@@ -1657,23 +1667,23 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(o
 // MarshalJSON supports json.Marshaler interface
 func (v BinaryAnnotation) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(&w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat8(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
 func (v BinaryAnnotation) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson3b0ebf6aEncodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(w, v)
+	easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat8(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *BinaryAnnotation) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(&r, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat8(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *BinaryAnnotation) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson3b0ebf6aDecodeGithubComSignalfxMetricproxyProtocolSignalfxFormat8(l, v)
+	easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat8(l, v)
 }

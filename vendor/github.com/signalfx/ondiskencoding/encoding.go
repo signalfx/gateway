@@ -72,8 +72,8 @@ type BufferEntry struct {
 	TraceID       string        `json:",omitempty"` // id of the trace
 	Spans         []*trace.Span `json:",omitempty"` // buffer of spans by trace id
 	Last          time.Time     `json:",omitempty"` // Last time we saw a span for this trace id
-	LatestEndTime float64       `json:",omitempty"` // Latest end time we've seen for any span
-	StartTime     float64       `json:",omitempty"` // Start time of initiating span if found
+	LatestEndTime int64       `json:",omitempty"` // Latest end time we've seen for any span
+	StartTime     int64       `json:",omitempty"` // Start time of initiating span if found
 	Initiating    *trace.Span   `json:",omitempty"` // initiating span
 	SizeSoFar     int64         `json:",omitempty"` // size of the trace so far
 	ToBeReleased  bool          `json:",omitempty"` // spans that have been selected to be released
@@ -95,7 +95,7 @@ type SampleList []*SampleEntry
 //easyjson:json
 type SampleEntry struct {
 	ID      *SpanIdentity `json:",omitempty"`
-	Samples []float64     `json:",omitempty"`
+	Samples []int64     `json:",omitempty"`
 }
 
 //easyjson:json
