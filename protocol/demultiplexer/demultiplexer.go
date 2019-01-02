@@ -153,7 +153,7 @@ func (streamer *Demultiplexer) handleLateOrFutureSpans(spans []*trace.Span) {
 
 					atomic.AddInt64(&streamer.stats.futureSpans, 1)
 					streamer.Logger.Log(logkey.Name, d.ID, logkey.Delta, time.Unix(0, *d.Timestamp*int64(time.Microsecond)).Sub(now), "trace received too far into the future")
-				} else if streamer.LateDuration != nil && time.Unix(0, int64(*d.Timestamp)*int64(time.Microsecond)).Before(now.Add(-*streamer.LateDuration)) {
+				} else if streamer.LateDuration != nil && time.Unix(0, *d.Timestamp*int64(time.Microsecond)).Before(now.Add(-*streamer.LateDuration)) {
 
 					atomic.AddInt64(&streamer.stats.lateSpans, 1)
 					streamer.Logger.Log(logkey.Name, d.ID, logkey.Delta, now.Sub(time.Unix(0, *d.Timestamp*int64(time.Microsecond))), "trace received too far into the past")
