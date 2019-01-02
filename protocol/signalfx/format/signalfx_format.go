@@ -54,7 +54,7 @@ type EventSendFormatV2 struct {
 //easyjson:json
 type InputAnnotation struct {
 	Endpoint  *trace.Endpoint `json:"endpoint"`
-	Timestamp *float64        `json:"timestamp"`
+	Timestamp *int64          `json:"timestamp"`
 	Value     *string         `json:"value"`
 }
 

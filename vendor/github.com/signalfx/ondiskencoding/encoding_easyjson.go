@@ -252,16 +252,16 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding2(in *jlexer.Lexer, ou
 				in.Delim('[')
 				if out.Samples == nil {
 					if !in.IsDelim(']') {
-						out.Samples = make([]float64, 0, 8)
+						out.Samples = make([]int64, 0, 8)
 					} else {
-						out.Samples = []float64{}
+						out.Samples = []int64{}
 					}
 				} else {
 					out.Samples = (out.Samples)[:0]
 				}
 				for !in.IsDelim(']') {
-					var v4 float64
-					v4 = float64(in.Float64())
+					var v4 int64
+					v4 = int64(in.Int64())
 					out.Samples = append(out.Samples, v4)
 					in.WantComma()
 				}
@@ -305,7 +305,7 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding2(out *jwriter.Writer,
 				if v5 > 0 {
 					out.RawByte(',')
 				}
-				out.Float64(float64(v6))
+				out.Int64(int64(v6))
 			}
 			out.RawByte(']')
 		}
@@ -907,9 +907,9 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding7(in *jlexer.Lexer, ou
 				in.AddError((out.Last).UnmarshalJSON(data))
 			}
 		case "LatestEndTime":
-			out.LatestEndTime = float64(in.Float64())
+			out.LatestEndTime = int64(in.Int64())
 		case "StartTime":
-			out.StartTime = float64(in.Float64())
+			out.StartTime = int64(in.Int64())
 		case "Initiating":
 			if in.IsNull() {
 				in.Skip()
@@ -1019,7 +1019,7 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding7(out *jwriter.Writer,
 		} else {
 			out.RawString(prefix)
 		}
-		out.Float64(float64(in.LatestEndTime))
+		out.Int64(int64(in.LatestEndTime))
 	}
 	if in.StartTime != 0 {
 		const prefix string = ",\"StartTime\":"
@@ -1029,7 +1029,7 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding7(out *jwriter.Writer,
 		} else {
 			out.RawString(prefix)
 		}
-		out.Float64(float64(in.StartTime))
+		out.Int64(int64(in.StartTime))
 	}
 	if in.Initiating != nil {
 		const prefix string = ",\"Initiating\":"
@@ -1146,9 +1146,9 @@ func easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in *jlexer.Lexer, out *tr
 				out.Timestamp = nil
 			} else {
 				if out.Timestamp == nil {
-					out.Timestamp = new(float64)
+					out.Timestamp = new(int64)
 				}
-				*out.Timestamp = float64(in.Float64())
+				*out.Timestamp = int64(in.Int64())
 			}
 		case "duration":
 			if in.IsNull() {
@@ -1156,9 +1156,9 @@ func easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in *jlexer.Lexer, out *tr
 				out.Duration = nil
 			} else {
 				if out.Duration == nil {
-					out.Duration = new(float64)
+					out.Duration = new(int64)
 				}
-				*out.Duration = float64(in.Float64())
+				*out.Duration = int64(in.Int64())
 			}
 		case "debug":
 			if in.IsNull() {
@@ -1338,7 +1338,7 @@ func easyjsonE453ad8fEncodeGithubComSignalfxGolibTrace(out *jwriter.Writer, in t
 		if in.Timestamp == nil {
 			out.RawString("null")
 		} else {
-			out.Float64(float64(*in.Timestamp))
+			out.Int64(int64(*in.Timestamp))
 		}
 	}
 	{
@@ -1352,7 +1352,7 @@ func easyjsonE453ad8fEncodeGithubComSignalfxGolibTrace(out *jwriter.Writer, in t
 		if in.Duration == nil {
 			out.RawString("null")
 		} else {
-			out.Float64(float64(*in.Duration))
+			out.Int64(int64(*in.Duration))
 		}
 	}
 	{
@@ -1489,9 +1489,9 @@ func easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace2(in *jlexer.Lexer, out *t
 				out.Timestamp = nil
 			} else {
 				if out.Timestamp == nil {
-					out.Timestamp = new(float64)
+					out.Timestamp = new(int64)
 				}
-				*out.Timestamp = float64(in.Float64())
+				*out.Timestamp = int64(in.Int64())
 			}
 		case "value":
 			if in.IsNull() {
@@ -1528,7 +1528,7 @@ func easyjsonE453ad8fEncodeGithubComSignalfxGolibTrace2(out *jwriter.Writer, in 
 		if in.Timestamp == nil {
 			out.RawString("null")
 		} else {
-			out.Float64(float64(*in.Timestamp))
+			out.Int64(int64(*in.Timestamp))
 		}
 	}
 	{
@@ -2115,9 +2115,9 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding11(in *jlexer.Lexer, o
 				in.AddError((out.Last).UnmarshalJSON(data))
 			}
 		case "LatestEndTime":
-			out.LatestEndTime = float64(in.Float64())
+			out.LatestEndTime = int64(in.Int64())
 		case "StartTime":
-			out.StartTime = float64(in.Float64())
+			out.StartTime = int64(in.Int64())
 		case "Initiating":
 			if in.IsNull() {
 				in.Skip()
@@ -2197,7 +2197,7 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding11(out *jwriter.Writer
 		} else {
 			out.RawString(prefix)
 		}
-		out.Float64(float64(in.LatestEndTime))
+		out.Int64(int64(in.LatestEndTime))
 	}
 	if in.StartTime != 0 {
 		const prefix string = ",\"StartTime\":"
@@ -2207,7 +2207,7 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding11(out *jwriter.Writer
 		} else {
 			out.RawString(prefix)
 		}
-		out.Float64(float64(in.StartTime))
+		out.Int64(int64(in.StartTime))
 	}
 	if in.Initiating != nil {
 		const prefix string = ",\"Initiating\":"

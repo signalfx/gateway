@@ -138,8 +138,8 @@ func convertJaegerSpan(tSpan *jThrift.Span, tProcess *jThrift.Process) *trace.Sp
 		ParentID:       ptrParentID,
 		Debug:          ptrDebug,
 		Name:           &tSpan.OperationName,
-		Timestamp:      pointer.Float64(float64(tSpan.StartTime)),
-		Duration:       pointer.Float64(float64(tSpan.Duration)),
+		Timestamp:      &tSpan.StartTime,
+		Duration:       &tSpan.Duration,
 		Kind:           kind,
 		LocalEndpoint:  localEndpoint,
 		RemoteEndpoint: remoteEndpoint,
@@ -153,7 +153,7 @@ func convertJaegerLogs(logs []*jThrift.Log) []*trace.Annotation {
 	annotations := make([]*trace.Annotation, 0, len(logs))
 	for i := range logs {
 		anno := trace.Annotation{
-			Timestamp: pointer.Float64(float64(logs[i].Timestamp)),
+			Timestamp: &logs[i].Timestamp,
 		}
 		if content, err := materializeWithJSON(logs[i].Fields); err == nil {
 			anno.Value = pointer.String(string(content))
