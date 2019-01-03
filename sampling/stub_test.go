@@ -2,10 +2,11 @@ package sampling
 
 import (
 	"context"
+	"testing"
+
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/trace"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func Test(t *testing.T) {

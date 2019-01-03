@@ -2,7 +2,8 @@ package sampling
 
 import (
 	"context"
-	"github.com/quentin-m/etcd-cloud-operator/pkg/etcd"
+
+	"github.com/signalfx/gateway/etcdIntf"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
@@ -11,8 +12,8 @@ import (
 
 // SmartSampleConfig is not here
 type SmartSampleConfig struct {
-	EtcdServer *etcd.Server `json:"-"`
-	EtcdClient *etcd.Client `json:"-"`
+	EtcdServer etcdIntf.Server `json:"-"`
+	EtcdClient etcdIntf.Client `json:"-"`
 }
 
 // SmartSampler is not here
