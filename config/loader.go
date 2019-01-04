@@ -10,6 +10,7 @@ import (
 	"github.com/signalfx/gateway/protocol/prometheus"
 	"github.com/signalfx/gateway/protocol/signalfx"
 	"github.com/signalfx/gateway/protocol/wavefront"
+	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
@@ -206,6 +207,7 @@ func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) 
 	if sfConf.TraceSample != nil {
 		sfConf.TraceSample.EtcdServer = conf.Server
 		sfConf.TraceSample.EtcdClient = conf.Client
+		sfConf.TraceSample.AdditionalDimensions = datapoint.AddMaps(conf.AdditionalDimensions, conf.TraceSample.AdditionalDimensions)
 	}
 	return signalfx.NewForwarder(&sfConf)
 }

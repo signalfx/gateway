@@ -29,6 +29,7 @@ import (
 	"github.com/signalfx/gateway/protocol/demultiplexer"
 	"github.com/signalfx/gateway/protocol/signalfx"
 	_ "github.com/signalfx/go-metrics"
+	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/eventcounter"
@@ -301,6 +302,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 		logCtx := log.NewContext(logger).With(logkey.Protocol, forwardConfig.Type, logkey.Direction, "forwarder")
 		forwardConfig.Server = manager.server
 		forwardConfig.Client = manager.client
+		forwardConfig.AdditionalDimensions = datapoint.AddMaps(loadedConfig.AdditionalDimensions, forwardConfig.AdditionalDimensions)
 		forwarder, err := loader.Forwarder(forwardConfig)
 		if err != nil {
 			return nil, err
@@ -343,20 +345,20 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 		scheduler.AddGroupedCallback(groupName, forwarder)
 		scheduler.AddGroupedCallback(groupName, bf)
 		scheduler.AddGroupedCallback(groupName, dcount)
-		scheduler.GroupedDefaultDimensions(groupName, map[string]string{
+		scheduler.GroupedDefaultDimensions(groupName, datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
 			"name":      name,
 			"direction": "forwarder",
 			"source":    "gateway",
 			"host":      *loadedConfig.ServerName,
 			"type":      forwardConfig.Type,
-		})
+		}))
 	}
 	return allForwarders, nil
 }
 
 var errDupeListener = errors.New("cannot duplicate listener names or types without names")
 
-func setupListeners(tk timekeeper.TimeKeeper, hostname string, loader *config.Loader, listenFrom []*config.ListenFrom, multiplexer signalfx.Sink, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Listener, error) {
+func setupListeners(tk timekeeper.TimeKeeper, hostname string, loadedConfig *config.GatewayConfig, loader *config.Loader, listenFrom []*config.ListenFrom, multiplexer signalfx.Sink, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Listener, error) {
 	listeners := make([]protocol.Listener, 0, len(listenFrom))
 	nameMap := make(map[string]bool)
 	for idx, listenConfig := range listenFrom {
@@ -391,13 +393,13 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loader *config.Lo
 		groupName := fmt.Sprintf("%s_l_%d", name, idx)
 		scheduler.AddGroupedCallback(groupName, listener)
 		scheduler.AddGroupedCallback(groupName, count)
-		scheduler.GroupedDefaultDimensions(groupName, map[string]string{
+		scheduler.GroupedDefaultDimensions(groupName, datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
 			"name":      name,
 			"direction": "listener",
 			"source":    "gateway",
 			"host":      hostname,
 			"type":      listenConfig.Type,
-		})
+		}))
 	}
 	return listeners, nil
 }
@@ -574,13 +576,13 @@ func (p *gateway) createCommonHTTPChain(loadedConfig *config.GatewayConfig) web.
 	})
 }
 
-func (p *gateway) setupScheduler(hostname string) *sfxclient.Scheduler {
+func (p *gateway) setupScheduler(loadedConfig *config.GatewayConfig) *sfxclient.Scheduler {
 	scheduler := sfxclient.NewScheduler()
 	scheduler.AddCallback(sfxclient.GoMetricsSource)
-	scheduler.DefaultDimensions(map[string]string{
+	scheduler.DefaultDimensions(datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
 		"source": "gateway",
-		"host":   hostname,
-	})
+		"host":   *loadedConfig.ServerName,
+	}))
 	return scheduler
 }
 
@@ -624,7 +626,7 @@ func (p *gateway) setupForwardersAndListeners(ctx context.Context, loader *confi
 
 	multiplexer := signalfx.FromChain(dmux, signalfx.NextWrap(signalfx.UnifyNextSinkWrap(&p.debugSink)))
 
-	p.listeners, err = setupListeners(p.tk, *loadedConfig.ServerName, loader, loadedConfig.ListenFrom, multiplexer, logger, scheduler)
+	p.listeners, err = setupListeners(p.tk, *loadedConfig.ServerName, loadedConfig, loader, loadedConfig.ListenFrom, multiplexer, logger, scheduler)
 	if err != nil {
 		p.logger.Log(log.Err, err, "Unable to setup listeners")
 		return nil, errors.Annotate(err, "cannot setup listeners from configuration")
@@ -654,7 +656,7 @@ func (p *gateway) run(ctx context.Context) error {
 	p.versionMetric.Logger = p.logger
 
 	logger := p.logger
-	scheduler := p.setupScheduler(*loadedConfig.ServerName)
+	scheduler := p.setupScheduler(loadedConfig)
 
 	if err := p.setupDebugServer(loadedConfig, logger, scheduler); err != nil {
 		p.logger.Log(log.Err, "debug server failed", err)

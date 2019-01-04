@@ -12,8 +12,9 @@ import (
 
 // SmartSampleConfig is not here
 type SmartSampleConfig struct {
-	EtcdServer etcdIntf.Server `json:"-"`
-	EtcdClient etcdIntf.Client `json:"-"`
+	EtcdServer           etcdIntf.Server   `json:"-"`
+	EtcdClient           etcdIntf.Client   `json:"-"`
+	AdditionalDimensions map[string]string `json:",omitempty"`
 }
 
 // SmartSampler is not here
