@@ -170,7 +170,7 @@ func (sb *spanBuilder) pullOutSpecialAnnotations(is *InputSpan) {
 
 		if !processed {
 			span.Annotations = append(span.Annotations, &trace.Annotation{
-				Timestamp: anno.Timestamp,
+				Timestamp: signalfxformat.GetPointerToInt64(anno.Timestamp),
 				Value:     anno.Value,
 			})
 		}
@@ -246,10 +246,10 @@ func (sb *spanBuilder) fillInMissingTimings(is *InputSpan) {
 
 	// the server side is smaller than that, we have to read annotations to find out
 	server.Shared = &trueVar
-	server.Timestamp = sb.sr.Timestamp
+	server.Timestamp = signalfxformat.GetPointerToInt64(sb.sr.Timestamp)
 	if sb.ss != nil && sb.ss.Timestamp != nil && sb.sr.Timestamp != nil {
 		ts := *sb.ss.Timestamp - *sb.sr.Timestamp
-		server.Duration = &ts
+		server.Duration = signalfxformat.GetPointerToInt64(&ts)
 	}
 	if sb.cr == nil && is.Duration == nil {
 		client.Duration = nil
@@ -261,21 +261,21 @@ func (sb *spanBuilder) handleIncompleteSpan(is *InputSpan) {
 		next := sb.spans[i]
 		if next.Kind != nil && *next.Kind == ClientKind {
 			if sb.cs != nil {
-				next.Timestamp = sb.cs.Timestamp
+				next.Timestamp = signalfxformat.GetPointerToInt64(sb.cs.Timestamp)
 			}
 			if sb.cr != nil {
 				next.Annotations = append(next.Annotations, &trace.Annotation{
-					Timestamp: sb.cr.Timestamp,
+					Timestamp: signalfxformat.GetPointerToInt64(sb.cr.Timestamp),
 					Value:     sb.cr.Value,
 				})
 			}
 		} else if next.Kind != nil && *next.Kind == ServerKind {
 			if sb.sr != nil {
-				next.Timestamp = sb.sr.Timestamp
+				next.Timestamp = signalfxformat.GetPointerToInt64(sb.sr.Timestamp)
 			}
 			if sb.ss != nil {
 				next.Annotations = append(next.Annotations, &trace.Annotation{
-					Timestamp: sb.ss.Timestamp,
+					Timestamp: signalfxformat.GetPointerToInt64(sb.ss.Timestamp),
 					Value:     sb.ss.Value,
 				})
 			}
@@ -287,8 +287,8 @@ func (sb *spanBuilder) handleIncompleteSpan(is *InputSpan) {
 
 func (sb *spanBuilder) fillInTimingsOnFirstSpan(is *InputSpan) {
 	if is.Timestamp != nil {
-		sb.spans[0].Timestamp = is.Timestamp
-		sb.spans[0].Duration = is.Duration
+		sb.spans[0].Timestamp = signalfxformat.GetPointerToInt64(is.Timestamp)
+		sb.spans[0].Duration = signalfxformat.GetPointerToInt64(is.Duration)
 	}
 }
 
@@ -308,14 +308,14 @@ func (sb *spanBuilder) handleMessageQueueAnnotations(is *InputSpan) {
 		if sb.ws != nil {
 			span := sb.spanForEndpoint(is, sb.ws.Endpoint)
 			span.Annotations = append(span.Annotations, &trace.Annotation{
-				Timestamp: sb.ws.Timestamp,
+				Timestamp: signalfxformat.GetPointerToInt64(sb.ws.Timestamp),
 				Value:     sb.ws.Value,
 			})
 		}
 		if sb.wr != nil {
 			span := sb.spanForEndpoint(is, sb.wr.Endpoint)
 			span.Annotations = append(span.Annotations, &trace.Annotation{
-				Timestamp: sb.wr.Timestamp,
+				Timestamp: signalfxformat.GetPointerToInt64(sb.wr.Timestamp),
 				Value:     sb.wr.Value,
 			})
 		}
@@ -337,17 +337,17 @@ func (sb *spanBuilder) handleBothMSAndMR(is *InputSpan) {
 
 	consumer.Shared = &trueVar
 	if sb.wr != nil && sb.mr.Timestamp != nil && sb.wr.Timestamp != nil {
-		consumer.Timestamp = sb.wr.Timestamp
+		consumer.Timestamp = signalfxformat.GetPointerToInt64(sb.wr.Timestamp)
 		ts := *sb.mr.Timestamp - *sb.wr.Timestamp
-		consumer.Duration = &ts
+		consumer.Duration = signalfxformat.GetPointerToInt64(&ts)
 	} else {
-		consumer.Timestamp = sb.mr.Timestamp
+		consumer.Timestamp = signalfxformat.GetPointerToInt64(sb.mr.Timestamp)
 	}
 
-	producer.Timestamp = sb.ms.Timestamp
+	producer.Timestamp = signalfxformat.GetPointerToInt64(sb.ms.Timestamp)
 	if sb.ws != nil && sb.ws.Timestamp != nil && sb.ms.Timestamp != nil {
 		ts := *sb.ws.Timestamp - *sb.ms.Timestamp
-		producer.Duration = &ts
+		producer.Duration = signalfxformat.GetPointerToInt64(&ts)
 	}
 }
 
@@ -355,13 +355,13 @@ func (sb *spanBuilder) maybeTimestampDuration(begin, end *signalfxformat.InputAn
 	span2 := sb.spanForEndpoint(is, begin.Endpoint)
 
 	if is.Timestamp != nil && is.Duration != nil {
-		span2.Timestamp = is.Timestamp
-		span2.Duration = is.Duration
+		span2.Timestamp = signalfxformat.GetPointerToInt64(is.Timestamp)
+		span2.Duration = signalfxformat.GetPointerToInt64(is.Duration)
 	} else {
-		span2.Timestamp = begin.Timestamp
+		span2.Timestamp = signalfxformat.GetPointerToInt64(begin.Timestamp)
 		if end != nil && end.Timestamp != nil && begin.Timestamp != nil {
 			ts := *end.Timestamp - *begin.Timestamp
-			span2.Duration = &ts
+			span2.Duration = signalfxformat.GetPointerToInt64(&ts)
 		}
 	}
 }
@@ -566,6 +566,8 @@ func (decoder *JSONTraceDecoderV1) Read(ctx context.Context, req *http.Request) 
 		inputSpan := (*InputSpan)(is)
 		if inputSpan.isDefinitelyZipkinV2() {
 			s, err := inputSpan.fromZipkinV2()
+			is.Span.Timestamp = signalfxformat.GetPointerToInt64(inputSpan.Timestamp)
+			is.Span.Duration = signalfxformat.GetPointerToInt64(inputSpan.Duration)
 			if err != nil {
 				conversionErrs = conversionErrs.Append(err)
 				continue

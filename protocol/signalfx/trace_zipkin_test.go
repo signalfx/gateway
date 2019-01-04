@@ -286,6 +286,8 @@ func TestZipkinTraceConversion(t *testing.T) {
 
 	Convey("Zipkin v2 spans gets passed through unaltered", t, func() {
 		span := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
+			Duration:  pointer.Float64(207000),
 			Span: trace.Span{
 				TraceID:        "7180c278b62e8f6a216a2aea45d08fc9",
 				ParentID:       pointer.String("6b221d5bc9e6496c"),
@@ -335,19 +337,19 @@ func TestZipkinTraceConversion(t *testing.T) {
 		}
 
 		client := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
+			Duration:  pointer.Float64(207000),
 			Span: trace.Span{TraceID: "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  pointer.String("6b221d5bc9e6496c"),
-				ID:        "5b4185666d50f68b",
-				Name:      pointer.String("get"),
-				Timestamp: pointer.Int64(1472470996199000),
-				Duration:  pointer.Int64(207000),
+				ParentID: pointer.String("6b221d5bc9e6496c"),
+				ID:       "5b4185666d50f68b",
+				Name:     pointer.String("get"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996238000), Value: pointer.String("ws"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996403000), Value: pointer.String("wr"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996406000), Value: pointer.String("cr"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996403000), Value: pointer.String("no"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("ws"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("wr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("cr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("no"), Endpoint: frontend},
 			},
 			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
 				{Key: pointer.String("http_path"), Value: interfaceAddr("/api"), Endpoint: frontend},
@@ -377,16 +379,16 @@ func TestZipkinTraceConversion(t *testing.T) {
 		}
 
 		client := &InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
 			Span: trace.Span{
-				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  pointer.String("6b221d5bc9e6496c"),
-				ID:        "5b4185666d50f68b",
-				Name:      pointer.String("get"),
-				Timestamp: pointer.Int64(1472470996199000),
+				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
+				ParentID: pointer.String("6b221d5bc9e6496c"),
+				ID:       "5b4185666d50f68b",
+				Name:     pointer.String("get"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996238000), Value: pointer.String("ws"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("ws"), Endpoint: frontend},
 			},
 		}
 
@@ -408,16 +410,16 @@ func TestZipkinTraceConversion(t *testing.T) {
 		}
 
 		client := &InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
+			Duration:  pointer.Float64(100),
 			Span: trace.Span{
-				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  pointer.String("6b221d5bc9e6496c"),
-				ID:        "5b4185666d50f68b",
-				Name:      pointer.String("get"),
-				Timestamp: pointer.Int64(1472470996199000),
-				Duration:  pointer.Int64(100),
+				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
+				ParentID: pointer.String("6b221d5bc9e6496c"),
+				ID:       "5b4185666d50f68b",
+				Name:     pointer.String("get"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199100), Value: pointer.String("cr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199100), Value: pointer.String("cr"), Endpoint: frontend},
 			},
 		}
 
@@ -439,13 +441,13 @@ func TestZipkinTraceConversion(t *testing.T) {
 		}
 
 		span := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
+			Duration:  pointer.Float64(207000),
 			Span: trace.Span{
-				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  pointer.String("6b221d5bc9e6496c"),
-				ID:        "5b4185666d50f68b",
-				Name:      pointer.String("get"),
-				Timestamp: pointer.Int64(1472470996199000),
-				Duration:  pointer.Int64(207000),
+				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
+				ParentID: pointer.String("6b221d5bc9e6496c"),
+				ID:       "5b4185666d50f68b",
+				Name:     pointer.String("get"),
 			},
 			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
 				{Key: pointer.String("ca"), Value: interfaceAddr(true), Endpoint: frontend},
@@ -471,17 +473,17 @@ func TestZipkinTraceConversion(t *testing.T) {
 		}
 
 		span := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
+			Duration:  pointer.Float64(207000),
 			Span: trace.Span{
-				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  pointer.String("6b221d5bc9e6496c"),
-				ID:        "5b4185666d50f68b",
-				Name:      pointer.String("get"),
-				Timestamp: pointer.Int64(1472470996199000),
-				Duration:  pointer.Int64(207000),
+				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
+				ParentID: pointer.String("6b221d5bc9e6496c"),
+				ID:       "5b4185666d50f68b",
+				Name:     pointer.String("get"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996406000), Value: pointer.String("cr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("cr"), Endpoint: frontend},
 			},
 			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
 				{Key: pointer.String("ca"), Value: interfaceAddr(true), Endpoint: frontend},
@@ -510,16 +512,16 @@ func TestZipkinTraceConversion(t *testing.T) {
 		}
 
 		server := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
+			Duration:  pointer.Float64(207000),
 			Span: trace.Span{
-				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ID:        "216a2aea45d08fc9",
-				Name:      pointer.String("get"),
-				Timestamp: pointer.Int64(1472470996199000),
-				Duration:  pointer.Int64(207000),
+				TraceID: "7180c278b62e8f6a216a2aea45d08fc9",
+				ID:      "216a2aea45d08fc9",
+				Name:    pointer.String("get"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("sr"), Endpoint: backend},
-				{Timestamp: pointer.Int64(1472470996406000), Value: pointer.String("ss"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("sr"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("ss"), Endpoint: backend},
 			},
 			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
 				{Key: pointer.String("http_path"), Value: interfaceAddr("/api"), Endpoint: backend},
@@ -545,15 +547,15 @@ func TestZipkinTraceConversion(t *testing.T) {
 		}
 
 		span := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
+			Duration:  pointer.Float64(207000),
 			Span: trace.Span{
-				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ID:        "216a2aea45d08fc9",
-				Name:      pointer.String("get"),
-				Timestamp: pointer.Int64(1472470996199000),
-				Duration:  pointer.Int64(207000),
+				TraceID: "7180c278b62e8f6a216a2aea45d08fc9",
+				ID:      "216a2aea45d08fc9",
+				Name:    pointer.String("get"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996406000), Value: pointer.String("cs"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("cs"), Endpoint: frontend},
 			},
 		}
 
@@ -574,15 +576,15 @@ func TestZipkinTraceConversion(t *testing.T) {
 		}
 
 		span := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
+			Duration:  pointer.Float64(207000),
 			Span: trace.Span{
-				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ID:        "216a2aea45d08fc9",
-				Name:      pointer.String("get"),
-				Timestamp: pointer.Int64(1472470996199000),
-				Duration:  pointer.Int64(207000),
+				TraceID: "7180c278b62e8f6a216a2aea45d08fc9",
+				ID:      "216a2aea45d08fc9",
+				Name:    pointer.String("get"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996406000), Value: pointer.String("ss"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("ss"), Endpoint: backend},
 			},
 		}
 
@@ -602,13 +604,13 @@ func TestZipkinTraceConversion(t *testing.T) {
 		}
 
 		span := InputSpan{
+			Duration:  pointer.Float64(207000),
+			Timestamp: pointer.Float64(1472470996199000),
 			Span: trace.Span{
-				TraceID:   "1",
-				ParentID:  pointer.String("1"),
-				ID:        "2",
-				Name:      pointer.String("foo"),
-				Duration:  pointer.Int64(207000),
-				Timestamp: pointer.Int64(1472470996199000),
+				TraceID:  "1",
+				ParentID: pointer.String("1"),
+				ID:       "2",
+				Name:     pointer.String("foo"),
 			},
 		}
 
@@ -630,15 +632,15 @@ func TestZipkinTraceConversion(t *testing.T) {
 		}
 
 		span := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
 			Span: trace.Span{
-				TraceID:   "1",
-				ParentID:  pointer.String("1"),
-				ID:        "2",
-				Name:      pointer.String("foo"),
-				Timestamp: pointer.Int64(1472470996199000),
+				TraceID:  "1",
+				ParentID: pointer.String("1"),
+				ID:       "2",
+				Name:     pointer.String("foo"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("sr"), Endpoint: nil},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("sr"), Endpoint: nil},
 			},
 		}
 
@@ -667,7 +669,7 @@ func TestZipkinTraceConversion(t *testing.T) {
 				Name:     pointer.String("foo"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("sr"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("sr"), Endpoint: backend},
 			},
 		}
 
@@ -698,7 +700,7 @@ func TestZipkinTraceConversion(t *testing.T) {
 				Name:     pointer.String("foo"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("ss"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("ss"), Endpoint: backend},
 			},
 			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
 				{Key: pointer.String("ca"), Value: interfaceAddr(true), Endpoint: frontend},
@@ -760,7 +762,7 @@ func TestZipkinTraceConversion(t *testing.T) {
 				Name:     pointer.String("foo"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("cr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cr"), Endpoint: frontend},
 			},
 			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
 				{Key: pointer.String("sa"), Value: interfaceAddr(true), Endpoint: backend},
@@ -783,7 +785,6 @@ func TestZipkinTraceConversion(t *testing.T) {
 		}
 
 		span := InputSpan{
-
 			Span: trace.Span{
 				TraceID:  "1",
 				ParentID: pointer.String("1"),
@@ -812,13 +813,13 @@ func TestZipkinTraceConversion(t *testing.T) {
 		}
 
 		local := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
+			Duration:  pointer.Float64(207000),
 			Span: trace.Span{
-				TraceID:   "1",
-				ParentID:  pointer.String("1"),
-				ID:        "2",
-				Name:      pointer.String("local"),
-				Timestamp: pointer.Int64(1472470996199000),
-				Duration:  pointer.Int64(207000),
+				TraceID:  "1",
+				ParentID: pointer.String("1"),
+				ID:       "2",
+				Name:     pointer.String("local"),
 			},
 
 			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
@@ -836,21 +837,21 @@ func TestZipkinTraceConversion(t *testing.T) {
 			Ipv4:        pointer.String("127.0.0.1"),
 		}
 		shared := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
+			Duration:  pointer.Float64(207000),
 			Span: trace.Span{
-				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  pointer.String("6b221d5bc9e6496c"),
-				ID:        "5b4185666d50f68b",
-				Name:      pointer.String("get"),
-				Timestamp: pointer.Int64(1472470996199000),
-				Duration:  pointer.Int64(207000),
+				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
+				ParentID: pointer.String("6b221d5bc9e6496c"),
+				ID:       "5b4185666d50f68b",
+				Name:     pointer.String("get"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("cs"), Endpoint: noNameService},
-				{Timestamp: pointer.Int64(1472470996238000), Value: pointer.String("ws"), Endpoint: noNameService},
-				{Timestamp: pointer.Int64(1472470996250000), Value: pointer.String("sr"), Endpoint: backend},
-				{Timestamp: pointer.Int64(1472470996350000), Value: pointer.String("ss"), Endpoint: backend},
-				{Timestamp: pointer.Int64(1472470996403000), Value: pointer.String("wr"), Endpoint: noNameService},
-				{Timestamp: pointer.Int64(1472470996406000), Value: pointer.String("cr"), Endpoint: noNameService},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cs"), Endpoint: noNameService},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("ws"), Endpoint: noNameService},
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("sr"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996350000), Value: pointer.String("ss"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("wr"), Endpoint: noNameService},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("cr"), Endpoint: noNameService},
 			},
 
 			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
@@ -919,8 +920,8 @@ func TestZipkinTraceConversion(t *testing.T) {
 				Name:     pointer.String("get"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996250000), Value: pointer.String("sr"), Endpoint: backend},
-				{Timestamp: pointer.Int64(1472470996350000), Value: pointer.String("ss"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("sr"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996350000), Value: pointer.String("ss"), Endpoint: backend},
 			},
 		}
 
@@ -943,20 +944,20 @@ func TestZipkinTraceConversion(t *testing.T) {
 
 	Convey("clientAndServer_loopback", t, func() {
 		shared := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
+			Duration:  pointer.Float64(207000),
 			Span: trace.Span{
-				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  pointer.String("6b221d5bc9e6496c"),
-				ID:        "5b4185666d50f68b",
-				Name:      pointer.String("get"),
-				Timestamp: pointer.Int64(1472470996199000),
-				Duration:  pointer.Int64(207000),
+				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
+				ParentID: pointer.String("6b221d5bc9e6496c"),
+				ID:       "5b4185666d50f68b",
+				Name:     pointer.String("get"),
 			},
 
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996250000), Value: pointer.String("sr"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996350000), Value: pointer.String("ss"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996406000), Value: pointer.String("cr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("sr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996350000), Value: pointer.String("ss"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("cr"), Endpoint: frontend},
 			},
 		}
 
@@ -998,8 +999,8 @@ func TestZipkinTraceConversion(t *testing.T) {
 				Name:     pointer.String("get"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996250000), Value: pointer.String("sr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("cs"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("sr"), Endpoint: frontend},
 			},
 		}
 
@@ -1039,7 +1040,7 @@ func TestZipkinTraceConversion(t *testing.T) {
 				Name:     pointer.String("send"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
 			},
 		}
 
@@ -1060,15 +1061,15 @@ func TestZipkinTraceConversion(t *testing.T) {
 
 	Convey("producer_remote", t, func() {
 		span := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
 			Span: trace.Span{
-				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  pointer.String("6b221d5bc9e6496c"),
-				ID:        "5b4185666d50f68b",
-				Name:      pointer.String("send"),
-				Timestamp: pointer.Int64(1472470996199000),
+				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
+				ParentID: pointer.String("6b221d5bc9e6496c"),
+				ID:       "5b4185666d50f68b",
+				Name:     pointer.String("send"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
 			},
 			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
 				{Key: pointer.String("ma"), Value: interfaceAddr(true), Endpoint: kafka},
@@ -1093,17 +1094,17 @@ func TestZipkinTraceConversion(t *testing.T) {
 
 	Convey("producer_duration", t, func() {
 		span := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
+			Duration:  pointer.Float64(51000),
 			Span: trace.Span{
-				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  pointer.String("6b221d5bc9e6496c"),
-				ID:        "5b4185666d50f68b",
-				Name:      pointer.String("send"),
-				Timestamp: pointer.Int64(1472470996199000),
-				Duration:  pointer.Int64(51000),
+				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
+				ParentID: pointer.String("6b221d5bc9e6496c"),
+				ID:       "5b4185666d50f68b",
+				Name:     pointer.String("send"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996250000), Value: pointer.String("ws"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("ws"), Endpoint: frontend},
 			},
 		}
 
@@ -1125,15 +1126,15 @@ func TestZipkinTraceConversion(t *testing.T) {
 
 	Convey("consumer", t, func() {
 		span := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
 			Span: trace.Span{
-				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  pointer.String("6b221d5bc9e6496c"),
-				ID:        "5b4185666d50f68b",
-				Name:      pointer.String("send"),
-				Timestamp: pointer.Int64(1472470996199000),
+				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
+				ParentID: pointer.String("6b221d5bc9e6496c"),
+				ID:       "5b4185666d50f68b",
+				Name:     pointer.String("send"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("mr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("mr"), Endpoint: frontend},
 			},
 		}
 
@@ -1154,15 +1155,15 @@ func TestZipkinTraceConversion(t *testing.T) {
 
 	Convey("consumer_remote", t, func() {
 		span := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
 			Span: trace.Span{
-				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  pointer.String("6b221d5bc9e6496c"),
-				ID:        "5b4185666d50f68b",
-				Name:      pointer.String("send"),
-				Timestamp: pointer.Int64(1472470996199000),
+				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
+				ParentID: pointer.String("6b221d5bc9e6496c"),
+				ID:       "5b4185666d50f68b",
+				Name:     pointer.String("send"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("mr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("mr"), Endpoint: frontend},
 			},
 			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
 				{Key: pointer.String("ma"), Value: interfaceAddr(true), Endpoint: kafka},
@@ -1187,17 +1188,17 @@ func TestZipkinTraceConversion(t *testing.T) {
 
 	Convey("consumer_duration", t, func() {
 		span := InputSpan{
+			Timestamp: pointer.Float64(1472470996199000),
+			Duration:  pointer.Float64(51000),
 			Span: trace.Span{
-				TraceID:   "7180c278b62e8f6a216a2aea45d08fc9",
-				ParentID:  pointer.String("6b221d5bc9e6496c"),
-				ID:        "5b4185666d50f68b",
-				Name:      pointer.String("send"),
-				Timestamp: pointer.Int64(1472470996199000),
-				Duration:  pointer.Int64(51000),
+				TraceID:  "7180c278b62e8f6a216a2aea45d08fc9",
+				ParentID: pointer.String("6b221d5bc9e6496c"),
+				ID:       "5b4185666d50f68b",
+				Name:     pointer.String("send"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("wr"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996250000), Value: pointer.String("mr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("wr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("mr"), Endpoint: frontend},
 			},
 		}
 
@@ -1227,10 +1228,10 @@ func TestZipkinTraceConversion(t *testing.T) {
 				Name:     pointer.String("whatev"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996238000), Value: pointer.String("ws"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("ws"), Endpoint: frontend},
 				{Timestamp: nil, Value: pointer.String("wr"), Endpoint: backend},
-				{Timestamp: pointer.Int64(1472470996406000), Value: pointer.String("mr"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("mr"), Endpoint: backend},
 			},
 			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
 				{Key: pointer.String("ma"), Value: interfaceAddr(true), Endpoint: kafka},
@@ -1278,10 +1279,10 @@ func TestZipkinTraceConversion(t *testing.T) {
 				Name:     pointer.String("message"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996238000), Value: pointer.String("ws"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996403000), Value: pointer.String("wr"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996406000), Value: pointer.String("mr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("ms"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("ws"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("wr"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996406000), Value: pointer.String("mr"), Endpoint: frontend},
 			},
 		}
 
@@ -1322,11 +1323,11 @@ func TestZipkinTraceConversion(t *testing.T) {
 				Name:    pointer.String("missing"),
 			},
 			Annotations: []*signalfxformat.InputAnnotation{
-				{Timestamp: pointer.Int64(1472470996199000), Value: pointer.String("foo"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996238000), Value: pointer.String("bar"), Endpoint: frontend},
-				{Timestamp: pointer.Int64(1472470996250000), Value: pointer.String("baz"), Endpoint: backend},
-				{Timestamp: pointer.Int64(1472470996350000), Value: pointer.String("qux"), Endpoint: backend},
-				{Timestamp: pointer.Int64(1472470996403000), Value: pointer.String("missing"), Endpoint: nil},
+				{Timestamp: pointer.Float64(1472470996199000), Value: pointer.String("foo"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996238000), Value: pointer.String("bar"), Endpoint: frontend},
+				{Timestamp: pointer.Float64(1472470996250000), Value: pointer.String("baz"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996350000), Value: pointer.String("qux"), Endpoint: backend},
+				{Timestamp: pointer.Float64(1472470996403000), Value: pointer.String("missing"), Endpoint: nil},
 			},
 			BinaryAnnotations: []*signalfxformat.BinaryAnnotation{
 				{Key: pointer.String("foo"), Value: interfaceAddr("bar"), Endpoint: frontend},

@@ -54,7 +54,7 @@ type EventSendFormatV2 struct {
 //easyjson:json
 type InputAnnotation struct {
 	Endpoint  *trace.Endpoint `json:"endpoint"`
-	Timestamp *int64          `json:"timestamp"`
+	Timestamp *float64        `json:"timestamp"`
 	Value     *string         `json:"value"`
 }
 
@@ -63,9 +63,18 @@ type InputAnnotation struct {
 // logic to know which span to associate the endpoint with.
 func (a *InputAnnotation) ToV2() *trace.Annotation {
 	return &trace.Annotation{
-		Timestamp: a.Timestamp,
+		Timestamp: GetPointerToInt64(a.Timestamp),
 		Value:     a.Value,
 	}
+}
+
+// GetpointerToInt64 does that
+func GetPointerToInt64(p *float64) *int64 {
+	if p == nil {
+		return nil
+	}
+	i := int64(*p)
+	return &i
 }
 
 // BinaryAnnotation associates an event that explains latency with a timestamp.
@@ -80,6 +89,8 @@ type BinaryAnnotation struct {
 //easyjson:json
 type InputSpan struct {
 	trace.Span
+	Timestamp         *float64            `json:"timestamp"`
+	Duration          *float64            `json:"duration"`
 	Annotations       []*InputAnnotation  `json:"annotations"`
 	BinaryAnnotations []*BinaryAnnotation `json:"binaryAnnotations"`
 }
