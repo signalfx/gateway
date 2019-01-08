@@ -192,17 +192,18 @@ func (s *signalFxLoader) Listener(sink signalfx.Sink, conf *ListenFrom) (protoco
 
 func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) {
 	sfConf := signalfx.ForwarderConfig{
-		DatapointURL:     conf.URL,
-		EventURL:         conf.EventURL,
-		TraceURL:         conf.TraceURL,
-		Timeout:          conf.TimeoutDuration,
-		SourceDimensions: conf.SourceDimensions,
-		GatewayVersion:   &s.versionString,
-		MaxIdleConns:     conf.DrainingThreads,
-		AuthToken:        conf.DefaultAuthToken,
-		Logger:           s.logger,
-		Filters:          conf.Filters,
-		TraceSample:      conf.TraceSample,
+		DatapointURL:       conf.URL,
+		EventURL:           conf.EventURL,
+		TraceURL:           conf.TraceURL,
+		Timeout:            conf.TimeoutDuration,
+		SourceDimensions:   conf.SourceDimensions,
+		GatewayVersion:     &s.versionString,
+		MaxIdleConns:       conf.DrainingThreads,
+		AuthToken:          conf.DefaultAuthToken,
+		DisableCompression: conf.DisableCompression,
+		Logger:             s.logger,
+		Filters:            conf.Filters,
+		TraceSample:        conf.TraceSample,
 	}
 	if sfConf.TraceSample != nil {
 		sfConf.TraceSample.EtcdServer = conf.Server
