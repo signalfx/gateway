@@ -202,7 +202,7 @@ const badInnternalMetrics = `
     ],
     "ForwardTo":[
     ],
-    "InternalMetrics": "0.0.0.0:999999"
+    "InternalMetricsListenerAddress": "0.0.0.0:999999"
   }
 `
 
@@ -212,7 +212,7 @@ const internalMetrics = `
     ],
     "ForwardTo":[
     ],
-    "InternalMetrics": "0.0.0.0:0"
+    "InternalMetricsListenerAddress": "0.0.0.0:0"
   }
 `
 
