@@ -21,9 +21,11 @@ import (
 	"time"
 
 	"encoding/json"
+	"github.com/gorilla/mux"
 	"github.com/quentin-m/etcd-cloud-operator/pkg/etcd"
 	"github.com/signalfx/gateway/config"
 	"github.com/signalfx/gateway/dp/dpbuffered"
+	"github.com/signalfx/gateway/internal-metrics"
 	"github.com/signalfx/gateway/logkey"
 	"github.com/signalfx/gateway/protocol"
 	"github.com/signalfx/gateway/protocol/demultiplexer"
@@ -220,23 +222,25 @@ func (mgr *etcdManager) shutdown(graceful bool) (err error) {
 }
 
 type gateway struct {
-	flags               gatewayFlags
-	listeners           []protocol.Listener
-	forwarders          []protocol.Forwarder
-	logger              log.Logger
-	setupDoneSignal     chan struct{}
-	tk                  timekeeper.TimeKeeper
-	debugServer         *httpdebug.Server
-	debugServerListener net.Listener
-	stdout              io.Writer
-	gomaxprocs          func(int) int
-	debugContext        web.HeaderCtxFlag
-	debugSink           dpsink.ItemFlagger
-	ctxDims             log.CtxDimensions
-	signalChan          chan os.Signal
-	config              *config.GatewayConfig
-	etcdMgr             *etcdManager
-	versionMetric       reportsha.SHA1Reporter
+	flags                   gatewayFlags
+	listeners               []protocol.Listener
+	forwarders              []protocol.Forwarder
+	logger                  log.Logger
+	setupDoneSignal         chan struct{}
+	tk                      timekeeper.TimeKeeper
+	debugServer             *httpdebug.Server
+	debugServerListener     net.Listener
+	internalMetricsServer   *internal.Collector
+	internalMetricsListener net.Listener
+	stdout                  io.Writer
+	gomaxprocs              func(int) int
+	debugContext            web.HeaderCtxFlag
+	debugSink               dpsink.ItemFlagger
+	ctxDims                 log.CtxDimensions
+	signalChan              chan os.Signal
+	config                  *config.GatewayConfig
+	etcdMgr                 *etcdManager
+	versionMetric           reportsha.SHA1Reporter
 }
 
 var mainInstance = gateway{
@@ -417,6 +421,28 @@ func splitSinks(forwarders []protocol.Forwarder) ([]dpsink.DSink, []dpsink.ESink
 	return dsinks, esinks, tsinks
 }
 
+func (p *gateway) setupInternalMetricsServer(conf *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler) error {
+	if conf.InternalMetricsListenerAddress == nil {
+		return nil
+	}
+	listener, err := net.Listen("tcp", *conf.InternalMetricsListenerAddress)
+	if err != nil {
+		return errors.Annotate(err, "cannot setup internal metrics server")
+	}
+	p.internalMetricsListener = listener
+
+	collector := internal.NewCollector(logger, scheduler)
+	handler := mux.NewRouter()
+	handler.Path("/internal-metrics").HandlerFunc(collector.MetricsHandler)
+	p.internalMetricsServer = collector
+
+	go func() {
+		err := http.Serve(listener, handler)
+		logger.Log(log.Err, err, "Finished serving internal metrics server")
+	}()
+	return nil
+}
+
 func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler) error {
 	if conf.LocalDebugServer == nil {
 		return nil
@@ -531,6 +557,9 @@ func (p *gateway) Close() error {
 	}
 	if p.debugServer != nil {
 		errs = append(errs, p.debugServerListener.Close())
+	}
+	if p.internalMetricsServer != nil {
+		errs = append(errs, p.internalMetricsListener.Close())
 	}
 	return errors.NewMultiErr(errs)
 }
@@ -660,6 +689,11 @@ func (p *gateway) run(ctx context.Context) error {
 
 	if err := p.setupDebugServer(loadedConfig, logger, scheduler); err != nil {
 		p.logger.Log(log.Err, "debug server failed", err)
+		return err
+	}
+
+	if err := p.setupInternalMetricsServer(loadedConfig, logger, scheduler); err != nil {
+		p.logger.Log(log.Err, "internal metrics server failed", err)
 		return err
 	}
 
