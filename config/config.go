@@ -111,6 +111,7 @@ type GatewayConfig struct {
 	UnhealthyMemberTTL            *time.Duration    `json:"-"`
 	RemoveMemberTimeout           *time.Duration    `json:"-"`
 	AdditionalDimensions          map[string]string `json:",omitempty"`
+	InternalMetrics               *string           `json:",omitempty"`
 }
 
 // DefaultGatewayConfig is default values for the gateway config

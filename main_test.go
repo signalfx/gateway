@@ -196,6 +196,26 @@ const emptyConfig = `
   }
 `
 
+const badInnternalMetrics = `
+  {
+    "ListenFrom":[
+    ],
+    "ForwardTo":[
+    ],
+    "InternalMetrics": "0.0.0.0:999999"
+  }
+`
+
+const internalMetrics = `
+  {
+    "ListenFrom":[
+    ],
+    "ForwardTo":[
+    ],
+    "InternalMetrics": "0.0.0.0:0"
+  }
+`
+
 const invalidClusterOpConfig = `
   {
     "ListenFrom":[
@@ -303,6 +323,8 @@ func TestConfigs(t *testing.T) {
 		{name: "empty", config: emptyConfig, closeAfterSetup: true, expectedLog: "", expectedErr: ""},
 		{name: "invalidForwarderConfig", config: invalidForwarderConfig, closeAfterSetup: false, expectedLog: "", expectedErr: "cannot find config unkndfdown"},
 		{name: "invalidDebugAddr", config: invalidDebugServerAddr, closeAfterSetup: false, expectedLog: "", expectedErr: "cannot setup debug server"},
+		{name: "validInternalMetrics", config: internalMetrics, closeAfterSetup: true, expectedLog: "", expectedErr: ""},
+		{name: "invalidInternalMetrics", config: badInnternalMetrics, closeAfterSetup: false, expectedLog: "", expectedErr: "listen tcp: address 999999: invalid port"},
 		{name: "invalidJSON", config: "__INVALID__JSON__", closeAfterSetup: false, expectedLog: "", expectedErr: "cannot unmarshal config JSON"},
 		{name: "invalidListenerConfig", config: invalidListenerConfig, closeAfterSetup: false, expectedLog: "", expectedErr: "cannot setup listeners from configuration"},
 		{name: "invalidPIDfile", config: invalidPIDfile, closeAfterSetup: true, expectedLog: "cannot store pid in pid file", expectedErr: ""},
