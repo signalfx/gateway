@@ -1,21 +1,23 @@
 package sampling
 
 import (
-	"context"
 	"testing"
 
+	"context"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/trace"
-	"github.com/stretchr/testify/assert"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 func Test(t *testing.T) {
-	obj := new(SmartSampleConfig)
-	n, err := New(obj, log.Discard, nil)
-	assert.Nil(t, n)
-	assert.Nil(t, err)
-	assert.Nil(t, n.AddSpans(context.Background(), []*trace.Span{}, nil))
-	assert.Nil(t, n.StartupFinished())
-	assert.Nil(t, n.Close())
-	assert.True(t, len(n.Datapoints()) == 0)
+	Convey("test smart sampler stub", t, func() {
+		obj := new(SmartSampleConfig)
+		n, err := New(obj, log.Discard, nil)
+		So(n, ShouldBeNil)
+		So(err, ShouldNotBeNil)
+		So(n.AddSpans(context.Background(), []*trace.Span{}, nil), ShouldBeNil)
+		So(n.StartupFinished(), ShouldBeNil)
+		So(n.Close(), ShouldBeNil)
+		So(len(n.Datapoints()), ShouldEqual, 0)
+	})
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/signalfx/gateway/etcdIntf"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
@@ -51,5 +52,5 @@ func (f *SmartSampler) ConfigureHTTPSink(sink *sfxclient.HTTPSink) {
 
 // New returns you nothing
 func New(*SmartSampleConfig, log.Logger, dtsink) (*SmartSampler, error) {
-	return nil, nil
+	return nil, errors.New("you are attempting to configure a regular SignalFx Gateway with the config of a Smart Gateway. This is an unsupported configuration")
 }
