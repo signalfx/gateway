@@ -43,7 +43,7 @@ func TestForwarders(t *testing.T) {
 			{name: "carbon forwarder should require a host", forwardTo: &ForwardTo{Type: "carbon"}},
 			{name: "should load CSV forwarder", forwardTo: &ForwardTo{Type: "csv", Filename: pointer.String("datapoints.csv")}, pass: true, reset: func() error { So(os.Remove("datapoints.csv"), ShouldBeNil); return nil }},
 			{name: "signalfx forwarder should work", forwardTo: &ForwardTo{Type: "signalfx"}, pass: true},
-			{name: "signalfx forwarder with sample should work", forwardTo: &ForwardTo{Type: "signalfx", TraceSample: &sampling.SmartSampleConfig{}}, pass: true},
+			{name: "signalfx forwarder with sample should fail due to not smart gateway", forwardTo: &ForwardTo{Type: "signalfx", TraceSample: &sampling.SmartSampleConfig{}}, pass: false},
 		}
 		for _, test := range tests {
 			Convey(test.name, func() {

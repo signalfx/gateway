@@ -17,6 +17,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/gateway/protocol/filtering"
+	"github.com/signalfx/gateway/sampling"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/errors"
@@ -243,6 +244,13 @@ func TestSignalfxListener(t *testing.T) {
 			resp, err := client.Do(req)
 			So(err, ShouldBeNil)
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)
+		})
+		Convey("And a signalfx forwarder with a smart sampler config", func() {
+			forwardConfig := &ForwarderConfig{
+				TraceSample: &sampling.SmartSampleConfig{},
+			}
+			_, err := NewForwarder(forwardConfig)
+			So(err, ShouldNotBeNil)
 		})
 		Convey("And a signalfx forwarder", func() {
 			forwardConfig := &ForwarderConfig{
