@@ -2,8 +2,10 @@ package sampling
 
 import (
 	"context"
-	"github.com/quentin-m/etcd-cloud-operator/pkg/etcd"
+
+	"github.com/signalfx/gateway/etcdIntf"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
@@ -11,8 +13,9 @@ import (
 
 // SmartSampleConfig is not here
 type SmartSampleConfig struct {
-	EtcdServer *etcd.Server `json:"-"`
-	EtcdClient *etcd.Client `json:"-"`
+	EtcdServer           etcdIntf.Server   `json:"-"`
+	EtcdClient           etcdIntf.Client   `json:"-"`
+	AdditionalDimensions map[string]string `json:",omitempty"`
 }
 
 // SmartSampler is not here
@@ -25,7 +28,7 @@ func (f *SmartSampler) StartupFinished() error {
 
 // AddSpans does nothing
 func (f *SmartSampler) AddSpans(context context.Context, spans []*trace.Span, sink trace.Sink) error {
-	return nil
+	return sink.AddSpans(context, spans)
 }
 
 // Datapoints adheres to the sfxclient.Collector interface
@@ -49,5 +52,5 @@ func (f *SmartSampler) ConfigureHTTPSink(sink *sfxclient.HTTPSink) {
 
 // New returns you nothing
 func New(*SmartSampleConfig, log.Logger, dtsink) (*SmartSampler, error) {
-	return nil, nil
+	return nil, errors.New("you are attempting to configure a regular SignalFx Gateway with the config of a Smart Gateway. This is an unsupported configuration")
 }

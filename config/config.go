@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"expvar"
-	"github.com/quentin-m/etcd-cloud-operator/pkg/etcd"
+	"os"
+
+	"github.com/signalfx/gateway/etcdIntf"
 	"github.com/signalfx/gateway/logkey"
 	"github.com/signalfx/gateway/protocol/filtering"
 	"github.com/signalfx/gateway/sampling"
@@ -15,34 +17,35 @@ import (
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/xdgbasedir"
-	"os"
 )
 
 // ForwardTo configures where we forward datapoints to
 type ForwardTo struct {
-	URL               *string `json:",omitempty"`
-	EventURL          *string `json:",omitempty"`
-	TraceURL          *string `json:",omitempty"`
-	Host              *string `json:",omitempty"`
-	Port              *uint16 `json:",omitempty"`
-	Type              string
-	TimeoutDuration   *time.Duration              `json:"-"`
-	Timeout           *string                     `json:",omitempty"`
-	DefaultSource     *string                     `json:",omitempty"`
-	DefaultAuthToken  *string                     `json:",omitempty"`
-	BufferSize        *int64                      `json:",omitempty"`
-	Name              *string                     `json:",omitempty"`
-	DrainingThreads   *int64                      `json:",omitempty"`
-	MetricCreationURL *string                     `json:",omitempty"`
-	MaxDrainSize      *int64                      `json:",omitempty"`
-	Filename          *string                     `json:",omitempty"`
-	SourceDimensions  *string                     `json:",omitempty"`
-	FormatVersion     *uint32                     `json:",omitempty"`
-	DimensionsOrder   []string                    `json:",omitempty"`
-	Filters           *filtering.FilterObj        `json:",omitempty"`
-	TraceSample       *sampling.SmartSampleConfig `json:",omitempty"`
-	Server            *etcd.Server                `json:"-"`
-	Client            *etcd.Client                `json:"-"`
+	URL                  *string `json:",omitempty"`
+	EventURL             *string `json:",omitempty"`
+	TraceURL             *string `json:",omitempty"`
+	Host                 *string `json:",omitempty"`
+	Port                 *uint16 `json:",omitempty"`
+	Type                 string
+	TimeoutDuration      *time.Duration              `json:"-"`
+	Timeout              *string                     `json:",omitempty"`
+	DefaultSource        *string                     `json:",omitempty"`
+	DefaultAuthToken     *string                     `json:",omitempty"`
+	BufferSize           *int64                      `json:",omitempty"`
+	Name                 *string                     `json:",omitempty"`
+	DrainingThreads      *int64                      `json:",omitempty"`
+	MetricCreationURL    *string                     `json:",omitempty"`
+	MaxDrainSize         *int64                      `json:",omitempty"`
+	Filename             *string                     `json:",omitempty"`
+	SourceDimensions     *string                     `json:",omitempty"`
+	FormatVersion        *uint32                     `json:",omitempty"`
+	DimensionsOrder      []string                    `json:",omitempty"`
+	Filters              *filtering.FilterObj        `json:",omitempty"`
+	TraceSample          *sampling.SmartSampleConfig `json:",omitempty"`
+	AdditionalDimensions map[string]string           `json:",omitempty"`
+	DisableCompression   *bool                       `json:",omitempty"`
+	Server               etcdIntf.Server             `json:"-"`
+	Client               etcdIntf.Client             `json:"-"`
 }
 
 // ListenFrom configures how we listen for datapoints to forward
@@ -61,6 +64,7 @@ type ListenFrom struct {
 	Protocol                       *string                `json:",omitempty"`
 	TimeoutDuration                *time.Duration         `json:"-"`
 	ServerAcceptDeadline           *time.Duration         `json:"-"`
+	SpanNameReplacementRules       []string               `json:",omitempty"`
 }
 
 func (listenFrom *ListenFrom) String() string {
@@ -73,40 +77,42 @@ func (forwardTo *ForwardTo) String() string {
 
 // GatewayConfig is the full config as presented inside the gateway config file
 type GatewayConfig struct {
-	ForwardTo                     []*ForwardTo   `json:",omitempty"`
-	ListenFrom                    []*ListenFrom  `json:",omitempty"`
-	StatsDelay                    *string        `json:",omitempty"`
-	StatsDelayDuration            *time.Duration `json:"-"`
-	NumProcs                      *int           `json:",omitempty"`
-	LocalDebugServer              *string        `json:",omitempty"`
-	PidFilename                   *string        `json:",omitempty"`
-	LogDir                        *string        `json:",omitempty"`
-	LogMaxSize                    *int           `json:",omitempty"`
-	LogMaxBackups                 *int           `json:",omitempty"`
-	LogFormat                     *string        `json:",omitempty"`
-	PprofAddr                     *string        `json:",omitempty"`
-	DebugFlag                     *string        `json:",omitempty"`
-	ServerName                    *string        `json:",omitempty"`
-	MaxGracefulWaitTime           *string        `json:",omitempty"`
-	GracefulCheckInterval         *string        `json:",omitempty"`
-	SilentGracefulTime            *string        `json:",omitempty"`
-	MaxGracefulWaitTimeDuration   *time.Duration `json:"-"`
-	GracefulCheckIntervalDuration *time.Duration `json:"-"`
-	SilentGracefulTimeDuration    *time.Duration `json:"-"`
-	LateThreshold                 *string        `json:",omitempty"`
-	FutureThreshold               *string        `json:",omitempty"`
-	LateThresholdDuration         *time.Duration `json:"-"`
-	FutureThresholdDuration       *time.Duration `json:"-"`
-	ClusterOperation              *string        `json:",omitempty"`
-	ClusterDataDir                *string        `json:",omitempty"`
-	TargetClusterAddresses        []string       `json:",omitempty"`
-	AdvertisePeerAddress          *string        `json:",omitempty"`
-	ListenOnPeerAddress           *string        `json:",omitempty"`
-	AdvertiseClientAddress        *string        `json:",omitempty"`
-	ListenOnClientAddress         *string        `json:",omitempty"`
-	ETCDMetricsAddress            *string        `json:",omitempty"`
-	UnhealthyMemberTTL            *time.Duration `json:"-"`
-	RemoveMemberTimeout           *time.Duration `json:"-"`
+	ForwardTo                      []*ForwardTo      `json:",omitempty"`
+	ListenFrom                     []*ListenFrom     `json:",omitempty"`
+	StatsDelay                     *string           `json:",omitempty"`
+	StatsDelayDuration             *time.Duration    `json:"-"`
+	NumProcs                       *int              `json:",omitempty"`
+	LocalDebugServer               *string           `json:",omitempty"`
+	PidFilename                    *string           `json:",omitempty"`
+	LogDir                         *string           `json:",omitempty"`
+	LogMaxSize                     *int              `json:",omitempty"`
+	LogMaxBackups                  *int              `json:",omitempty"`
+	LogFormat                      *string           `json:",omitempty"`
+	PprofAddr                      *string           `json:",omitempty"`
+	DebugFlag                      *string           `json:",omitempty"`
+	ServerName                     *string           `json:",omitempty"`
+	MaxGracefulWaitTime            *string           `json:",omitempty"`
+	GracefulCheckInterval          *string           `json:",omitempty"`
+	SilentGracefulTime             *string           `json:",omitempty"`
+	MaxGracefulWaitTimeDuration    *time.Duration    `json:"-"`
+	GracefulCheckIntervalDuration  *time.Duration    `json:"-"`
+	SilentGracefulTimeDuration     *time.Duration    `json:"-"`
+	LateThreshold                  *string           `json:",omitempty"`
+	FutureThreshold                *string           `json:",omitempty"`
+	LateThresholdDuration          *time.Duration    `json:"-"`
+	FutureThresholdDuration        *time.Duration    `json:"-"`
+	ClusterOperation               *string           `json:",omitempty"`
+	ClusterDataDir                 *string           `json:",omitempty"`
+	TargetClusterAddresses         []string          `json:",omitempty"`
+	AdvertisePeerAddress           *string           `json:",omitempty"`
+	ListenOnPeerAddress            *string           `json:",omitempty"`
+	AdvertiseClientAddress         *string           `json:",omitempty"`
+	ListenOnClientAddress          *string           `json:",omitempty"`
+	ETCDMetricsAddress             *string           `json:",omitempty"`
+	UnhealthyMemberTTL             *time.Duration    `json:"-"`
+	RemoveMemberTimeout            *time.Duration    `json:"-"`
+	AdditionalDimensions           map[string]string `json:",omitempty"`
+	InternalMetricsListenerAddress *string           `json:",omitempty"`
 }
 
 // DefaultGatewayConfig is default values for the gateway config
@@ -130,6 +136,7 @@ var DefaultGatewayConfig = &GatewayConfig{
 	ClusterDataDir:                pointer.String("./etcd-data"),
 	ClusterOperation:              pointer.String(""),
 	TargetClusterAddresses:        []string{},
+	AdditionalDimensions:          map[string]string{},
 }
 
 func getDefaultName(osHostname func() (string, error)) string {

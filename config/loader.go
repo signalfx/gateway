@@ -10,6 +10,7 @@ import (
 	"github.com/signalfx/gateway/protocol/prometheus"
 	"github.com/signalfx/gateway/protocol/signalfx"
 	"github.com/signalfx/gateway/protocol/wavefront"
+	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
@@ -179,33 +180,36 @@ type signalFxLoader struct {
 
 func (s *signalFxLoader) Listener(sink signalfx.Sink, conf *ListenFrom) (protocol.Listener, error) {
 	sfConf := signalfx.ListenerConfig{
-		ListenAddr:   conf.ListenAddr,
-		Timeout:      conf.TimeoutDuration,
-		Logger:       s.logger,
-		RootContext:  s.rootContext,
-		DebugContext: s.debugContext,
-		HTTPChain:    s.httpChain,
+		ListenAddr:               conf.ListenAddr,
+		Timeout:                  conf.TimeoutDuration,
+		Logger:                   s.logger,
+		RootContext:              s.rootContext,
+		DebugContext:             s.debugContext,
+		HTTPChain:                s.httpChain,
+		SpanNameReplacementRules: conf.SpanNameReplacementRules,
 	}
 	return signalfx.NewListener(sink, &sfConf)
 }
 
 func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) {
 	sfConf := signalfx.ForwarderConfig{
-		DatapointURL:     conf.URL,
-		EventURL:         conf.EventURL,
-		TraceURL:         conf.TraceURL,
-		Timeout:          conf.TimeoutDuration,
-		SourceDimensions: conf.SourceDimensions,
-		GatewayVersion:   &s.versionString,
-		MaxIdleConns:     conf.DrainingThreads,
-		AuthToken:        conf.DefaultAuthToken,
-		Logger:           s.logger,
-		Filters:          conf.Filters,
-		TraceSample:      conf.TraceSample,
+		DatapointURL:       conf.URL,
+		EventURL:           conf.EventURL,
+		TraceURL:           conf.TraceURL,
+		Timeout:            conf.TimeoutDuration,
+		SourceDimensions:   conf.SourceDimensions,
+		GatewayVersion:     &s.versionString,
+		MaxIdleConns:       conf.DrainingThreads,
+		AuthToken:          conf.DefaultAuthToken,
+		DisableCompression: conf.DisableCompression,
+		Logger:             s.logger,
+		Filters:            conf.Filters,
+		TraceSample:        conf.TraceSample,
 	}
 	if sfConf.TraceSample != nil {
 		sfConf.TraceSample.EtcdServer = conf.Server
 		sfConf.TraceSample.EtcdClient = conf.Client
+		sfConf.TraceSample.AdditionalDimensions = datapoint.AddMaps(conf.AdditionalDimensions, conf.TraceSample.AdditionalDimensions)
 	}
 	return signalfx.NewForwarder(&sfConf)
 }

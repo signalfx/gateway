@@ -406,6 +406,26 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat4(in *j
 			continue
 		}
 		switch key {
+		case "timestamp":
+			if in.IsNull() {
+				in.Skip()
+				out.Timestamp = nil
+			} else {
+				if out.Timestamp == nil {
+					out.Timestamp = new(float64)
+				}
+				*out.Timestamp = float64(in.Float64())
+			}
+		case "duration":
+			if in.IsNull() {
+				in.Skip()
+				out.Duration = nil
+			} else {
+				if out.Duration == nil {
+					out.Duration = new(float64)
+				}
+				*out.Duration = float64(in.Float64())
+			}
 		case "annotations":
 			if in.IsNull() {
 				in.Skip()
@@ -506,26 +526,6 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat4(in *j
 				}
 				*out.Kind = string(in.String())
 			}
-		case "timestamp":
-			if in.IsNull() {
-				in.Skip()
-				out.Timestamp = nil
-			} else {
-				if out.Timestamp == nil {
-					out.Timestamp = new(int64)
-				}
-				*out.Timestamp = int64(in.Int64())
-			}
-		case "duration":
-			if in.IsNull() {
-				in.Skip()
-				out.Duration = nil
-			} else {
-				if out.Duration == nil {
-					out.Duration = new(int64)
-				}
-				*out.Duration = int64(in.Int64())
-			}
 		case "debug":
 			if in.IsNull() {
 				in.Skip()
@@ -600,6 +600,34 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(out *
 	out.RawByte('{')
 	first := true
 	_ = first
+	{
+		const prefix string = ",\"timestamp\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Timestamp == nil {
+			out.RawString("null")
+		} else {
+			out.Float64(float64(*in.Timestamp))
+		}
+	}
+	{
+		const prefix string = ",\"duration\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		if in.Duration == nil {
+			out.RawString("null")
+		} else {
+			out.Float64(float64(*in.Duration))
+		}
+	}
 	{
 		const prefix string = ",\"annotations\":"
 		if first {
@@ -710,34 +738,6 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(out *
 			out.RawString("null")
 		} else {
 			out.String(string(*in.Kind))
-		}
-	}
-	{
-		const prefix string = ",\"timestamp\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		if in.Timestamp == nil {
-			out.RawString("null")
-		} else {
-			out.Int64(int64(*in.Timestamp))
-		}
-	}
-	{
-		const prefix string = ",\"duration\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		if in.Duration == nil {
-			out.RawString("null")
-		} else {
-			out.Int64(int64(*in.Duration))
 		}
 	}
 	{
@@ -1014,9 +1014,9 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat5(in *j
 				out.Timestamp = nil
 			} else {
 				if out.Timestamp == nil {
-					out.Timestamp = new(int64)
+					out.Timestamp = new(float64)
 				}
-				*out.Timestamp = int64(in.Int64())
+				*out.Timestamp = float64(in.Float64())
 			}
 		case "value":
 			if in.IsNull() {
@@ -1067,7 +1067,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat5(out *
 		if in.Timestamp == nil {
 			out.RawString("null")
 		} else {
-			out.Int64(int64(*in.Timestamp))
+			out.Float64(float64(*in.Timestamp))
 		}
 	}
 	{
