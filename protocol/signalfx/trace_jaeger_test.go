@@ -172,6 +172,38 @@ const jaegerBatchJSON = `
     {
       "traceIdLow": 5951113872249657919,
       "spanId": 27532398882098234,
+      "operationName": "post",
+      "startTime": 1485467191639875,
+	  "flags": 2,
+      "duration": 22938,
+      "tags": [
+        {
+          "key": "span.kind",
+          "vType": "STRING",
+          "vStr": "producer"
+        },
+        {
+          "key": "peer.ipv6",
+          "vType": "STRING",
+		  "vStr": "::1"
+        }
+      ],
+      "references": [
+        {
+          "refType": "FOLLOWS_FROM",
+          "traceIdLow": 5951113872249657919,
+          "spanId": 6866148
+        },
+        {
+          "refType": "CHILD_OF",
+          "traceIdLow": 5951113872249657919,
+          "spanId": 6866147
+        }
+      ]
+    },
+    {
+      "traceIdLow": 5951113872249657919,
+      "spanId": 27532398882098234,
       "parentSpanId": 6866147,
       "operationName": "post",
       "startTime": 1485467191639875,
@@ -317,6 +349,29 @@ func TestJaegerTraceDecoder(t *testing.T) {
 				Debug:          nil,
 				Shared:         nil,
 				Annotations:    []*trace.Annotation{},
+				Tags: map[string]string{
+					"hostname":       "api246-sjc1",
+					"jaeger.version": "Python-3.1.0",
+				},
+			},
+			{
+				TraceID:  "52969a8955571a3f",
+				ParentID: pointer.String("000000000068c4e3"),
+				ID:       "0061d092272e8c3a",
+				Name:     pointer.String("post"),
+				Kind:     &ProducerKind,
+				LocalEndpoint: &trace.Endpoint{
+					ServiceName: pointer.String("api"),
+					Ipv4:        pointer.String("10.53.69.61"),
+				},
+				RemoteEndpoint: &trace.Endpoint{
+					Ipv6: pointer.String("::1"),
+				},
+				Timestamp:   pointer.Int64(1485467191639875),
+				Duration:    pointer.Int64(22938),
+				Debug:       pointer.Bool(true),
+				Shared:      nil,
+				Annotations: []*trace.Annotation{},
 				Tags: map[string]string{
 					"hostname":       "api246-sjc1",
 					"jaeger.version": "Python-3.1.0",
