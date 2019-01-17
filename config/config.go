@@ -64,6 +64,7 @@ type ListenFrom struct {
 	Protocol                       *string                `json:",omitempty"`
 	TimeoutDuration                *time.Duration         `json:"-"`
 	ServerAcceptDeadline           *time.Duration         `json:"-"`
+	SpanNameReplacementRules       []string               `json:",omitempty"`
 }
 
 func (listenFrom *ListenFrom) String() string {

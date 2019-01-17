@@ -167,6 +167,14 @@ func TestSignalfxListenerFailure(t *testing.T) {
 		_, err := NewListener(nil, listenConf)
 		So(err, ShouldNotBeNil)
 	})
+	Convey("invalid tag regex should not listen", t, func() {
+		listenConf := &ListenerConfig{
+			ListenAddr:               pointer.String("127.0.0.1:0"),
+			SpanNameReplacementRules: []string{`ntId>.*)\/update$`},
+		}
+		_, err := NewListener(nil, listenConf)
+		So(err, ShouldNotBeNil)
+	})
 }
 
 func TestCheckResp(t *testing.T) {

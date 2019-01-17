@@ -28,7 +28,7 @@ func (f *SmartSampler) StartupFinished() error {
 
 // AddSpans does nothing
 func (f *SmartSampler) AddSpans(context context.Context, spans []*trace.Span, sink trace.Sink) error {
-	return nil
+	return sink.AddSpans(context, spans)
 }
 
 // Datapoints adheres to the sfxclient.Collector interface
