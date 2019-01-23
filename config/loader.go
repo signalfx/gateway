@@ -210,6 +210,7 @@ func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) 
 		sfConf.TraceSample.EtcdServer = conf.Server
 		sfConf.TraceSample.EtcdClient = conf.Client
 		sfConf.TraceSample.AdditionalDimensions = datapoint.AddMaps(conf.AdditionalDimensions, conf.TraceSample.AdditionalDimensions)
+		sfConf.TraceSample.ClusterName = conf.ClusterName
 	}
 	return signalfx.NewForwarder(&sfConf)
 }

@@ -46,6 +46,7 @@ type ForwardTo struct {
 	DisableCompression   *bool                       `json:",omitempty"`
 	Server               etcdIntf.Server             `json:"-"`
 	Client               etcdIntf.Client             `json:"-"`
+	ClusterName          *string                     `json:"-"`
 }
 
 // ListenFrom configures how we listen for datapoints to forward
@@ -113,6 +114,7 @@ type GatewayConfig struct {
 	RemoveMemberTimeout            *time.Duration    `json:"-"`
 	AdditionalDimensions           map[string]string `json:",omitempty"`
 	InternalMetricsListenerAddress *string           `json:",omitempty"`
+	ClusterName                    *string           `json:",omitempty"`
 }
 
 // DefaultGatewayConfig is default values for the gateway config
@@ -137,6 +139,7 @@ var DefaultGatewayConfig = &GatewayConfig{
 	ClusterOperation:              pointer.String(""),
 	TargetClusterAddresses:        []string{},
 	AdditionalDimensions:          map[string]string{},
+	ClusterName:                   pointer.String("gateway"),
 }
 
 func getDefaultName(osHostname func() (string, error)) string {
@@ -250,6 +253,9 @@ func Load(configFile string, logger log.Logger) (*GatewayConfig, error) {
 	if err == nil {
 		c := pointer.FillDefaultFrom(p, DefaultGatewayConfig).(*GatewayConfig)
 		if err = os.Setenv("gatewayServerName", *c.ServerName); err == nil {
+			if c.ClusterName == nil || *c.ClusterName == "" {
+				return nil, errors.New("gateway now requires configuring ClusterName at top level of config")
+			}
 			return c, nil
 		}
 	}

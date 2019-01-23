@@ -306,6 +306,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 		logCtx := log.NewContext(logger).With(logkey.Protocol, forwardConfig.Type, logkey.Direction, "forwarder")
 		forwardConfig.Server = manager.server
 		forwardConfig.Client = manager.client
+		forwardConfig.ClusterName = loadedConfig.ClusterName
 		forwardConfig.AdditionalDimensions = datapoint.AddMaps(loadedConfig.AdditionalDimensions, forwardConfig.AdditionalDimensions)
 		forwarder, err := loader.Forwarder(forwardConfig)
 		if err != nil {
@@ -355,6 +356,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 			"source":    "gateway",
 			"host":      *loadedConfig.ServerName,
 			"type":      forwardConfig.Type,
+			"cluster":   *loadedConfig.ClusterName,
 		}))
 	}
 	return allForwarders, nil
@@ -403,6 +405,7 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loadedConfig *con
 			"source":    "gateway",
 			"host":      hostname,
 			"type":      listenConfig.Type,
+			"cluster":   *loadedConfig.ClusterName,
 		}))
 	}
 	return listeners, nil
@@ -609,8 +612,9 @@ func (p *gateway) setupScheduler(loadedConfig *config.GatewayConfig) *sfxclient.
 	scheduler := sfxclient.NewScheduler()
 	scheduler.AddCallback(sfxclient.GoMetricsSource)
 	scheduler.DefaultDimensions(datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
-		"source": "gateway",
-		"host":   *loadedConfig.ServerName,
+		"source":  "gateway",
+		"host":    *loadedConfig.ServerName,
+		"cluster": *loadedConfig.ClusterName,
 	}))
 	return scheduler
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/trace"
@@ -79,12 +78,12 @@ func New(ruleStrings []string, next sink) (*TagReplace, error) {
 			return nil, err
 		}
 		if len(rp.SubexpNames()) < 2 {
-			return nil, errors.New(fmt.Sprintf("regex contains no named parenthesized subexpressions '%s'", r))
+			return nil, fmt.Errorf("regex contains no named parenthesized subexpressions '%s'", r)
 		}
 		for i := 1; i < len(rp.SubexpNames()); i++ {
 			v := rp.SubexpNames()[i]
 			if len(v) < 1 {
-				return nil, errors.New(fmt.Sprintf("regex contains a non named parenthesized subexpression '%s'", r))
+				return nil, fmt.Errorf("regex contains a non named parenthesized subexpression '%s'", r)
 			}
 		}
 		rules = append(rules, rp)

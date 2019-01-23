@@ -107,6 +107,10 @@ func TestLoad(t *testing.T) {
 	_, err = Load(filename, log.Discard)
 	assert.Nil(t, err)
 
+	err = ioutil.WriteFile(filename, []byte(`{"ClusterName":"", "ListenFrom":[{"Timeout":"3s"}]}`), os.FileMode(0644))
+	assert.Nil(t, err)
+	_, err = Load(filename, log.Discard)
+	assert.Error(t, err)
 }
 
 func TestDecodeConfig(t *testing.T) {

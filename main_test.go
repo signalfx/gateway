@@ -520,7 +520,7 @@ func startProxies(ctx context.Context, proxies []*gateway, logger *log.Hierarchy
 		case err := <-mainDoneChan:
 			if err != nil {
 				p.etcdMgr.shutdown(false)
-				time.Sleep(time.Second * 2)
+				time.Sleep(time.Second * 5)
 				goto retry
 			}
 		}
