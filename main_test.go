@@ -26,12 +26,14 @@ import (
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/errors"
+	"github.com/signalfx/golib/httpdebug"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/timekeeper"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
+	"runtime"
 )
 
 const configEtcd = `
@@ -696,5 +698,48 @@ func TestEnvVarFuncs(t *testing.T) {
 		Reset(func() {
 			os.Unsetenv(testKey)
 		})
+	})
+}
+
+// there will be a test on this later
+type addfunc func(http.ResponseWriter, *http.Request)
+
+func (f addfunc) DebugEndpoints() map[string]http.Handler {
+	return map[string]http.Handler{"/sampler": http.HandlerFunc(f)}
+}
+
+func debugEndpointHandleFunc(rw http.ResponseWriter, req *http.Request) {
+	rw.Write([]byte(`"OK"`))
+}
+
+func TestDebugEndpoints(t *testing.T) {
+	Convey("test handle endpoints", t, func() {
+		listener, err := net.Listen("tcp", "0.0.0.0:0")
+		So(err, ShouldBeNil)
+		p := &gateway{}
+		p.debugServerListener = listener
+		p.debugServer = httpdebug.New(&httpdebug.Config{
+			Logger:        log.DefaultLogger,
+			ExplorableObj: p,
+		})
+		m := map[string]http.Handler{}
+
+		// casting func to type addfunc so it can satisfy the protocol.DebugEndpointer interface, which in turn casts the func itself to be an http.HandlerFunc which implements the http.Handler interface
+		p.addEndpoints(addfunc(debugEndpointHandleFunc), m)
+
+		p.handleEndpoints(m)
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			p.debugServer.Serve(listener)
+			wg.Done()
+		}()
+		runtime.Gosched()
+		listenPort := nettest.TCPPort(p.debugServerListener)
+		resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/sampler", listenPort))
+		So(err, ShouldBeNil)
+		So(resp.StatusCode, ShouldEqual, 200)
+		So(p.debugServerListener.Close(), ShouldBeNil)
+		wg.Wait()
 	})
 }

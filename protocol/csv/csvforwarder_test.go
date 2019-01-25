@@ -16,6 +16,7 @@ import (
 	"github.com/signalfx/golib/trace"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
+	"net/http"
 )
 
 func TestFilenameForwarder(t *testing.T) {
@@ -39,6 +40,7 @@ func TestFilenameForwarder(t *testing.T) {
 	assert.NoError(t, f.AddSpans(ctx, []*trace.Span{{}}))
 	assert.Equal(t, int64(0), f.Pipeline())
 	assert.Nil(t, f.StartupFinished())
+	assert.Equal(t, f.DebugEndpoints(), map[string]http.Handler{})
 }
 
 func TestFilenameForwarderBadFilename(t *testing.T) {

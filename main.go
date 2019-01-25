@@ -342,7 +342,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 			Name:               forwardConfig.Name,
 			Cdim:               cdim,
 		}
-		bf := dpbuffered.NewBufferedForwarder(ctx, bconf, endingSink, forwarder.Close, forwarder.StartupFinished, limitedLogger)
+		bf := dpbuffered.NewBufferedForwarder(ctx, bconf, endingSink, forwarder.Close, forwarder.StartupFinished, limitedLogger, forwarder.DebugEndpoints)
 		allForwarders = append(allForwarders, bf)
 
 		groupName := fmt.Sprintf("%s_f_%d", name, idx)
@@ -446,7 +446,7 @@ func (p *gateway) setupInternalMetricsServer(conf *config.GatewayConfig, logger 
 	return nil
 }
 
-func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler) error {
+func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler, debugEndpoints map[string]http.Handler) error {
 	if conf.LocalDebugServer == nil {
 		return nil
 	}
@@ -460,6 +460,7 @@ func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger
 		ExplorableObj: p,
 	})
 	p.debugServer.Mux.Handle("/debug/dims", &p.debugSink)
+	p.handleEndpoints(debugEndpoints)
 
 	p.debugServer.Exp2.Exported["config"] = conf.Var()
 	p.debugServer.Exp2.Exported["datapoints"] = scheduler.Var()
@@ -482,6 +483,12 @@ func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger
 		logger.Log(log.Err, err, "Finished serving debug server")
 	}()
 	return nil
+}
+
+func (p *gateway) handleEndpoints(debugEndpoints map[string]http.Handler) {
+	for k, v := range debugEndpoints {
+		p.debugServer.Mux.Handle(k, v)
+	}
 }
 
 func setupGoMaxProcs(numProcs *int, gomaxprocs func(int) int) {
@@ -633,12 +640,12 @@ func (p *gateway) scheduleStatCollection(ctx context.Context, scheduler *sfxclie
 	return finishedContext, cancelFunc
 }
 
-func (p *gateway) setupForwardersAndListeners(ctx context.Context, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler) (signalfx.Sink, error) {
+func (p *gateway) setupForwardersAndListeners(ctx context.Context, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler) (signalfx.Sink, map[string]http.Handler, error) {
 	var err error
 	p.forwarders, err = setupForwarders(ctx, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims, p.etcdMgr)
 	if err != nil {
 		p.logger.Log(log.Err, err, "Unable to setup forwarders")
-		return nil, errors.Annotate(err, "unable to setup forwarders")
+		return nil, nil, errors.Annotate(err, "unable to setup forwarders")
 	}
 
 	dpSinks, eSinks, tSinks := splitSinks(p.forwarders)
@@ -662,16 +669,27 @@ func (p *gateway) setupForwardersAndListeners(ctx context.Context, loader *confi
 	p.listeners, err = setupListeners(p.tk, *loadedConfig.ServerName, loadedConfig, loader, loadedConfig.ListenFrom, multiplexer, logger, scheduler)
 	if err != nil {
 		p.logger.Log(log.Err, err, "Unable to setup listeners")
-		return nil, errors.Annotate(err, "cannot setup listeners from configuration")
+		return nil, nil, errors.Annotate(err, "cannot setup listeners from configuration")
 	}
 
 	var errs []error
+	endpoints := make(map[string]http.Handler)
 	for _, f := range p.forwarders {
 		err = f.StartupFinished()
 		errs = append(errs, err)
 		log.IfErr(logger, err)
+		p.addEndpoints(f, endpoints)
 	}
-	return multiplexer, FirstNonNil(errs...)
+
+	return multiplexer, endpoints, FirstNonNil(errs...)
+}
+
+func (p *gateway) addEndpoints(f protocol.DebugEndpointer, endpoints map[string]http.Handler) {
+	for k, v := range f.DebugEndpoints() {
+		if _, ok := endpoints[k]; !ok {
+			endpoints[k] = v
+		}
+	}
 }
 
 func (p *gateway) run(ctx context.Context) error {
@@ -690,11 +708,6 @@ func (p *gateway) run(ctx context.Context) error {
 
 	logger := p.logger
 	scheduler := p.setupScheduler(loadedConfig)
-
-	if err := p.setupDebugServer(loadedConfig, logger, scheduler); err != nil {
-		p.logger.Log(log.Err, "debug server failed", err)
-		return err
-	}
 
 	if err := p.setupInternalMetricsServer(loadedConfig, logger, scheduler); err != nil {
 		p.logger.Log(log.Err, "internal metrics server failed", err)
@@ -718,8 +731,13 @@ func (p *gateway) run(ctx context.Context) error {
 	chain := p.createCommonHTTPChain(loadedConfig)
 	loader := config.NewLoader(ctx, logger, Version, &p.debugContext, &p.debugSink, &p.ctxDims, chain)
 
-	multiplexer, err := p.setupForwardersAndListeners(ctx, loader, loadedConfig, logger, scheduler)
+	multiplexer, additionalEndpoints, err := p.setupForwardersAndListeners(ctx, loader, loadedConfig, logger, scheduler)
 	if err == nil {
+		if err := p.setupDebugServer(loadedConfig, logger, scheduler, additionalEndpoints); err != nil {
+			p.logger.Log(log.Err, "debug server failed", err)
+			return err
+		}
+
 		finishedContext, cancelFunc := p.scheduleStatCollection(ctx, scheduler, loadedConfig, multiplexer)
 
 		// Schedule datapoint collection to a Discard sink so we can get the stats in Expvar()

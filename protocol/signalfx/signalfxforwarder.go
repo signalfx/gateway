@@ -38,6 +38,11 @@ type Forwarder struct {
 	sampler     *sampling.SmartSampler
 }
 
+// DebugEndpoints returns the httphandlers of the sampler
+func (connector *Forwarder) DebugEndpoints() map[string]http.Handler {
+	return connector.sampler.DebugEndpoints()
+}
+
 type stats struct {
 	totalDatapointsForwarded int64
 	totalEventsForwarded     int64

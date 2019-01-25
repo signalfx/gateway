@@ -8,6 +8,7 @@ import (
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
+	"net/http"
 )
 
 // DatapointForwarder can send datapoints and not events
@@ -15,6 +16,11 @@ type DatapointForwarder interface {
 	sfxclient.Collector
 	io.Closer
 	dpsink.DSink
+}
+
+// DebugEndpointer gives an object a chance to expose http endpoints
+type DebugEndpointer interface {
+	DebugEndpoints() map[string]http.Handler
 }
 
 // Forwarder is the basic interface endpoints must support for the gateway to forward to them
@@ -25,6 +31,7 @@ type Forwarder interface {
 	sfxclient.Collector
 	io.Closer
 	StartupHook
+	DebugEndpointer
 }
 
 // Listener is the basic interface anything that listens for new metrics must implement
@@ -52,6 +59,11 @@ type Pipeline interface {
 // UneventfulForwarder converts a datapoint only forwarder into a datapoint/event forwarder
 type UneventfulForwarder struct {
 	DatapointForwarder
+}
+
+// DebugEndpoints does nothing
+func (u *UneventfulForwarder) DebugEndpoints() map[string]http.Handler {
+	return map[string]http.Handler{}
 }
 
 // StartupFinished is to be called after startup is finished

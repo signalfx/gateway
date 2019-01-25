@@ -9,6 +9,7 @@ import (
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/trace"
 	. "github.com/smartystreets/goconvey/convey"
+	"net/http"
 )
 
 type end struct {
@@ -35,5 +36,6 @@ func Test(t *testing.T) {
 		So(n.StartupFinished(), ShouldBeNil)
 		So(n.Close(), ShouldBeNil)
 		So(len(n.Datapoints()), ShouldEqual, 0)
+		So(n.DebugEndpoints(), ShouldResemble, map[string]http.Handler{})
 	})
 }
