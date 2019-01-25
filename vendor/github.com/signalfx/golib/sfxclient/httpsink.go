@@ -92,7 +92,8 @@ func (h *HTTPSink) handleResponse(resp *http.Response, respValidator responseVal
 		return errors.Annotate(err, "cannot fully read response body")
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	// all 2XXs
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return SFXAPIError{
 			StatusCode:   resp.StatusCode,
 			ResponseBody: string(respBody),

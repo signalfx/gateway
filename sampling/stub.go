@@ -16,6 +16,7 @@ type SmartSampleConfig struct {
 	EtcdServer           etcdIntf.Server   `json:"-"`
 	EtcdClient           etcdIntf.Client   `json:"-"`
 	AdditionalDimensions map[string]string `json:",omitempty"`
+	ClusterName          *string           `json:"-"`
 }
 
 // SmartSampler is not here
