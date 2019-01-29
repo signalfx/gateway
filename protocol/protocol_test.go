@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"net/http"
 )
 
 func TestUneventfulForwarder(t *testing.T) {
@@ -12,6 +13,7 @@ func TestUneventfulForwarder(t *testing.T) {
 	assert.Equal(t, u.AddSpans(nil, nil), nil)
 	assert.Equal(t, int64(0), u.Pipeline())
 	assert.Equal(t, u.StartupFinished(), nil)
+	assert.Equal(t, u.DebugEndpoints(), map[string]http.Handler{})
 }
 
 func TestDimMakers(t *testing.T) {

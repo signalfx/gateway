@@ -14,6 +14,7 @@ import (
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/trace"
+	"net/http"
 	"sync/atomic"
 )
 
@@ -43,6 +44,11 @@ type Forwarder struct {
 	file        *os.File
 	writeString func(f *os.File, s string) (ret int, err error)
 	stats       stats
+}
+
+// DebugEndpoints returns no http handlers
+func (f *Forwarder) DebugEndpoints() map[string]http.Handler {
+	return map[string]http.Handler{}
 }
 
 var _ dpsink.Sink = &Forwarder{}

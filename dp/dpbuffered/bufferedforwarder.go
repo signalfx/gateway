@@ -15,6 +15,7 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
+	"net/http"
 )
 
 // Config controls BufferedForwarder limits
@@ -71,11 +72,17 @@ type BufferedForwarder struct {
 	cdim                        *log.CtxDimensions
 	identifier                  string
 
-	sendTo       signalfx.Sink
-	stopContext  context.Context
-	stopFunc     context.CancelFunc
-	closeSender  func() error
-	afterStartup func() error
+	sendTo         signalfx.Sink
+	stopContext    context.Context
+	stopFunc       context.CancelFunc
+	closeSender    func() error
+	afterStartup   func() error
+	debugEndpoints func() map[string]http.Handler
+}
+
+// DebugEndpoints returns any configured http handlers and the point they can be reached at
+func (forwarder *BufferedForwarder) DebugEndpoints() map[string]http.Handler {
+	return forwarder.debugEndpoints()
 }
 
 var _ dpsink.Sink = &BufferedForwarder{}
@@ -355,25 +362,26 @@ func (forwarder *BufferedForwarder) StartupFinished() error {
 
 // NewBufferedForwarder is used only by this package to create a forwarder that buffers its
 // datapoint channel
-func NewBufferedForwarder(ctx context.Context, config *Config, sendTo signalfx.Sink, closeIt, afterStartup func() error, logger log.Logger) *BufferedForwarder {
+func NewBufferedForwarder(ctx context.Context, config *Config, sendTo signalfx.Sink, closeIt, afterStartup func() error, logger log.Logger, debugEnpoints func() map[string]http.Handler) *BufferedForwarder {
 	config = pointer.FillDefaultFrom(config, DefaultConfig).(*Config)
 	logCtx := log.NewContext(logger).With(logkey.Struct, "BufferedForwarder")
 	logCtx.Log(logkey.Config, config)
 	context, cancel := context.WithCancel(ctx)
 	ret := &BufferedForwarder{
-		stopFunc:     cancel,
-		stopContext:  context,
-		dpChan:       make(chan []*datapoint.Datapoint, *config.BufferSize),
-		eChan:        make(chan []*event.Event, *config.BufferSize),
-		tChan:        make(chan []*trace.Span, *config.BufferSize),
-		config:       config,
-		sendTo:       sendTo,
-		closeSender:  closeIt,
-		afterStartup: afterStartup,
-		logger:       logCtx,
-		checker:      config.Checker,
-		cdim:         config.Cdim,
-		identifier:   *config.Name,
+		stopFunc:       cancel,
+		stopContext:    context,
+		dpChan:         make(chan []*datapoint.Datapoint, *config.BufferSize),
+		eChan:          make(chan []*event.Event, *config.BufferSize),
+		tChan:          make(chan []*trace.Span, *config.BufferSize),
+		config:         config,
+		sendTo:         sendTo,
+		closeSender:    closeIt,
+		afterStartup:   afterStartup,
+		logger:         logCtx,
+		checker:        config.Checker,
+		cdim:           config.Cdim,
+		identifier:     *config.Name,
+		debugEndpoints: debugEnpoints,
 	}
 	ret.start()
 	return ret

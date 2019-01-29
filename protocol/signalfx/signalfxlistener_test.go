@@ -253,7 +253,7 @@ func TestSignalfxListener(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)
 		})
-		Convey("And a signalfx forwarder with a smart sampler config", func() {
+		Convey("And a signalfx forwarder with a smart sampler config should not work", func() {
 			forwardConfig := &ForwarderConfig{
 				TraceSample: &sampling.SmartSampleConfig{},
 			}
@@ -268,6 +268,7 @@ func TestSignalfxListener(t *testing.T) {
 			}
 			forwarder, err := NewForwarder(forwardConfig)
 			So(forwarder.StartupFinished(), ShouldBeNil)
+			So(forwarder.DebugEndpoints(), ShouldResemble, map[string]http.Handler{})
 			So(err, ShouldBeNil)
 			So(len(forwarder.Datapoints()), ShouldEqual, 7)
 			So(forwarder.Pipeline(), ShouldEqual, 0)

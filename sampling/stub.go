@@ -9,6 +9,7 @@ import (
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
+	"net/http"
 )
 
 // SmartSampleConfig is not here
@@ -21,6 +22,11 @@ type SmartSampleConfig struct {
 
 // SmartSampler is not here
 type SmartSampler struct{}
+
+// DebugEndpoints does nothing
+func (f *SmartSampler) DebugEndpoints() map[string]http.Handler {
+	return map[string]http.Handler{}
+}
 
 // StartupFinished does nothing
 func (f *SmartSampler) StartupFinished() error {

@@ -19,6 +19,7 @@ import (
 	"github.com/signalfx/golib/web"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
+	"net/http"
 )
 
 const numStats = 6
@@ -41,6 +42,10 @@ func (t *threadSafeWriter) Write(p []byte) (n int, err error) {
 }
 
 func c() error { return nil }
+
+func d() map[string]http.Handler {
+	return map[string]http.Handler{}
+}
 
 // TODO figure out why this test is flaky, should be > 2, but change to >= 2 so it passes
 func TestBufferedForwarderBasic(t *testing.T) {
@@ -65,7 +70,7 @@ func TestBufferedForwarderBasic(t *testing.T) {
 		buf := &bytes.Buffer{}
 		threadWriter := &threadSafeWriter{Writer: buf}
 		l := log.NewLogfmtLogger(threadWriter, log.Panic)
-		bf := NewBufferedForwarder(ctx, config, sendTo, c, c, l)
+		bf := NewBufferedForwarder(ctx, config, sendTo, c, c, l, d)
 		So(bf.StartupFinished(), ShouldBeNil)
 		datas := []*datapoint.Datapoint{
 			dptest.DP(),
@@ -176,6 +181,9 @@ func TestBufferedForwarderBasic(t *testing.T) {
 			So(len(buf.String()), ShouldBeGreaterThan, 0)
 			threadWriter.mu.Unlock()
 		})
+		Convey("test DebugEndpoints", func() {
+			So(bf.DebugEndpoints(), ShouldResemble, map[string]http.Handler{})
+		})
 	})
 }
 
@@ -197,7 +205,7 @@ func TestBufferedForwarderContexts(t *testing.T) {
 	}
 
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo, c, c, log.Discard)
+	bf := NewBufferedForwarder(ctx, config, sendTo, c, c, log.Discard, d)
 	assert.NoError(t, bf.AddDatapoints(ctx, datas))
 	canceledContext, cancelFunc := context.WithCancel(ctx)
 	waiter := make(chan struct{})
@@ -266,7 +274,7 @@ func TestBufferedForwarderContextsEvent(t *testing.T) {
 	spans := []*trace.Span{{}}
 
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo, c, c, log.Discard)
+	bf := NewBufferedForwarder(ctx, config, sendTo, c, c, log.Discard, d)
 	assert.NoError(t, bf.AddEvents(ctx, events))
 	assert.NoError(t, bf.AddSpans(ctx, spans))
 	canceledContext, cancelFunc := context.WithCancel(ctx)
@@ -314,7 +322,7 @@ func TestBufferedForwarderMaxTotalDatapoints(t *testing.T) {
 	}
 	ctx := context.Background()
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo, c, c, log.Discard)
+	bf := NewBufferedForwarder(ctx, config, sendTo, c, c, log.Discard, d)
 	defer func() {
 		assert.NoError(t, bf.Close())
 	}()
@@ -349,7 +357,7 @@ func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
 	}
 	ctx := context.Background()
 	sendTo := dptest.NewBasicSink()
-	bf := NewBufferedForwarder(ctx, config, sendTo, c, c, log.Discard)
+	bf := NewBufferedForwarder(ctx, config, sendTo, c, c, log.Discard, d)
 	defer func() {
 		assert.NoError(t, bf.Close())
 	}()
