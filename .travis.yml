@@ -3,7 +3,7 @@ language: go
 sudo: false
 
 go:
-  - "1.11.1"
+  - "1.11.5"
 
 before_install:
   - wget "http://ftp.debian.org/debian/pool/main/s/shellcheck/shellcheck_0.4.4-4_amd64.deb"
