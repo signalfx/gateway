@@ -93,25 +93,27 @@ func (e *ErrorTrackerHandler) ServeHTTPC(ctx context.Context, rw http.ResponseWr
 
 // ListenerConfig controls optional parameters for the listener
 type ListenerConfig struct {
-	ListenAddr               *string
-	HealthCheck              *string
-	Timeout                  *time.Duration
-	Logger                   log.Logger
-	RootContext              context.Context
-	JSONMarshal              func(v interface{}) ([]byte, error)
-	DebugContext             *web.HeaderCtxFlag
-	HTTPChain                web.NextConstructor
-	SpanNameReplacementRules []string
+	ListenAddr                         *string
+	HealthCheck                        *string
+	Timeout                            *time.Duration
+	Logger                             log.Logger
+	RootContext                        context.Context
+	JSONMarshal                        func(v interface{}) ([]byte, error)
+	DebugContext                       *web.HeaderCtxFlag
+	HTTPChain                          web.NextConstructor
+	SpanNameReplacementRules           []string
+	SpanNameReplacementBreakAfterMatch *bool
 }
 
 var defaultListenerConfig = &ListenerConfig{
-	ListenAddr:               pointer.String("127.0.0.1:12345"),
-	HealthCheck:              pointer.String("/healthz"),
-	Timeout:                  pointer.Duration(time.Second * 30),
-	Logger:                   log.Discard,
-	RootContext:              context.Background(),
-	JSONMarshal:              json.Marshal,
-	SpanNameReplacementRules: []string{},
+	ListenAddr:                         pointer.String("127.0.0.1:12345"),
+	HealthCheck:                        pointer.String("/healthz"),
+	Timeout:                            pointer.Duration(time.Second * 30),
+	Logger:                             log.Discard,
+	RootContext:                        context.Background(),
+	JSONMarshal:                        json.Marshal,
+	SpanNameReplacementRules:           []string{},
+	SpanNameReplacementBreakAfterMatch: pointer.Bool(true),
 }
 
 type metricHandler struct {
@@ -201,7 +203,7 @@ func NewListener(sink Sink, conf *ListenerConfig) (*ListenerServer, error) {
 	traceSink := sink
 	if len(conf.SpanNameReplacementRules) > 0 {
 		var err error
-		traceSink, err = tagreplace.New(conf.SpanNameReplacementRules, sink)
+		traceSink, err = tagreplace.New(conf.SpanNameReplacementRules, *conf.SpanNameReplacementBreakAfterMatch, sink)
 		if err != nil {
 			return nil, errors.Annotatef(err, "cannot parse tag replacement rules %v", conf.SpanNameReplacementRules)
 		}
