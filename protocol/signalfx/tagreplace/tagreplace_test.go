@@ -31,25 +31,36 @@ func Test(t *testing.T) {
 		rules      []string
 		inputSpan  *trace.Span
 		outputSpan *trace.Span
+		exitEarly  bool
 	}{
 		{
 			desc:       "test single replacement",
 			rules:      []string{`^\/api\/v1\/document\/(?P<documentId>.*)\/update$`},
 			inputSpan:  &trace.Span{Name: pointer.String("/api/v1/document/321083210/update")},
 			outputSpan: &trace.Span{Name: pointer.String("/api/v1/document/{documentId}/update"), Tags: map[string]string{"documentId": "321083210"}},
+			exitEarly:  false,
 		},
 		{
 			desc:       "test multi replacement",
 			rules:      []string{`^\/api\/(?P<version>.*)\/document\/(?P<documentId>.*)\/update$`},
 			inputSpan:  &trace.Span{Name: pointer.String("/api/v1/document/321083210/update")},
 			outputSpan: &trace.Span{Name: pointer.String("/api/{version}/document/{documentId}/update"), Tags: map[string]string{"documentId": "321083210", "version": "v1"}},
+			exitEarly:  false,
+		},
+		{
+			desc: "test exit early",
+			rules: []string{`^\/api\/v1\/document\/(?P<documentId>.*)\/update$`,
+				`^\/api\/(?P<version>.*)\/document\/(?P<documentId>.*)\/update$`},
+			inputSpan:  &trace.Span{Name: pointer.String("/api/v1/document/321083210/update")},
+			outputSpan: &trace.Span{Name: pointer.String("/api/v1/document/{documentId}/update"), Tags: map[string]string{"documentId": "321083210"}},
+			exitEarly:  true,
 		},
 	}
 	Convey("test tag replace", t, func() {
 		for _, tc := range cases {
 			Convey("Testing case: "+tc.desc, func() {
 				e := &end{}
-				tr, err := New(tc.rules, e)
+				tr, err := New(tc.rules, tc.exitEarly, e)
 				So(err, ShouldBeNil)
 				So(tr, ShouldNotBeNil)
 				err = tr.AddSpans(context.Background(), []*trace.Span{tc.inputSpan})
@@ -70,7 +81,7 @@ func Benchmark(b *testing.B) {
 	}
 	tr, _ := New([]string{
 		`^\/api\/(?P<version>.*)\/document\/(?P<documentId>.*)\/update$`,
-	}, &end{})
+	}, false, &end{})
 	b.ResetTimer()
 	b.ReportAllocs()
 	tr.AddSpans(context.Background(), spans)
@@ -78,15 +89,15 @@ func Benchmark(b *testing.B) {
 
 func TestBad(t *testing.T) {
 	Convey("test bad regex", t, func() {
-		_, err := New([]string{`ntId>.*)\/update$`}, &end{})
+		_, err := New([]string{`ntId>.*)\/update$`}, false, &end{})
 		So(err, ShouldNotBeNil)
 	})
 	Convey("test no sub exp regex", t, func() {
-		_, err := New([]string{`^\/api\/version\/document\/documentId\/update$`}, &end{})
+		_, err := New([]string{`^\/api\/version\/document\/documentId\/update$`}, false, &end{})
 		So(err, ShouldNotBeNil)
 	})
 	Convey("test non named sub exp regex", t, func() {
-		_, err := New([]string{`^\/api\/version\/document\/(.*)\/update$`}, &end{})
+		_, err := New([]string{`^\/api\/version\/document\/(.*)\/update$`}, false, &end{})
 		So(err, ShouldNotBeNil)
 	})
 	Convey("test passthroughs", t, func() {

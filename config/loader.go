@@ -180,13 +180,14 @@ type signalFxLoader struct {
 
 func (s *signalFxLoader) Listener(sink signalfx.Sink, conf *ListenFrom) (protocol.Listener, error) {
 	sfConf := signalfx.ListenerConfig{
-		ListenAddr:               conf.ListenAddr,
-		Timeout:                  conf.TimeoutDuration,
-		Logger:                   s.logger,
-		RootContext:              s.rootContext,
-		DebugContext:             s.debugContext,
-		HTTPChain:                s.httpChain,
-		SpanNameReplacementRules: conf.SpanNameReplacementRules,
+		ListenAddr:                         conf.ListenAddr,
+		Timeout:                            conf.TimeoutDuration,
+		Logger:                             s.logger,
+		RootContext:                        s.rootContext,
+		DebugContext:                       s.debugContext,
+		HTTPChain:                          s.httpChain,
+		SpanNameReplacementRules:           conf.SpanNameReplacementRules,
+		SpanNameReplacementBreakAfterMatch: conf.SpanNameReplacementBreakAfterMatch,
 	}
 	return signalfx.NewListener(sink, &sfConf)
 }

@@ -22,8 +22,9 @@ var _ sink = &TagReplace{}
 // TagReplace does regex search and replace in span Names and puts resultant in tags.
 // This modifies the objects parsed, so in a concurrent context, you will want to copy the objects sent here first
 type TagReplace struct {
-	rules []*regexp.Regexp
-	next  sink
+	rules     []*regexp.Regexp
+	exitEarly bool
+	next      sink
 }
 
 // AddDatapoints is a passthrough
@@ -37,6 +38,7 @@ func (t *TagReplace) AddEvents(ctx context.Context, events []*event.Event) error
 }
 
 // AddSpans maps all rules to all spans and does the replacements, this can be VERY expensive, and modifies the spans
+// if exitEarly is true, will only apply the first rule that matches
 func (t *TagReplace) AddSpans(ctx context.Context, spans []*trace.Span) error {
 	for _, s := range spans {
 		if s.Name != nil {
@@ -61,6 +63,9 @@ func (t *TagReplace) AddSpans(ctx context.Context, spans []*trace.Span) error {
 						newName = append(newName, oldName[index:])
 					}
 					s.Name = pointer.String(strings.Join(newName, ""))
+					if t.exitEarly {
+						break
+					}
 				}
 			}
 		}
@@ -69,7 +74,7 @@ func (t *TagReplace) AddSpans(ctx context.Context, spans []*trace.Span) error {
 }
 
 // New returns you a new TagReplace object
-func New(ruleStrings []string, next sink) (*TagReplace, error) {
+func New(ruleStrings []string, exitEarly bool, next sink) (*TagReplace, error) {
 	var rules []*regexp.Regexp
 	for _, r := range ruleStrings {
 		var err error
@@ -89,7 +94,8 @@ func New(ruleStrings []string, next sink) (*TagReplace, error) {
 		rules = append(rules, rp)
 	}
 	return &TagReplace{
-		rules: rules,
-		next:  next,
+		rules:     rules,
+		next:      next,
+		exitEarly: exitEarly,
 	}, nil
 }
