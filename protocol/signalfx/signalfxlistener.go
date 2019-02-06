@@ -232,7 +232,7 @@ func setupNotFoundHandler(ctx context.Context, r *mux.Router) sfxclient.Collecto
 	metricTracking := web.RequestCounter{}
 	r.NotFoundHandler = web.NewHandler(ctx, web.FromHTTP(http.NotFoundHandler())).Add(web.NextHTTP(metricTracking.ServeHTTP))
 	return &sfxclient.WithDimensions{
-		Dimensions: map[string]string{"http_endpoint": "http404"},
+		Dimensions: map[string]string{"protocol": "http404"},
 		Collector:  &metricTracking,
 	}
 }
@@ -243,7 +243,8 @@ func SetupChain(ctx context.Context, sink Sink, chainType string, getReader func
 	zippers := zipper.NewZipper()
 
 	counter := &dpsink.Counter{
-		Logger: logger,
+		Logger:        logger,
+		DroppedReason: "mux",
 	}
 
 	ucount := UnifyNextSinkWrap(counter)
@@ -266,7 +267,7 @@ func SetupChain(ctx context.Context, sink Sink, chainType string, getReader func
 			zippers,
 		),
 		Dimensions: map[string]string{
-			"http_endpoint": "sfx_" + chainType,
+			"protocol": "sfx_" + chainType,
 		},
 	}
 	return zippers.GzipHandler(handler), st
@@ -283,7 +284,8 @@ func SetupJSONByPaths(r *mux.Router, handler http.Handler, endpoint string) {
 
 func setupCollectd(ctx context.Context, r *mux.Router, sink dpsink.Sink, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor, logger log.Logger) sfxclient.Collector {
 	counter := &dpsink.Counter{
-		Logger: logger,
+		Logger:        logger,
+		DroppedReason: "mux",
 	}
 	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
 	decoder := collectd.JSONDecoder{

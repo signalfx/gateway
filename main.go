@@ -327,7 +327,8 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 			Now:          tk.Now,
 		}
 		dcount := &dpsink.Counter{
-			Logger: limitedLogger,
+			Logger:        limitedLogger,
+			DroppedReason: "downstream",
 		}
 		count := signalfx.UnifyNextSinkWrap(dcount)
 		endingSink := signalfx.FromChain(forwarder, signalfx.NextWrap(count))
@@ -380,17 +381,8 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loadedConfig *con
 			return nil, errDupeListener
 		}
 		nameMap[name] = true
-		count := &dpsink.Counter{
-			Logger: &log.RateLimitedLogger{
-				EventCounter: eventcounter.New(tk.Now(), time.Second),
-				Limit:        16,
-				Logger:       logCtx,
-				Now:          tk.Now,
-			},
-		}
-		endingSink := signalfx.FromChain(multiplexer, signalfx.NextWrap(signalfx.UnifyNextSinkWrap(count)))
 
-		listener, err := loader.Listener(endingSink, listenConfig)
+		listener, err := loader.Listener(multiplexer, listenConfig)
 		if err != nil {
 			logCtx.Log(log.Err, err, "unable to load config")
 			return nil, err
@@ -398,7 +390,6 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loadedConfig *con
 		listeners = append(listeners, listener)
 		groupName := fmt.Sprintf("%s_l_%d", name, idx)
 		scheduler.AddGroupedCallback(groupName, listener)
-		scheduler.AddGroupedCallback(groupName, count)
 		scheduler.GroupedDefaultDimensions(groupName, datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
 			"name":      name,
 			"direction": "listener",

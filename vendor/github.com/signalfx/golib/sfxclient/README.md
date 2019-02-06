@@ -18,18 +18,20 @@ struct parameter that needs to be configured is AuthToken. To make it easier to
 create common Datapoint objects, wrappers exist for Gauge and Cumulative. An
 example of sending a hello world metric would look like this:
 
-    func SendHelloWorld() {
-        client := NewHTTPSink()
-        client.AuthToken = "ABCDXYZ"
-        ctx := context.Background()
-        client.AddDatapoints(ctx, []*datapoint.Datapoint{
-            GaugeF("hello.world", nil, 1.0),
-        })
-        dims = make(map[string]string)
-        client.AddEvents(ctx, []*event.Event{
-            event.New("hello.world", event.USERDEFINED, dims, time.Time{}),
-        })
-    }
+```go
+func SendHelloWorld() {
+    client := NewHTTPSink()
+    client.AuthToken = "ABCDXYZ"
+    ctx := context.Background()
+    client.AddDatapoints(ctx, []*datapoint.Datapoint{
+        GaugeF("hello.world", nil, 1.0),
+    })
+    dims = make(map[string]string)
+    client.AddEvents(ctx, []*event.Event{
+        event.New("hello.world", event.USERDEFINED, dims, time.Time{}),
+    })
+}
+```
 
 
 ### Scheduler
@@ -38,21 +40,23 @@ To facilitate periodic sending of datapoints to SignalFx, a Scheduler
 abstraction exists. You can use this to report custom metrics to SignalFx at
 some periodic interval.
 
-    type CustomApplication struct {
-        queue chan int64
+```go
+type CustomApplication struct {
+    queue chan int64
+}
+func (c *CustomApplication) Datapoints() []*datapoint.Datapoint {
+    return []*datapoint.Datapoint {
+        sfxclient.Gauge("queue.size", nil, len(queue)),
     }
-    func (c *CustomApplication) Datapoints() []*datapoint.Datapoint {
-        return []*datapoint.Datapoint {
-          sfxclient.Gauge("queue.size", nil, len(queue)),
-        }
-    }
-    func main() {
-        scheduler := sfxclient.NewScheduler()
-        scheduler.Sink.(*HTTPSink).AuthToken = "ABCD-XYZ"
-        app := &CustomApplication{}
-        scheduler.AddCallback(app)
-        go scheduler.Schedule(context.Background())
-    }
+}
+func main() {
+    scheduler := sfxclient.NewScheduler()
+    scheduler.Sink.(*HTTPSink).AuthToken = "ABCD-XYZ"
+    app := &CustomApplication{}
+    scheduler.AddCallback(app)
+    go scheduler.Schedule(context.Background())
+}
+```
 
 
 RollingBucket and CumulativeBucket
