@@ -51,30 +51,6 @@ func ValueToValue(v ValueToSend) (datapoint.Value, error) {
 	return nil, fmt.Errorf("unable to convert value: %s", v)
 }
 
-func valueToRaw(v ValueToSend) interface{} {
-	f, ok := v.(float64)
-	if ok {
-		return f
-	}
-	i, ok := v.(int64)
-	if ok {
-		return i
-	}
-	i2, ok := v.(int)
-	if ok {
-		return int64(i2)
-	}
-	s, ok := v.(string)
-	if ok {
-		return s
-	}
-	b, ok := v.(bool)
-	if ok {
-		return b
-	}
-	return nil
-}
-
 // MetricCreationStruct is the API format for /v1/metric POST
 type MetricCreationStruct struct {
 	MetricName string `json:"sf_metric"`
@@ -135,18 +111,6 @@ func NewProtobufDataPointWithType(dp *com_signalfx_metrics_protobuf.DataPoint, m
 	}
 
 	dpToRet := datapoint.New(dp.GetMetric(), dims, NewDatumValue(dp.GetValue()), fromMT(mt), fromTs(dp.GetTimestamp()))
-
-	for _, p := range dp.Properties {
-		key := p.GetKey()
-		if key == "" {
-			continue
-		}
-		val := PropertyAsRawType(p.GetValue())
-		if val == nil {
-			continue
-		}
-		dpToRet.SetProperty(key, val)
-	}
 	return dpToRet, nil
 }
 
