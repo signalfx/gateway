@@ -67,7 +67,7 @@ func TestNewProtobufDataPointWithType(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(dp2.Dimensions["sf_source"], ShouldEqual, "hello")
 			})
-			Convey("properties should set", func() {
+			Convey("properties should not be set", func() {
 				dp.Properties = []*com_signalfx_metrics_protobuf.Property{
 					{
 						Key: proto.String("name"),
@@ -88,48 +88,9 @@ func TestNewProtobufDataPointWithType(t *testing.T) {
 				}
 				dp2, err := NewProtobufDataPointWithType(&dp, com_signalfx_metrics_protobuf.MetricType_COUNTER)
 				So(err, ShouldBeNil)
-				So(dp2.GetProperties()["name"], ShouldEqual, "jack")
-				So(len(dp2.GetProperties()), ShouldEqual, 1)
+				So(len(dp2.GetProperties()), ShouldEqual, 0)
 			})
 		})
-	})
-}
-
-func TestValueToRaw(t *testing.T) {
-	Convey("With value raw test valueToRaw", t, func() {
-		type testCase struct {
-			v   ValueToSend
-			exp interface{}
-		}
-		cases := []testCase{
-			{
-				v:   ValueToSend(1.0),
-				exp: 1.0,
-			},
-			{
-				v:   ValueToSend(int64(1)),
-				exp: int64(1),
-			},
-			{
-				v:   ValueToSend(1),
-				exp: 1,
-			},
-			{
-				v:   ValueToSend("hi"),
-				exp: "hi",
-			},
-			{
-				v:   ValueToSend(true),
-				exp: true,
-			},
-			{
-				v:   ValueToSend(func() {}),
-				exp: nil,
-			},
-		}
-		for _, c := range cases {
-			So(valueToRaw(c.v), ShouldEqual, c.exp)
-		}
 	})
 }
 

@@ -172,16 +172,6 @@ type JSONDecoderV2 struct {
 	invalidValue      int64
 }
 
-func appendProperties(dp *datapoint.Datapoint, Properties map[string]signalfxformat.ValueToSend) {
-	for name, p := range Properties {
-		v := valueToRaw(p)
-		if v == nil {
-			continue
-		}
-		dp.SetProperty(name, p)
-	}
-}
-
 var errInvalidJSONFormat = errors.New("invalid JSON format; please see correct format at https://developers.signalfx.com/docs/datapoint")
 
 // Datapoints returns datapoints for json decoder v2
@@ -222,7 +212,6 @@ func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error
 					continue
 				}
 				dp := datapoint.New(jsonDatapoint.Metric, jsonDatapoint.Dimensions, v, fromMT(com_signalfx_metrics_protobuf.MetricType(mt)), fromTs(jsonDatapoint.Timestamp))
-				appendProperties(dp, jsonDatapoint.Properties)
 				dps = append(dps, dp)
 			}
 		}
