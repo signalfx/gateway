@@ -243,7 +243,8 @@ func SetupChain(ctx context.Context, sink Sink, chainType string, getReader func
 	zippers := zipper.NewZipper()
 
 	counter := &dpsink.Counter{
-		Logger: logger,
+		Logger:        logger,
+		DroppedReason: "mux",
 	}
 
 	ucount := UnifyNextSinkWrap(counter)
@@ -283,7 +284,8 @@ func SetupJSONByPaths(r *mux.Router, handler http.Handler, endpoint string) {
 
 func setupCollectd(ctx context.Context, r *mux.Router, sink dpsink.Sink, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor, logger log.Logger) sfxclient.Collector {
 	counter := &dpsink.Counter{
-		Logger: logger,
+		Logger:        logger,
+		DroppedReason: "mux",
 	}
 	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
 	decoder := collectd.JSONDecoder{

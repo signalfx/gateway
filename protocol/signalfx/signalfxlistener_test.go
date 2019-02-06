@@ -409,10 +409,10 @@ func TestSignalfxListener(t *testing.T) {
 			verifyStatusCode("INVALID_JSON", "application/json", "/v1/event", http.StatusNotFound)
 
 			dps := listener.Datapoints()
-			So(dptest.ExactlyOneDims(dps, "total_errors", map[string]string{"http_endpoint": "sfx_protobuf_v2"}).Value.String(), ShouldEqual, "0")
+			So(dptest.ExactlyOneDims(dps, "total_errors", map[string]string{"protocol": "sfx_protobuf_v2"}).Value.String(), ShouldEqual, "0")
 			verifyStatusCode("INVALID_PROTOBUF", "application/x-protobuf", "/v2/datapoint", http.StatusBadRequest)
 			dps = listener.Datapoints()
-			So(dptest.ExactlyOneDims(dps, "total_errors", map[string]string{"http_endpoint": "sfx_protobuf_v2"}).Value.String(), ShouldEqual, "1")
+			So(dptest.ExactlyOneDims(dps, "total_errors", map[string]string{"protocol": "sfx_protobuf_v2"}).Value.String(), ShouldEqual, "1")
 			So(len(dps), ShouldEqual, 165)
 			So(dptest.ExactlyOneDims(dps, "dropped_points", map[string]string{"protocol": "sfx_json_v2", "reason": "unknown_metric_type"}).Value.String(), ShouldEqual, "0")
 			So(dptest.ExactlyOneDims(dps, "dropped_points", map[string]string{"protocol": "sfx_json_v2", "reason": "invalid_value"}).Value.String(), ShouldEqual, "0")
