@@ -37,7 +37,7 @@ func (decoder *ProtobufEventDecoderV2) Read(ctx context.Context, req *http.Reque
 	}
 	evts := make([]*event.Event, 0, len(msg.GetEvents()))
 	for _, protoDb := range msg.GetEvents() {
-		if e, err := NewProtobufEvent(protoDb); err == nil {
+		if e, err1 := NewProtobufEvent(protoDb); err1 == nil {
 			evts = append(evts, e)
 		}
 	}

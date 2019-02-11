@@ -28,6 +28,7 @@ import (
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
 )
 
 var errReadErr = errors.New("could not read")
@@ -280,17 +281,6 @@ func TestSignalfxListener(t *testing.T) {
 				So(dpSent.String(), ShouldEqual, dpSeen.String())
 				So(atomic.LoadInt64(&callCount), ShouldEqual, 1)
 			})
-			Convey("points with properties should not send", func() {
-				dpSent := dptest.DP()
-				dpSent.SetProperty("name", "jack")
-				dpSent.SetProperty("awesome", false)
-				dpSent.Timestamp = dpSent.Timestamp.Round(time.Millisecond)
-				So(forwarder.AddDatapoints(ctx, []*datapoint.Datapoint{dpSent}), ShouldBeNil)
-				dpSeen := sendTo.Next()
-				So(dpSent.String(), ShouldEqual, dpSeen.String())
-				So(atomic.LoadInt64(&callCount), ShouldEqual, 1)
-				So(len(dpSeen.GetProperties()), ShouldEqual, 0)
-			})
 			Convey("Should be able to send zero len events", func() {
 				So(forwarder.AddEvents(ctx, []*event.Event{}), ShouldBeNil)
 			})
@@ -376,6 +366,8 @@ func TestSignalfxListener(t *testing.T) {
 			}
 			datapointSeen := sendTo.Next()
 			So(datapointSent.String(), ShouldEqual, datapointSeen.String())
+			So(len(datapointSeen.Meta), ShouldEqual, 0)
+			assert.NotNil(t, datapointSeen.Meta, "meta should not be nil")
 		})
 		Convey("Should not be able to send a v2 JSON point with properties", func() {
 			now := time.Now().Round(time.Second)
@@ -388,8 +380,8 @@ func TestSignalfxListener(t *testing.T) {
 			}
 			datapointSeen := sendTo.Next()
 			So(datapointSent.String(), ShouldEqual, datapointSeen.String())
-
-			So(len(datapointSeen.GetProperties()), ShouldEqual, 0)
+			So(len(datapointSeen.Meta), ShouldEqual, 0)
+			assert.NotNil(t, datapointSeen.Meta, "meta should not be nil")
 		})
 		Convey("invalid requests should error", func() {
 			verifyStatusCode("INVALID_JSON", "application/json", "/v1/datapoint", http.StatusBadRequest)
@@ -477,6 +469,7 @@ func TestSignalfxListener(t *testing.T) {
 			datapointSeen := sendTo.Next()
 			datapointSent.Timestamp = datapointSeen.Timestamp
 			So(datapointSent.String(), ShouldEqual, datapointSeen.String())
+			So(len(datapointSeen.Meta), ShouldEqual, 0)
 		})
 		Convey("Invalid regexes should cause an error", func() {
 			forwardConfig := &ForwarderConfig{

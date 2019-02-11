@@ -154,7 +154,7 @@ func (decoder *ProtobufDecoderV2) Read(ctx context.Context, req *http.Request) (
 	}
 	dps := make([]*datapoint.Datapoint, 0, len(msg.GetDatapoints()))
 	for _, protoDb := range msg.GetDatapoints() {
-		if dp, err := NewProtobufDataPointWithType(protoDb, com_signalfx_metrics_protobuf.MetricType_GAUGE); err == nil {
+		if dp, err1 := NewProtobufDataPointWithType(protoDb, com_signalfx_metrics_protobuf.MetricType_GAUGE); err1 == nil {
 			dps = append(dps, dp)
 		}
 	}
