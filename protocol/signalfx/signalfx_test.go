@@ -8,11 +8,12 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 
 	"errors"
+	"math"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/gateway/protocol/signalfx/format"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/pointer"
-	"math"
 )
 
 func TestValueToValue(t *testing.T) {
@@ -66,29 +67,6 @@ func TestNewProtobufDataPointWithType(t *testing.T) {
 				dp2, err := NewProtobufDataPointWithType(&dp, com_signalfx_metrics_protobuf.MetricType_COUNTER)
 				So(err, ShouldBeNil)
 				So(dp2.Dimensions["sf_source"], ShouldEqual, "hello")
-			})
-			Convey("properties should not be set", func() {
-				dp.Properties = []*com_signalfx_metrics_protobuf.Property{
-					{
-						Key: proto.String("name"),
-						Value: &com_signalfx_metrics_protobuf.PropertyValue{
-							StrValue: proto.String("jack"),
-						},
-					},
-					{
-						Key:   proto.String("missing"),
-						Value: &com_signalfx_metrics_protobuf.PropertyValue{},
-					},
-					{
-						Key: proto.String(""),
-						Value: &com_signalfx_metrics_protobuf.PropertyValue{
-							StrValue: proto.String("notset"),
-						},
-					},
-				}
-				dp2, err := NewProtobufDataPointWithType(&dp, com_signalfx_metrics_protobuf.MetricType_COUNTER)
-				So(err, ShouldBeNil)
-				So(len(dp2.GetProperties()), ShouldEqual, 0)
 			})
 		})
 	})

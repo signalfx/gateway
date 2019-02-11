@@ -4,6 +4,7 @@ package signalfxformat
 
 import (
 	json "encoding/json"
+
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
@@ -688,7 +689,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(out *
 		}
 		out.String(string(in.TraceID))
 	}
-	{
+	if in.Name != nil {
 		const prefix string = ",\"name\":"
 		if first {
 			first = false
@@ -696,13 +697,9 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(out *
 		} else {
 			out.RawString(prefix)
 		}
-		if in.Name == nil {
-			out.RawString("null")
-		} else {
-			out.String(string(*in.Name))
-		}
+		out.String(string(*in.Name))
 	}
-	{
+	if in.ParentID != nil {
 		const prefix string = ",\"parentId\":"
 		if first {
 			first = false
@@ -710,11 +707,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(out *
 		} else {
 			out.RawString(prefix)
 		}
-		if in.ParentID == nil {
-			out.RawString("null")
-		} else {
-			out.String(string(*in.ParentID))
-		}
+		out.String(string(*in.ParentID))
 	}
 	{
 		const prefix string = ",\"id\":"
@@ -726,7 +719,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(out *
 		}
 		out.String(string(in.ID))
 	}
-	{
+	if in.Kind != nil {
 		const prefix string = ",\"kind\":"
 		if first {
 			first = false
@@ -734,13 +727,9 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(out *
 		} else {
 			out.RawString(prefix)
 		}
-		if in.Kind == nil {
-			out.RawString("null")
-		} else {
-			out.String(string(*in.Kind))
-		}
+		out.String(string(*in.Kind))
 	}
-	{
+	if in.Debug != nil {
 		const prefix string = ",\"debug\":"
 		if first {
 			first = false
@@ -748,13 +737,9 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(out *
 		} else {
 			out.RawString(prefix)
 		}
-		if in.Debug == nil {
-			out.RawString("null")
-		} else {
-			out.Bool(bool(*in.Debug))
-		}
+		out.Bool(bool(*in.Debug))
 	}
-	{
+	if in.Shared != nil {
 		const prefix string = ",\"shared\":"
 		if first {
 			first = false
@@ -762,13 +747,9 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(out *
 		} else {
 			out.RawString(prefix)
 		}
-		if in.Shared == nil {
-			out.RawString("null")
-		} else {
-			out.Bool(bool(*in.Shared))
-		}
+		out.Bool(bool(*in.Shared))
 	}
-	{
+	if in.LocalEndpoint != nil {
 		const prefix string = ",\"localEndpoint\":"
 		if first {
 			first = false
@@ -776,13 +757,9 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(out *
 		} else {
 			out.RawString(prefix)
 		}
-		if in.LocalEndpoint == nil {
-			out.RawString("null")
-		} else {
-			easyjson3b0ebf6aEncodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibTrace(out, *in.LocalEndpoint)
-		}
+		easyjson3b0ebf6aEncodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibTrace(out, *in.LocalEndpoint)
 	}
-	{
+	if in.RemoteEndpoint != nil {
 		const prefix string = ",\"remoteEndpoint\":"
 		if first {
 			first = false
@@ -790,13 +767,9 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(out *
 		} else {
 			out.RawString(prefix)
 		}
-		if in.RemoteEndpoint == nil {
-			out.RawString("null")
-		} else {
-			easyjson3b0ebf6aEncodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibTrace(out, *in.RemoteEndpoint)
-		}
+		easyjson3b0ebf6aEncodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibTrace(out, *in.RemoteEndpoint)
 	}
-	{
+	if len(in.Tags) != 0 {
 		const prefix string = ",\"tags\":"
 		if first {
 			first = false
@@ -804,9 +777,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat4(out *
 		} else {
 			out.RawString(prefix)
 		}
-		if in.Tags == nil && (out.Flags&jwriter.NilMapAsEmpty) == 0 {
-			out.RawString(`null`)
-		} else {
+		{
 			out.RawByte('{')
 			v19First := true
 			for v19Name, v19Value := range in.Tags {
@@ -921,7 +892,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibT
 	out.RawByte('{')
 	first := true
 	_ = first
-	{
+	if in.ServiceName != nil {
 		const prefix string = ",\"serviceName\":"
 		if first {
 			first = false
@@ -929,13 +900,9 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibT
 		} else {
 			out.RawString(prefix)
 		}
-		if in.ServiceName == nil {
-			out.RawString("null")
-		} else {
-			out.String(string(*in.ServiceName))
-		}
+		out.String(string(*in.ServiceName))
 	}
-	{
+	if in.Ipv4 != nil {
 		const prefix string = ",\"ipv4\":"
 		if first {
 			first = false
@@ -943,13 +910,9 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibT
 		} else {
 			out.RawString(prefix)
 		}
-		if in.Ipv4 == nil {
-			out.RawString("null")
-		} else {
-			out.String(string(*in.Ipv4))
-		}
+		out.String(string(*in.Ipv4))
 	}
-	{
+	if in.Ipv6 != nil {
 		const prefix string = ",\"ipv6\":"
 		if first {
 			first = false
@@ -957,13 +920,9 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibT
 		} else {
 			out.RawString(prefix)
 		}
-		if in.Ipv6 == nil {
-			out.RawString("null")
-		} else {
-			out.String(string(*in.Ipv6))
-		}
+		out.String(string(*in.Ipv6))
 	}
-	{
+	if in.Port != nil {
 		const prefix string = ",\"port\":"
 		if first {
 			first = false
@@ -971,11 +930,7 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayVendorGithubComSignalfxGolibT
 		} else {
 			out.RawString(prefix)
 		}
-		if in.Port == nil {
-			out.RawString("null")
-		} else {
-			out.Int32(int32(*in.Port))
-		}
+		out.Int32(int32(*in.Port))
 	}
 	out.RawByte('}')
 }
@@ -1384,32 +1339,6 @@ func easyjson3b0ebf6aDecodeGithubComSignalfxGatewayProtocolSignalfxFormat7(in *j
 				}
 				in.Delim('}')
 			}
-		case "properties":
-			if in.IsNull() {
-				in.Skip()
-			} else {
-				in.Delim('{')
-				if !in.IsDelim('}') {
-					out.Properties = make(map[string]ValueToSend)
-				} else {
-					out.Properties = nil
-				}
-				for !in.IsDelim('}') {
-					key := string(in.String())
-					in.WantColon()
-					var v25 ValueToSend
-					if m, ok := v25.(easyjson.Unmarshaler); ok {
-						m.UnmarshalEasyJSON(in)
-					} else if m, ok := v25.(json.Unmarshaler); ok {
-						_ = m.UnmarshalJSON(in.Raw())
-					} else {
-						v25 = in.Interface()
-					}
-					(out.Properties)[key] = v25
-					in.WantComma()
-				}
-				in.Delim('}')
-			}
 		default:
 			in.SkipRecursive()
 		}
@@ -1472,48 +1401,16 @@ func easyjson3b0ebf6aEncodeGithubComSignalfxGatewayProtocolSignalfxFormat7(out *
 			out.RawString(`null`)
 		} else {
 			out.RawByte('{')
-			v26First := true
-			for v26Name, v26Value := range in.Dimensions {
-				if v26First {
-					v26First = false
+			v25First := true
+			for v25Name, v25Value := range in.Dimensions {
+				if v25First {
+					v25First = false
 				} else {
 					out.RawByte(',')
 				}
-				out.String(string(v26Name))
+				out.String(string(v25Name))
 				out.RawByte(':')
-				out.String(string(v26Value))
-			}
-			out.RawByte('}')
-		}
-	}
-	{
-		const prefix string = ",\"properties\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		if in.Properties == nil && (out.Flags&jwriter.NilMapAsEmpty) == 0 {
-			out.RawString(`null`)
-		} else {
-			out.RawByte('{')
-			v27First := true
-			for v27Name, v27Value := range in.Properties {
-				if v27First {
-					v27First = false
-				} else {
-					out.RawByte(',')
-				}
-				out.String(string(v27Name))
-				out.RawByte(':')
-				if m, ok := v27Value.(easyjson.Marshaler); ok {
-					m.MarshalEasyJSON(out)
-				} else if m, ok := v27Value.(json.Marshaler); ok {
-					out.Raw(m.MarshalJSON())
-				} else {
-					out.Raw(json.Marshal(v27Value))
-				}
+				out.String(string(v25Value))
 			}
 			out.RawByte('}')
 		}

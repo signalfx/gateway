@@ -28,6 +28,7 @@ import (
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
 )
 
 var errReadErr = errors.New("could not read")
@@ -376,6 +377,9 @@ func TestSignalfxListener(t *testing.T) {
 			}
 			datapointSeen := sendTo.Next()
 			So(datapointSent.String(), ShouldEqual, datapointSeen.String())
+			So(len(datapointSeen.Meta), ShouldEqual, 0)
+			assert.NotNil(t, datapointSeen.Meta, "meta should not be nil")
+			So(len(datapointSeen.GetProperties()), ShouldEqual, 0)
 		})
 		Convey("Should not be able to send a v2 JSON point with properties", func() {
 			now := time.Now().Round(time.Second)
@@ -388,7 +392,8 @@ func TestSignalfxListener(t *testing.T) {
 			}
 			datapointSeen := sendTo.Next()
 			So(datapointSent.String(), ShouldEqual, datapointSeen.String())
-
+			So(len(datapointSeen.Meta), ShouldEqual, 0)
+			assert.NotNil(t, datapointSeen.Meta, "meta should not be nil")
 			So(len(datapointSeen.GetProperties()), ShouldEqual, 0)
 		})
 		Convey("invalid requests should error", func() {
@@ -477,6 +482,8 @@ func TestSignalfxListener(t *testing.T) {
 			datapointSeen := sendTo.Next()
 			datapointSent.Timestamp = datapointSeen.Timestamp
 			So(datapointSent.String(), ShouldEqual, datapointSeen.String())
+			So(len(datapointSeen.Meta), ShouldEqual, 0)
+			So(len(datapointSeen.GetProperties()), ShouldEqual, 0)
 		})
 		Convey("Invalid regexes should cause an error", func() {
 			forwardConfig := &ForwarderConfig{

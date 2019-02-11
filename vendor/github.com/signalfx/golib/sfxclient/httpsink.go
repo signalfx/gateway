@@ -2,20 +2,20 @@ package sfxclient
 
 import (
 	"bytes"
+	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 	"unicode"
-
-	"compress/gzip"
-	"context"
-	"io"
-	"sync"
+	"unsafe"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/mailru/easyjson"
@@ -26,7 +26,6 @@ import (
 	"github.com/signalfx/golib/sfxclient/spanfilter"
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/trace/format"
-	"unsafe"
 )
 
 const (
@@ -277,16 +276,6 @@ func (h *HTTPSink) coreDatapointToProtobuf(point *datapoint.Datapoint) *com_sign
 		Value:      datumForPoint(point.Value),
 		MetricType: &mt,
 		Dimensions: mapToDimensions(point.Dimensions),
-	}
-	for k, v := range point.GetProperties() {
-		kv := k
-		pv := rawToProtobuf(v)
-		if pv != nil && k != "" {
-			dp.Properties = append(dp.Properties, &com_signalfx_metrics_protobuf.Property{
-				Key:   &kv,
-				Value: pv,
-			})
-		}
 	}
 	return dp
 }
