@@ -31,6 +31,7 @@ type ForwardTo struct {
 	Timeout              *string                     `json:",omitempty"`
 	DefaultSource        *string                     `json:",omitempty"`
 	DefaultAuthToken     *string                     `json:",omitempty"`
+	AuthTokenEnvVar      *string                     `json:",omitempty"`
 	BufferSize           *int64                      `json:",omitempty"`
 	Name                 *string                     `json:",omitempty"`
 	DrainingThreads      *int64                      `json:",omitempty"`
@@ -171,6 +172,7 @@ func decodeConfig(configBytes []byte) (*GatewayConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+	config.decodeEnvAuthToken()
 	return &config, nil
 }
 
@@ -224,6 +226,21 @@ func (p *GatewayConfig) decodeDurations() error {
 		return errors.Annotatef(err, "cannot parse lag threshold %s", *p.LateThreshold)
 	}
 	return nil
+}
+
+func (p *GatewayConfig) decodeEnvAuthToken() {
+	for _, f := range p.ForwardTo {
+		if f.AuthTokenEnvVar != nil {
+			if token, exists := os.LookupEnv(*f.AuthTokenEnvVar); exists {
+				f.DefaultAuthToken = &token
+			}
+		}
+		if f.DefaultAuthToken == nil {
+			if token, exists := os.LookupEnv("SIGNALFX_ACCESS_TOKEN"); exists {
+				f.DefaultAuthToken = &token
+			}
+		}
+	}
 }
 
 func loadConfig(configFile string) (*GatewayConfig, error) {

@@ -73,6 +73,33 @@ func TestParseListenFromTimeout(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestDecodeEnvAuthToken(t *testing.T) {
+	prevAccessToken := os.Getenv("SIGNALFX_ACCESS_TOKEN")
+	os.Setenv("SIGNALFX_ACCESS_TOKEN", "test-token")
+	defer func() { os.Setenv("SIGNALFX_ACCESS_TOKEN", prevAccessToken) }()
+	config, err := decodeConfig([]byte(`{"ForwardTo":[{}]}`))
+	assert.Nil(t, err)
+	assert.Equal(t, *config.ForwardTo[0].DefaultAuthToken, "test-token")
+
+	config, err = decodeConfig([]byte(`{"ForwardTo":[{"AuthTokenEnvVar":"CUSTOM_VAR"}]}`))
+	assert.Nil(t, err)
+	assert.Equal(t, *config.ForwardTo[0].DefaultAuthToken, "test-token")
+
+	config, err = decodeConfig([]byte(`{"ForwardTo":[{"DefaultAuthToken":"default-token"}]}`))
+	assert.Nil(t, err)
+	assert.Equal(t, *config.ForwardTo[0].DefaultAuthToken, "default-token")
+
+	config, err = decodeConfig([]byte(`{"ForwardTo":[{"AuthTokenEnvVar":"CUSTOM_VAR","DefaultAuthToken":"default-token"}]}`))
+	assert.Nil(t, err)
+	assert.Equal(t, *config.ForwardTo[0].DefaultAuthToken, "default-token")
+
+	os.Setenv("CUSTOM_VAR", "secret-token")
+	defer func() { os.Unsetenv("CUSTOM_VAR") }()
+	config, err = decodeConfig([]byte(`{"ForwardTo":[{"AuthTokenEnvVar":"CUSTOM_VAR","DefaultAuthToken":"default-token"}]}`))
+	assert.Nil(t, err)
+	assert.Equal(t, *config.ForwardTo[0].DefaultAuthToken, "secret-token")
+}
+
 func TestFileLoading(t *testing.T) {
 	fileObj, _ := ioutil.TempFile("", "gotest")
 	filename := fileObj.Name()
