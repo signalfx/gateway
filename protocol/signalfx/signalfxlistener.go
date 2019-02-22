@@ -202,10 +202,10 @@ func NewListener(sink Sink, conf *ListenerConfig) (*ListenerServer, error) {
 
 	traceSink := sink
 	if len(conf.SpanNameReplacementRules) > 0 {
-		var err error
-		traceSink, err = tagreplace.New(conf.SpanNameReplacementRules, *conf.SpanNameReplacementBreakAfterMatch, sink)
-		if err != nil {
-			return nil, errors.Annotatef(err, "cannot parse tag replacement rules %v", conf.SpanNameReplacementRules)
+		var err1 error
+		traceSink, err1 = tagreplace.New(conf.SpanNameReplacementRules, *conf.SpanNameReplacementBreakAfterMatch, sink)
+		if err1 != nil {
+			return nil, errors.Annotatef(err1, "cannot parse tag replacement rules %v", conf.SpanNameReplacementRules)
 		}
 	}
 
