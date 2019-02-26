@@ -5,6 +5,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/mvcc/mvccpb"
 	"io"
 	"io/ioutil"
 	"net"
@@ -698,6 +700,16 @@ func TestEnvVarFuncs(t *testing.T) {
 		Reset(func() {
 			os.Unsetenv(testKey)
 		})
+	})
+}
+
+func TestHandleClusterNameErr(t *testing.T) {
+	m := &etcdManager{clusterName: "helloworld"}
+	r := &clientv3.GetResponse{}
+	r.Kvs = []*mvccpb.KeyValue{}
+	Convey("if there is a cluster name conflict the server should not start", t, func() {
+		r.Kvs = append(r.Kvs, &mvccpb.KeyValue{Key: []byte("/gateway/cluster/name"), Value: []byte("not hello world")})
+		So(m.handleClusterName(r), ShouldNotBeNil)
 	})
 }
 

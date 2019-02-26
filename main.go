@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"github.com/coreos/etcd/clientv3"
 	"io"
 	"io/ioutil"
 	"os"
@@ -104,6 +105,7 @@ type gatewayFlags struct {
 
 type etcdManager struct {
 	etcd.ServerConfig
+	clusterName   string
 	logger        log.Logger
 	removeTimeout time.Duration
 	operation     string
@@ -113,6 +115,7 @@ type etcdManager struct {
 }
 
 func (mgr *etcdManager) setup(conf *config.GatewayConfig) {
+	mgr.clusterName = getStringEnvVar("SFX_GATEWAY_CLUSTER_NAME", *conf.ClusterName)
 	mgr.LPAddress = getStringEnvVar("SFX_LISTEN_ON_PEER_ADDRESS", *conf.ListenOnPeerAddress)
 	mgr.APAddress = getStringEnvVar("SFX_ADVERTISE_PEER_ADDRESS", *conf.AdvertisePeerAddress)
 	mgr.LCAddress = getStringEnvVar("SFX_LISTEN_ON_CLIENT_ADDRESS", *conf.ListenOnClientAddress)
@@ -132,6 +135,50 @@ func (mgr *etcdManager) setup(conf *config.GatewayConfig) {
 	mgr.targetCluster = getCommaSeparatedStringEnvVar("SFX_TARGET_CLUSTER_ADDRESSES", conf.TargetClusterAddresses)
 }
 
+func (mgr *etcdManager) handleClusterName(resp *clientv3.GetResponse) (err error) {
+
+	// set the cluster name if it hasn't been set
+	if resp == nil || len(resp.Kvs) < 1 || string(resp.Kvs[0].Value) == "" {
+		_, _ = mgr.client.Put(context.Background(), "/gateway/cluster/name", mgr.clusterName)
+	} else if string(resp.Kvs[0].Value) != mgr.clusterName {
+		err = fmt.Errorf("the configured cluster name '%s' does not match the existing cluster name '%s'", string(resp.Kvs[0].Value), mgr.clusterName)
+	}
+
+	return err
+}
+
+func (mgr *etcdManager) seed() (err error) {
+	mgr.logger.Log(fmt.Sprintf("starting etcd server %s to seed cluster", mgr.ServerConfig.Name))
+	if err = mgr.server.Seed(nil); err == nil {
+		if !isStringInSlice(mgr.AdvertisedClientAddress(), mgr.targetCluster) {
+			mgr.targetCluster = append(mgr.targetCluster, mgr.AdvertisedClientAddress())
+		}
+		mgr.client, err = etcd.NewClient(mgr.targetCluster, etcd.SecurityConfig{}, true)
+		var resp *clientv3.GetResponse
+		if resp, err = mgr.client.Get(context.Background(), "/gateay/cluster/name"); err == nil {
+			err = mgr.handleClusterName(resp)
+		}
+	}
+	return err
+}
+
+func (mgr *etcdManager) join() (err error) {
+	mgr.logger.Log(fmt.Sprintf("joining cluster with etcd server name: %s", mgr.ServerConfig.Name))
+	if mgr.client, err = etcd.NewClient(mgr.targetCluster, etcd.SecurityConfig{}, true); err == nil {
+		mgr.logger.Log(fmt.Sprintf("joining etcd cluster @ %s", mgr.client.Endpoints()))
+		var resp *clientv3.GetResponse
+		if resp, err = mgr.client.Get(context.Background(), "/gateay/cluster/name"); err == nil {
+			if err = mgr.handleClusterName(resp); err == nil {
+				if err = mgr.server.Join(mgr.client); err == nil {
+					mgr.logger.Log(fmt.Sprintf("successfully joined cluster at %s", mgr.targetCluster))
+				}
+			}
+		}
+
+	}
+	return err
+}
+
 func (mgr *etcdManager) start() (err error) {
 
 	// use a default server name if one is not provided
@@ -145,23 +192,10 @@ func (mgr *etcdManager) start() (err error) {
 		return
 
 	case "seed":
-		mgr.logger.Log(fmt.Sprintf("starting etcd server %s to seed cluster", mgr.ServerConfig.Name))
-		if err = mgr.server.Seed(nil); err == nil {
-			if !isStringInSlice(mgr.AdvertisedClientAddress(), mgr.targetCluster) {
-				mgr.targetCluster = append(mgr.targetCluster, mgr.AdvertisedClientAddress())
-			}
-			mgr.client, err = etcd.NewClient(mgr.targetCluster, etcd.SecurityConfig{}, true)
-		}
+		err = mgr.seed()
 
 	case "join":
-		mgr.logger.Log(fmt.Sprintf("joining cluster with etcd server name: %s", mgr.ServerConfig.Name))
-		if mgr.client, err = etcd.NewClient(mgr.targetCluster, etcd.SecurityConfig{}, true); err == nil {
-			mgr.logger.Log(fmt.Sprintf("joining etcd cluster @ %s", mgr.client.Endpoints()))
-			if err = mgr.server.Join(mgr.client); err == nil {
-				mgr.logger.Log(fmt.Sprintf("successfully joined cluster at %s", mgr.targetCluster))
-			}
-		}
-
+		err = mgr.join()
 	default:
 		err = fmt.Errorf("unsupported cluster-op specified \"%s\"", mgr.operation)
 	}
