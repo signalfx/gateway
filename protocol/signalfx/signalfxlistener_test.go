@@ -241,6 +241,9 @@ func TestSignalfxListener(t *testing.T) {
 				atomic.AddInt64(&callCount, 1)
 				next.ServeHTTPC(ctx, rw, r)
 			},
+			AdditionalSpanTags: map[string]string{
+				"key": "value",
+			},
 		}
 		listener, err := NewListener(sendTo, listenConf)
 		So(err, ShouldBeNil)
@@ -303,6 +306,12 @@ func TestSignalfxListener(t *testing.T) {
 			})
 			Convey("Should be able to send traces", func() {
 				So(forwarder.AddSpans(ctx, []*trace.Span{{}}), ShouldBeNil)
+			})
+			Convey("Should be able to add tags to spans", func() {
+				spanSent := dptest.S()
+				So(forwarder.AddSpans(ctx, []*trace.Span{spanSent}), ShouldBeNil)
+				spanSeen := sendTo.NextSpan()
+				So(spanSeen.Tags, ShouldResemble, map[string]string{"key": "value"})
 			})
 			Convey("Should be able to send events", func() {
 				eventSent := dptest.E()

@@ -1089,10 +1089,10 @@
 			"revisionTime": "2019-02-07T19:17:13Z"
 		},
 		{
-			"checksumSHA1": "e95O2kFV1Tjw2oByCd7h903zFUo=",
+			"checksumSHA1": "IJLCUD15/cDRGo6YBAVGYRNP8MQ=",
 			"path": "github.com/signalfx/golib/datapoint/dptest",
-			"revision": "04bf64a838739ffba780a1ebc5b810bf6d14b3e3",
-			"revisionTime": "2019-02-07T19:17:13Z"
+			"revision": "e6f78db9ba1eb579b945a5c4327eeca3ec99efad",
+			"revisionTime": "2019-03-04T19:18:26Z"
 		},
 		{
 			"checksumSHA1": "GuSggAzlI13Uu1yZ9rM8puMTEi8=",

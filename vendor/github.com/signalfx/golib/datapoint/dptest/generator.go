@@ -8,6 +8,8 @@ import (
 
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
+	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/trace"
 )
 
 // DatapointSource is a simple way to generate throw away datapoints
@@ -33,6 +35,8 @@ func init() {
 	globalEventSource.Meta = map[string]interface{}{"string": "value", "boolean": true, "int": int64(40), "double": 0.0}
 	globalEventSource.TimeSource = time.Now
 	globalEventSource.Category = event.COLLECTD
+	globalSpanSource.TimeSource = time.Now().UnixNano
+	globalSpanSource.Name = "test-span"
 }
 
 // Next returns a unique datapoint
@@ -78,4 +82,35 @@ func (d *EventSource) Next() *event.Event {
 // E generates and returns a unique event to use for testing purposes
 func E() *event.Event {
 	return globalEventSource.Next()
+}
+
+// SpanSource is a simple way to generate throw away spans
+type SpanSource struct {
+	mu sync.Mutex
+
+	TimeSource   func() int64
+	Name         string
+	CurrentIndex int64
+}
+
+var globalSpanSource SpanSource
+
+// Next return a unique span
+func (d *SpanSource) Next() *trace.Span {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	randomID := strconv.FormatInt(d.TimeSource(), 16)
+	return &trace.Span{
+		TraceID:   randomID,
+		ID:        randomID,
+		Name:      &d.Name,
+		Timestamp: pointer.Int64(atomic.AddInt64(&d.CurrentIndex, 1)),
+		Duration:  pointer.Int64((d.CurrentIndex % 15) + 5), // set duration in the range [5..20}
+	}
+}
+
+// S generates and returns a unique span to use for testing purposes
+func S() *trace.Span {
+	return globalSpanSource.Next()
 }

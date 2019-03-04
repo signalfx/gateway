@@ -68,6 +68,7 @@ type ListenFrom struct {
 	ServerAcceptDeadline               *time.Duration         `json:"-"`
 	SpanNameReplacementRules           []string               `json:",omitempty"`
 	SpanNameReplacementBreakAfterMatch *bool                  `json:",omitempty"`
+	AdditionalSpanTags                 map[string]string      `json:",omitempty"`
 }
 
 func (listenFrom *ListenFrom) String() string {

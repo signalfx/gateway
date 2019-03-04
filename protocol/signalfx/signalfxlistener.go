@@ -16,6 +16,7 @@ import (
 	"github.com/signalfx/gateway/logkey"
 	"github.com/signalfx/gateway/protocol"
 	"github.com/signalfx/gateway/protocol/collectd"
+	"github.com/signalfx/gateway/protocol/signalfx/additionalspantags"
 	"github.com/signalfx/gateway/protocol/signalfx/tagreplace"
 	"github.com/signalfx/gateway/protocol/zipper"
 	"github.com/signalfx/golib/datapoint"
@@ -103,6 +104,7 @@ type ListenerConfig struct {
 	HTTPChain                          web.NextConstructor
 	SpanNameReplacementRules           []string
 	SpanNameReplacementBreakAfterMatch *bool
+	AdditionalSpanTags                 map[string]string
 }
 
 var defaultListenerConfig = &ListenerConfig{
@@ -114,6 +116,7 @@ var defaultListenerConfig = &ListenerConfig{
 	JSONMarshal:                        json.Marshal,
 	SpanNameReplacementRules:           []string{},
 	SpanNameReplacementBreakAfterMatch: pointer.Bool(true),
+	AdditionalSpanTags:                 make(map[string]string),
 }
 
 type metricHandler struct {
@@ -200,14 +203,7 @@ func NewListener(sink Sink, conf *ListenerConfig) (*ListenerServer, error) {
 	r.Handle("/v1/metric", &listenServer.metricHandler)
 	r.Handle("/metric", &listenServer.metricHandler)
 
-	traceSink := sink
-	if len(conf.SpanNameReplacementRules) > 0 {
-		var err1 error
-		traceSink, err1 = tagreplace.New(conf.SpanNameReplacementRules, *conf.SpanNameReplacementBreakAfterMatch, sink)
-		if err1 != nil {
-			return nil, errors.Annotatef(err1, "cannot parse tag replacement rules %v", conf.SpanNameReplacementRules)
-		}
-	}
+	traceSink, err := createTraceSink(sink, conf)
 
 	listenServer.internalCollectors = sfxclient.NewMultiCollector(
 		setupNotFoundHandler(conf.RootContext, r),
@@ -235,6 +231,20 @@ func setupNotFoundHandler(ctx context.Context, r *mux.Router) sfxclient.Collecto
 		Dimensions: map[string]string{"protocol": "http404"},
 		Collector:  &metricTracking,
 	}
+}
+
+func createTraceSink(sink Sink, conf *ListenerConfig) (Sink, error) {
+	if len(conf.SpanNameReplacementRules) > 0 {
+		var err1 error
+		sink, err1 = tagreplace.New(conf.SpanNameReplacementRules, *conf.SpanNameReplacementBreakAfterMatch, sink)
+		if err1 != nil {
+			return nil, errors.Annotatef(err1, "cannot parse tag replacement rules %v", conf.SpanNameReplacementRules)
+		}
+	}
+	if len(conf.AdditionalSpanTags) > 0 {
+		sink = additionalspantags.New(conf.AdditionalSpanTags, sink)
+	}
+	return sink, nil
 }
 
 // SetupChain wraps the reader returned by getReader in an http.Handler along
