@@ -188,6 +188,7 @@ func (s *signalFxLoader) Listener(sink signalfx.Sink, conf *ListenFrom) (protoco
 		HTTPChain:                          s.httpChain,
 		SpanNameReplacementRules:           conf.SpanNameReplacementRules,
 		SpanNameReplacementBreakAfterMatch: conf.SpanNameReplacementBreakAfterMatch,
+		AdditionalSpanTags:                 conf.AdditionalSpanTags,
 	}
 	return signalfx.NewListener(sink, &sfConf)
 }
