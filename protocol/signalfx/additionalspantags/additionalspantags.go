@@ -35,7 +35,7 @@ func (a *AdditionalSpanTags) AddEvents(ctx context.Context, events []*event.Even
 func (a *AdditionalSpanTags) AddSpans(ctx context.Context, spans []*trace.Span) error {
 	for _, s := range spans {
 		if s.Tags == nil {
-			s.Tags = map[string]string{}
+			s.Tags = make(map[string]string, len(a.tags))
 		}
 
 		for k, v := range a.tags {

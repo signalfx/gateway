@@ -6,6 +6,7 @@ import (
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/trace"
 	. "github.com/smartystreets/goconvey/convey"
+	"strconv"
 	"testing"
 )
 
@@ -92,4 +93,24 @@ func TestPassthroughs(t *testing.T) {
 		So(at.AddDatapoints(context.Background(), []*datapoint.Datapoint{}), ShouldBeNil)
 		So(at.AddEvents(context.Background(), []*event.Event{}), ShouldBeNil)
 	})
+}
+
+func Benchmark(b *testing.B) {
+	spans := make([]*trace.Span, 0, b.N)
+	for i := 0; i < b.N; i++ {
+		spans = append(spans, &trace.Span{})
+	}
+	tagsConfig := make(map[string]string, 100)
+	var i int64
+	for i = 0; i < 100; i++ {
+		kv := strconv.FormatInt(i, 10)
+		tagsConfig[kv] = kv
+	}
+	addTags := AdditionalSpanTags{
+		tags: tagsConfig,
+		next: &end{},
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	addTags.AddSpans(context.Background(), spans)
 }
