@@ -39,6 +39,16 @@ func (f *BasicSink) NextEvent() *event.Event {
 	return r[0]
 }
 
+// NextSpan returns a single span from the top of TracesChan and panics if the top doesn't contain
+// only one span
+func (f *BasicSink) NextSpan() *trace.Span {
+	r := <-f.TracesChan
+	if len(r) != 1 {
+		panic("Expect a single span")
+	}
+	return r[0]
+}
+
 // AddDatapoints buffers the point on an internal chan or returns errors if RetErr is set
 func (f *BasicSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
 	f.mu.Lock()
