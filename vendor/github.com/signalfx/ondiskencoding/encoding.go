@@ -57,27 +57,32 @@ type Histo struct {
 }
 
 //easyjson:json
+type BufferEntryCommon struct {
+	TraceID       string      `json:",omitempty"` // id of the trace
+	Last          time.Time   `json:",omitempty"` // Last time we saw a span for this trace id
+	LatestEndTime int64       `json:",omitempty"` // Latest end time we've seen for any span
+	StartTime     int64       `json:",omitempty"` // Start time of initiating span if found
+	Initiating    *trace.Span `json:",omitempty"` // initiating span
+}
+
+//easyjson:json
 type ExpiredBufferEntry struct {
-	BufferEntry
-	NewSpanSeen   bool `json:",omitempty"` // we've seen a new span
-	Released      bool `json:",omitempty"`
-	TraceTooLarge bool `json:",omitempty"`
+	*BufferEntryCommon
+	NewSpanSeen   bool        `json:",omitempty"` // we've seen a new span
+	Released      bool        `json:",omitempty"` // we've released this trace so send along any new spans we see
+	TraceTooLarge bool        `json:",omitempty"` // trace is too large so increment counters to this effect
+}
+
+//easyjson:json
+type BufferEntry struct {
+	*BufferEntryCommon
+	Spans         []*trace.Span `json:",omitempty"` // buffer of spans by trace id
+	SizeSoFar     int64         `json:",omitempty"` // size of the trace so far
+	ToBeReleased  bool          `json:",omitempty"` // spans that have been selected to be released
 }
 
 //easyjson:json
 type ExpiredBufferEntries []*ExpiredBufferEntry
-
-//easyjson:json
-type BufferEntry struct {
-	TraceID       string        `json:",omitempty"` // id of the trace
-	Spans         []*trace.Span `json:",omitempty"` // buffer of spans by trace id
-	Last          time.Time     `json:",omitempty"` // Last time we saw a span for this trace id
-	LatestEndTime int64       `json:",omitempty"` // Latest end time we've seen for any span
-	StartTime     int64       `json:",omitempty"` // Start time of initiating span if found
-	Initiating    *trace.Span   `json:",omitempty"` // initiating span
-	SizeSoFar     int64         `json:",omitempty"` // size of the trace so far
-	ToBeReleased  bool          `json:",omitempty"` // spans that have been selected to be released
-}
 
 //easyjson:json
 type BufferEntries []*BufferEntry
@@ -95,7 +100,7 @@ type SampleList []*SampleEntry
 //easyjson:json
 type SampleEntry struct {
 	ID      *SpanIdentity `json:",omitempty"`
-	Samples []int64     `json:",omitempty"`
+	Samples []int64       `json:",omitempty"`
 }
 
 //easyjson:json
