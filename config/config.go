@@ -2,12 +2,19 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/coreos/etcd/embed"
 	"io/ioutil"
+	"net/url"
+	"path"
+	"runtime"
+	"strings"
 	"time"
 
 	"expvar"
 	"os"
 
+	"github.com/signalfx/embetcd/embetcd"
 	"github.com/signalfx/gateway/etcdIntf"
 	"github.com/signalfx/gateway/logkey"
 	"github.com/signalfx/gateway/protocol/filtering"
@@ -81,70 +88,209 @@ func (forwardTo *ForwardTo) String() string {
 
 // GatewayConfig is the full config as presented inside the gateway config file
 type GatewayConfig struct {
-	ForwardTo                      []*ForwardTo      `json:",omitempty"`
-	ListenFrom                     []*ListenFrom     `json:",omitempty"`
-	StatsDelay                     *string           `json:",omitempty"`
-	StatsDelayDuration             *time.Duration    `json:"-"`
-	NumProcs                       *int              `json:",omitempty"`
-	LocalDebugServer               *string           `json:",omitempty"`
-	PidFilename                    *string           `json:",omitempty"`
-	LogDir                         *string           `json:",omitempty"`
-	LogMaxSize                     *int              `json:",omitempty"`
-	LogMaxBackups                  *int              `json:",omitempty"`
-	LogFormat                      *string           `json:",omitempty"`
-	PprofAddr                      *string           `json:",omitempty"`
-	DebugFlag                      *string           `json:",omitempty"`
-	ServerName                     *string           `json:",omitempty"`
-	MaxGracefulWaitTime            *string           `json:",omitempty"`
-	GracefulCheckInterval          *string           `json:",omitempty"`
-	SilentGracefulTime             *string           `json:",omitempty"`
-	MaxGracefulWaitTimeDuration    *time.Duration    `json:"-"`
-	GracefulCheckIntervalDuration  *time.Duration    `json:"-"`
-	SilentGracefulTimeDuration     *time.Duration    `json:"-"`
-	LateThreshold                  *string           `json:",omitempty"`
-	FutureThreshold                *string           `json:",omitempty"`
-	LateThresholdDuration          *time.Duration    `json:"-"`
-	FutureThresholdDuration        *time.Duration    `json:"-"`
-	ClusterOperation               *string           `json:",omitempty"`
-	ClusterDataDir                 *string           `json:",omitempty"`
-	TargetClusterAddresses         []string          `json:",omitempty"`
-	AdvertisePeerAddress           *string           `json:",omitempty"`
-	ListenOnPeerAddress            *string           `json:",omitempty"`
-	AdvertiseClientAddress         *string           `json:",omitempty"`
-	ListenOnClientAddress          *string           `json:",omitempty"`
-	ETCDMetricsAddress             *string           `json:",omitempty"`
-	UnhealthyMemberTTL             *time.Duration    `json:"-"`
-	RemoveMemberTimeout            *time.Duration    `json:"-"`
-	AdditionalDimensions           map[string]string `json:",omitempty"`
-	InternalMetricsListenerAddress *string           `json:",omitempty"`
-	ClusterName                    *string           `json:",omitempty"`
+	// General Gateway Configurations
+	NumProcs             *int              `json:",omitempty"`
+	PidFilename          *string           `json:",omitempty"`
+	AdditionalDimensions map[string]string `json:",omitempty"`
+
+	// forwarder Configuration
+	ForwardTo []*ForwardTo `json:",omitempty"`
+
+	// Listener Configurations
+	ListenFrom              []*ListenFrom  `json:",omitempty"`
+	LateThreshold           *string        `json:",omitempty"`
+	FutureThreshold         *string        `json:",omitempty"`
+	LateThresholdDuration   *time.Duration `json:"-"`
+	FutureThresholdDuration *time.Duration `json:"-"`
+
+	// Log configurations
+	LogDir        *string `json:",omitempty"`
+	LogMaxSize    *int    `json:",omitempty"`
+	LogMaxBackups *int    `json:",omitempty"`
+	LogFormat     *string `json:",omitempty"`
+
+	// Internal Metric Configurations
+	StatsDelay                     *string        `json:",omitempty"`
+	StatsDelayDuration             *time.Duration `json:"-"`
+	InternalMetricsListenerAddress *string        `json:",omitempty"`
+
+	// Debug Configurations
+	LocalDebugServer *string `json:",omitempty"`
+	PprofAddr        *string `json:",omitempty"`
+	DebugFlag        *string `json:",omitempty"`
+
+	// Shutdown Configurations
+	MaxGracefulWaitTime           *string        `json:",omitempty"`
+	GracefulCheckInterval         *string        `json:",omitempty"`
+	SilentGracefulTime            *string        `json:",omitempty"`
+	MaxGracefulWaitTimeDuration   *time.Duration `json:"-"`
+	GracefulCheckIntervalDuration *time.Duration `json:"-"`
+	SilentGracefulTimeDuration    *time.Duration `json:"-"`
+
+	// Clustering
+
+	// General Cluster configurations
+	ServerName       *string `json:",omitempty"`
+	ClusterName      *string `json:",omitempty"`
+	ClusterOperation *string `json:",omitempty"`
+	ClusterDataDir   *string `json:",omitempty"`
+
+	// Target Cluster Addresses
+	TargetClusterAddresses []string `json:",omitempty"`
+
+	// Peer Addresses
+	AdvertisedPeerAddresses []string `json:",omitempty"`
+	AdvertisePeerAddress    *string  `json:",omitempty"`
+	ListenOnPeerAddresses   []string `json:",omitempty"`
+	ListenOnPeerAddress     *string  `json:",omitempty"`
+
+	// Client Addresses
+	AdvertisedClientAddresses []string `json:",omitempty"`
+	AdvertiseClientAddress    *string  `json:",omitempty"`
+	ListenOnClientAddresses   []string `json:",omitempty"`
+	ListenOnClientAddress     *string  `json:",omitempty"`
+
+	// Metric Addresses for Etcd
+	EtcdListenOnMetricsAddresses []string `json:",omitempty"`
+	ETCDMetricsAddress           *string  `json:",omitempty"`
+
+	// Durations
+	UnhealthyMemberTTL     *time.Duration `json:"-"`
+	RemoveMemberTimeout    *time.Duration `json:"-"`
+	EtcdServerStartTimeout *time.Duration `json:"-"`
+
+	// Etcd Configurable Durations
+	EtcdDialTimeout            *time.Duration `json:"-"`
+	EtcdAutoSyncInterval       *time.Duration `json:"-"`
+	EtcdStartupGracePeriod     *time.Duration `json:"-"`
+	EtcdClusterCleanUpInterval *time.Duration `json:"-"`
 }
 
-// DefaultGatewayConfig is default values for the gateway config
-var DefaultGatewayConfig = &GatewayConfig{
-	PidFilename:                   pointer.String("gateway.pid"),
-	LogDir:                        pointer.String(os.TempDir()),
-	LogMaxSize:                    pointer.Int(100),
-	LogMaxBackups:                 pointer.Int(10),
-	LogFormat:                     pointer.String(""),
-	ServerName:                    pointer.String(getDefaultName(os.Hostname)),
-	MaxGracefulWaitTimeDuration:   pointer.Duration(time.Second),
-	GracefulCheckIntervalDuration: pointer.Duration(time.Second),
-	SilentGracefulTimeDuration:    pointer.Duration(2 * time.Second),
-	ListenOnPeerAddress:           pointer.String("0.0.0.0:2380"),
-	AdvertisePeerAddress:          pointer.String("127.0.0.1:2380"),
-	ListenOnClientAddress:         pointer.String("0.0.0.0:2379"),
-	AdvertiseClientAddress:        pointer.String("127.0.0.1:2379"),
-	ETCDMetricsAddress:            pointer.String("127.0.0.1:2381"),
-	UnhealthyMemberTTL:            pointer.Duration(time.Second * 5),
-	RemoveMemberTimeout:           pointer.Duration(time.Second),
-	ClusterDataDir:                pointer.String("./etcd-data"),
-	ClusterOperation:              pointer.String(""),
-	TargetClusterAddresses:        []string{},
-	AdditionalDimensions:          map[string]string{},
-	ClusterName:                   pointer.String("gateway"),
+func stringToURL(s string) (u *url.URL, err error) {
+	if s != "" && !strings.HasPrefix(s, "http") {
+		u, err = url.Parse(fmt.Sprintf("http://%s", s))
+	} else {
+		u, err = url.Parse(s)
+	}
+
+	return u, err
 }
 
+func etcdURLHelper(single *string, multiple []string) []url.URL {
+	urls := make([]url.URL, 0, len(multiple)+1)
+	if single != nil {
+		u, err := stringToURL(*single)
+		if err == nil {
+			urls = append(urls, *u)
+		}
+	}
+	if len(multiple) > 0 {
+		for _, stringURL := range multiple {
+			u, err := stringToURL(stringURL)
+			if err == nil {
+				urls = append(urls, *u)
+			}
+		}
+	}
+	return urls
+}
+
+var etcdClusterStateMapping = map[string]string{
+	"seed":                         embed.ClusterStateFlagNew,
+	"join":                         embed.ClusterStateFlagExisting,
+	embed.ClusterStateFlagNew:      embed.ClusterStateFlagNew,
+	embed.ClusterStateFlagExisting: embed.ClusterStateFlagExisting,
+}
+
+// ToEtcdConfig returns a config struct for github.com/signalfx/embetcd/embetcd
+func (p *GatewayConfig) ToEtcdConfig() *embetcd.Config {
+	// etcd/embed config struct
+	etcdCfg := embed.NewConfig()
+
+	// general configurations
+	if p.ServerName != nil {
+		etcdCfg.Name = *p.ServerName
+	}
+	if p.ClusterDataDir != nil {
+		etcdCfg.Dir = path.Join(*p.ClusterDataDir, "etcd")
+	}
+
+	// cast "seed" or "join" to their corresponding etcd/embed cluster state
+	// or just return the exact value that was passed into the config
+	if p.ClusterOperation != nil {
+		if op, ok := etcdClusterStateMapping[*p.ClusterOperation]; ok {
+			etcdCfg.ClusterState = op
+		} else {
+			etcdCfg.ClusterState = *p.ClusterOperation
+		}
+	}
+
+	// process urls
+	etcdCfg.ListenMetricsUrls = etcdURLHelper(p.ETCDMetricsAddress, p.EtcdListenOnMetricsAddresses)
+	etcdCfg.LPUrls = etcdURLHelper(p.ListenOnPeerAddress, p.ListenOnPeerAddresses)
+	etcdCfg.APUrls = etcdURLHelper(p.AdvertisePeerAddress, p.AdvertisedPeerAddresses)
+	etcdCfg.LCUrls = etcdURLHelper(p.ListenOnClientAddress, p.ListenOnClientAddresses)
+	etcdCfg.ACUrls = etcdURLHelper(p.AdvertiseClientAddress, p.AdvertisedClientAddresses)
+
+	// signalfx/embetcd config struct
+	cfg := &embetcd.Config{
+		// creates an embedded etcd server config with default values that we'll override
+		Config:              etcdCfg,
+		CleanUpInterval:     p.EtcdClusterCleanUpInterval,
+		DialTimeout:         p.EtcdDialTimeout,
+		AutoSyncInterval:    p.EtcdAutoSyncInterval,
+		StartupGracePeriod:  p.EtcdStartupGracePeriod,
+		UnhealthyTTL:        p.UnhealthyMemberTTL,
+		RemoveMemberTimeout: p.RemoveMemberTimeout,
+	}
+
+	// validate urls before we use them
+	initialCluster := make([]string, 0, len(cfg.InitialCluster))
+	for _, s := range p.TargetClusterAddresses {
+		if s, err := stringToURL(s); err == nil {
+			initialCluster = append(initialCluster, s.String())
+		}
+	}
+	cfg.InitialCluster = initialCluster
+
+	if p.ClusterName != nil {
+		cfg.ClusterName = *p.ClusterName
+	}
+
+	return cfg
+}
+
+// DefaultGatewayConfig returns default gateway config
+func DefaultGatewayConfig() *GatewayConfig {
+	return &GatewayConfig{
+		PidFilename:                   pointer.String("gateway.pid"),
+		LogDir:                        pointer.String(os.TempDir()),
+		LogMaxSize:                    pointer.Int(100),
+		LogMaxBackups:                 pointer.Int(10),
+		LogFormat:                     pointer.String(""),
+		ServerName:                    pointer.String(getDefaultName(os.Hostname)),
+		MaxGracefulWaitTimeDuration:   pointer.Duration(time.Second),
+		GracefulCheckIntervalDuration: pointer.Duration(time.Second),
+		SilentGracefulTimeDuration:    pointer.Duration(2 * time.Second),
+		ListenOnPeerAddress:           pointer.String("0.0.0.0:2380"),
+		AdvertisePeerAddress:          pointer.String("127.0.0.1:2380"),
+		ListenOnClientAddress:         pointer.String("0.0.0.0:2379"),
+		AdvertiseClientAddress:        pointer.String("127.0.0.1:2379"),
+		ETCDMetricsAddress:            pointer.String("127.0.0.1:2381"),
+		UnhealthyMemberTTL:            pointer.Duration(embetcd.DefaultUnhealthyTTL),
+		RemoveMemberTimeout:           pointer.Duration(time.Second),
+		EtcdStartupGracePeriod:        pointer.Duration(embetcd.DefaultStartUpGracePeriod),
+		EtcdDialTimeout:               pointer.Duration(embetcd.DefaultDialTimeout),
+		EtcdClusterCleanUpInterval:    pointer.Duration(embetcd.DefaultCleanUpInterval),
+		EtcdAutoSyncInterval:          pointer.Duration(embetcd.DefaultAutoSyncInterval),
+		ClusterDataDir:                pointer.String("./etcd-data"),
+		ClusterOperation:              pointer.String(""),
+		TargetClusterAddresses:        []string{},
+		AdditionalDimensions:          map[string]string{},
+		ClusterName:                   pointer.String("gateway"),
+		NumProcs:                      pointer.Int(runtime.NumCPU()),
+	}
+}
 func getDefaultName(osHostname func() (string, error)) string {
 	hostname, err := osHostname()
 	if err == nil {
@@ -270,11 +416,13 @@ func (p *GatewayConfig) Var() expvar.Var {
 func Load(configFile string, logger log.Logger) (*GatewayConfig, error) {
 	p, err := loadNoDefault(configFile, logger)
 	if err == nil {
-		c := pointer.FillDefaultFrom(p, DefaultGatewayConfig).(*GatewayConfig)
+		c := pointer.FillDefaultFrom(p, DefaultGatewayConfig()).(*GatewayConfig)
 		if err = os.Setenv("gatewayServerName", *c.ServerName); err == nil {
 			if c.ClusterName == nil || *c.ClusterName == "" {
 				return nil, errors.New("gateway now requires configuring ClusterName at top level of config")
 			}
+			// fill in environment variable values to override config file
+			loadFromEnv(p)
 			return c, nil
 		}
 	}
@@ -299,4 +447,70 @@ func loadNoDefault(configFile string, logger log.Logger) (*GatewayConfig, error)
 		return nil, errors.Annotatef(errConfigfile, "cannot load config file %s", errConfigfile)
 	}
 	return config, nil
+}
+
+// getStringEnvVar returns the given env var key's value or the default value
+func getStringEnvVar(envVar string, def *string) *string {
+	if val := os.Getenv(envVar); val != "" {
+		return &val
+	}
+	return def
+}
+
+// getDurationEnvVar returns the given env var key's value or the default value
+func getDurationEnvVar(envVar string, def *time.Duration) *time.Duration {
+	if strVal := os.Getenv(envVar); strVal != "" {
+		if dur, err := time.ParseDuration(strVal); err == nil {
+			return &dur
+		}
+	}
+	return def
+}
+
+// getCommaSeparatedStringEnvVar returns the given env var key's value split by comma or the default values
+func getCommaSeparatedStringEnvVar(envVar string, def []string) []string {
+	if val := os.Getenv(envVar); val != "" {
+		def = def[:0]
+		for _, addr := range strings.Split(strings.Replace(val, " ", "", -1), ",") {
+			def = append(def, addr)
+		}
+	}
+	return def
+}
+
+// loadFromEnv loads environment variables to override values in the gateway config file
+func loadFromEnv(conf *GatewayConfig) {
+	// general configs
+	conf.ServerName = getStringEnvVar("SFX_SERVER_NAME", conf.ServerName)
+	conf.ClusterName = getStringEnvVar("SFX_GATEWAY_CLUSTER_NAME", conf.ClusterName)
+	conf.ClusterOperation = getStringEnvVar("SFX_CLUSTER_OPERATION", conf.ClusterOperation)
+	conf.ClusterDataDir = getStringEnvVar("SFX_CLUSTER_DATA_DIR", conf.ClusterDataDir)
+
+	// Target Cluster Addresses
+	conf.TargetClusterAddresses = getCommaSeparatedStringEnvVar("SFX_TARGET_CLUSTER_ADDRESSES", conf.TargetClusterAddresses)
+
+	// Peer Addresses
+	conf.ListenOnPeerAddress = getStringEnvVar("SFX_LISTEN_ON_PEER_ADDRESS", conf.ListenOnPeerAddress)
+	conf.ListenOnPeerAddresses = getCommaSeparatedStringEnvVar("SFX_LISTEN_ON_PEER_ADDRESSES", conf.ListenOnPeerAddresses)
+	conf.AdvertisePeerAddress = getStringEnvVar("SFX_ADVERTISE_PEER_ADDRESS", conf.AdvertisePeerAddress)
+	conf.AdvertisedPeerAddresses = getCommaSeparatedStringEnvVar("SFX_ADVERTISED_PEER_ADDRESSES", conf.AdvertisedPeerAddresses)
+
+	// Client Addresses
+	conf.ListenOnClientAddress = getStringEnvVar("SFX_LISTEN_ON_CLIENT_ADDRESS", conf.ListenOnClientAddress)
+	conf.ListenOnClientAddresses = getCommaSeparatedStringEnvVar("SFX_LISTEN_ON_CLIENT_ADDRESSES", conf.ListenOnClientAddresses)
+	conf.AdvertiseClientAddress = getStringEnvVar("SFX_ADVERTISE_CLIENT_ADDRESS", conf.AdvertiseClientAddress)
+	conf.AdvertisedClientAddresses = getCommaSeparatedStringEnvVar("SFX_ADVERTISED_CLIENT_ADDRESSES", conf.AdvertisedClientAddresses)
+
+	// Metric Addresses
+	conf.ETCDMetricsAddress = getStringEnvVar("SFX_ETCD_METRICS_ADDRESS", conf.ETCDMetricsAddress)
+	conf.EtcdListenOnMetricsAddresses = getCommaSeparatedStringEnvVar("SFX_ETCD_LISTEN_ON_METRICS_ADDRESSES", conf.EtcdListenOnMetricsAddresses)
+
+	// Durations
+	conf.UnhealthyMemberTTL = getDurationEnvVar("SFX_UNHEALTHY_MEMBER_TTL", conf.UnhealthyMemberTTL)
+	conf.RemoveMemberTimeout = getDurationEnvVar("SFX_REMOVE_MEMBER_TIMEOUT", conf.RemoveMemberTimeout)
+	conf.EtcdDialTimeout = getDurationEnvVar("SFX_ETCD_DIAL_TIMEOUT", conf.EtcdDialTimeout)
+	conf.EtcdClusterCleanUpInterval = getDurationEnvVar("SFX_ETCD_CLUSTER_CLEANUP_INTERVAL", conf.EtcdClusterCleanUpInterval)
+	conf.EtcdAutoSyncInterval = getDurationEnvVar("SFX_ETCD_AUTOSYNC_INTERVAL", conf.EtcdAutoSyncInterval)
+	conf.EtcdStartupGracePeriod = getDurationEnvVar("SFX_ETCD_STARTUP_GRACE_PERIOD", conf.EtcdStartupGracePeriod)
+
 }

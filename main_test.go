@@ -5,14 +5,16 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/mvcc/mvccpb"
+	"github.com/signalfx/gateway/flaghelpers"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
+	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,10 +23,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/quentin-m/etcd-cloud-operator/pkg/etcd"
+	"github.com/coreos/etcd/embed"
+	"github.com/signalfx/embetcd/embetcd"
 	"github.com/signalfx/gateway/config"
 	"github.com/signalfx/gateway/protocol/carbon"
 	"github.com/signalfx/gateway/protocol/signalfx"
+	_ "github.com/signalfx/go-metrics"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/errors"
@@ -33,13 +37,15 @@ import (
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/timekeeper"
+	_ "github.com/signalfx/ondiskencoding"
 	. "github.com/smartystreets/goconvey/convey"
-	"github.com/stretchr/testify/assert"
-	"runtime"
+	_ "github.com/spaolacci/murmur3"
+	"gotest.tools/assert"
 )
 
 const configEtcd = `
 	{
+		"ClusterName": "<<CLUSTERNAME>>",
 		"LogFormat": "logfmt",
 		"LogDir": "-",
 		"NumProcs":4,
@@ -120,7 +126,8 @@ const config1 = `
 	"MaxGracefulWaitTime":     "<<MAX>>ms",
 	"GracefulCheckInterval":   "<<CHECK>>ms",
 	"MinimalGracefulWaitTime": "<<MIN>>ms",
-	"SilentGracefulTime": "50ms"
+	"SilentGracefulTime": "50ms",
+	"InternalMetricsListenerAddress": "<<INTERNALMETRICS>>"
   }
 `
 
@@ -250,13 +257,32 @@ func (g *goMaxProcs) Set(i int) int {
 	return int(atomic.SwapInt64(&g.lastVal, int64(i)))
 }
 
-func TestMainInstance(t *testing.T) {
-	flagParse = func() {}
-	s := mainInstance.flags.configFileName
-	mainInstance.flags.configFileName = "__INVALID_FILENAME__"
+func Test_setupGoMaxProcs(t *testing.T) {
+	Convey("setup go max procs", t, func() {
+		gmp := &goMaxProcs{lastVal: 0}
+		setupGoMaxProcs(&config.GatewayConfig{}, gmp.Set)
+		So(gmp.lastVal, ShouldEqual, runtime.NumCPU())
+		setupGoMaxProcs(&config.GatewayConfig{NumProcs: pointer.Int(3)}, gmp.Set)
+		So(gmp.lastVal, ShouldEqual, 3)
+
+	})
+}
+
+func Test_GetContext(t *testing.T) {
+	Convey("GetContext", t, func() {
+		So(GetContext(nil), ShouldEqual, context.Background())
+		So(GetContext(context.Background()), ShouldEqual, context.Background())
+	})
+}
+
+func Test_Main(t *testing.T) {
+	defer func() {
+		// reset package flags
+		flags = &gatewayFlags{}
+		flagParse = flag.Parse
+	}()
+	flags.configFileName = "__INVALID_FILENAME__"
 	main()
-	mainInstance.flags.configFileName = s
-	flagParse = flag.Parse
 }
 
 type ConcurrentByteBuffer struct {
@@ -268,6 +294,20 @@ func (c *ConcurrentByteBuffer) Write(p []byte) (n int, err error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	return c.Buffer.Write(p)
+}
+
+func Test_logIfCtxExceeded(t *testing.T) {
+	Convey("logIfCtxExceeded", t, func() {
+		logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
+		logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
+		ctx, cancel := context.WithCancel(context.Background())
+		logIfCtxExceeded(ctx, logger)
+		So(logBuf.String(), ShouldContainSubstring, "Graceful shutdown complete")
+		logBuf.Reset()
+		cancel()
+		logIfCtxExceeded(ctx, logger)
+		So(logBuf.String(), ShouldContainSubstring, "Exceeded graceful shutdown period")
+	})
 }
 
 func failingTestRun(t *testing.T, c string, closeAfterSetup bool, expectedLog string, expectedErr string) context.CancelFunc {
@@ -284,15 +324,9 @@ func failingTestRun(t *testing.T, c string, closeAfterSetup bool, expectedLog st
 		ctx, contextCancel := context.WithCancel(context.Background())
 		So(ioutil.WriteFile(filename, []byte(c), os.FileMode(0666)), ShouldBeNil)
 		p := gateway{
-			flags: gatewayFlags{
-				configFileName: filename,
-			},
-			logger:          logger,
 			tk:              timekeeper.RealTime{},
 			setupDoneSignal: make(chan struct{}),
 			stdout:          logBuf,
-			gomaxprocs:      (&goMaxProcs{}).Set,
-			etcdMgr:         &etcdManager{ServerConfig: etcd.ServerConfig{}, logger: logger.CreateChild()},
 		}
 		if closeAfterSetup {
 			go func() {
@@ -302,8 +336,19 @@ func failingTestRun(t *testing.T, c string, closeAfterSetup bool, expectedLog st
 		} else {
 			cc = contextCancel
 		}
-		err = p.main(ctx)
+
+		// loadedConfig
+		var loadedConfig *config.GatewayConfig
+		loadedConfig, err = loadConfig(filename, logger)
+
+		// set config on gateway instance
+		if loadedConfig != nil {
+			writePidFile(loadedConfig, logger)
+			p.configure(loadedConfig)
+			err = p.start(ctx)
+		}
 		if expectedErr != "" {
+			fmt.Println(logBuf.String())
 			So(err, ShouldNotBeNil)
 			So(errors.Details(err), ShouldContainSubstring, expectedErr)
 		} else {
@@ -332,7 +377,7 @@ func TestConfigs(t *testing.T) {
 		{name: "invalidJSON", config: "__INVALID__JSON__", closeAfterSetup: false, expectedLog: "", expectedErr: "cannot unmarshal config JSON"},
 		{name: "invalidListenerConfig", config: invalidListenerConfig, closeAfterSetup: false, expectedLog: "", expectedErr: "cannot setup listeners from configuration"},
 		{name: "invalidPIDfile", config: invalidPIDfile, closeAfterSetup: true, expectedLog: "cannot store pid in pid file", expectedErr: ""},
-		{name: "invalidPIDfile", config: invalidClusterOpConfig, closeAfterSetup: true, expectedLog: "", expectedErr: "unsupported cluster-op specified \"woohoo\""},
+		{name: "invalidClusterOp", config: invalidClusterOpConfig, closeAfterSetup: true, expectedLog: "", expectedErr: "unsupported cluster-op specified \"woohoo\""},
 		{name: "dupeForwarder", config: dupeForwarder, closeAfterSetup: false, expectedLog: "", expectedErr: errDupeForwarder.Error()},
 		{name: "dupeListener", config: dupeListener, closeAfterSetup: false, expectedLog: "", expectedErr: errDupeListener.Error()},
 	}
@@ -362,7 +407,7 @@ func TestProxy1(t *testing.T) {
 		var cl *carbon.Listener
 		checkError := false
 
-		setUp := func(max int, min int, check int) {
+		setUp := func(max int, min int, check int, internalMetricsAddress string) {
 			go func() {
 				for {
 					ln, _ := net.Listen("tcp", "localhost:9999")
@@ -391,32 +436,23 @@ func TestProxy1(t *testing.T) {
 			proxyConf = strings.Replace(proxyConf, "<<MAX>>", strconv.FormatInt(int64(max), 10), -1)
 			proxyConf = strings.Replace(proxyConf, "<<MIN>>", strconv.FormatInt(int64(min), 10), -1)
 			proxyConf = strings.Replace(proxyConf, "<<CHECK>>", strconv.FormatInt(int64(check), 10), -1)
+			proxyConf = strings.Replace(proxyConf, "<<INTERNALMETRICS>>", internalMetricsAddress, -1)
 			So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
 			fmt.Println("Launching server...")
-			gmp := &goMaxProcs{}
-			p = &gateway{
-				flags: gatewayFlags{
-					configFileName: filename,
-				},
-				stdout:          os.Stdout,
-				logger:          logger,
-				tk:              timekeeper.RealTime{},
-				setupDoneSignal: make(chan struct{}),
-				gomaxprocs:      gmp.Set,
-				signalChan:      make(chan os.Signal),
-				etcdMgr:         &etcdManager{ServerConfig: etcd.ServerConfig{DataDir: etcdDataDir, LCAddress: "127.0.0.1:2379", ACAddress: "127.0.0.1:2379", LPAddress: "127.0.0.1:2380", APAddress: "127.0.0.1:2380", MAddress: "127.0.0.1:2381"}, operation: "", logger: logger.CreateChild()},
-			}
+			p = newGateway()
+			p.logger = logger
+			loadedConfig, _ := loadConfig(filename, logger)
+			p.configure(loadedConfig)
 			mainDoneChan = make(chan error)
 			go func() {
-				mainDoneChan <- p.main(ctx)
+				mainDoneChan <- p.start(ctx)
 				close(mainDoneChan)
 			}()
 			<-p.setupDoneSignal
-			So(gmp.lastVal, ShouldEqual, int64(4))
 		}
 
 		Convey("should have signalfx listener too", func() {
-			setUp(1000, 0, 25)
+			setUp(1000, 0, 25, "0.0.0.0:2500")
 			So(p, ShouldNotBeNil)
 			sfxListenPort := nettest.TCPPort(p.listeners[2].(*signalfx.ListenerServer))
 			resp, err := http.Post(fmt.Sprintf("http://127.0.0.1:%d/v2/datapoint", sfxListenPort), "application/json", strings.NewReader("{}"))
@@ -426,7 +462,7 @@ func TestProxy1(t *testing.T) {
 		})
 
 		Convey("should have debug values", func() {
-			setUp(1000, 0, 25)
+			setUp(1000, 0, 25, "0.0.0.0:2501")
 			So(p, ShouldNotBeNil)
 			listenPort := nettest.TCPPort(p.debugServerListener)
 			resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/debug/vars", listenPort))
@@ -435,7 +471,7 @@ func TestProxy1(t *testing.T) {
 		})
 
 		Convey("should gateway a carbon point", func() {
-			setUp(1000, 0, 25)
+			setUp(1000, 0, 25, "0.0.0.0:2501")
 			So(p, ShouldNotBeNil)
 			dp := dptest.DP()
 			dp.Dimensions = nil
@@ -446,7 +482,7 @@ func TestProxy1(t *testing.T) {
 		})
 
 		Convey("getLogOutput should work correctly", func() {
-			setUp(1000, 0, 25)
+			setUp(1000, 0, 25, "0.0.0.0:2502")
 			So(p, ShouldNotBeNil)
 			So(p.getLogOutput(&config.GatewayConfig{
 				LogDir: pointer.String("-"),
@@ -464,12 +500,12 @@ func TestProxy1(t *testing.T) {
 		})
 
 		Convey("max time exceed should work correctly", func() {
-			setUp(0, 0, 25)
+			setUp(0, 0, 25, "0.0.0.0:2503")
 			So(p, ShouldNotBeNil)
 		})
 
 		Convey("", func() {
-			setUp(1000, 0, 25)
+			setUp(1000, 0, 25, "0.0.0.0:2504")
 			So(p, ShouldNotBeNil)
 			sfxListenPort := nettest.TCPPort(p.listeners[2].(*signalfx.ListenerServer))
 			go func() {
@@ -502,215 +538,10 @@ func TestProxy1(t *testing.T) {
 	})
 }
 
-func startProxies(ctx context.Context, proxies []*gateway, logger *log.Hierarchy) ([]*gateway, []chan error) {
-	ps := make([]*gateway, 0, len(proxies))
-	mainDoneChans := make([]chan error, 0, len(proxies))
-	gmp := &goMaxProcs{}
-	for _, p := range proxies {
-		p.gomaxprocs = gmp.Set
-		p.logger = logger.CreateChild()
-		p.etcdMgr.logger = logger.CreateChild()
-	retry:
-		mainDoneChan := make(chan error)
-		go func(p *gateway, mainDoneChan chan error) {
-			mainDoneChan <- p.main(ctx)
-			close(mainDoneChan)
-		}(p, mainDoneChan)
-		select {
-		case <-p.setupDoneSignal:
-			mainDoneChans = append(mainDoneChans, mainDoneChan)
-			ps = append(ps, p)
-			continue
-		case err := <-mainDoneChan:
-			if err != nil {
-				p.etcdMgr.shutdown(false)
-				time.Sleep(time.Second * 5)
-				goto retry
-			}
-		}
-	}
-	return ps, mainDoneChans
-}
-
-func formatTargetAddresses(targetClusters []string) (targetAddresses string) {
-	for index, address := range targetClusters {
-		targetAddresses += fmt.Sprintf("\"%s\"", address)
-		if index < (len(targetClusters) - 1) {
-			targetAddresses += ","
-		}
-		targetAddresses += "\n"
-	}
-	return
-}
-
 var errTest = errors.New("test")
 
 func Test_NonNil(t *testing.T) {
 	assert.Equal(t, FirstNonNil(errTest), errTest)
-}
-
-func TestProxyCluster(t *testing.T) {
-	Convey("a setup gateway cluster", t, func() {
-		ctx, cancelfunc := context.WithCancel(context.Background())
-		var ps []*gateway
-		filenames := make([]string, 0, 0)
-		var mainDoneChans []chan error
-		logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
-		checkError := false
-
-		setUp := func(max int, min int, check int, etcdConfigs []*etcdManager) {
-			go func() {
-				for {
-					ln, _ := net.Listen("tcp", "localhost:9999")
-					if ln != nil {
-						conn, _ := ln.Accept()
-						time.Sleep(time.Second)
-						_ = conn.Close()
-					}
-				}
-			}()
-			var proxies = make([]*gateway, 0, len(etcdConfigs))
-			for _, etcdConf := range etcdConfigs {
-				fileObj, err := ioutil.TempFile("", "TestProxyCluster")
-				So(err, ShouldBeNil)
-				etcdDataDir, err := ioutil.TempDir("", "TestProxyCluster")
-				So(err, ShouldBeNil)
-				So(os.RemoveAll(etcdDataDir), ShouldBeNil)
-				filename := fileObj.Name()
-				filenames = append(filenames, filename)
-				So(os.Remove(filename), ShouldBeNil)
-				proxyConf := configEtcd
-				proxyConf = strings.Replace(proxyConf, "<<MAX>>", strconv.FormatInt(int64(max), 10), -1)
-				proxyConf = strings.Replace(proxyConf, "<<MIN>>", strconv.FormatInt(int64(min), 10), -1)
-				proxyConf = strings.Replace(proxyConf, "<<CHECK>>", strconv.FormatInt(int64(check), 10), -1)
-				proxyConf = strings.Replace(proxyConf, "<<CHECK>>", strconv.FormatInt(int64(check), 10), -1)
-				proxyConf = strings.Replace(proxyConf, "<<LPADDRESS>>", etcdConf.LPAddress, -1)
-				proxyConf = strings.Replace(proxyConf, "<<APADDRESS>>", etcdConf.APAddress, -1)
-				proxyConf = strings.Replace(proxyConf, "<<LCADDRESS>>", etcdConf.LCAddress, -1)
-				proxyConf = strings.Replace(proxyConf, "<<ACADDRESS>>", etcdConf.ACAddress, -1)
-				proxyConf = strings.Replace(proxyConf, "<<MADDRESS>>", etcdConf.MAddress, -1)
-				proxyConf = strings.Replace(proxyConf, "<<UNHEALTHYTTL>>", strconv.FormatFloat(etcdConf.UnhealthyMemberTTL.Seconds()*1000, 'f', 2, 64), -1)
-				proxyConf = strings.Replace(proxyConf, "<<REMOVEMEMBERTIMEOUT>>", strconv.FormatInt(int64(etcdConf.removeTimeout), 10), -1)
-				proxyConf = strings.Replace(proxyConf, "<<DATADIR>>", filepath.Join(etcdDataDir, etcdConf.DataDir), -1)
-				proxyConf = strings.Replace(proxyConf, "<<CLUSTEROP>>", etcdConf.operation, -1)
-				proxyConf = strings.Replace(proxyConf, "<<TARGETADDRESSES>>", formatTargetAddresses(etcdConf.targetCluster), -1)
-				proxyConf = strings.Replace(proxyConf, "<<SERVERNAME>>", etcdConf.Name, -1)
-
-				So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
-
-				proxies = append(proxies, &gateway{
-					stdout:          os.Stdout,
-					tk:              timekeeper.RealTime{},
-					setupDoneSignal: make(chan struct{}),
-					signalChan:      make(chan os.Signal),
-					flags: gatewayFlags{
-						configFileName: filename,
-					},
-					etcdMgr: &etcdManager{ServerConfig: etcd.ServerConfig{}},
-				})
-			}
-			logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
-			fmt.Println("Launching servers...")
-			ps, mainDoneChans = startProxies(ctx, proxies, logger)
-		}
-
-		Convey("the etcd cluster should be aware of all members", func() {
-			etcdConfs := []*etcdManager{
-				{removeTimeout: 3000, ServerConfig: etcd.ServerConfig{Name: "instance1", UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data", LCAddress: "127.0.0.1:2379", ACAddress: "127.0.0.1:2379", LPAddress: "127.0.0.1:2380", APAddress: "127.0.0.1:2380", MAddress: "127.0.0.1:2381"}, operation: "seed"},
-				{removeTimeout: 3000, ServerConfig: etcd.ServerConfig{Name: "instance2", UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data1", LCAddress: "127.0.0.1:2479", ACAddress: "127.0.0.1:2479", LPAddress: "127.0.0.1:2480", APAddress: "127.0.0.1:2480", MAddress: "127.0.0.1:2481"}, targetCluster: []string{"127.0.0.1:2379"}, operation: "join"},
-				{removeTimeout: -1, ServerConfig: etcd.ServerConfig{Name: "instance3", UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data2", LCAddress: "127.0.0.1:2579", ACAddress: "127.0.0.1:2579", LPAddress: "127.0.0.1:2580", APAddress: "127.0.0.1:2580", MAddress: "127.0.0.1:2581"}, targetCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479"}, operation: "join"},
-				{removeTimeout: 3000, ServerConfig: etcd.ServerConfig{Name: "", UnhealthyMemberTTL: 1000 * time.Millisecond, DataDir: "etcd-data3", LCAddress: "127.0.0.1:2679", ACAddress: "127.0.0.1:2679", LPAddress: "127.0.0.1:2680", APAddress: "127.0.0.1:2680", MAddress: "127.0.0.1:2681"}, targetCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479", "127.0.0.1:2579"}, operation: "join"},
-			}
-			setUp(15000, 0, 25, etcdConfs)
-			So(ps[0].etcdMgr.server.IsRunning(), ShouldBeTrue)
-			for _, p := range ps {
-				memberList, err := p.etcdMgr.client.MemberList(context.Background())
-				fmt.Println(memberList)
-				So(err, ShouldBeNil)
-				So(len(memberList.Members), ShouldEqual, len(ps))
-			}
-		})
-
-		Reset(func() {
-			for index, p := range ps {
-				p.signalChan <- syscall.SIGTERM
-				err := <-mainDoneChans[index]
-				if checkError {
-					So(err, ShouldNotBeNil)
-					checkError = false
-				}
-			}
-			for _, filename := range filenames {
-				So(os.Remove(filename), ShouldBeNil)
-			}
-			if cancelfunc != nil {
-				cancelfunc()
-			}
-		})
-	})
-}
-
-func TestStringIsInSlice(t *testing.T) {
-	Convey("stringIsInSlice", t, func() {
-		testData := []string{"hello", "world"}
-		Convey("should return true if the string is in the slice", func() {
-			So(isStringInSlice("hello", testData), ShouldBeTrue)
-		})
-		Convey("should return false if the string is not in the slice", func() {
-			So(isStringInSlice("goodbye", []string{}), ShouldBeFalse)
-			So(isStringInSlice("goodbye", testData), ShouldBeFalse)
-		})
-	})
-}
-
-func TestEnvVarFuncs(t *testing.T) {
-	testKey := "SFX_TEST_ENV_VAR"
-	Convey("test the following environment variable helper functions", t, func() {
-		Convey("getCommaSeparatedStringEnvVar should parses comma separated strings", func() {
-			testVal := []string{"127.0.0.1:9999", "127.0.0.2:9999", "127.0.0.3:9999"}
-			os.Setenv(testKey, strings.Join(testVal, ","))
-			loaded := getCommaSeparatedStringEnvVar(testKey, []string{})
-			So(len(loaded), ShouldEqual, 3)
-			So(strings.Join(loaded, ","), ShouldEqual, strings.Join(testVal, ","))
-		})
-		Convey("getStringEnvVar", func() {
-			Convey("should return the value if the environment variable is set", func() {
-				testVal := "testStringValue"
-				os.Setenv(testKey, testVal)
-				loaded := getStringEnvVar(testKey, "defaultVal")
-				So(loaded, ShouldEqual, testVal)
-			})
-			Convey("should return the default value if the environment variable is not set", func() {
-				loaded := getStringEnvVar(testKey, "defaultVal")
-				So(loaded, ShouldEqual, "defaultVal")
-			})
-		})
-		Convey("getDurationEnvVar", func() {
-			Convey("should return the value if the environment variable is set", func() {
-				testVal := "5s"
-				os.Setenv(testKey, testVal)
-				loaded := getDurationEnvVar(testKey, 0*time.Second)
-				So(loaded, ShouldEqual, time.Second*5)
-			})
-			Convey("should return the default value if the environment variable is not set", func() {
-				loaded := getDurationEnvVar(testKey, 1*time.Second)
-				So(loaded, ShouldEqual, time.Second*1)
-			})
-		})
-		Reset(func() {
-			os.Unsetenv(testKey)
-		})
-	})
-}
-
-func TestHandleClusterNameErr(t *testing.T) {
-	m := &etcdManager{clusterName: "helloworld"}
-	r := &clientv3.GetResponse{}
-	r.Kvs = []*mvccpb.KeyValue{}
-	Convey("if there is a cluster name conflict the server should not start", t, func() {
-		r.Kvs = append(r.Kvs, &mvccpb.KeyValue{Key: []byte("/gateway/cluster/name"), Value: []byte("not hello world")})
-		So(m.handleClusterName(r), ShouldNotBeNil)
-	})
 }
 
 // there will be a test on this later
@@ -753,5 +584,174 @@ func TestDebugEndpoints(t *testing.T) {
 		So(resp.StatusCode, ShouldEqual, 200)
 		So(p.debugServerListener.Close(), ShouldBeNil)
 		wg.Wait()
+	})
+}
+
+// The following functions are test fixtures for cluster tests
+func formatTargetAddresses(targetClusters []string) (targetAddresses string) {
+	for index, address := range targetClusters {
+		targetAddresses += fmt.Sprintf("\"%s\"", address)
+		if index < (len(targetClusters) - 1) {
+			targetAddresses += ","
+		}
+		targetAddresses += "\n"
+	}
+	return
+}
+
+/* Cluster Tests */
+
+// The following functions are test fixtures for TestProxyCluster
+func setConfigFile(etcdConf *embetcd.Config, max int, min int, check int) (configFilePath string, etcdDataDirPath string) {
+	// get a temporary filename for the config file
+	fileObj, err := ioutil.TempFile("", "TestProxyCluster")
+	So(err, ShouldBeNil)
+	configFilePath = fileObj.Name()
+	// remove the temp file so we can overwrite it
+	So(os.Remove(configFilePath), ShouldBeNil)
+
+	// get a temporary directory for the etcd data directory
+	etcdDataDirPath, err = ioutil.TempDir("", "TestProxyCluster")
+	So(err, ShouldBeNil)
+	// remove the temp dir so we can recreate it
+	So(os.RemoveAll(etcdDataDirPath), ShouldBeNil)
+
+	proxyConf := configEtcd
+	proxyConf = strings.Replace(proxyConf, "<<MAX>>", strconv.FormatInt(int64(max), 10), -1)
+	proxyConf = strings.Replace(proxyConf, "<<MIN>>", strconv.FormatInt(int64(min), 10), -1)
+	proxyConf = strings.Replace(proxyConf, "<<CHECK>>", strconv.FormatInt(int64(check), 10), -1)
+	proxyConf = strings.Replace(proxyConf, "<<LPADDRESS>>", etcdConf.LPUrls[0].String(), -1)
+	proxyConf = strings.Replace(proxyConf, "<<APADDRESS>>", etcdConf.APUrls[0].String(), -1)
+	proxyConf = strings.Replace(proxyConf, "<<LCADDRESS>>", etcdConf.LCUrls[0].String(), -1)
+	proxyConf = strings.Replace(proxyConf, "<<ACADDRESS>>", etcdConf.ACUrls[0].String(), -1)
+	proxyConf = strings.Replace(proxyConf, "<<MADDRESS>>", etcdConf.ListenMetricsUrls[0].String(), -1)
+	proxyConf = strings.Replace(proxyConf, "<<UNHEALTHYTTL>>", etcdConf.UnhealthyTTL.String(), -1)
+	proxyConf = strings.Replace(proxyConf, "<<REMOVEMEMBERTIMEOUT>>", etcdConf.RemoveMemberTimeout.String(), -1)
+	proxyConf = strings.Replace(proxyConf, "<<DATADIR>>", filepath.Join(etcdDataDirPath, etcdConf.Dir), -1)
+	proxyConf = strings.Replace(proxyConf, "<<CLUSTEROP>>", etcdConf.ClusterState, -1)
+	proxyConf = strings.Replace(proxyConf, "<<TARGETADDRESSES>>", formatTargetAddresses(etcdConf.InitialCluster), -1)
+	proxyConf = strings.Replace(proxyConf, "<<SERVERNAME>>", etcdConf.Name, -1)
+	proxyConf = strings.Replace(proxyConf, "<<CLUSTERNAME>>", etcdConf.ClusterName, -1)
+
+	So(ioutil.WriteFile(configFilePath, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
+	return configFilePath, etcdDataDirPath
+}
+
+// startTestGateway starts a gateway and waits for it to signal that setup is down or for the
+// main function to return an error
+func startTestGateway(ctx context.Context, gw *gateway) chan error {
+	mainErrCh := make(chan error, 1)
+	go func() {
+		mainErrCh <- gw.start(ctx)
+		close(mainErrCh)
+	}()
+
+	// wait for the gateway to start or error out
+	select {
+	case <-gw.setupDoneSignal:
+	case <-mainErrCh:
+	}
+
+	return mainErrCh
+}
+
+// tearDownClusterTest cleans up all provided gateways, error channels, and configfile paths and etcdDataDir paths
+func tearDownClusterTest(cancel context.CancelFunc, gateways []*gateway, mainErrChs []chan error, configFiles []string, etcdDataDirs []string) {
+
+	// remove test config files
+	for _, filename := range configFiles {
+		So(os.Remove(filename), ShouldBeNil)
+	}
+
+	// remove test etcd data directories
+	for _, etcdDataDirPath := range etcdDataDirs {
+		// remove the temp dir so we can recreate it
+		So(os.RemoveAll(etcdDataDirPath), ShouldBeNil)
+	}
+
+	// cancel the test context
+	if cancel != nil {
+		cancel()
+	}
+}
+
+func TestProxyCluster(t *testing.T) {
+	Convey("the etcd cluster should...", t, func() {
+		Convey("be aware of all members", func() {
+			etcdConfigs := []*embetcd.Config{
+				{Config: &embed.Config{Name: "instance1", Dir: "etcd-data", ClusterState: "seed", LCUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2379"}}, ACUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2379"}}, LPUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2380"}}, APUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2380"}}, ListenMetricsUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2381"}}}, ClusterName: "test-cluster-1", InitialCluster: []string{}, RemoveMemberTimeout: pointer.Duration(3000 * time.Second), UnhealthyTTL: pointer.Duration(1000 * time.Millisecond)},
+				{Config: &embed.Config{Name: "instance2", Dir: "etcd-data1", ClusterState: "join", LCUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2479"}}, ACUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2479"}}, LPUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2480"}}, APUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2480"}}, ListenMetricsUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2481"}}}, ClusterName: "test-cluster-1", InitialCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479", "127.0.0.1:2579"}, RemoveMemberTimeout: pointer.Duration(3000 * time.Second), UnhealthyTTL: pointer.Duration(1000 * time.Millisecond)},
+				{Config: &embed.Config{Name: "instance3", Dir: "etcd-data2", ClusterState: "join", LCUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2579"}}, ACUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2579"}}, LPUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2580"}}, APUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2580"}}, ListenMetricsUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2581"}}}, ClusterName: "test-cluster-1", InitialCluster: []string{"127.0.0.1:2379"}, RemoveMemberTimeout: pointer.Duration(-1 * time.Second), UnhealthyTTL: pointer.Duration(1000 * time.Millisecond)},
+				// {Config: &embed.Config{Name: "", Dir: "etcd-data3", ClusterState: "join", LCUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2679"}}, ACUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2679"}}, LPUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2680"}}, APUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2680"}}, ListenMetricsUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2681"}}}, InitialCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479", "127.0.0.1:2579"}, RemoveMemberTimeout: pointer.Duration(3000 * time.Second), UnhealthyTTL: pointer.Duration(1000 * time.Millisecond)},
+			}
+
+			// set up logger
+			logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
+			logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
+
+			// initialize storage test structures
+			gateways := make([]*gateway, 0, len(etcdConfigs))
+			configFiles := make([]string, 0, len(etcdConfigs))
+			etcdDataDirs := make([]string, 0, len(etcdConfigs))
+			mainErrChs := make([]chan error, 0, len(etcdConfigs))
+
+			// test context
+			ctx, cancel := context.WithCancel(context.Background())
+
+			// defer test tear down
+			defer tearDownClusterTest(cancel, gateways, mainErrChs, configFiles, etcdDataDirs)
+
+			// set up config files
+			for index, config := range etcdConfigs {
+
+				// create the configuration file
+				configFile, etcdDataDir := setConfigFile(config, 15000, 0, 25)
+				configFiles = append(configFiles, configFile)
+				etcdDataDirs = append(etcdDataDirs, etcdDataDir)
+
+				// create gateway struct with config file path set as a flag
+				gw := &gateway{
+					logger:          logger.CreateChild(),
+					stdout:          os.Stdout,
+					tk:              timekeeper.RealTime{},
+					setupDoneSignal: make(chan struct{}),
+					signalChan:      make(chan os.Signal),
+				}
+
+				flags = &gatewayFlags{}
+				flags.operation = flaghelpers.NewStringFlag()
+				if index == 0 {
+					flags.operation.Set("seed")
+				}
+
+				loadedConfig, _ := loadConfig(configFile, logger)
+				gw.configure(loadedConfig)
+
+				// start the gateway
+				mainErrChs = append(mainErrChs, startTestGateway(ctx, gw))
+				gateways = append(gateways, gw)
+
+				// verify that the gateway started successfully
+				So(gw.etcdServer, ShouldNotBeNil)
+				So(gw.etcdServer.IsRunning(), ShouldBeTrue)
+				So(len(gw.etcdServer.Server.Cluster().Members()), ShouldEqual, len(gateways))
+			}
+
+			// shutdown the cluster
+			// send sigterm to each gateway
+			for index, g := range gateways {
+				fmt.Println("signaling server: ", *g.config.ServerName)
+				g.signalChan <- syscall.SIGTERM
+				val := <-mainErrChs[index]
+				fmt.Println(*g.config.ServerName, "returned", val)
+
+				// This is a little hacky but it lets us avoid writing a dedicated
+				// test to get coverage for the runningLoop() case where etcdStopCh returns
+				g.signalChan = make(chan os.Signal, 5)
+				fmt.Println(g.runningLoop(context.Background()))
+			}
+
+			return
+		})
 	})
 }
