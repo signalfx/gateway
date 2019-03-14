@@ -68,17 +68,27 @@ type BufferEntryCommon struct {
 //easyjson:json
 type ExpiredBufferEntry struct {
 	*BufferEntryCommon
-	NewSpanSeen   bool        `json:",omitempty"` // we've seen a new span
-	Released      bool        `json:",omitempty"` // we've released this trace so send along any new spans we see
-	TraceTooLarge bool        `json:",omitempty"` // trace is too large so increment counters to this effect
+	NewSpanSeen   bool `json:",omitempty"` // we've seen a new span
+	Released      bool `json:",omitempty"` // we've released this trace so send along any new spans we see
+	TraceTooLarge bool `json:",omitempty"` // trace is too large so increment counters to this effect
 }
 
 //easyjson:json
 type BufferEntry struct {
 	*BufferEntryCommon
-	Spans         []*trace.Span `json:",omitempty"` // buffer of spans by trace id
-	SizeSoFar     int64         `json:",omitempty"` // size of the trace so far
-	ToBeReleased  bool          `json:",omitempty"` // spans that have been selected to be released
+	Spans        []*trace.Span `json:",omitempty"` // buffer of spans by trace id
+	SizeSoFar    int64         `json:",omitempty"` // size of the trace so far
+	ToBeReleased bool          `json:",omitempty"` // spans that have been selected to be released
+}
+
+//easyjson:json
+type BufferEntryNew struct {
+	*BufferEntryCommon
+	FirstWallclock int64 `json:",omitempty"`  // first wallclock we've seen a point for this (used to query)
+	LastWallClock  int64 `json:",oimitempty"` // last wallclock we've seen a point for this (used to query)
+	SizeSoFar      int64 `json:",omitempty"`  // size of the trace so far
+	CountOfSpans   int32   `json:",omitempty"`  // CountOfSpans
+	ToBeReleased   bool  `json:",omitempty"`  // spans that have been selected to be released
 }
 
 //easyjson:json
@@ -90,6 +100,13 @@ type BufferEntries []*BufferEntry
 //easyjson:json
 type BufferOnDisk struct {
 	Traces        map[string]*BufferEntry        `json:",omitempty"` // map of trace id to buffer entry
+	NumSpans      int64                          `json:",omitempty"` // num spans buffered in Traces
+	ExpiredTraces map[string]*ExpiredBufferEntry `json:",omitempty"` // map of trace id to expired buffer entry
+}
+
+//easyjson:json
+type BufferInMemory struct {
+	Traces        map[string]*BufferEntryNew     `json:",omitempty"` // map of trace id to new buffer entry
 	NumSpans      int64                          `json:",omitempty"` // num spans buffered in Traces
 	ExpiredTraces map[string]*ExpiredBufferEntry `json:",omitempty"` // map of trace id to expired buffer entry
 }
