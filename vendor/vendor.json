@@ -928,6 +928,12 @@
 			"revisionTime": "2016-04-24T11:30:07Z"
 		},
 		{
+			"checksumSHA1": "bjhbz+Ie79EfFEPVGocK89USabo=",
+			"path": "github.com/mdubbyap/timespan",
+			"revision": "96e435f01fb4f075efc20c24ab907f35c01f1060",
+			"revisionTime": "2019-03-19T18:37:43Z"
+		},
+		{
 			"checksumSHA1": "wIcN7tZiF441h08RHAm4NV8cYO4=",
 			"path": "github.com/opentracing/opentracing-go",
 			"revision": "bd9c3193394760d98b2fa6ebb2291f0cd1d06a7d",
