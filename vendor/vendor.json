@@ -928,6 +928,12 @@
 			"revisionTime": "2016-04-24T11:30:07Z"
 		},
 		{
+			"checksumSHA1": "bjhbz+Ie79EfFEPVGocK89USabo=",
+			"path": "github.com/mdubbyap/timespan",
+			"revision": "96e435f01fb4f075efc20c24ab907f35c01f1060",
+			"revisionTime": "2019-03-19T18:37:43Z"
+		},
+		{
 			"checksumSHA1": "wIcN7tZiF441h08RHAm4NV8cYO4=",
 			"path": "github.com/opentracing/opentracing-go",
 			"revision": "bd9c3193394760d98b2fa6ebb2291f0cd1d06a7d",
@@ -1197,7 +1203,7 @@
 			"revisionTime": "2019-02-07T19:17:13Z"
 		},
 		{
-			"checksumSHA1": "dd7xmHeDdMsDk7098vQrOk0y4cM=",
+			"checksumSHA1": "aiJplDs1/ZYuj9vKgqXzh6CN97Y=",
 			"path": "github.com/signalfx/ondiskencoding",
 			"revision": "51e7d7510ac92a8cca129458e0981c59222da932",
 			"revisionTime": "2019-02-22T19:40:30Z"
