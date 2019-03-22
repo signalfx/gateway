@@ -673,9 +673,17 @@ func (p *gateway) setupEtcd(ctx context.Context, loadedConfig *config.GatewayCon
 	// get an etcd config struct from our loaded gateway config
 	etcdCfg := loadedConfig.ToEtcdConfig()
 
+	// set up a timeout for the etcd server startup
+	timeout := ctx
+	if loadedConfig.EtcdServerStartTimeout != nil {
+		var cancel context.CancelFunc
+		timeout, cancel = context.WithTimeout(context.Background(), *loadedConfig.EtcdServerStartTimeout)
+		defer cancel()
+	}
+
 	// TODO: only do this if we're running in server mode
 	// start the server
-	if err := p.setupEtcdServer(ctx, etcdCfg); err != nil {
+	if err := p.setupEtcdServer(timeout, etcdCfg); err != nil {
 		p.logger.Log(log.Err, "unable to start etcd server", err)
 		return err
 	}

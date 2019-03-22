@@ -725,6 +725,8 @@ func TestProxyCluster(t *testing.T) {
 				}
 
 				loadedConfig, _ := loadConfig(configFile, logger)
+				loadedConfig.EtcdServerStartTimeout = pointer.Duration(time.Second * 60)
+
 				gw.configure(loadedConfig)
 
 				// start the gateway
