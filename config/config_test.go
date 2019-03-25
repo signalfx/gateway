@@ -3,12 +3,18 @@ package config
 import (
 	"errors"
 	"fmt"
+	"github.com/coreos/etcd/embed"
 	"io/ioutil"
+	"net/url"
 	"os"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/signalfx/embetcd/embetcd"
 	"github.com/signalfx/golib/log"
+	"github.com/signalfx/golib/pointer"
 	"github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 )
@@ -181,4 +187,200 @@ func TestGracefulDurations(t *testing.T) {
 		convey.So(err, convey.ShouldNotBeNil)
 	})
 
+}
+
+func TestEnvVarFuncs(t *testing.T) {
+	testKey := "SFX_TEST_ENV_VAR"
+	convey.Convey("test the following environment variable helper functions", t, func() {
+		convey.Convey("getCommaSeparatedStringEnvVar should parses comma separated strings", func() {
+			testVal := []string{"127.0.0.1:9999", "127.0.0.2:9999", "127.0.0.3:9999"}
+			os.Setenv(testKey, strings.Join(testVal, ","))
+			loaded := getCommaSeparatedStringEnvVar(testKey, []string{})
+			convey.So(len(loaded), convey.ShouldEqual, 3)
+			convey.So(strings.Join(loaded, ","), convey.ShouldEqual, strings.Join(testVal, ","))
+		})
+		convey.Convey("getStringEnvVar", func() {
+			convey.Convey("should return the value if the environment variable is set", func() {
+				testVal := "testStringValue"
+				os.Setenv(testKey, testVal)
+				loaded := getStringEnvVar(testKey, pointer.String("defaultVal"))
+				convey.So(*loaded, convey.ShouldEqual, testVal)
+			})
+			convey.Convey("should return the default value if the environment variable is not set", func() {
+				loaded := getStringEnvVar(testKey, pointer.String("defaultVal"))
+				convey.So(*loaded, convey.ShouldEqual, "defaultVal")
+			})
+		})
+		convey.Convey("getDurationEnvVar", func() {
+			convey.Convey("should return the value if the environment variable is set", func() {
+				testVal := "5s"
+				os.Setenv(testKey, testVal)
+				loaded := getDurationEnvVar(testKey, pointer.Duration(0*time.Second))
+				convey.So(*loaded, convey.ShouldEqual, time.Second*5)
+			})
+			convey.Convey("should return the default value if the environment variable is not set", func() {
+				loaded := getDurationEnvVar(testKey, pointer.Duration(1*time.Second))
+				convey.So(*loaded, convey.ShouldEqual, time.Second*1)
+			})
+		})
+		convey.Reset(func() {
+			os.Unsetenv(testKey)
+		})
+	})
+}
+
+func TestGatewayConfig_ToEtcdConfig(t *testing.T) {
+	type fields struct {
+		ForwardTo                      []*ForwardTo
+		ListenFrom                     []*ListenFrom
+		StatsDelay                     *string
+		StatsDelayDuration             *time.Duration
+		NumProcs                       *int
+		LocalDebugServer               *string
+		PidFilename                    *string
+		LogDir                         *string
+		LogMaxSize                     *int
+		LogMaxBackups                  *int
+		LogFormat                      *string
+		PprofAddr                      *string
+		DebugFlag                      *string
+		MaxGracefulWaitTime            *string
+		GracefulCheckInterval          *string
+		SilentGracefulTime             *string
+		MaxGracefulWaitTimeDuration    *time.Duration
+		GracefulCheckIntervalDuration  *time.Duration
+		SilentGracefulTimeDuration     *time.Duration
+		LateThreshold                  *string
+		FutureThreshold                *string
+		LateThresholdDuration          *time.Duration
+		FutureThresholdDuration        *time.Duration
+		AdditionalDimensions           map[string]string
+		InternalMetricsListenerAddress *string
+		ServerName                     *string
+		ClusterName                    *string
+		ClusterOperation               *string
+		ClusterDataDir                 *string
+		TargetClusterAddresses         []string
+		AdvertisedPeerAddresses        []string
+		AdvertisePeerAddress           *string
+		ListenOnPeerAddresses          []string
+		ListenOnPeerAddress            *string
+		AdvertisedClientAddresses      []string
+		AdvertiseClientAddress         *string
+		ListenOnClientAddresses        []string
+		ListenOnClientAddress          *string
+		EtcdListenOnMetricsAddresses   []string
+		ETCDMetricsAddress             *string
+		UnhealthyMemberTTL             *time.Duration
+		RemoveMemberTimeout            *time.Duration
+		EtcdDialTimeout                *time.Duration
+		EtcdClusterCleanUpInterval     *time.Duration
+		EtcdAutoSyncInterval           *time.Duration
+		EtcdStartupGracePeriod         *time.Duration
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *embetcd.Config
+	}{
+		{
+			name: "test config to etcd config",
+			fields: fields{
+				ClusterName:             pointer.String("testCluster1"),
+				ServerName:              pointer.String("testServer1"),
+				ClusterDataDir:          pointer.String("./etcd-config"),
+				ClusterOperation:        pointer.String("join"),
+				AdvertisePeerAddress:    pointer.String("http://127.0.0.1:9990"),
+				AdvertisedPeerAddresses: []string{"https://127.0.0.1:9991", "http://127.0.0.1:9992", "127.0.0.1:9993"},
+				TargetClusterAddresses:  []string{"https://127.0.0.1:9994"},
+			},
+			want: &embetcd.Config{
+				ClusterName: "testCluster1",
+				Config: &embed.Config{
+					Name:         "testServer1",
+					Dir:          "./etcd-config",
+					ClusterState: "join",
+					APUrls:       []url.URL{{Scheme: "http", Host: "127.0.0.1:9990"}, {Scheme: "https", Host: "127.0.0.1:9991"}, {Scheme: "http", Host: "127.0.0.1:9992"}, {Scheme: "http", Host: "127.0.0.1:9993"}},
+				},
+			},
+		},
+		{
+			name: "test config to etcd config with invalid cluster op",
+			fields: fields{
+				ClusterName:             pointer.String("testCluster1"),
+				ServerName:              pointer.String("testServer1"),
+				ClusterDataDir:          pointer.String("./etcd-config"),
+				ClusterOperation:        pointer.String("yabadabadoo"),
+				AdvertisePeerAddress:    pointer.String("http://127.0.0.1:9990"),
+				AdvertisedPeerAddresses: []string{"https://127.0.0.1:9991", "http://127.0.0.1:9992", "127.0.0.1:9993"},
+				TargetClusterAddresses:  []string{"https://127.0.0.1:9994"},
+			},
+			want: &embetcd.Config{
+				ClusterName: "testCluster1",
+				Config: &embed.Config{
+					Name:         "testServer1",
+					Dir:          "./etcd-config",
+					ClusterState: "yabadabadoo",
+					APUrls:       []url.URL{{Scheme: "http", Host: "127.0.0.1:9990"}, {Scheme: "https", Host: "127.0.0.1:9991"}, {Scheme: "http", Host: "127.0.0.1:9992"}, {Scheme: "http", Host: "127.0.0.1:9993"}},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GatewayConfig{
+				ForwardTo:                      tt.fields.ForwardTo,
+				ListenFrom:                     tt.fields.ListenFrom,
+				StatsDelay:                     tt.fields.StatsDelay,
+				StatsDelayDuration:             tt.fields.StatsDelayDuration,
+				NumProcs:                       tt.fields.NumProcs,
+				LocalDebugServer:               tt.fields.LocalDebugServer,
+				PidFilename:                    tt.fields.PidFilename,
+				LogDir:                         tt.fields.LogDir,
+				LogMaxSize:                     tt.fields.LogMaxSize,
+				LogMaxBackups:                  tt.fields.LogMaxBackups,
+				LogFormat:                      tt.fields.LogFormat,
+				PprofAddr:                      tt.fields.PprofAddr,
+				DebugFlag:                      tt.fields.DebugFlag,
+				MaxGracefulWaitTime:            tt.fields.MaxGracefulWaitTime,
+				GracefulCheckInterval:          tt.fields.GracefulCheckInterval,
+				SilentGracefulTime:             tt.fields.SilentGracefulTime,
+				MaxGracefulWaitTimeDuration:    tt.fields.MaxGracefulWaitTimeDuration,
+				GracefulCheckIntervalDuration:  tt.fields.GracefulCheckIntervalDuration,
+				SilentGracefulTimeDuration:     tt.fields.SilentGracefulTimeDuration,
+				LateThreshold:                  tt.fields.LateThreshold,
+				FutureThreshold:                tt.fields.FutureThreshold,
+				LateThresholdDuration:          tt.fields.LateThresholdDuration,
+				FutureThresholdDuration:        tt.fields.FutureThresholdDuration,
+				AdditionalDimensions:           tt.fields.AdditionalDimensions,
+				InternalMetricsListenerAddress: tt.fields.InternalMetricsListenerAddress,
+				ServerName:                     tt.fields.ServerName,
+				ClusterName:                    tt.fields.ClusterName,
+				ClusterOperation:               tt.fields.ClusterOperation,
+				ClusterDataDir:                 tt.fields.ClusterDataDir,
+				TargetClusterAddresses:         tt.fields.TargetClusterAddresses,
+				AdvertisedPeerAddresses:        tt.fields.AdvertisedPeerAddresses,
+				AdvertisePeerAddress:           tt.fields.AdvertisePeerAddress,
+				ListenOnPeerAddresses:          tt.fields.ListenOnPeerAddresses,
+				ListenOnPeerAddress:            tt.fields.ListenOnPeerAddress,
+				AdvertisedClientAddresses:      tt.fields.AdvertisedClientAddresses,
+				AdvertiseClientAddress:         tt.fields.AdvertiseClientAddress,
+				ListenOnClientAddresses:        tt.fields.ListenOnClientAddresses,
+				ListenOnClientAddress:          tt.fields.ListenOnClientAddress,
+				EtcdListenOnMetricsAddresses:   tt.fields.EtcdListenOnMetricsAddresses,
+				ETCDMetricsAddress:             tt.fields.ETCDMetricsAddress,
+				UnhealthyMemberTTL:             tt.fields.UnhealthyMemberTTL,
+				RemoveMemberTimeout:            tt.fields.RemoveMemberTimeout,
+				EtcdDialTimeout:                tt.fields.EtcdDialTimeout,
+				EtcdClusterCleanUpInterval:     tt.fields.EtcdClusterCleanUpInterval,
+				EtcdAutoSyncInterval:           tt.fields.EtcdAutoSyncInterval,
+				EtcdStartupGracePeriod:         tt.fields.EtcdStartupGracePeriod,
+			}
+			got := g.ToEtcdConfig()
+			if !reflect.DeepEqual(got.APUrls, tt.want.APUrls) {
+
+				t.Errorf("APUrls %v, want %v", got.APUrls, tt.want.APUrls)
+			}
+		})
+	}
 }

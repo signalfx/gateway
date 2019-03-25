@@ -2,7 +2,7 @@
   ignoreDirs = [".git", "vendor"]
   duplLimit = "300"
   testCoverage = 100.0
-  testFlags = ["-covermode", "atomic", "-race", "-timeout", "60s", "-cpu", "4", "-parallel", "8"]
+  testFlags = ["-covermode", "atomic", "-timeout", "60s", "-cpu", "4", "-parallel", "8"]
 
 [metalinter]
   [metalinter.vars]

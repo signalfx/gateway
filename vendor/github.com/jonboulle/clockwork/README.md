@@ -12,25 +12,25 @@ Replace uses of the `time` package with the `clockwork.Clock` interface instead.
 
 For example, instead of using `time.Sleep` directly:
 
-```
-func my_func() {
+```go
+func myFunc() {
 	time.Sleep(3 * time.Second)
-	do_something()
+	doSomething()
 }
 ```
 
 inject a clock and use its `Sleep` method instead:
 
-```
-func my_func(clock clockwork.Clock) {
+```go
+func myFunc(clock clockwork.Clock) {
 	clock.Sleep(3 * time.Second)
-	do_something()
+	doSomething()
 }
 ```
 
-Now you can easily test `my_func` with a `FakeClock`:
+Now you can easily test `myFunc` with a `FakeClock`:
 
-```
+```go
 func TestMyFunc(t *testing.T) {
 	c := clockwork.NewFakeClock()
 
@@ -38,14 +38,14 @@ func TestMyFunc(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		my_func(c)
+		myFunc(c)
 		wg.Done()
 	}()
 
-	// Ensure we wait until my_func is sleeping
+	// Ensure we wait until myFunc is sleeping
 	c.BlockUntil(1)
 
-	assert_state()
+	assertState()
 
 	// Advance the FakeClock forward in time
 	c.Advance(3 * time.Second)
@@ -53,13 +53,14 @@ func TestMyFunc(t *testing.T) {
 	// Wait until the function completes
 	wg.Wait()
 
-	assert_state()
+	assertState()
 }
 ```
 
 and in production builds, simply inject the real clock instead:
-```
-my_func(clockwork.NewRealClock())
+
+```go
+myFunc(clockwork.NewRealClock())
 ```
 
 See [example_test.go](example_test.go) for a full example.

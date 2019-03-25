@@ -1,31 +1,33 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"expvar"
 	"flag"
-	"github.com/coreos/etcd/clientv3"
+	"fmt"
+	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"io/ioutil"
+	"net"
+	"net/http"
 	"os"
+	"os/signal"
 	"path"
 	"runtime"
 	"strconv"
-
-	"context"
-	"expvar"
-	"fmt"
-	"net"
-	"net/http"
-	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	"encoding/json"
+	etcdcli "github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/embed"
 	"github.com/gorilla/mux"
-	"github.com/quentin-m/etcd-cloud-operator/pkg/etcd"
+	"github.com/signalfx/embetcd/embetcd"
 	"github.com/signalfx/gateway/config"
 	"github.com/signalfx/gateway/dp/dpbuffered"
+	"github.com/signalfx/gateway/flaghelpers"
 	"github.com/signalfx/gateway/internal-metrics"
 	"github.com/signalfx/gateway/logkey"
 	"github.com/signalfx/gateway/protocol"
@@ -38,6 +40,7 @@ import (
 	"github.com/signalfx/golib/eventcounter"
 	"github.com/signalfx/golib/httpdebug"
 	"github.com/signalfx/golib/log"
+	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/reportsha"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/timekeeper"
@@ -45,8 +48,11 @@ import (
 	"github.com/signalfx/golib/web"
 	_ "github.com/signalfx/ondiskencoding"
 	_ "github.com/spaolacci/murmur3"
-	"gopkg.in/natefinch/lumberjack.v2"
 	_ "net/http/pprof"
+)
+
+const (
+	clusterOpFlag = "cluster-op"
 )
 
 var (
@@ -56,248 +62,32 @@ var (
 	BuildDate = ""
 )
 
-func writePidFile(pidFileName string) error {
-	pid := os.Getpid()
-	return ioutil.WriteFile(pidFileName, []byte(strconv.FormatInt(int64(pid), 10)), os.FileMode(0644))
-}
-
-// getCommaSeparatedStringEnvVar returns the given env var key's value split by comma or the default values
-func getCommaSeparatedStringEnvVar(envVar string, def []string) []string {
-	if val := os.Getenv(envVar); val != "" {
-		def = def[:0]
-		for _, addr := range strings.Split(strings.Replace(val, " ", "", -1), ",") {
-			def = append(def, addr)
-		}
-	}
-	return def
-}
-
-// getStringEnvVar returns the given env var key's value or the default value
-func getStringEnvVar(envVar string, def string) string {
-	if val := os.Getenv(envVar); val != "" {
-		return val
-	}
-	return def
-}
-
-// getDurationEnvVar returns the given env var key's value or the default value
-func getDurationEnvVar(envVar string, def time.Duration) time.Duration {
-	if strVal := os.Getenv(envVar); strVal != "" {
-		if dur, err := time.ParseDuration(strVal); err == nil {
-			return dur
-		}
-	}
-	return def
-}
-
-func isStringInSlice(target string, strs []string) bool {
-	for _, addr := range strs {
-		if addr == target {
-			return true
-		}
-	}
-	return false
-}
-
+// gatewayFlags is a struct used to store runtime flags for the gateway
 type gatewayFlags struct {
 	configFileName string
+	operation      flaghelpers.StringFlag
 }
 
-type etcdManager struct {
-	etcd.ServerConfig
-	clusterName   string
-	logger        log.Logger
-	removeTimeout time.Duration
-	operation     string
-	targetCluster []string
-	server        *etcd.Server
-	client        *etcd.Client
-}
-
-func (mgr *etcdManager) setup(conf *config.GatewayConfig) {
-	mgr.clusterName = getStringEnvVar("SFX_GATEWAY_CLUSTER_NAME", *conf.ClusterName)
-	mgr.LPAddress = getStringEnvVar("SFX_LISTEN_ON_PEER_ADDRESS", *conf.ListenOnPeerAddress)
-	mgr.APAddress = getStringEnvVar("SFX_ADVERTISE_PEER_ADDRESS", *conf.AdvertisePeerAddress)
-	mgr.LCAddress = getStringEnvVar("SFX_LISTEN_ON_CLIENT_ADDRESS", *conf.ListenOnClientAddress)
-	mgr.ACAddress = getStringEnvVar("SFX_ADVERTISE_CLIENT_ADDRESS", *conf.AdvertiseClientAddress)
-	mgr.MAddress = getStringEnvVar("SFX_ETCD_METRICS_ADDRESS", *conf.ETCDMetricsAddress)
-	mgr.UnhealthyMemberTTL = getDurationEnvVar("SFX_UNHEALTHY_MEMBER_TTL", *conf.UnhealthyMemberTTL)
-	mgr.removeTimeout = getDurationEnvVar("SFX_REMOVE_MEMBER_TIMEOUT", *conf.RemoveMemberTimeout)
-	mgr.DataDir = getStringEnvVar("SFX_CLUSTER_DATA_DIR", *conf.ClusterDataDir)
-	mgr.Name = getStringEnvVar("SFX_SERVER_NAME", *conf.ServerName)
-	mgr.ServerConfig.Name = mgr.Name
-
-	// if already set, then a command line flag was provided and takes precedence
-	if mgr.operation == "" {
-		mgr.operation = getStringEnvVar("SFX_CLUSTER_OPERATION", *conf.ClusterOperation)
+// addFlagsToConfig applies the flags to a config struct
+func (g *gatewayFlags) addFlagsToConfig(loadedConfig *config.GatewayConfig) {
+	if g.operation.IsSet() {
+		loadedConfig.ClusterOperation = pointer.String(g.operation.String())
 	}
-
-	mgr.targetCluster = getCommaSeparatedStringEnvVar("SFX_TARGET_CLUSTER_ADDRESSES", conf.TargetClusterAddresses)
 }
 
-func (mgr *etcdManager) handleClusterName(resp *clientv3.GetResponse) (err error) {
+var flags *gatewayFlags
+var flagParse func()
 
-	// set the cluster name if it hasn't been set
-	if resp == nil || len(resp.Kvs) < 1 || string(resp.Kvs[0].Value) == "" {
-		_, _ = mgr.client.Put(context.Background(), "/gateway/cluster/name", mgr.clusterName)
-	} else if string(resp.Kvs[0].Value) != mgr.clusterName {
-		err = fmt.Errorf("the configured cluster name '%s' does not match the existing cluster name '%s'", string(resp.Kvs[0].Value), mgr.clusterName)
-	}
-
-	return err
-}
-
-func (mgr *etcdManager) seed() (err error) {
-	mgr.logger.Log(fmt.Sprintf("starting etcd server %s to seed cluster", mgr.ServerConfig.Name))
-	if err = mgr.server.Seed(nil); err == nil {
-		if !isStringInSlice(mgr.AdvertisedClientAddress(), mgr.targetCluster) {
-			mgr.targetCluster = append(mgr.targetCluster, mgr.AdvertisedClientAddress())
-		}
-		mgr.client, err = etcd.NewClient(mgr.targetCluster, etcd.SecurityConfig{}, true)
-		var resp *clientv3.GetResponse
-		if resp, err = mgr.client.Get(context.Background(), "/gateay/cluster/name"); err == nil {
-			err = mgr.handleClusterName(resp)
-		}
-	}
-	return err
-}
-
-func (mgr *etcdManager) join() (err error) {
-	mgr.logger.Log(fmt.Sprintf("joining cluster with etcd server name: %s", mgr.ServerConfig.Name))
-	if mgr.client, err = etcd.NewClient(mgr.targetCluster, etcd.SecurityConfig{}, true); err == nil {
-		mgr.logger.Log(fmt.Sprintf("joining etcd cluster @ %s", mgr.client.Endpoints()))
-		var resp *clientv3.GetResponse
-		if resp, err = mgr.client.Get(context.Background(), "/gateay/cluster/name"); err == nil {
-			if err = mgr.handleClusterName(resp); err == nil {
-				if err = mgr.server.Join(mgr.client); err == nil {
-					mgr.logger.Log(fmt.Sprintf("successfully joined cluster at %s", mgr.targetCluster))
-				}
-			}
-		}
-
-	}
-	return err
-}
-
-func (mgr *etcdManager) start() (err error) {
-
-	// use a default server name if one is not provided
-	if mgr.ServerConfig.Name == "" {
-		mgr.ServerConfig.Name = fmt.Sprintf("%s", mgr.ServerConfig.ACAddress)
-	}
-
-	mgr.server = etcd.NewServer(mgr.ServerConfig)
-	switch strings.ToLower(mgr.operation) {
-	case "": // this is a valid option and means we shouldn't run etcd
-		return
-
-	case "seed":
-		err = mgr.seed()
-
-	case "join":
-		err = mgr.join()
-	default:
-		err = fmt.Errorf("unsupported cluster-op specified \"%s\"", mgr.operation)
-	}
-
-	return err
-}
-
-func (mgr *etcdManager) getMemberID(ctx context.Context) (uint64, error) {
-	var memberID uint64
-	// use the client to retrieve this instance's member id
-	members, err := mgr.client.MemberList(ctx)
-	if members != nil {
-		for _, m := range members.Members {
-			if m.Name == mgr.Name {
-				memberID = m.ID
-			}
-		}
-	}
-	return memberID, err
-}
-
-func (mgr *etcdManager) removeMember() error {
-	var err error
-	var memberID uint64
-	ctx, cancel := context.WithTimeout(context.Background(), mgr.removeTimeout)
-	defer cancel()
-	// only remove yourself from the cluster if the server is running
-	if mgr.server.IsRunning() {
-		if memberID, err = mgr.getMemberID(ctx); err == nil {
-			removed := make(chan error, 1)
-			go func() {
-				defer close(removed)
-				removed <- mgr.client.RemoveMember(mgr.Name, memberID)
-			}()
-			select {
-			case err = <-removed:
-				cancel()
-			case <-ctx.Done():
-			}
-			if ctx.Err() != nil {
-				err = ctx.Err()
-			}
-		}
-	}
-	return err
-}
-
-func (mgr *etcdManager) shutdown(graceful bool) (err error) {
-	if mgr.server.IsRunning() {
-		// stop the etcd server
-		mgr.server.Stop(graceful, false) // graceful shutdown true, snapshot false
-	}
-	if mgr.client != nil {
-		// close the client if applicable
-		err = mgr.client.Close()
-	}
-	return err
-}
-
-type gateway struct {
-	flags                   gatewayFlags
-	listeners               []protocol.Listener
-	forwarders              []protocol.Forwarder
-	logger                  log.Logger
-	setupDoneSignal         chan struct{}
-	tk                      timekeeper.TimeKeeper
-	debugServer             *httpdebug.Server
-	debugServerListener     net.Listener
-	internalMetricsServer   *internal.Collector
-	internalMetricsListener net.Listener
-	stdout                  io.Writer
-	gomaxprocs              func(int) int
-	debugContext            web.HeaderCtxFlag
-	debugSink               dpsink.ItemFlagger
-	ctxDims                 log.CtxDimensions
-	signalChan              chan os.Signal
-	config                  *config.GatewayConfig
-	etcdMgr                 *etcdManager
-	versionMetric           reportsha.SHA1Reporter
-}
-
-var mainInstance = gateway{
-	tk:         timekeeper.RealTime{},
-	logger:     log.DefaultLogger.CreateChild(),
-	stdout:     os.Stdout,
-	gomaxprocs: runtime.GOMAXPROCS,
-	debugContext: web.HeaderCtxFlag{
-		HeaderName: "X-Debug-Id",
-	},
-	debugSink: dpsink.ItemFlagger{
-		EventMetaName:       "dbg_events",
-		MetricDimensionName: "sf_metric",
-	},
-	signalChan: make(chan os.Signal, 1),
-	etcdMgr:    &etcdManager{ServerConfig: etcd.ServerConfig{}, logger: log.DefaultLogger.CreateChild()},
-}
-
+// package init
 func init() {
-	flag.StringVar(&mainInstance.flags.configFileName, "configfile", "sf/gateway.conf", "Name of the db gateway configuration file")
-	flag.StringVar(&mainInstance.etcdMgr.operation, "cluster-op", "", "operation to perform if running in cluster mode [\"seed\", \"join\", \"\"] this overrides the ClusterOperation set in the config file")
+	// initialize the runtime flags for the package
+	flags = &gatewayFlags{}
+	flagParse = flag.Parse
+	flag.StringVar(&flags.configFileName, "configfile", "sf/gateway.conf", "Name of the db gateway configuration file")
+	flag.Var(&flags.operation, clusterOpFlag, "operation to perform if running in cluster mode [\"seed\", \"join\", \"\"] this overrides the ClusterOperation set in the config file")
 }
 
+// TODO: don't make this part of the gateway itself
 func (p *gateway) getLogOutput(loadedConfig *config.GatewayConfig) io.Writer {
 	logDir := *loadedConfig.LogDir
 	if logDir == "-" {
@@ -315,6 +105,7 @@ func (p *gateway) getLogOutput(loadedConfig *config.GatewayConfig) io.Writer {
 	return lumberjackLogger
 }
 
+// TODO: don't make this part of the gateway itself
 func (p *gateway) getLogger(loadedConfig *config.GatewayConfig) log.Logger {
 	out := p.getLogOutput(loadedConfig)
 	useJSON := *loadedConfig.LogFormat == "json"
@@ -322,6 +113,48 @@ func (p *gateway) getLogger(loadedConfig *config.GatewayConfig) log.Logger {
 		return log.NewJSONLogger(out, log.DefaultErrorHandler)
 	}
 	return log.NewLogfmtLogger(out, log.DefaultErrorHandler)
+}
+
+// TODO: put gateway and related functions into a dedicated package that main.go imports
+// gateway is a struct representing a gateway.  It must be instantiated, configured, started, and stopped
+type gateway struct {
+	listeners               []protocol.Listener
+	forwarders              []protocol.Forwarder
+	logger                  log.Logger
+	setupDoneSignal         chan struct{}
+	tk                      timekeeper.TimeKeeper
+	debugServer             *httpdebug.Server
+	debugServerListener     net.Listener
+	internalMetricsServer   *internal.Collector
+	internalMetricsListener net.Listener
+	stdout                  io.Writer
+	debugContext            web.HeaderCtxFlag
+	debugSink               dpsink.ItemFlagger
+	ctxDims                 log.CtxDimensions
+	signalChan              chan os.Signal
+	config                  *config.GatewayConfig
+	etcdServer              *embetcd.Server
+	etcdClient              *embetcd.Client
+	versionMetric           reportsha.SHA1Reporter
+}
+
+// newGateway returns a new gateway instance with any loaded flags
+// flags are loaded as part of package init()
+func newGateway() *gateway {
+	return &gateway{
+		tk:     timekeeper.RealTime{},
+		logger: log.DefaultLogger.CreateChild(),
+		stdout: os.Stdout,
+		debugContext: web.HeaderCtxFlag{
+			HeaderName: "X-Debug-Id",
+		},
+		debugSink: dpsink.ItemFlagger{
+			EventMetaName:       "dbg_events",
+			MetricDimensionName: "sf_metric",
+		},
+		setupDoneSignal: make(chan struct{}),
+		signalChan:      make(chan os.Signal, 1),
+	}
 }
 
 func forwarderName(f *config.ForwardTo) string {
@@ -333,13 +166,13 @@ func forwarderName(f *config.ForwardTo) string {
 
 var errDupeForwarder = errors.New("cannot duplicate forwarder names or types without names")
 
-func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, manager *etcdManager) ([]protocol.Forwarder, error) {
+func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, etcdServer *embetcd.Server, etcdClient *embetcd.Client) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	nameMap := make(map[string]bool)
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, forwardConfig.Type, logkey.Direction, "forwarder")
-		forwardConfig.Server = manager.server
-		forwardConfig.Client = manager.client
+		forwardConfig.Server = etcdServer
+		forwardConfig.Client = etcdClient
 		forwardConfig.ClusterName = loadedConfig.ClusterName
 		forwardConfig.AdditionalDimensions = datapoint.AddMaps(loadedConfig.AdditionalDimensions, forwardConfig.AdditionalDimensions)
 		forwarder, err := loader.Forwarder(forwardConfig)
@@ -466,7 +299,7 @@ func (p *gateway) setupInternalMetricsServer(conf *config.GatewayConfig, logger 
 
 	go func() {
 		err := http.Serve(listener, handler)
-		logger.Log(log.Err, err, "Finished serving internal metrics server")
+		logger.Log(log.Msg, err, "Finished serving internal metrics server")
 	}()
 	return nil
 }
@@ -505,7 +338,8 @@ func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger
 
 	go func() {
 		err := p.debugServer.Serve(listener)
-		logger.Log(log.Err, err, "Finished serving debug server")
+		log.IfErrWithKeys(logger, err, log.Err, "error encountered in debug server")
+		logger.Log(log.Msg, "Finished serving debug server")
 	}()
 	return nil
 }
@@ -516,63 +350,143 @@ func (p *gateway) handleEndpoints(debugEndpoints map[string]http.Handler) {
 	}
 }
 
-func setupGoMaxProcs(numProcs *int, gomaxprocs func(int) int) {
-	if numProcs != nil {
-		gomaxprocs(*numProcs)
-	} else {
-		numProcs := runtime.NumCPU()
-		gomaxprocs(numProcs)
+// closeListenerHealthChecks
+func closeListenerHealthChecks(listeners []protocol.Listener) {
+	for _, l := range listeners {
+		l.CloseHealthCheck()
 	}
 }
 
-func (p *gateway) gracefulShutdown() (err error) {
-	p.logger.Log("Starting graceful shutdown")
-	totalWaitTime := p.tk.After(*p.config.MaxGracefulWaitTimeDuration)
-	errs := make([]error, len(p.listeners)+len(p.forwarders)+1)
-
-	// close health checks on all first
-	for _, l := range p.listeners {
-		l.CloseHealthCheck()
+// closeListeners concurrently closes all of the listeners and wait for them to all close
+func closeListeners(listeners []protocol.Listener) []error {
+	errs := make([]error, len(listeners))
+	wg := sync.WaitGroup{}
+	wg.Add(len(listeners))
+	for index, l := range listeners {
+		go func(index int, l protocol.Listener, errs []error) {
+			errs[index] = l.Close()
+			wg.Done()
+		}(index, l, errs)
 	}
+	wg.Wait()
+	return errs
+}
 
-	// defer close of listeners and forwarders till we exit
-	defer func() {
-		p.logger.Log("close listeners")
-		for _, l := range p.listeners {
-			errs = append(errs, l.Close())
-		}
-		log.IfErr(p.logger, errors.NewMultiErr(errs))
-		p.logger.Log("Graceful shutdown done")
-	}()
+// closeForwarders concurrently close and drain all of the forwarders
+func closeForwarders(forwarders []protocol.Forwarder) []error {
+	errs := make([]error, len(forwarders))
+	wg := sync.WaitGroup{}
+	wg.Add(len(forwarders))
+	for index, f := range forwarders {
+		go func(index int, f protocol.Forwarder, errs []error) {
+			errs[index] = f.Close()
+			wg.Done()
+		}(index, f, errs)
+	}
+	wg.Wait()
+	return errs
+}
 
+// waitForForwardersToDrain waits for the pipeline of inflight things to drain across all forwarders
+// or for the context to expire.  The passed in context should be the graceful shutdown timeout context.
+// It should be cancelled when this function exceeds the configured graceful timeout duration
+func (p *gateway) waitForForwardersToDrain(ctx context.Context, startTime time.Time) {
 	p.logger.Log("Waiting for connections to drain")
-	startingTimeGood := p.tk.Now()
 	for {
 		select {
-		case <-totalWaitTime:
-			totalPipeline := p.Pipeline()
-			if totalPipeline > 0 {
+		case <-ctx.Done():
+			if totalPipeline := p.Pipeline(); totalPipeline != 0 {
 				p.logger.Log(logkey.TotalPipeline, totalPipeline, "Connections never drained.  This could be bad ...")
 			}
 			return
-
 		case <-p.tk.After(*p.config.GracefulCheckIntervalDuration):
-			now := p.tk.Now()
-			totalPipeline := p.Pipeline()
-			p.logger.Log(logkey.TotalPipeline, totalPipeline, "Waking up for graceful shutdown")
-			if totalPipeline > 0 {
-				p.logger.Log(logkey.TotalPipeline, totalPipeline, "Items are still draining")
-				startingTimeGood = now
-				continue
-			}
-			if now.Sub(startingTimeGood) >= *p.config.SilentGracefulTimeDuration {
-				p.logger.Log(logkey.TotalPipeline, totalPipeline, "I've been silent.  Graceful shutdown done")
+			// wait for the total pipeline to get to 0
+			if totalPipeline := p.Pipeline(); totalPipeline == 0 {
 				return
-			}
+			} else if time.Since(startTime) > *p.config.SilentGracefulTimeDuration {
+				//p.logger.Log(logkey.TotalPipeline, totalPipeline, "Waking up for graceful shutdown")
+				p.logger.Log(logkey.TotalPipeline, totalPipeline, "Items are still draining...")
+			} // else continue looping
 		}
 	}
 }
 
+// GetContext returns the context passed in or creates a background context if the context passed in is nil
+func GetContext(ctx context.Context) context.Context {
+	if ctx != nil {
+		return ctx
+	}
+	return context.Background()
+}
+
+func logIfCtxExceeded(ctx context.Context, logger log.Logger) {
+	if ctx.Err() == context.DeadlineExceeded || ctx.Err() == context.Canceled {
+		logger.Log("Exceeded graceful shutdown period")
+	} else {
+		logger.Log("Graceful shutdown complete")
+	}
+}
+
+// Stop shutsdown a running gateway and utilizes the graceful shutdown timeout
+func (p *gateway) stop(ctx context.Context) (err error) {
+	startTime := p.tk.Now() // keeps track of the time when graceful shutdown began
+	p.logger.Log("Starting graceful shutdown")
+
+	errs := make([]error, len(p.listeners)+len(p.forwarders)+1)
+
+	// close health checks on all first
+	closeListenerHealthChecks(p.listeners)
+
+	// create timeout context for graceful shutdown period
+	timeout, cancel := context.WithTimeout(GetContext(ctx), *p.config.MaxGracefulWaitTimeDuration) // max graceful timeout context
+	defer cancel()
+
+	// wait for forwarder pipeline to drain
+	p.waitForForwardersToDrain(timeout, startTime)
+
+	// close listeners
+	p.logger.Log("Close listeners")
+	listenErrs := closeListeners(p.listeners)
+	log.IfErr(p.logger, errors.NewMultiErr(listenErrs))
+	errs = append(errs, listenErrs...)
+
+	// close forwarders
+	p.logger.Log("Close forwarders")
+	fwdErrs := closeForwarders(p.forwarders)
+	log.IfErr(p.logger, errors.NewMultiErr(fwdErrs))
+	errs = append(errs, fwdErrs...)
+
+	// Stop the etcd server using the timeout context from above for graceful shutdown
+	// If the context is already expired it will do a hard stop of the etcd server.
+	// if there is time left on the timeout it will attempt a graceful shutdown.
+	// etcd should not be stopped until all forwarders have been stopped
+	if p.etcdServer != nil && p.etcdServer.IsRunning() {
+		errs = append(errs, p.etcdServer.Shutdown(timeout))
+	}
+
+	// The graceful part of shutdown is complete when all of the inflight pipeline is cleared and the
+	// etcd server is shutdown.  Log whether we made it here before the graceful shutdown context timedout
+	logIfCtxExceeded(ctx, p.logger)
+
+	// close the etcd client if it is not nil
+	if p.etcdClient != nil {
+		errs = append(errs, p.etcdClient.Close())
+	}
+
+	// stop debug server listener
+	if p.debugServer != nil {
+		errs = append(errs, p.debugServerListener.Close())
+	}
+
+	// stop internal metric server listener
+	if p.internalMetricsServer != nil {
+		errs = append(errs, p.internalMetricsListener.Close())
+	}
+
+	return errors.NewMultiErr(errs)
+}
+
+// Pipeline returns the number of items in flight that need to be drained across all configured forwarders
 func (p *gateway) Pipeline() int64 {
 	var totalForwarded int64
 	for _, f := range p.forwarders {
@@ -581,48 +495,40 @@ func (p *gateway) Pipeline() int64 {
 	return totalForwarded
 }
 
-func (p *gateway) Close() error {
-	errs := make([]error, 0, len(p.forwarders)+1)
-	for _, f := range p.forwarders {
-		errs = append(errs, f.Close())
+// takes a gateway config and configures the gateway with it
+func (p *gateway) configure(loadedConfig *config.GatewayConfig) error {
+	if loadedConfig == nil {
+		return fmt.Errorf("unable to configure gateway with nil config")
 	}
-	if p.etcdMgr != nil && p.etcdMgr.server != nil {
-		errs = append(errs, p.etcdMgr.removeMember())
-		errs = append(errs, p.etcdMgr.shutdown(true)) // shutdown the etcd server and close the client
-	}
-	if p.debugServer != nil {
-		errs = append(errs, p.debugServerListener.Close())
-	}
-	if p.internalMetricsServer != nil {
-		errs = append(errs, p.internalMetricsListener.Close())
-	}
-	return errors.NewMultiErr(errs)
-}
+	// save config to the gateway
+	p.config = loadedConfig
 
-func (p *gateway) main(ctx context.Context) error {
-	// Disable the default logger to make sure nobody else uses it
-	err := p.run(ctx)
-	return errors.NewMultiErr([]error{err, p.Close()})
-}
-
-func (p *gateway) setup(loadedConfig *config.GatewayConfig) {
+	// set debug context from loaded config
 	if loadedConfig.DebugFlag != nil && *loadedConfig.DebugFlag != "" {
 		p.debugContext.SetFlagStr(*loadedConfig.DebugFlag)
 	}
-	p.config = loadedConfig
+
+	// set debugSink ctx flag
+	p.debugSink.CtxFlagCheck = &p.debugContext
+
+	// TODO: allow arbitrary logger to be passed into configure function
+	// set lumberjack log formatting using a child derived from the default logger
+	// this is used as a back up by p.getLogger when we try to create a logger using the loaded config
+	p.logger = log.NewContext(log.DefaultLogger.CreateChild()).With(logkey.Time, log.DefaultTimestamp, logkey.Caller, log.DefaultCaller)
+
+	// NOTE: the main reason to do that ^ and apply the keys is so that our log messages look consistent.
+	// there is are messages logged by p.getLogger before the keys are applied in the following statement
+
+	// create a new logger using the loaded config
 	p.logger = log.NewContext(p.getLogger(loadedConfig)).With(logkey.Time, log.DefaultTimestamp, logkey.Caller, log.DefaultCaller)
+
+	// assign logger to debug sink
 	p.debugSink.Logger = p.logger
-	log.DefaultLogger.Set(p.logger)
-	pidFilename := *loadedConfig.PidFilename
-	if err := writePidFile(pidFilename); err != nil {
-		p.logger.Log(log.Err, err, logkey.Filename, pidFilename, "cannot store pid in pid file")
-	}
-	defer func() {
-		log.IfErr(p.logger, os.Remove(pidFilename))
-	}()
-	defer func() {
-		log.DefaultLogger.Set(log.Discard)
-	}()
+
+	// setup logger on versionMetric which reports our SHA1
+	p.versionMetric.Logger = p.logger
+
+	return nil
 }
 
 func (p *gateway) createCommonHTTPChain(loadedConfig *config.GatewayConfig) web.NextConstructor {
@@ -667,7 +573,7 @@ func (p *gateway) scheduleStatCollection(ctx context.Context, scheduler *sfxclie
 
 func (p *gateway) setupForwardersAndListeners(ctx context.Context, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler) (signalfx.Sink, map[string]http.Handler, error) {
 	var err error
-	p.forwarders, err = setupForwarders(ctx, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims, p.etcdMgr)
+	p.forwarders, err = setupForwarders(ctx, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims, p.etcdServer, p.etcdClient)
 	if err != nil {
 		p.logger.Log(log.Err, err, "Unable to setup forwarders")
 		return nil, nil, errors.Annotate(err, "unable to setup forwarders")
@@ -717,84 +623,248 @@ func (p *gateway) addEndpoints(f protocol.DebugEndpointer, endpoints map[string]
 	}
 }
 
-func (p *gateway) run(ctx context.Context) error {
-	p.debugSink.CtxFlagCheck = &p.debugContext
-	p.logger.Log(logkey.ConfigFile, p.flags.configFileName, "Looking for config file")
-	p.logger.Log(logkey.Env, strings.Join(os.Environ(), "-"), "Looking for config file")
+// setupEtcdClient sets up the etcd client on the gateway
+func (p *gateway) setupEtcdClient(etcdCfg *embetcd.Config) (err error) {
+	var endpoints []string
+	if len(etcdCfg.InitialCluster) == 0 && etcdCfg.ClusterState == embed.ClusterStateFlagNew {
+		endpoints = embetcd.URLSToStringSlice(etcdCfg.ACUrls)
+	} else {
+		endpoints = etcdCfg.InitialCluster
+	}
+	// setup the etcd client
+	if etcdCfg.ClusterName != "" && len(etcdCfg.InitialCluster) > 0 {
+		p.etcdClient, err = embetcd.NewClient(etcdcli.Config{
+			Endpoints:        endpoints,
+			AutoSyncInterval: *etcdCfg.AutoSyncInterval,
+			DialTimeout:      *etcdCfg.DialTimeout,
+		})
+	}
+	return err
+}
 
-	loadedConfig, err := config.Load(p.flags.configFileName, p.logger)
-	if err != nil {
-		p.logger.Log(log.Err, err, "Unable to load config")
-		return err
+// setupEtcdServer sets up the etcd server on the gateway
+func (p *gateway) setupEtcdServer(ctx context.Context, etcdCfg *embetcd.Config) (err error) {
+	// if the cluster op is invalid short circuit and return
+	if !(etcdCfg.ClusterState == embed.ClusterStateFlagExisting || etcdCfg.ClusterState == embed.ClusterStateFlagNew || etcdCfg.ClusterState == "") {
+		return fmt.Errorf("unsupported cluster-op specified \"%s\"", etcdCfg.ClusterState)
 	}
 
-	p.setup(loadedConfig)
-	p.versionMetric.Logger = p.logger
+	// instantiate the etcdServer
+	if etcdCfg.ClusterState != "" {
+		p.etcdServer = embetcd.New()
 
-	logger := p.logger
-	scheduler := p.setupScheduler(loadedConfig)
-
-	if err := p.setupInternalMetricsServer(loadedConfig, logger, scheduler); err != nil {
-		p.logger.Log(log.Err, "internal metrics server failed", err)
-		return err
+		// set up the etcd server
+		timeout, cancel := context.WithTimeout(ctx, time.Second*120)
+		defer cancel()
+		err = p.etcdServer.Start(timeout, etcdCfg)
 	}
 
-	p.etcdMgr.setup(loadedConfig)
+	return err
+}
 
-	if err := p.etcdMgr.start(); err != nil {
+// setupEtcd sets up the etcd server and client if applicable and returns errors if there's any problems
+func (p *gateway) setupEtcd(ctx context.Context, loadedConfig *config.GatewayConfig) error {
+	// short circuit if there is no cluster operation defined because that means we're running in non-cluster mode
+	// This IS NOT an error state!
+	if loadedConfig.ClusterOperation == nil || *loadedConfig.ClusterOperation == "" {
+		return nil
+	}
+
+	// get an etcd config struct from our loaded gateway config
+	etcdCfg := loadedConfig.ToEtcdConfig()
+
+	// set up a timeout for the etcd server startup
+	timeout := ctx
+	if loadedConfig.EtcdServerStartTimeout != nil {
+		var cancel context.CancelFunc
+		timeout, cancel = context.WithTimeout(context.Background(), *loadedConfig.EtcdServerStartTimeout)
+		defer cancel()
+	}
+
+	// TODO: only do this if we're running in server mode
+	// start the server
+	if err := p.setupEtcdServer(timeout, etcdCfg); err != nil {
 		p.logger.Log(log.Err, "unable to start etcd server", err)
 		return err
 	}
 
+	// create the client
+	return log.IfErrWithKeysAndReturn(p.logger, p.setupEtcdClient(etcdCfg), log.Err, "unable to create etcd client")
+}
+
+// runningLoop is the where we block in the main gateway routine
+func (p *gateway) runningLoop(ctx context.Context) (err error) {
+	// getEtcdStopCh returns the gateway's etcd server's stop notify channel or returns a blocking channel if etcd is nil
+	getEtcdStopCh := func() <-chan struct{} {
+		if p.etcdServer != nil && p.etcdServer.Server != nil {
+			return p.etcdServer.Server.StopNotify()
+		}
+		return make(chan struct{})
+	}
+	// main loop
+	for {
+		select {
+		case <-ctx.Done():
+			return err
+		case <-p.signalChan: // shutdown the gateway if the gateway is signaled
+			return p.stop(ctx)
+		case <-getEtcdStopCh(): // shutdown the gateway if the etcd server goes down
+			// TODO: try to relaod the etcd server some # of times if it fails
+			//  instead of shutting down the whole gateway.  There is an err chan
+			//  on etcd server that we could use to identify if we've errored out
+			// signal to the running routine to close the gateway
+			p.signalChan <- syscall.SIGTERM
+			p.logger.Log(log.Msg, "etcd server has stopped")
+		}
+	}
+}
+
+func (p *gateway) start(ctx context.Context) error {
+	if p.config == nil {
+		return fmt.Errorf("gateway was not configured properly")
+	}
+
+	// handle etcd configurations start server and/or open client if applicable to config
+	if err := p.setupEtcd(ctx, p.config); err != nil {
+		p.logger.Log(log.Err, "failed to set up the etcd server")
+		return err
+	}
+
+	// setup scheduler
+	scheduler := p.setupScheduler(p.config)
+
+	// setup internal metrics server
+	if err := p.setupInternalMetricsServer(p.config, p.logger, scheduler); err != nil {
+		p.logger.Log(log.Err, "internal metrics server failed", err)
+		return err
+	}
+
+	// create http chain
+	chain := p.createCommonHTTPChain(p.config)
+
+	// create
+	loader := config.NewLoader(ctx, p.logger, Version, &p.debugContext, &p.debugSink, &p.ctxDims, chain)
+
+	multiplexer, additionalEndpoints, err := p.setupForwardersAndListeners(ctx, loader, p.config, p.logger, scheduler)
+	if err == nil {
+		if err := p.setupDebugServer(p.config, p.logger, scheduler, additionalEndpoints); err != nil {
+			p.logger.Log(log.Err, "debug server failed", err)
+			return err
+		}
+
+		finishedContext, cancelFunc := p.scheduleStatCollection(ctx, scheduler, p.config, multiplexer)
+
+		// Schedule datapoint collection to a Discard sink so we can get the stats in Expvar()
+		wg := sync.WaitGroup{}
+
+		wg.Add(1)
+		go func() {
+			err := scheduler.Schedule(finishedContext)
+			p.logger.Log(log.Err, err, logkey.Struct, "scheduler", "Schedule finished")
+			wg.Done()
+		}()
+
+		if p.setupDoneSignal != nil {
+			close(p.setupDoneSignal)
+		}
+
+		p.logger.Log("Setup done.  Blocking!")
+		err = p.runningLoop(ctx)
+
+		cancelFunc()
+		wg.Wait()
+	}
+
+	return err
+}
+
+// loadConfig loads a config file for the Gateway, the returned error
+// is used for testing and should be refactored out later
+func loadConfig(configFilePath string, logger log.Logger) (*config.GatewayConfig, error) {
+	logger.Log(logkey.ConfigFile, configFilePath, "Looking for config file")
+	logger.Log(logkey.Env, strings.Join(os.Environ(), "-"), "Looking for config file")
+
+	// load the config file
+	loadedConfig, err := config.Load(configFilePath, logger)
+
+	// log an error and return if we fail to load the config file
+	if err != nil {
+		return nil, err
+	}
+
+	// add flag values to the loadedConfig.  This overrides any values in the config file with runtime flags.
+	flags.addFlagsToConfig(loadedConfig)
+
+	// log the config that we loaded
 	var bb []byte
 	if bb, err = json.Marshal(loadedConfig); err == nil {
 		logger.Log(logkey.Config, string(bb), logkey.Env, strings.Join(os.Environ(), "-"), "config loaded")
 	}
 
-	setupGoMaxProcs(loadedConfig.NumProcs, p.gomaxprocs)
-
-	chain := p.createCommonHTTPChain(loadedConfig)
-	loader := config.NewLoader(ctx, logger, Version, &p.debugContext, &p.debugSink, &p.ctxDims, chain)
-
-	multiplexer, additionalEndpoints, err := p.setupForwardersAndListeners(ctx, loader, loadedConfig, logger, scheduler)
-	if err == nil {
-		if err := p.setupDebugServer(loadedConfig, logger, scheduler, additionalEndpoints); err != nil {
-			p.logger.Log(log.Err, "debug server failed", err)
-			return err
-		}
-
-		finishedContext, cancelFunc := p.scheduleStatCollection(ctx, scheduler, loadedConfig, multiplexer)
-
-		// Schedule datapoint collection to a Discard sink so we can get the stats in Expvar()
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
-			err := scheduler.Schedule(finishedContext)
-			logger.Log(log.Err, err, logkey.Struct, "scheduler", "Schedule finished")
-			wg.Done()
-		}()
-		if p.setupDoneSignal != nil {
-			close(p.setupDoneSignal)
-		}
-
-		logger.Log("Setup done.  Blocking!")
-		select {
-		case <-ctx.Done():
-		case <-p.signalChan:
-			err = p.gracefulShutdown()
-		}
-		cancelFunc()
-		wg.Wait()
-	}
-	return err
+	return loadedConfig, nil
 }
 
-var flagParse = flag.Parse
+// setupGoMaxProcs is a function that takes a pointer to an int and a function(int) int and if the int pointer
+// is not nil it feeds the value into the function
+func setupGoMaxProcs(loadedConfig *config.GatewayConfig, gomaxprocs func(int) int) int {
+	if loadedConfig != nil && loadedConfig.NumProcs != nil {
+		return gomaxprocs(*loadedConfig.NumProcs)
+	}
+	// go does this by default in most modern version of go
+	return gomaxprocs(runtime.NumCPU())
+}
 
+// writePidFile writes the pid file for the gateway server
+func writePidFile(loadedConfig *config.GatewayConfig, logger log.Logger) {
+	if loadedConfig != nil && loadedConfig.PidFilename != nil {
+		pid := os.Getpid()
+		if err := ioutil.WriteFile(*loadedConfig.PidFilename, []byte(strconv.FormatInt(int64(pid), 10)), os.FileMode(0644)); err != nil {
+			logger.Log(log.Err, err, logkey.Filename, *loadedConfig.PidFilename, "cannot store pid in pid file")
+		}
+		// clean up the pid file
+		// also why are we removing the pid file?
+		log.IfErr(logger, os.Remove(*loadedConfig.PidFilename))
+	}
+	logger.Log(log.Err, "no pid file configuration found")
+}
+
+// main function for gateway server
 func main() {
+	// create a logger before we load config
+	// TODO: make logger a package variable so we don't have to pass it around
+	logger := log.NewContext(log.DefaultLogger.CreateChild()).With(logkey.Time, log.DefaultTimestamp, logkey.Caller, log.DefaultCaller)
+
+	// parse runtime flags only once
 	flagParse()
+
+	// instantiate a gateway
+	mainInstance := newGateway()
+
+	// send sigterm to the signalChan
 	signal.Notify(mainInstance.signalChan, syscall.SIGTERM)
-	log.IfErr(log.DefaultLogger, mainInstance.main(context.Background()))
+
+	// when main completes stop sending sigterms to the channel
+	defer func() {
+		//signal.Stop(mainInstance.signalChan)
+		close(mainInstance.signalChan)
+	}()
+
+	// load the config file using runtime flag
+	loadedConfig, err := loadConfig(flags.configFileName, logger)
+	log.IfErrWithKeys(logger, err, log.Err, "an error occurred while loading the config file")
+
+	// setup pid file if one is configured
+	writePidFile(loadedConfig, logger)
+
+	// use the config value for NumProcs to set the maximum processes for go to schedule against
+	logger.Log(log.Msg, "setting go maximum number of processes to ", setupGoMaxProcs(loadedConfig, runtime.GOMAXPROCS))
+
+	// configure the gateway
+	log.IfErr(logger, mainInstance.configure(loadedConfig))
+
+	// start the gateway
+	log.IfErr(logger, mainInstance.start(context.Background()))
+
 }
 
 // FirstNonNil returns what it says it does
