@@ -626,13 +626,13 @@ func (p *gateway) addEndpoints(f protocol.DebugEndpointer, endpoints map[string]
 // setupEtcdClient sets up the etcd client on the gateway
 func (p *gateway) setupEtcdClient(etcdCfg *embetcd.Config) (err error) {
 	var endpoints []string
-	if len(etcdCfg.InitialCluster) == 0 && etcdCfg.ClusterState == embed.ClusterStateFlagNew {
+	if etcdCfg.ClusterState == embed.ClusterStateFlagNew {
 		endpoints = embetcd.URLSToStringSlice(etcdCfg.ACUrls)
 	} else {
 		endpoints = etcdCfg.InitialCluster
 	}
 	// setup the etcd client
-	if etcdCfg.ClusterName != "" && len(etcdCfg.InitialCluster) > 0 {
+	if etcdCfg.ClusterName != "" && len(endpoints) > 0 {
 		p.etcdClient, err = embetcd.NewClient(etcdcli.Config{
 			Endpoints:        endpoints,
 			AutoSyncInterval: *etcdCfg.AutoSyncInterval,
@@ -681,11 +681,11 @@ func (p *gateway) setupEtcd(ctx context.Context, loadedConfig *config.GatewayCon
 		defer cancel()
 	}
 
-	// TODO: only do this if we're running in server mode
 	// start the server
-	if err := p.setupEtcdServer(timeout, etcdCfg); err != nil {
-		p.logger.Log(log.Err, "unable to start etcd server", err)
-		return err
+	if *loadedConfig.ClusterOperation != "client" {
+		if err := p.setupEtcdServer(timeout, etcdCfg); err != nil {
+			return err
+		}
 	}
 
 	// create the client

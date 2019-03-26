@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/coreos/etcd/clientv3"
 	"github.com/signalfx/gateway/flaghelpers"
 	"io"
 	"io/ioutil"
@@ -13,6 +14,7 @@ import (
 	_ "net/http/pprof"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -602,19 +604,20 @@ func formatTargetAddresses(targetClusters []string) (targetAddresses string) {
 /* Cluster Tests */
 
 // The following functions are test fixtures for TestProxyCluster
-func setConfigFile(etcdConf *embetcd.Config, max int, min int, check int) (configFilePath string, etcdDataDirPath string) {
+func setConfigFile(etcdConf *embetcd.Config, max int, min int, check int) (configFilePath string, tempDir string) {
+	// get a temporary directory for the etcd data directory
+	tempDir, err := ioutil.TempDir("", "TestProxyCluster")
+	So(err, ShouldBeNil)
+	So(os.RemoveAll(tempDir), ShouldBeNil)
+
 	// get a temporary filename for the config file
-	fileObj, err := ioutil.TempFile("", "TestProxyCluster")
+	fileObj, err := ioutil.TempFile("", "TestProxyClusterConfig")
 	So(err, ShouldBeNil)
 	configFilePath = fileObj.Name()
 	// remove the temp file so we can overwrite it
 	So(os.Remove(configFilePath), ShouldBeNil)
 
-	// get a temporary directory for the etcd data directory
-	etcdDataDirPath, err = ioutil.TempDir("", "TestProxyCluster")
-	So(err, ShouldBeNil)
-	// remove the temp dir so we can recreate it
-	So(os.RemoveAll(etcdDataDirPath), ShouldBeNil)
+	//// remove the temp dir so we can recreate it
 
 	proxyConf := configEtcd
 	proxyConf = strings.Replace(proxyConf, "<<MAX>>", strconv.FormatInt(int64(max), 10), -1)
@@ -627,14 +630,14 @@ func setConfigFile(etcdConf *embetcd.Config, max int, min int, check int) (confi
 	proxyConf = strings.Replace(proxyConf, "<<MADDRESS>>", etcdConf.ListenMetricsUrls[0].String(), -1)
 	proxyConf = strings.Replace(proxyConf, "<<UNHEALTHYTTL>>", etcdConf.UnhealthyTTL.String(), -1)
 	proxyConf = strings.Replace(proxyConf, "<<REMOVEMEMBERTIMEOUT>>", etcdConf.RemoveMemberTimeout.String(), -1)
-	proxyConf = strings.Replace(proxyConf, "<<DATADIR>>", filepath.Join(etcdDataDirPath, etcdConf.Dir), -1)
+	proxyConf = strings.Replace(proxyConf, "<<DATADIR>>", filepath.Join(tempDir, etcdConf.Dir), -1)
 	proxyConf = strings.Replace(proxyConf, "<<CLUSTEROP>>", etcdConf.ClusterState, -1)
 	proxyConf = strings.Replace(proxyConf, "<<TARGETADDRESSES>>", formatTargetAddresses(etcdConf.InitialCluster), -1)
 	proxyConf = strings.Replace(proxyConf, "<<SERVERNAME>>", etcdConf.Name, -1)
 	proxyConf = strings.Replace(proxyConf, "<<CLUSTERNAME>>", etcdConf.ClusterName, -1)
 
-	So(ioutil.WriteFile(configFilePath, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
-	return configFilePath, etcdDataDirPath
+	So(ioutil.WriteFile(path.Join(configFilePath), []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
+	return configFilePath, tempDir
 }
 
 // startTestGateway starts a gateway and waits for it to signal that setup is down or for the
@@ -655,8 +658,7 @@ func startTestGateway(ctx context.Context, gw *gateway) chan error {
 	return mainErrCh
 }
 
-// tearDownClusterTest cleans up all provided gateways, error channels, and configfile paths and etcdDataDir paths
-func tearDownClusterTest(cancel context.CancelFunc, gateways []*gateway, mainErrChs []chan error, configFiles []string, etcdDataDirs []string) {
+func tearDownClusterTest(cancel context.CancelFunc, configFiles []string, etcdDataDirs []string) {
 
 	// remove test config files
 	for _, filename := range configFiles {
@@ -669,43 +671,44 @@ func tearDownClusterTest(cancel context.CancelFunc, gateways []*gateway, mainErr
 		So(os.RemoveAll(etcdDataDirPath), ShouldBeNil)
 	}
 
-	// cancel the test context
-	if cancel != nil {
-		cancel()
-	}
 }
 
 func TestProxyCluster(t *testing.T) {
 	Convey("the etcd cluster should...", t, func() {
+		// initialize storage test structures
+		var configFiles []string
+		var etcdDataDirs []string
+		var ctx context.Context
+		var cancel context.CancelFunc
+
 		Convey("be aware of all members", func() {
 			etcdConfigs := []*embetcd.Config{
 				{Config: &embed.Config{Name: "instance1", Dir: "etcd-data", ClusterState: "seed", LCUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2379"}}, ACUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2379"}}, LPUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2380"}}, APUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2380"}}, ListenMetricsUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2381"}}}, ClusterName: "test-cluster-1", InitialCluster: []string{}, RemoveMemberTimeout: pointer.Duration(3000 * time.Second), UnhealthyTTL: pointer.Duration(1000 * time.Millisecond)},
 				{Config: &embed.Config{Name: "instance2", Dir: "etcd-data1", ClusterState: "join", LCUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2479"}}, ACUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2479"}}, LPUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2480"}}, APUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2480"}}, ListenMetricsUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2481"}}}, ClusterName: "test-cluster-1", InitialCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479", "127.0.0.1:2579"}, RemoveMemberTimeout: pointer.Duration(3000 * time.Second), UnhealthyTTL: pointer.Duration(1000 * time.Millisecond)},
 				{Config: &embed.Config{Name: "instance3", Dir: "etcd-data2", ClusterState: "join", LCUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2579"}}, ACUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2579"}}, LPUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2580"}}, APUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2580"}}, ListenMetricsUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2581"}}}, ClusterName: "test-cluster-1", InitialCluster: []string{"127.0.0.1:2379"}, RemoveMemberTimeout: pointer.Duration(-1 * time.Second), UnhealthyTTL: pointer.Duration(1000 * time.Millisecond)},
-				// {Config: &embed.Config{Name: "", Dir: "etcd-data3", ClusterState: "join", LCUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2679"}}, ACUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2679"}}, LPUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2680"}}, APUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2680"}}, ListenMetricsUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2681"}}}, InitialCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479", "127.0.0.1:2579"}, RemoveMemberTimeout: pointer.Duration(3000 * time.Second), UnhealthyTTL: pointer.Duration(1000 * time.Millisecond)},
+				{Config: &embed.Config{Name: "instance4", Dir: "etcd-data3", ClusterState: "client", LCUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2679"}}, ACUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2679"}}, LPUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2680"}}, APUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2680"}}, ListenMetricsUrls: []url.URL{{Scheme: "http", Host: "127.0.0.1:2681"}}}, ClusterName: "test-cluster-1", InitialCluster: []string{"127.0.0.1:2379", "127.0.0.1:2479", "127.0.0.1:2579"}, RemoveMemberTimeout: pointer.Duration(3000 * time.Second), UnhealthyTTL: pointer.Duration(1000 * time.Millisecond)},
 			}
+
+			gateways := make([]*gateway, 0, len(etcdConfigs))
+			mainErrChs := make([]chan error, 0, len(etcdConfigs))
+			configFiles = make([]string, 0, len(etcdConfigs))
+			etcdDataDirs = make([]string, 0, len(etcdConfigs))
 
 			// set up logger
 			logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
 			logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
 
-			// initialize storage test structures
-			gateways := make([]*gateway, 0, len(etcdConfigs))
-			configFiles := make([]string, 0, len(etcdConfigs))
-			etcdDataDirs := make([]string, 0, len(etcdConfigs))
-			mainErrChs := make([]chan error, 0, len(etcdConfigs))
-
 			// test context
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel = context.WithCancel(context.Background())
+			defer cancel()
 
-			// defer test tear down
-			defer tearDownClusterTest(cancel, gateways, mainErrChs, configFiles, etcdDataDirs)
+			var numClients int
 
 			// set up config files
 			for index, config := range etcdConfigs {
 
 				// create the configuration file
-				configFile, etcdDataDir := setConfigFile(config, 15000, 0, 25)
+				configFile, etcdDataDir := setConfigFile(config, 5000, 0, 25)
 				configFiles = append(configFiles, configFile)
 				etcdDataDirs = append(etcdDataDirs, etcdDataDir)
 
@@ -734,9 +737,30 @@ func TestProxyCluster(t *testing.T) {
 				gateways = append(gateways, gw)
 
 				// verify that the gateway started successfully
-				So(gw.etcdServer, ShouldNotBeNil)
-				So(gw.etcdServer.IsRunning(), ShouldBeTrue)
-				So(len(gw.etcdServer.Server.Cluster().Members()), ShouldEqual, len(gateways))
+				if config.ClusterState != "client" {
+					So(gw.etcdServer, ShouldNotBeNil)
+					So(gw.etcdServer.IsRunning(), ShouldBeTrue)
+				} else {
+					numClients++
+					So(gw.etcdServer, ShouldBeNil)
+				}
+				// there should always be a client
+				So(gw.etcdClient, ShouldNotBeNil)
+			}
+
+			// check that each instance is aware of each other
+			// take into account that one of the instances is a client only and does not have members
+			for _, gw := range gateways {
+				if gw.etcdServer != nil {
+					// There's only one member that is a client and not running the etcd server we must account for this
+					So(len(gw.etcdServer.Server.Cluster().Members()), ShouldEqual, len(gateways)-numClients)
+				}
+				if gw.etcdClient != nil {
+					resp, err := gw.etcdClient.Get(ctx, "__etcd-cluster__", clientv3.WithPrefix())
+					So(err, ShouldBeNil)
+					So(resp.Kvs, ShouldNotBeNil)
+					So(len(resp.Kvs), ShouldBeGreaterThan, len(gateways)-numClients)
+				}
 			}
 
 			// shutdown the cluster
@@ -750,10 +774,18 @@ func TestProxyCluster(t *testing.T) {
 				// This is a little hacky but it lets us avoid writing a dedicated
 				// test to get coverage for the runningLoop() case where etcdStopCh returns
 				g.signalChan = make(chan os.Signal, 5)
+
+				// if the etcd server is nil the next statement out side of this if will block forever
+				if g.etcdServer == nil {
+					close(g.signalChan)
+				}
 				fmt.Println(g.runningLoop(context.Background()))
 			}
 
 			return
+		})
+		Reset(func() {
+			tearDownClusterTest(cancel, configFiles, etcdDataDirs)
 		})
 	})
 }
