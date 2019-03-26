@@ -27,6 +27,7 @@ import (
 	"github.com/signalfx/embetcd/embetcd"
 	"github.com/signalfx/gateway/config"
 	"github.com/signalfx/gateway/dp/dpbuffered"
+	"github.com/signalfx/gateway/etcdIntf"
 	"github.com/signalfx/gateway/flaghelpers"
 	"github.com/signalfx/gateway/internal-metrics"
 	"github.com/signalfx/gateway/logkey"
@@ -623,6 +624,78 @@ func (p *gateway) addEndpoints(f protocol.DebugEndpointer, endpoints map[string]
 	}
 }
 
+func setClusterName(etcdClient etcdIntf.Client, clusterName string) (err error) {
+	_, err = etcdClient.Put(context.Background(), "/gateway/cluster/name", clusterName)
+	return err
+}
+
+func getTempEtcdClient(ctx context.Context, endpoints []string, etcdCfg *embetcd.Config) (tempCli *embetcd.Client, closeCli func(), err error) {
+	closeCli = func() {
+		if tempCli != nil {
+			_ = tempCli.Close()
+		}
+	}
+
+	loop := true
+	for ctx.Err() == nil && loop {
+		// close previously existing fn
+		if closeCli != nil {
+			closeCli()
+		}
+
+		// create a temporary cli
+		tempCli, err = embetcd.NewClient(etcdcli.Config{
+			Endpoints:        endpoints,
+			AutoSyncInterval: *etcdCfg.AutoSyncInterval,
+			DialTimeout:      *etcdCfg.DialTimeout,
+		})
+
+		// if successful return
+		if err == nil {
+			loop = false
+		}
+	}
+
+	return tempCli, closeCli, err
+}
+
+func handleClusterNameResponse(ctx context.Context, tempCli etcdIntf.Client, resp *etcdcli.GetResponse, clusterName string) (err error) {
+	// if there is a key
+	if len(resp.Kvs) != 0 {
+		// the key doesn't match
+		if string(resp.Kvs[0].Value) != clusterName {
+			err = fmt.Errorf("the configured cluster name '%s' does not match the existing cluster name '%s'", string(resp.Kvs[0].Value), clusterName)
+		}
+	} else {
+		err = setClusterName(tempCli, clusterName)
+	}
+	return err
+}
+
+func (p *gateway) checkForClusterNameConflict(ctx context.Context, etcdCfg *embetcd.Config) (err error) {
+	var tempCli *embetcd.Client
+	var closeCli func()
+
+	// conflicts only occur if we're joining or a client
+	if etcdCfg != nil && etcdCfg.ClusterState == "join" || etcdCfg.ClusterState == "client" {
+
+		// get the a temporary cli for the cluster
+		tempCli, closeCli, err = getTempEtcdClient(ctx, etcdCfg.InitialCluster, etcdCfg)
+		defer closeCli()
+
+		var resp *etcdcli.GetResponse
+		if err == nil {
+			resp, err = tempCli.Get(ctx, "/gateway/cluster/name")
+		}
+
+		// handle cluster name stuff
+		if err == nil {
+			err = handleClusterNameResponse(ctx, tempCli, resp, etcdCfg.ClusterName)
+		}
+	}
+	return err
+}
+
 // setupEtcdClient sets up the etcd client on the gateway
 func (p *gateway) setupEtcdClient(etcdCfg *embetcd.Config) (err error) {
 	var endpoints []string
@@ -681,11 +754,33 @@ func (p *gateway) setupEtcd(ctx context.Context, loadedConfig *config.GatewayCon
 		defer cancel()
 	}
 
+	var err error
+
+	// check the for cluster name conflicts
+	err = p.checkForClusterNameConflict(ctx, etcdCfg)
+
 	// start the server
-	if *loadedConfig.ClusterOperation != "client" {
-		if err := p.setupEtcdServer(timeout, etcdCfg); err != nil {
-			return err
+	if *loadedConfig.ClusterOperation != "client" && err == nil {
+		err = p.setupEtcdServer(timeout, etcdCfg)
+
+		// once the server starts
+		if err == nil && etcdCfg.ClusterState == embed.ClusterStateFlagNew {
+			endpoints := embetcd.URLSToStringSlice(etcdCfg.ACUrls)
+			var tempCli *embetcd.Client
+			var cancel func()
+			tempCli, cancel, err = getTempEtcdClient(ctx, endpoints, etcdCfg)
+			defer cancel()
+
+			// set the cluster name for new clusters
+			if err == nil {
+				err = setClusterName(tempCli, etcdCfg.ClusterName)
+			}
+
 		}
+	}
+
+	if err != nil {
+		return err
 	}
 
 	// create the client
