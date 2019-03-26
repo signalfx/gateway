@@ -100,8 +100,13 @@ func clusterNameConflicts(ctx context.Context, client *Client, clusterName strin
 		// then you run the risk of breaking quorum and stalling out on the cluster name check
 		resp, err = client.Get(ctx, "/name")
 		if err == nil {
-			if len(resp.Kvs) == 0 || string(resp.Kvs[0].Value) != clusterName {
-				err = ErrClusterNameConflict
+
+			if len(resp.Kvs) == 0 || string(resp.Kvs[0].Value) == "" {
+				_, _ = client.Put(ctx, "/name", clusterName)
+				return nil
+			}
+			if len(resp.Kvs) != 0 && string(resp.Kvs[0].Value) != clusterName {
+				return ErrClusterNameConflict
 			}
 			break
 		}
