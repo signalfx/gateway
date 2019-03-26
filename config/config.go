@@ -423,7 +423,7 @@ func Load(configFile string, logger log.Logger) (*GatewayConfig, error) {
 				return nil, errors.New("gateway now requires configuring ClusterName at top level of config")
 			}
 			// fill in environment variable values to override config file
-			loadFromEnv(p)
+			loadFromEnv(c)
 			return c, nil
 		}
 	}
