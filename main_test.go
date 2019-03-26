@@ -658,6 +658,21 @@ func startTestGateway(ctx context.Context, gw *gateway) chan error {
 	return mainErrCh
 }
 
+func tearDownClusterTest(cancel context.CancelFunc, configFiles []string, etcdDataDirs []string) {
+
+	// remove test config files
+	for _, filename := range configFiles {
+		So(os.Remove(filename), ShouldBeNil)
+	}
+
+	// remove test etcd data directories
+	for _, etcdDataDirPath := range etcdDataDirs {
+		// remove the temp dir so we can recreate it
+		So(os.RemoveAll(etcdDataDirPath), ShouldBeNil)
+	}
+
+}
+
 func TestProxyCluster(t *testing.T) {
 	Convey("the etcd cluster should...", t, func() {
 		// initialize storage test structures
@@ -685,6 +700,7 @@ func TestProxyCluster(t *testing.T) {
 
 			// test context
 			ctx, cancel = context.WithCancel(context.Background())
+			defer cancel()
 
 			var numClients int
 
@@ -769,21 +785,7 @@ func TestProxyCluster(t *testing.T) {
 			return
 		})
 		Reset(func() {
-			// remove test config files
-			for _, filename := range configFiles {
-				So(os.Remove(filename), ShouldBeNil)
-			}
-
-			// remove test etcd data directories
-			for _, etcdDataDirPath := range etcdDataDirs {
-				// remove the temp dir so we can recreate it
-				So(os.RemoveAll(etcdDataDirPath), ShouldBeNil)
-			}
-
-			// cancel the test context
-			if cancel != nil {
-				cancel()
-			}
+			tearDownClusterTest(cancel, configFiles, etcdDataDirs)
 		})
 	})
 }
