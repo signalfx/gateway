@@ -277,6 +277,7 @@ func DefaultGatewayConfig() *GatewayConfig {
 		ListenOnClientAddress:         pointer.String("0.0.0.0:2379"),
 		AdvertiseClientAddress:        pointer.String("127.0.0.1:2379"),
 		ETCDMetricsAddress:            pointer.String("127.0.0.1:2381"),
+		EtcdServerStartTimeout:        pointer.Duration(time.Second * 90),
 		UnhealthyMemberTTL:            pointer.Duration(embetcd.DefaultUnhealthyTTL),
 		RemoveMemberTimeout:           pointer.Duration(time.Second),
 		EtcdStartupGracePeriod:        pointer.Duration(embetcd.DefaultStartUpGracePeriod),
