@@ -84,7 +84,9 @@ func (m *Members) Get(member *membership.Member) (info *Member) {
 	info.Member = member
 
 	// update the member client endpoints
-	info.Client.SetEndpoints(member.ClientURLs...)
+	if member != nil && member.ClientURLs != nil {
+		info.Client.SetEndpoints(member.ClientURLs...)
+	}
 
 	return info
 }

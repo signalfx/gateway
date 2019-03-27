@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,7 +27,7 @@ const (
 	DefaultCleanUpInterval = time.Second * 5
 	// DefaultStartUpGracePeriod is the graceperiod to wait for new cluster members to startup
 	// before they're subject to health checks
-	DefaultStartUpGracePeriod = time.Second * 10
+	DefaultStartUpGracePeriod = time.Second * 60
 	// DefaultShutdownTimeout is the default time to wait for the server to shutdown cleanly
 	DefaultShutdownTimeout = time.Minute * 1
 	// DefaultDialTimeout is the default etcd dial timeout
@@ -59,6 +60,31 @@ func ServerNameConflicts(ctx context.Context, client *Client, name string) (conf
 	return conflicts, err
 }
 
+// dedupPeerString take a peer string and deduplicates it
+func dedupPeerString(peer string) (peers string) {
+	// map to keep track of already used substrings
+	set := make(map[string]struct{})
+
+	// break on , and check if the substring has already been used
+	for _, substr := range strings.Split(peer, ",") {
+		cleansubstr := strings.TrimSpace(substr)
+		if _, ok := set[cleansubstr]; !ok {
+			parts := strings.Split(cleansubstr, "=")
+			if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+				if len(set) == 0 {
+					// don't use a comma if first element
+					peers = cleansubstr
+				} else {
+					// use comma for everything after the first element
+					peers = fmt.Sprintf("%s,%s", peers, cleansubstr)
+				}
+				set[cleansubstr] = struct{}{}
+			}
+		}
+	}
+	return peers
+}
+
 // getServerPeers returns the peer urls for the cluster formatted for the initialCluster server configuration.
 // The context that is passed in should have a configured timeout.
 func getServerPeers(ctx context.Context, c *Client, initialCluster string) (peers string, err error) {
@@ -87,7 +113,7 @@ func getServerPeers(ctx context.Context, c *Client, initialCluster string) (peer
 			break
 		}
 	}
-
+	peers = dedupPeerString(peers)
 	return peers, err
 }
 
@@ -100,8 +126,13 @@ func clusterNameConflicts(ctx context.Context, client *Client, clusterName strin
 		// then you run the risk of breaking quorum and stalling out on the cluster name check
 		resp, err = client.Get(ctx, "/name")
 		if err == nil {
-			if len(resp.Kvs) == 0 || string(resp.Kvs[0].Value) != clusterName {
-				err = ErrClusterNameConflict
+
+			if len(resp.Kvs) == 0 || string(resp.Kvs[0].Value) == "" {
+				_, _ = client.Put(ctx, "/name", clusterName)
+				return nil
+			}
+			if len(resp.Kvs) != 0 && string(resp.Kvs[0].Value) != clusterName {
+				return ErrClusterNameConflict
 			}
 			break
 		}
@@ -367,17 +398,15 @@ func (s *Server) cleanCluster(ctx context.Context, members *Members, client *Cli
 		for _, cmember := range currentMembers {
 
 			// wait to check health until the member is listed as started
-			if cmember.IsStarted() {
 
-				currentMemberIDs[uint64(cmember.ID)] = struct{}{}
+			currentMemberIDs[uint64(cmember.ID)] = struct{}{}
 
-				// fetch the health of the member in a separate go routine
-				wg.Add(1)
-				go func(m *Member) {
-					m.Update(client)
-					wg.Done()
-				}(members.Get(cmember))
-			}
+			// fetch the health of the member in a separate go routine
+			wg.Add(1)
+			go func(m *Member) {
+				m.Update(client)
+				wg.Done()
+			}(members.Get(cmember))
 
 		}
 

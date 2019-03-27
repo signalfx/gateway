@@ -5,8 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/coreos/etcd/clientv3"
-	"github.com/signalfx/gateway/flaghelpers"
+	"github.com/coreos/etcd/mvcc/mvccpb"
 	"io"
 	"io/ioutil"
 	"net"
@@ -25,9 +24,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/embed"
 	"github.com/signalfx/embetcd/embetcd"
 	"github.com/signalfx/gateway/config"
+	"github.com/signalfx/gateway/flaghelpers"
 	"github.com/signalfx/gateway/protocol/carbon"
 	"github.com/signalfx/gateway/protocol/signalfx"
 	_ "github.com/signalfx/go-metrics"
@@ -788,4 +789,156 @@ func TestProxyCluster(t *testing.T) {
 			tearDownClusterTest(cancel, configFiles, etcdDataDirs)
 		})
 	})
+}
+
+type myetcd struct {
+	lock     sync.Mutex
+	closeCh  chan struct{}
+	watchChs []chan clientv3.WatchResponse
+	watchCh  chan clientv3.WatchResponse
+	members  []*mvccpb.KeyValue
+}
+
+func newEtcd() *myetcd {
+	m := &myetcd{
+		lock:     sync.Mutex{},
+		closeCh:  make(chan struct{}, 0),
+		watchChs: []chan clientv3.WatchResponse{},
+		watchCh:  make(chan clientv3.WatchResponse, 100),
+		members:  []*mvccpb.KeyValue{},
+	}
+	m.start()
+	return m
+}
+
+func (m *myetcd) start() {
+	go func() {
+		for {
+			select {
+			case msg := <-m.watchCh:
+				m.lock.Lock()
+				// broadcast to all instances watching
+				for _, ch := range m.watchChs {
+					ch <- clientv3.WatchResponse{
+						Events: []*clientv3.Event{
+							{
+								Type: msg.Events[0].Type,
+								Kv:   &mvccpb.KeyValue{Key: msg.Events[0].Kv.Key, Value: msg.Events[0].Kv.Value},
+							},
+						},
+					}
+				}
+				m.lock.Unlock()
+			case <-m.closeCh:
+				m.lock.Lock()
+				for _, ch := range m.watchChs {
+					close(ch)
+				}
+				m.members = m.members[:0]
+				m.watchChs = m.watchChs[:0]
+				m.lock.Unlock()
+				return
+			}
+		}
+	}()
+}
+
+func (m *myetcd) close() {
+	close(m.closeCh)
+}
+
+func (m *myetcd) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	members := make([]*mvccpb.KeyValue, len(m.members))
+	copy(members, m.members)
+
+	return &clientv3.GetResponse{
+		Kvs: members,
+	}, nil
+}
+
+func (m *myetcd) Grant(ctx context.Context, ttl int64) (*clientv3.LeaseGrantResponse, error) {
+	return &clientv3.LeaseGrantResponse{}, nil
+}
+
+func (m *myetcd) KeepAlive(ctx context.Context, id clientv3.LeaseID) (<-chan *clientv3.LeaseKeepAliveResponse, error) {
+	ch := make(chan *clientv3.LeaseKeepAliveResponse, 1)
+	ch <- &clientv3.LeaseKeepAliveResponse{}
+	return ch, nil
+}
+
+func (m *myetcd) Watch(ctx context.Context, key string, opts ...clientv3.OpOption) clientv3.WatchChan {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	ch := make(chan clientv3.WatchResponse, 100)
+	m.watchChs = append(m.watchChs, ch)
+	return ch
+}
+
+func (m *myetcd) Put(ctx context.Context, key, val string, opts ...clientv3.OpOption) (*clientv3.PutResponse, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.members = append(m.members, &mvccpb.KeyValue{Key: []byte(key), Value: []byte(val)})
+	m.watchCh <- clientv3.WatchResponse{
+		Events: []*clientv3.Event{
+			{
+				Type: mvccpb.PUT,
+				Kv:   &mvccpb.KeyValue{Key: []byte(key), Value: []byte(val)},
+			},
+		},
+	}
+	return &clientv3.PutResponse{}, nil
+}
+
+func (m *myetcd) Delete(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.DeleteResponse, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	var val []byte
+	bkey := []byte(key)
+	new := make([]*mvccpb.KeyValue, 0)
+	for _, mem := range m.members {
+		if !bytes.Equal(mem.Key, bkey) {
+			new = append(new, mem)
+		} else {
+			val = mem.Value
+		}
+	}
+	if len(new) != len(m.members) {
+		m.members = new
+		m.watchCh <- clientv3.WatchResponse{
+			Events: []*clientv3.Event{
+				{
+					Type: mvccpb.DELETE,
+					Kv:   &mvccpb.KeyValue{Key: []byte(key), Value: val},
+				},
+			},
+		}
+		return &clientv3.DeleteResponse{}, nil
+	}
+	return &clientv3.DeleteResponse{}, fmt.Errorf("failed to delete key")
+}
+
+func Test_handleClusterNameResponse(t *testing.T) {
+	tempCli := newEtcd()
+	kvs := make([]*mvccpb.KeyValue, 1)
+	kvs[0] = &mvccpb.KeyValue{Key: []byte("hello")}
+	resp := &clientv3.GetResponse{
+		Kvs: kvs,
+	}
+	if err := handleClusterNameResponse(context.Background(), tempCli, resp, "bananas"); err == nil {
+		t.Errorf("handleClusterName should have returned an error because the existing key doesn't match")
+		return
+	}
+	if err := handleClusterNameResponse(context.Background(), tempCli, &clientv3.GetResponse{}, "bananas"); err != nil {
+		t.Errorf("should have created the new cluster name")
+		return
+	}
+	resp, err := tempCli.Get(context.Background(), "bananas")
+	if err != nil {
+		t.Errorf("the temp cli should not have returned an error when fetching the new key")
+	}
+	if string(resp.Kvs[0].Value) != "bananas" {
+		t.Errorf("the new key %s does not match what it should be %s", string(resp.Kvs[0].Value), "bananas")
+	}
 }
