@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/signalfx/gateway/protocol/signalfx/spanobfuscation"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -176,6 +177,14 @@ func TestSignalfxListenerFailure(t *testing.T) {
 		_, err := NewListener(nil, listenConf)
 		So(err, ShouldNotBeNil)
 	})
+	Convey("invalid span removal rule should not listen", t, func() {
+		listenConf := &ListenerConfig{
+			ListenAddr:     pointer.String("127.0.0.1:0"),
+			RemoveSpanTags: []*spanobfuscation.TagRemovalRuleConfig{{}},
+		}
+		_, err := NewListener(nil, listenConf)
+		So(err, ShouldNotBeNil)
+	})
 }
 
 func TestCheckResp(t *testing.T) {
@@ -243,6 +252,13 @@ func TestSignalfxListener(t *testing.T) {
 			},
 			AdditionalSpanTags: map[string]string{
 				"key": "value",
+			},
+			RemoveSpanTags: []*spanobfuscation.TagRemovalRuleConfig{
+				{
+					Service:   pointer.String("remove-*"),
+					Operation: pointer.String("*op"),
+					Tags:      []string{"delete-me"},
+				},
 			},
 		}
 		listener, err := NewListener(sendTo, listenConf)
@@ -312,6 +328,15 @@ func TestSignalfxListener(t *testing.T) {
 				So(forwarder.AddSpans(ctx, []*trace.Span{spanSent}), ShouldBeNil)
 				spanSeen := sendTo.NextSpan()
 				So(spanSeen.Tags, ShouldResemble, map[string]string{"key": "value"})
+			})
+			Convey("Should remove tags", func() {
+				spanSent := dptest.S()
+				spanSent.Tags = map[string]string{"delete-me": "val", "keep-me": "other-val"}
+				spanSent.Name = pointer.String("sensitive-op")
+				spanSent.LocalEndpoint = &trace.Endpoint{ServiceName: pointer.String("remove-my-tags")}
+				So(forwarder.AddSpans(ctx, []*trace.Span{spanSent}), ShouldBeNil)
+				spanSeen := sendTo.NextSpan()
+				So(spanSeen.Tags, ShouldResemble, map[string]string{"keep-me": "other-val", "key": "value"})
 			})
 			Convey("Should be able to send events", func() {
 				eventSent := dptest.E()
