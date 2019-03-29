@@ -119,6 +119,7 @@ var defaultListenerConfig = &ListenerConfig{
 	SpanNameReplacementRules:           []string{},
 	SpanNameReplacementBreakAfterMatch: pointer.Bool(true),
 	AdditionalSpanTags:                 make(map[string]string),
+	RemoveSpanTags:                     []*spanobfuscation.TagRemovalRuleConfig{},
 }
 
 type metricHandler struct {
