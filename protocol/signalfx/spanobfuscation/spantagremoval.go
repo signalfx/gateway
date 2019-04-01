@@ -3,9 +3,9 @@ package spanobfuscation
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 
+	"github.com/gobwas/glob"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/event"
@@ -27,8 +27,8 @@ type SpanTagRemoval struct {
 }
 
 type rule struct {
-	service   *regexp.Regexp
-	operation *regexp.Regexp
+	service   glob.Glob
+	operation glob.Glob
 	tags      []string
 }
 
@@ -67,7 +67,7 @@ func (o *SpanTagRemoval) AddSpans(ctx context.Context, spans []*trace.Span) erro
 		}
 
 		for _, r := range o.rules {
-			if r.service.MatchString(service) && r.operation.MatchString(name) {
+			if r.service.Match(service) && r.operation.Match(name) {
 				for _, t := range r.tags {
 					delete(s.Tags, t)
 				}
@@ -93,8 +93,8 @@ func New(ruleConfigs []*TagRemovalRuleConfig, next sink) (*SpanTagRemoval, error
 			return nil, fmt.Errorf("must include Tags for %s:%s", service, operation)
 		}
 
-		serviceRx := getRegex(service)
-		operationRx := getRegex(operation)
+		serviceGlob := getGlob(service)
+		operationGlob := getGlob(operation)
 		for _, t := range r.Tags {
 			if t == "" {
 				return nil, fmt.Errorf("found empty tag in %s:%s", service, operation)
@@ -103,8 +103,8 @@ func New(ruleConfigs []*TagRemovalRuleConfig, next sink) (*SpanTagRemoval, error
 
 		rules = append(rules,
 			&rule{
-				service:   serviceRx,
-				operation: operationRx,
+				service:   serviceGlob,
+				operation: operationGlob,
 				tags:      r.Tags,
 			})
 	}
@@ -115,10 +115,10 @@ func New(ruleConfigs []*TagRemovalRuleConfig, next sink) (*SpanTagRemoval, error
 	}, nil
 }
 
-func getRegex(pattern string) *regexp.Regexp {
+func getGlob(pattern string) glob.Glob {
 	patternParts := strings.Split(pattern, "*")
 	for i := 0; i < len(patternParts); i++ {
-		patternParts[i] = regexp.QuoteMeta(patternParts[i])
+		patternParts[i] = glob.QuoteMeta(patternParts[i])
 	}
-	return regexp.MustCompile("^" + strings.Join(patternParts, ".*") + "$")
+	return glob.MustCompile(strings.Join(patternParts, "*"))
 }

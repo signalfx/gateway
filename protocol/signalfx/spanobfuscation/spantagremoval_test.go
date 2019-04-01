@@ -2,9 +2,10 @@ package spanobfuscation
 
 import (
 	"context"
-	"regexp"
 	"testing"
 
+	"github.com/gobwas/glob"
+	"github.com/gobwas/glob/match"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/pointer"
@@ -28,9 +29,9 @@ func (e *end) AddEvents(ctx context.Context, events []*event.Event) error {
 }
 
 func TestNew(t *testing.T) {
-	defaultRegex, _ := regexp.Compile(`^.*$`)
-	serviceRegex, _ := regexp.Compile(`^\^\\some.*service\$$`)
-	opRegex, _ := regexp.Compile(`^operation\..*$`)
+	defaultGlob, _ := glob.Compile(`*`)
+	serviceGlob, _ := glob.Compile(`\^\\some*service\$`)
+	opGlob, _ := glob.Compile(`operation\.*`)
 
 	var cases = []struct {
 		desc        string
@@ -40,27 +41,27 @@ func TestNew(t *testing.T) {
 		{
 			desc:        "empty service and empty operation",
 			config:      []*TagRemovalRuleConfig{{Tags: []string{"test-tag"}}},
-			outputRules: []*rule{{service: defaultRegex, operation: defaultRegex, tags: []string{"test-tag"}}},
+			outputRules: []*rule{{service: defaultGlob, operation: defaultGlob, tags: []string{"test-tag"}}},
 		},
 		{
 			desc:        "service regex and empty operation",
 			config:      []*TagRemovalRuleConfig{{Service: pointer.String(`^\some*service$`), Tags: []string{"test-tag"}}},
-			outputRules: []*rule{{service: serviceRegex, operation: defaultRegex, tags: []string{"test-tag"}}},
+			outputRules: []*rule{{service: serviceGlob, operation: defaultGlob, tags: []string{"test-tag"}}},
 		},
 		{
 			desc:        "empty service and operation regex",
 			config:      []*TagRemovalRuleConfig{{Operation: pointer.String(`operation.*`), Tags: []string{"test-tag"}}},
-			outputRules: []*rule{{service: defaultRegex, operation: opRegex, tags: []string{"test-tag"}}},
+			outputRules: []*rule{{service: defaultGlob, operation: opGlob, tags: []string{"test-tag"}}},
 		},
 		{
 			desc:        "service regex and operation regex",
 			config:      []*TagRemovalRuleConfig{{Service: pointer.String(`^\some*service$`), Operation: pointer.String(`operation.*`), Tags: []string{"test-tag"}}},
-			outputRules: []*rule{{service: serviceRegex, operation: opRegex, tags: []string{"test-tag"}}},
+			outputRules: []*rule{{service: serviceGlob, operation: opGlob, tags: []string{"test-tag"}}},
 		},
 		{
 			desc:        "multiple tags",
 			config:      []*TagRemovalRuleConfig{{Service: pointer.String(`^\some*service$`), Operation: pointer.String(`operation.*`), Tags: []string{"test-tag", "another-tag"}}},
-			outputRules: []*rule{{service: serviceRegex, operation: opRegex, tags: []string{"test-tag", "another-tag"}}},
+			outputRules: []*rule{{service: serviceGlob, operation: opGlob, tags: []string{"test-tag", "another-tag"}}},
 		},
 		{
 			desc: "multiple rules",
@@ -71,10 +72,10 @@ func TestNew(t *testing.T) {
 				{Service: pointer.String(`^\some*service$`), Operation: pointer.String(`operation.*`), Tags: []string{"test-tag"}},
 			},
 			outputRules: []*rule{
-				{service: defaultRegex, operation: defaultRegex, tags: []string{"test-tag"}},
-				{service: serviceRegex, operation: defaultRegex, tags: []string{"test-tag"}},
-				{service: defaultRegex, operation: opRegex, tags: []string{"test-tag"}},
-				{service: serviceRegex, operation: opRegex, tags: []string{"test-tag"}},
+				{service: defaultGlob, operation: defaultGlob, tags: []string{"test-tag"}},
+				{service: serviceGlob, operation: defaultGlob, tags: []string{"test-tag"}},
+				{service: defaultGlob, operation: opGlob, tags: []string{"test-tag"}},
+				{service: serviceGlob, operation: opGlob, tags: []string{"test-tag"}},
 			},
 		},
 	}
@@ -86,8 +87,8 @@ func TestNew(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(so, ShouldNotBeNil)
 				for i := 0; i < len(so.rules); i++ {
-					So(so.rules[i].service.String(), ShouldEqual, tc.outputRules[i].service.String())
-					So(so.rules[i].operation.String(), ShouldEqual, tc.outputRules[i].operation.String())
+					So(so.rules[i].service.(match.Matcher).String(), ShouldEqual, tc.outputRules[i].service.(match.Matcher).String())
+					So(so.rules[i].operation.(match.Matcher).String(), ShouldEqual, tc.outputRules[i].operation.(match.Matcher).String())
 					for idx, tag := range so.rules[i].tags {
 						So(tag, ShouldEqual, tc.outputRules[i].tags[idx])
 					}
@@ -179,6 +180,59 @@ func TestPassthrough(t *testing.T) {
 		so := &SpanTagRemoval{next: &end{}}
 		So(so.AddDatapoints(context.Background(), []*datapoint.Datapoint{}), ShouldBeNil)
 		So(so.AddEvents(context.Background(), []*event.Event{}), ShouldBeNil)
+	})
+}
+
+func TestEscapeMetaCharacters(t *testing.T) {
+	var cases = []struct {
+		desc    string
+		pattern string
+		match   []string
+		noMatch []string
+	}{
+		{
+			desc:    `^`,
+			pattern: `^test*service`,
+			match:   []string{`^test-service`, `^test^service`},
+			noMatch: []string{`test-service`, `testservice`},
+		},
+		{
+			desc:    `?`,
+			pattern: `test?service*`,
+			match:   []string{`test?service-one`},
+			noMatch: []string{`test-service`, `test.service`, `testaservice`, `test.service.prod`},
+		},
+		{
+			desc:    `\`,
+			pattern: `test\*service`,
+			match:   []string{`test\this\service`, `test\service`, `test\\service`},
+			noMatch: []string{`test-service`, `test.service`, `testservice`},
+		},
+		{
+			desc:    `{}`,
+			pattern: `service{2}`,
+			match:   []string{`service{2}`},
+			noMatch: []string{`servicee`, `serviceeee`},
+		},
+		{
+			desc:    `[]`,
+			pattern: `service*[a-z]`,
+			match:   []string{`service[a-z]`, `service/handle/[a-z]`},
+			noMatch: []string{`servicea`, `servicee`},
+		},
+	}
+	Convey("should correctly handle special character ", t, func() {
+		for _, c := range cases {
+			Convey(c.desc, func() {
+				g := getGlob(c.pattern)
+				for _, m := range c.match {
+					So(g.Match(m), ShouldBeTrue)
+				}
+				for _, n := range c.noMatch {
+					So(g.Match(n), ShouldBeFalse)
+				}
+			})
+		}
 	})
 }
 
