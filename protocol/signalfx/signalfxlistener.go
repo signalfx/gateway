@@ -239,6 +239,20 @@ func setupNotFoundHandler(ctx context.Context, r *mux.Router) sfxclient.Collecto
 }
 
 func createTraceSink(sink Sink, conf *ListenerConfig) (Sink, error) {
+	if len(conf.RemoveSpanTags) > 0 {
+		var err error
+		sink, err = spanobfuscation.NewRm(conf.RemoveSpanTags, sink)
+		if err != nil {
+			return nil, errors.Annotatef(err, "cannot parse span tag removal rules %v", conf.RemoveSpanTags)
+		}
+	}
+	if len(conf.ObfuscateSpanTags) > 0 {
+		var err error
+		sink, err = spanobfuscation.NewObf(conf.ObfuscateSpanTags, sink)
+		if err != nil {
+			return nil, errors.Annotatef(err, "cannot parse span tag obfuscation rules %v", conf.ObfuscateSpanTags)
+		}
+	}
 	if len(conf.SpanNameReplacementRules) > 0 {
 		var err1 error
 		sink, err1 = tagreplace.New(conf.SpanNameReplacementRules, *conf.SpanNameReplacementBreakAfterMatch, sink)
@@ -248,20 +262,6 @@ func createTraceSink(sink Sink, conf *ListenerConfig) (Sink, error) {
 	}
 	if len(conf.AdditionalSpanTags) > 0 {
 		sink = additionalspantags.New(conf.AdditionalSpanTags, sink)
-	}
-	if len(conf.ObfuscateSpanTags) > 0 {
-		var err error
-		sink, err = spanobfuscation.NewObf(conf.ObfuscateSpanTags, sink)
-		if err != nil {
-			return nil, errors.Annotatef(err, "cannot parse span tag obfuscation rules %v", conf.ObfuscateSpanTags)
-		}
-	}
-	if len(conf.RemoveSpanTags) > 0 {
-		var err error
-		sink, err = spanobfuscation.NewRm(conf.RemoveSpanTags, sink)
-		if err != nil {
-			return nil, errors.Annotatef(err, "cannot parse span tag removal rules %v", conf.RemoveSpanTags)
-		}
 	}
 	return sink, nil
 }
