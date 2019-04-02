@@ -172,8 +172,10 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 	nameMap := make(map[string]bool)
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, forwardConfig.Type, logkey.Direction, "forwarder")
-		forwardConfig.Server = etcdServer
-		forwardConfig.Client = etcdClient
+		if etcdClient != nil {
+			forwardConfig.Server = etcdServer
+			forwardConfig.Client = etcdClient
+		}
 		forwardConfig.ClusterName = loadedConfig.ClusterName
 		forwardConfig.AdditionalDimensions = datapoint.AddMaps(loadedConfig.AdditionalDimensions, forwardConfig.AdditionalDimensions)
 		forwarder, err := loader.Forwarder(forwardConfig)
