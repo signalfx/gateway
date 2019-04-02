@@ -110,3 +110,46 @@ func TestObfPassthrough(t *testing.T) {
 		So(obf.AddEvents(context.Background(), []*event.Event{}), ShouldBeNil)
 	})
 }
+
+func BenchmarkObfOne(b *testing.B) {
+	spans := make([]*trace.Span, 0, b.N)
+	for i := 0; i < b.N; i++ {
+		spans = append(spans, makeSpan("some-test-service", "test-op", map[string]string{"PII": "name", "otherTag": "ok"}))
+	}
+	config := []*TagMatchRuleConfig{
+		{
+			Service:   pointer.String("some*test*service"),
+			Operation: pointer.String("test*"),
+			Tags:      []string{"PII"},
+		},
+	}
+	obf, _ := NewObf(config, &rmend{})
+	b.ResetTimer()
+	b.ReportAllocs()
+	obf.AddSpans(context.Background(), spans)
+}
+
+func BenchmarkObfTen(b *testing.B) {
+	spans := make([]*trace.Span, 0, b.N)
+	for i := 0; i < b.N; i++ {
+		spans = append(spans, makeSpan("some-test-service", "test-op", map[string]string{"PII": "name", "otherTag": "ok"}))
+	}
+	config := make([]*TagMatchRuleConfig, 0, 10)
+	for i := 0; i < 9; i++ {
+		rule := &TagMatchRuleConfig{
+			Service:   pointer.String("some*test*service" + string(i)),
+			Operation: pointer.String("test*"),
+			Tags:      []string{"PII"},
+		}
+		config = append(config, rule)
+	}
+	config = append(config, &TagMatchRuleConfig{
+		Service:   pointer.String("some*test*service"),
+		Operation: pointer.String("test*"),
+		Tags:      []string{"PII"},
+	})
+	obf, _ := NewObf(config, &rmend{})
+	b.ResetTimer()
+	b.ReportAllocs()
+	obf.AddSpans(context.Background(), spans)
+}

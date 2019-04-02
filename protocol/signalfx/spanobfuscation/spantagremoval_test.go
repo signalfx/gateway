@@ -111,7 +111,7 @@ func TestRmPassthrough(t *testing.T) {
 	})
 }
 
-func BenchmarkOne(b *testing.B) {
+func BenchmarkRmOne(b *testing.B) {
 	spans := make([]*trace.Span, 0, b.N)
 	for i := 0; i < b.N; i++ {
 		spans = append(spans, makeSpan("some-test-service", "test-op", map[string]string{"PII": "name", "otherTag": "ok"}))
@@ -129,7 +129,7 @@ func BenchmarkOne(b *testing.B) {
 	so.AddSpans(context.Background(), spans)
 }
 
-func BenchmarkTen(b *testing.B) {
+func BenchmarkRmTen(b *testing.B) {
 	spans := make([]*trace.Span, 0, b.N)
 	for i := 0; i < b.N; i++ {
 		spans = append(spans, makeSpan("some-test-service", "test-op", map[string]string{"PII": "name", "otherTag": "ok"}))
