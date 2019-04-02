@@ -180,7 +180,15 @@ func TestSignalfxListenerFailure(t *testing.T) {
 	Convey("invalid span removal rule should not listen", t, func() {
 		listenConf := &ListenerConfig{
 			ListenAddr:     pointer.String("127.0.0.1:0"),
-			RemoveSpanTags: []*spanobfuscation.TagRemovalRuleConfig{{}},
+			RemoveSpanTags: []*spanobfuscation.TagMatchRuleConfig{{}},
+		}
+		_, err := NewListener(nil, listenConf)
+		So(err, ShouldNotBeNil)
+	})
+	Convey("invalid span obfuscation rule should not listen", t, func() {
+		listenConf := &ListenerConfig{
+			ListenAddr:        pointer.String("127.0.0.1:0"),
+			ObfuscateSpanTags: []*spanobfuscation.TagMatchRuleConfig{{}},
 		}
 		_, err := NewListener(nil, listenConf)
 		So(err, ShouldNotBeNil)
@@ -253,11 +261,17 @@ func TestSignalfxListener(t *testing.T) {
 			AdditionalSpanTags: map[string]string{
 				"key": "value",
 			},
-			RemoveSpanTags: []*spanobfuscation.TagRemovalRuleConfig{
+			RemoveSpanTags: []*spanobfuscation.TagMatchRuleConfig{
 				{
 					Service:   pointer.String("remove-*"),
 					Operation: pointer.String("*op"),
 					Tags:      []string{"delete-me"},
+				},
+			},
+			ObfuscateSpanTags: []*spanobfuscation.TagMatchRuleConfig{
+				{
+					Service: pointer.String("*-obf"),
+					Tags:    []string{"obfuscate-me"},
 				},
 			},
 		}
@@ -337,6 +351,15 @@ func TestSignalfxListener(t *testing.T) {
 				So(forwarder.AddSpans(ctx, []*trace.Span{spanSent}), ShouldBeNil)
 				spanSeen := sendTo.NextSpan()
 				So(spanSeen.Tags, ShouldResemble, map[string]string{"keep-me": "other-val", "key": "value"})
+			})
+			Convey("Should obfuscate tags", func() {
+				spanSent := dptest.S()
+				spanSent.Tags = map[string]string{"obfuscate-me": "val", "keep-me": "other-val"}
+				spanSent.Name = pointer.String("sensitive-op")
+				spanSent.LocalEndpoint = &trace.Endpoint{ServiceName: pointer.String("should-be-obf")}
+				So(forwarder.AddSpans(ctx, []*trace.Span{spanSent}), ShouldBeNil)
+				spanSeen := sendTo.NextSpan()
+				So(spanSeen.Tags, ShouldResemble, map[string]string{"obfuscate-me": spanobfuscation.OBFUSCATED, "keep-me": "other-val", "key": "value"})
 			})
 			Convey("Should be able to send events", func() {
 				eventSent := dptest.E()

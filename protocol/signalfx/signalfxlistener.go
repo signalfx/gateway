@@ -106,7 +106,8 @@ type ListenerConfig struct {
 	SpanNameReplacementRules           []string
 	SpanNameReplacementBreakAfterMatch *bool
 	AdditionalSpanTags                 map[string]string
-	RemoveSpanTags                     []*spanobfuscation.TagRemovalRuleConfig
+	RemoveSpanTags                     []*spanobfuscation.TagMatchRuleConfig
+	ObfuscateSpanTags                  []*spanobfuscation.TagMatchRuleConfig
 }
 
 var defaultListenerConfig = &ListenerConfig{
@@ -119,7 +120,8 @@ var defaultListenerConfig = &ListenerConfig{
 	SpanNameReplacementRules:           []string{},
 	SpanNameReplacementBreakAfterMatch: pointer.Bool(true),
 	AdditionalSpanTags:                 make(map[string]string),
-	RemoveSpanTags:                     []*spanobfuscation.TagRemovalRuleConfig{},
+	RemoveSpanTags:                     []*spanobfuscation.TagMatchRuleConfig{},
+	ObfuscateSpanTags:                  []*spanobfuscation.TagMatchRuleConfig{},
 }
 
 type metricHandler struct {
@@ -247,9 +249,16 @@ func createTraceSink(sink Sink, conf *ListenerConfig) (Sink, error) {
 	if len(conf.AdditionalSpanTags) > 0 {
 		sink = additionalspantags.New(conf.AdditionalSpanTags, sink)
 	}
+	if len(conf.ObfuscateSpanTags) > 0 {
+		var err error
+		sink, err = spanobfuscation.NewObf(conf.ObfuscateSpanTags, sink)
+		if err != nil {
+			return nil, errors.Annotatef(err, "cannot parse span tag obfuscation rules %v", conf.ObfuscateSpanTags)
+		}
+	}
 	if len(conf.RemoveSpanTags) > 0 {
 		var err error
-		sink, err = spanobfuscation.New(conf.RemoveSpanTags, sink)
+		sink, err = spanobfuscation.NewRm(conf.RemoveSpanTags, sink)
 		if err != nil {
 			return nil, errors.Annotatef(err, "cannot parse span tag removal rules %v", conf.RemoveSpanTags)
 		}

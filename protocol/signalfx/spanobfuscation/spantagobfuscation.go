@@ -9,33 +9,36 @@ import (
 	"github.com/signalfx/golib/trace"
 )
 
-type rmsink interface {
+type obfsink interface {
 	dpsink.Sink
 	trace.Sink
 }
 
-var _ rmsink = &SpanTagRemoval{}
+var _ obfsink = &SpanTagObfuscation{}
 
-// SpanTagRemoval does a wildcard search for service and operation name, and removes the given tags from matching spans
+// SpanTagObfuscation does a wildcard search for service and operation name, and replaces the given tags from matching spans with the OBFUSCATED const
 // This modifies the objects parsed, so in a concurrent context, you will want to copy the objects sent here first
-type SpanTagRemoval struct {
+type SpanTagObfuscation struct {
 	rules []*rule
-	next  rmsink
+	next  obfsink
 }
 
+// OBFUSCATED is the value to use for obfuscated tags
+const OBFUSCATED = "<obfuscated>"
+
 //AddDatapoints is a passthrough
-func (o *SpanTagRemoval) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
+func (o *SpanTagObfuscation) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
 	return o.next.AddDatapoints(ctx, points)
 }
 
 //AddEvents is a passthrough
-func (o *SpanTagRemoval) AddEvents(ctx context.Context, events []*event.Event) error {
+func (o *SpanTagObfuscation) AddEvents(ctx context.Context, events []*event.Event) error {
 	return o.next.AddEvents(ctx, events)
 }
 
-// AddSpans maps all rules to all spans and deletes the specified tags if the service and operation match.
+// AddSpans maps all rules to all spans and replaces the specified tags with the OBFUSCATED const if the service and operation match.
 // This can be very expensive, and modifies the spans
-func (o *SpanTagRemoval) AddSpans(ctx context.Context, spans []*trace.Span) error {
+func (o *SpanTagObfuscation) AddSpans(ctx context.Context, spans []*trace.Span) error {
 	for _, s := range spans {
 		service := ""
 		name := ""
@@ -49,7 +52,9 @@ func (o *SpanTagRemoval) AddSpans(ctx context.Context, spans []*trace.Span) erro
 		for _, r := range o.rules {
 			if r.service.Match(service) && r.operation.Match(name) {
 				for _, t := range r.tags {
-					delete(s.Tags, t)
+					if _, exists := s.Tags[t]; exists {
+						s.Tags[t] = OBFUSCATED
+					}
 				}
 			}
 		}
@@ -57,14 +62,13 @@ func (o *SpanTagRemoval) AddSpans(ctx context.Context, spans []*trace.Span) erro
 	return o.next.AddSpans(ctx, spans)
 }
 
-// NewRm returns you a new SpanTagRemoval object
-func NewRm(ruleConfigs []*TagMatchRuleConfig, next rmsink) (*SpanTagRemoval, error) {
+// NewObf returns you a new SpanTagObfuscation object
+func NewObf(ruleConfigs []*TagMatchRuleConfig, next obfsink) (*SpanTagObfuscation, error) {
 	rules, err := getRules(ruleConfigs)
 	if err != nil {
 		return nil, err
 	}
-
-	return &SpanTagRemoval{
+	return &SpanTagObfuscation{
 		rules: rules,
 		next:  next,
 	}, nil
