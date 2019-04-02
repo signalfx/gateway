@@ -17,6 +17,7 @@ import (
 	"github.com/signalfx/gateway/protocol"
 	"github.com/signalfx/gateway/protocol/collectd"
 	"github.com/signalfx/gateway/protocol/signalfx/additionalspantags"
+	"github.com/signalfx/gateway/protocol/signalfx/spanobfuscation"
 	"github.com/signalfx/gateway/protocol/signalfx/tagreplace"
 	"github.com/signalfx/gateway/protocol/zipper"
 	"github.com/signalfx/golib/datapoint"
@@ -105,6 +106,7 @@ type ListenerConfig struct {
 	SpanNameReplacementRules           []string
 	SpanNameReplacementBreakAfterMatch *bool
 	AdditionalSpanTags                 map[string]string
+	RemoveSpanTags                     []*spanobfuscation.TagRemovalRuleConfig
 }
 
 var defaultListenerConfig = &ListenerConfig{
@@ -117,6 +119,7 @@ var defaultListenerConfig = &ListenerConfig{
 	SpanNameReplacementRules:           []string{},
 	SpanNameReplacementBreakAfterMatch: pointer.Bool(true),
 	AdditionalSpanTags:                 make(map[string]string),
+	RemoveSpanTags:                     []*spanobfuscation.TagRemovalRuleConfig{},
 }
 
 type metricHandler struct {
@@ -243,6 +246,13 @@ func createTraceSink(sink Sink, conf *ListenerConfig) (Sink, error) {
 	}
 	if len(conf.AdditionalSpanTags) > 0 {
 		sink = additionalspantags.New(conf.AdditionalSpanTags, sink)
+	}
+	if len(conf.RemoveSpanTags) > 0 {
+		var err error
+		sink, err = spanobfuscation.New(conf.RemoveSpanTags, sink)
+		if err != nil {
+			return nil, errors.Annotatef(err, "cannot parse span tag removal rules %v", conf.RemoveSpanTags)
+		}
 	}
 	return sink, nil
 }
