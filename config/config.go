@@ -266,7 +266,7 @@ func (p *GatewayConfig) ToEtcdConfig() *embetcd.Config {
 // DefaultGatewayConfig returns default gateway config
 func DefaultGatewayConfig() *GatewayConfig {
 	return &GatewayConfig{
-		PidFilename:                   pointer.String("gateway.pid"),
+		PidFilename:                   pointer.String("/var/run/gateway.pid"),
 		LogDir:                        pointer.String(os.TempDir()),
 		LogMaxSize:                    pointer.Int(100),
 		LogMaxBackups:                 pointer.Int(10),

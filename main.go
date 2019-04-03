@@ -486,6 +486,9 @@ func (p *gateway) stop(ctx context.Context) (err error) {
 		errs = append(errs, p.internalMetricsListener.Close())
 	}
 
+	// remove the pid file
+	removePidFile(p.config, p.logger)
+
 	return errors.NewMultiErr(errs)
 }
 
@@ -918,11 +921,16 @@ func writePidFile(loadedConfig *config.GatewayConfig, logger log.Logger) {
 		if err := ioutil.WriteFile(*loadedConfig.PidFilename, []byte(strconv.FormatInt(int64(pid), 10)), os.FileMode(0644)); err != nil {
 			logger.Log(log.Err, err, logkey.Filename, *loadedConfig.PidFilename, "cannot store pid in pid file")
 		}
-		// clean up the pid file
-		// also why are we removing the pid file?
+	} else {
+		logger.Log(log.Err, "no PidFilename configuration found")
+	}
+}
+
+// removePidFile removes the pid file for the gateway server
+func removePidFile(loadedConfig *config.GatewayConfig, logger log.Logger) {
+	if loadedConfig != nil && loadedConfig.PidFilename != nil {
 		log.IfErr(logger, os.Remove(*loadedConfig.PidFilename))
 	}
-	logger.Log(log.Err, "no pid file configuration found")
 }
 
 // main function for gateway server
