@@ -1,24 +1,32 @@
 package encoding
 
 import (
-	"github.com/signalfx/golib/trace"
-	"time"
-	"strconv"
+	"errors"
 	"fmt"
+	"github.com/signalfx/golib/trace"
+	"strconv"
+	"time"
 )
 
 // low, high
 type ID [2]uint64
 
-func GetID(s string) ID {
+var errInvalid = errors.New("ID is not a 16 or 32 byte hex string")
+
+func GetID(s string) (ID, error) {
+	var err error
 	var low, high uint64
 	if len(s) == 16 {
-		low, _ = strconv.ParseUint(s, 16, 64)
+		low, err = strconv.ParseUint(s, 16, 64)
 	} else if len(s) == 32 {
-		high, _ = strconv.ParseUint(s[:16], 16, 64)
-		low, _ = strconv.ParseUint(s[16:], 16, 64)
+		high, err = strconv.ParseUint(s[:16], 16, 64)
+		if err == nil {
+			low, err = strconv.ParseUint(s[16:], 16, 64)
+		}
+	} else {
+		err = errInvalid
 	}
-	return [2]uint64{low, high}
+	return [2]uint64{low, high}, err
 }
 
 func (id *ID) String() string {
