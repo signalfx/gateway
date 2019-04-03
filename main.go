@@ -916,13 +916,11 @@ func setupGoMaxProcs(loadedConfig *config.GatewayConfig, gomaxprocs func(int) in
 
 // writePidFile writes the pid file for the gateway server
 func writePidFile(loadedConfig *config.GatewayConfig, logger log.Logger) {
-	if loadedConfig != nil && loadedConfig.PidFilename != nil {
+	if loadedConfig != nil {
 		pid := os.Getpid()
 		if err := ioutil.WriteFile(*loadedConfig.PidFilename, []byte(strconv.FormatInt(int64(pid), 10)), os.FileMode(0644)); err != nil {
 			logger.Log(log.Err, err, logkey.Filename, *loadedConfig.PidFilename, "cannot store pid in pid file")
 		}
-	} else {
-		logger.Log(log.Err, "no PidFilename configuration found")
 	}
 }
 
