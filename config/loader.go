@@ -190,6 +190,7 @@ func (s *signalFxLoader) Listener(sink signalfx.Sink, conf *ListenFrom) (protoco
 		SpanNameReplacementBreakAfterMatch: conf.SpanNameReplacementBreakAfterMatch,
 		AdditionalSpanTags:                 conf.AdditionalSpanTags,
 		RemoveSpanTags:                     conf.RemoveSpanTags,
+		ObfuscateSpanTags:                  conf.ObfuscateSpanTags,
 	}
 	return signalfx.NewListener(sink, &sfConf)
 }

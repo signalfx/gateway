@@ -61,23 +61,24 @@ type ForwardTo struct {
 // ListenFrom configures how we listen for datapoints to forward
 type ListenFrom struct {
 	Type                               string
-	ListenAddr                         *string                                 `json:",omitempty"`
-	Dimensions                         map[string]string                       `json:",omitempty"`
-	MetricDeconstructor                *string                                 `json:",omitempty"`
-	MetricDeconstructorOptions         *string                                 `json:",omitempty"`
-	MetricDeconstructorOptionsJSON     map[string]interface{}                  `json:",omitempty"`
-	Timeout                            *string                                 `json:",omitempty"`
-	Name                               *string                                 `json:",omitempty"`
-	ListenPath                         *string                                 `json:",omitempty"`
-	JSONEngine                         *string                                 `json:",omitempty"`
-	Encrypted                          *bool                                   `json:",omitempty"`
-	Protocol                           *string                                 `json:",omitempty"`
-	TimeoutDuration                    *time.Duration                          `json:"-"`
-	ServerAcceptDeadline               *time.Duration                          `json:"-"`
-	SpanNameReplacementRules           []string                                `json:",omitempty"`
-	SpanNameReplacementBreakAfterMatch *bool                                   `json:",omitempty"`
-	AdditionalSpanTags                 map[string]string                       `json:",omitempty"`
-	RemoveSpanTags                     []*spanobfuscation.TagRemovalRuleConfig `json:",omitempty"`
+	ListenAddr                         *string                               `json:",omitempty"`
+	Dimensions                         map[string]string                     `json:",omitempty"`
+	MetricDeconstructor                *string                               `json:",omitempty"`
+	MetricDeconstructorOptions         *string                               `json:",omitempty"`
+	MetricDeconstructorOptionsJSON     map[string]interface{}                `json:",omitempty"`
+	Timeout                            *string                               `json:",omitempty"`
+	Name                               *string                               `json:",omitempty"`
+	ListenPath                         *string                               `json:",omitempty"`
+	JSONEngine                         *string                               `json:",omitempty"`
+	Encrypted                          *bool                                 `json:",omitempty"`
+	Protocol                           *string                               `json:",omitempty"`
+	TimeoutDuration                    *time.Duration                        `json:"-"`
+	ServerAcceptDeadline               *time.Duration                        `json:"-"`
+	SpanNameReplacementRules           []string                              `json:",omitempty"`
+	SpanNameReplacementBreakAfterMatch *bool                                 `json:",omitempty"`
+	AdditionalSpanTags                 map[string]string                     `json:",omitempty"`
+	RemoveSpanTags                     []*spanobfuscation.TagMatchRuleConfig `json:",omitempty"`
+	ObfuscateSpanTags                  []*spanobfuscation.TagMatchRuleConfig `json:"omitempty"`
 }
 
 func (listenFrom *ListenFrom) String() string {
