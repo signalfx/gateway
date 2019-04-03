@@ -20,7 +20,7 @@ type rule struct {
 type TagMatchRuleConfig struct {
 	Service   *string  `json:",omitempty"`
 	Operation *string  `json:",omitempty"`
-	Tags      []string `json:"omitempty"`
+	Tags      []string `json:",omitempty"`
 }
 
 func getRules(ruleConfigs []*TagMatchRuleConfig) ([]*rule, error) {
