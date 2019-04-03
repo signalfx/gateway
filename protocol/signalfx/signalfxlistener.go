@@ -239,6 +239,8 @@ func setupNotFoundHandler(ctx context.Context, r *mux.Router) sfxclient.Collecto
 }
 
 func createTraceSink(sink Sink, conf *ListenerConfig) (Sink, error) {
+	// These sinks will be called in the opposite order that they are declared here, since we are passing them as "next"
+	// to each successive sink
 	if len(conf.RemoveSpanTags) > 0 {
 		var err error
 		sink, err = spanobfuscation.NewRm(conf.RemoveSpanTags, sink)
