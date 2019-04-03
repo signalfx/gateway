@@ -78,7 +78,7 @@ type ListenFrom struct {
 	SpanNameReplacementBreakAfterMatch *bool                                 `json:",omitempty"`
 	AdditionalSpanTags                 map[string]string                     `json:",omitempty"`
 	RemoveSpanTags                     []*spanobfuscation.TagMatchRuleConfig `json:",omitempty"`
-	ObfuscateSpanTags                  []*spanobfuscation.TagMatchRuleConfig `json:"omitempty"`
+	ObfuscateSpanTags                  []*spanobfuscation.TagMatchRuleConfig `json:",omitempty"`
 }
 
 func (listenFrom *ListenFrom) String() string {
