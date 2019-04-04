@@ -926,7 +926,7 @@ func writePidFile(loadedConfig *config.GatewayConfig, logger log.Logger) {
 
 // removePidFile removes the pid file for the gateway server
 func removePidFile(loadedConfig *config.GatewayConfig, logger log.Logger) {
-	if loadedConfig != nil && loadedConfig.PidFilename != nil {
+	if loadedConfig != nil {
 		log.IfErr(logger, os.Remove(*loadedConfig.PidFilename))
 	}
 }
