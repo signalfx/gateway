@@ -1065,12 +1065,12 @@
 			"revisionTime": "2019-02-22T19:39:49Z"
 		},
 		{
-			"checksumSHA1": "seVO8MhsU1pOKEd+ic/e1mS1xJg=",
+			"checksumSHA1": "jb4BiniiWqe/PQ+lmtOMEeRBp94=",
 			"path": "github.com/signalfx/embetcd/embetcd",
-			"revision": "b944585f2658b1bf8877c6efb4ed47782261b267",
-			"revisionTime": "2019-03-27T20:43:29Z",
-			"version": "v0.0.3",
-			"versionExact": "v0.0.3"
+			"revision": "570fa16234fe160c0983912f84c19de48bba44a0",
+			"revisionTime": "2019-04-05T20:39:35Z",
+			"version": "v0.0.5",
+			"versionExact": "v0.0.5"
 		},
 		{
 			"path": "github.com/signalfx/gateway/cluster/etcd/etcdutil",

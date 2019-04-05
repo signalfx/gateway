@@ -29,11 +29,11 @@ const (
 	// before they're subject to health checks
 	DefaultStartUpGracePeriod = time.Second * 60
 	// DefaultShutdownTimeout is the default time to wait for the server to shutdown cleanly
-	DefaultShutdownTimeout = time.Minute * 1
+	DefaultShutdownTimeout = time.Second * 60
 	// DefaultDialTimeout is the default etcd dial timeout
 	DefaultDialTimeout = time.Second * 5
 	// DefaultAutoSyncInterval is the default etcd autosync interval
-	DefaultAutoSyncInterval = time.Second * 1
+	DefaultAutoSyncInterval = time.Second * 5
 )
 
 // setupClusterNamespace configures the client with the EtcdClusterNamespace prefix
@@ -535,20 +535,10 @@ func (s *Server) waitForShutdown(ctx context.Context, done chan struct{}) (err e
 	return
 }
 
-// removeSelfFromCluster removes this server from it's cluster
-func (s *Server) removeSelfFromCluster(ctx context.Context) (err error) {
-	members := s.Server.Cluster().Members()
-
-	if len(members) > 1 {
-		endpoints := make([]string, 0, len(members))
-		for _, member := range members {
-			if len(member.ClientURLs) > 0 {
-				endpoints = append(endpoints, member.ClientURLs...)
-			}
-		}
-
-		// use a temporary client to try removing ourselves from the cluster
-		var tempcli *Client
+//getNamespacedClient returns an etcd client with the cluster's namespace
+func (s *Server) getNamespacedClient(ctx context.Context, endpoints []string) (tempcli *Client, err error) {
+	for ctx.Err() == nil {
+		// try to create a client to the cluster to remove ourselves
 		tempcli, err = NewClient(cli.Config{
 			Endpoints:        endpoints,
 			DialTimeout:      DurationOrDefault(s.config.DialTimeout, DefaultDialTimeout),
@@ -557,38 +547,63 @@ func (s *Server) removeSelfFromCluster(ctx context.Context) (err error) {
 			Context:          ctx,
 		})
 
+		// setup the cluster namespace if the client was created successfully
 		if err == nil {
 			setupClusterNamespace(tempcli)
-			defer tempcli.Close()
-		}
-
-		// loop while the context hasn't closed
-		for ctx.Err() == nil {
-
-			// create a child context with its own timeout
-			timeout, cancel := context.WithTimeout(ctx, DurationOrDefault(s.config.DialTimeout, DefaultDialTimeout))
-
-			// use the temporary client to try removing ourselves from the cluster
-			var unlock func(context.Context) error
-			if unlock, err = tempcli.Lock(timeout, s.Server.Cfg.Name); err == nil {
-				_, err = tempcli.MemberRemove(ctx, uint64(s.Server.ID()))
-				unlock(timeout)
-				// mask the member not found err because it could mean a cluster clean up routine cleaned us up already
-				if err == nil || err == rpctypes.ErrMemberNotFound {
-					err = nil
-					cancel()
-					break
-				}
-			}
-
-			// wait for the until timeout to try again
-			<-timeout.Done()
-
-			// cancel the timeout context
-			cancel()
-
+			break
 		}
 	}
+	return tempcli, err
+}
+
+// removeSelfFromCluster removes this server from it's cluster
+func (s *Server) removeSelfFromCluster(ctx context.Context) (err error) {
+	members := s.Server.Cluster().Members()
+	// just return if we're the last member ...or somehow there are no members
+	if len(members) < 2 {
+		return err
+	}
+
+	endpoints := make([]string, 0, len(members))
+	for _, member := range members {
+		if len(member.ClientURLs) > 0 {
+			endpoints = append(endpoints, member.ClientURLs...)
+		}
+	}
+
+	// use a temporary client to try removing ourselves from the cluster
+	var tempcli *Client
+	if tempcli, err = s.getNamespacedClient(ctx, endpoints); tempcli != nil {
+		defer tempcli.Close()
+	}
+
+	// loop while the context hasn't closed
+	for ctx.Err() == nil {
+
+		// create a child context with its own timeout
+		timeout, cancel := context.WithTimeout(ctx, DurationOrDefault(s.config.DialTimeout, DefaultDialTimeout))
+
+		// use the temporary client to try removing ourselves from the cluster
+		var unlock func(context.Context) error
+		if unlock, err = tempcli.Lock(timeout, s.Server.Cfg.Name); err == nil {
+			_, err = tempcli.MemberRemove(ctx, uint64(s.Server.ID()))
+			unlock(timeout)
+			// mask the member not found err because it could mean a cluster clean up routine cleaned us up already
+			if err == nil || err == rpctypes.ErrMemberNotFound {
+				err = nil
+				cancel()
+				break
+			}
+		}
+
+		// wait for the until timeout to try again
+		<-timeout.Done()
+
+		// cancel the timeout context
+		cancel()
+
+	}
+
 	return err
 }
 
