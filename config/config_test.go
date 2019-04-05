@@ -277,6 +277,8 @@ func TestGatewayConfig_ToEtcdConfig(t *testing.T) {
 		EtcdClusterCleanUpInterval     *time.Duration
 		EtcdAutoSyncInterval           *time.Duration
 		EtcdStartupGracePeriod         *time.Duration
+		EtcdHeartBeatInterval          *time.Duration
+		EtcdElectionTimeout            *time.Duration
 	}
 	tests := []struct {
 		name   string
@@ -293,6 +295,8 @@ func TestGatewayConfig_ToEtcdConfig(t *testing.T) {
 				AdvertisePeerAddress:    pointer.String("http://127.0.0.1:9990"),
 				AdvertisedPeerAddresses: []string{"https://127.0.0.1:9991", "http://127.0.0.1:9992", "127.0.0.1:9993"},
 				TargetClusterAddresses:  []string{"https://127.0.0.1:9994"},
+				EtcdHeartBeatInterval:   pointer.Duration(time.Millisecond * 200),
+				EtcdElectionTimeout:     pointer.Duration(time.Millisecond * 2000),
 			},
 			want: &embetcd.Config{
 				ClusterName: "testCluster1",
@@ -375,6 +379,8 @@ func TestGatewayConfig_ToEtcdConfig(t *testing.T) {
 				EtcdClusterCleanUpInterval:     tt.fields.EtcdClusterCleanUpInterval,
 				EtcdAutoSyncInterval:           tt.fields.EtcdAutoSyncInterval,
 				EtcdStartupGracePeriod:         tt.fields.EtcdStartupGracePeriod,
+				EtcdHeartBeatInterval:          tt.fields.EtcdHeartBeatInterval,
+				EtcdElectionTimeout:            tt.fields.EtcdElectionTimeout,
 			}
 			got := g.ToEtcdConfig()
 			if !reflect.DeepEqual(got.APUrls, tt.want.APUrls) {

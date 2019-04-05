@@ -2,18 +2,17 @@ package config
 
 import (
 	"encoding/json"
+	"expvar"
 	"fmt"
-	"github.com/coreos/etcd/embed"
 	"io/ioutil"
 	"net/url"
+	"os"
 	"path"
 	"runtime"
 	"strings"
 	"time"
 
-	"expvar"
-	"os"
-
+	"github.com/coreos/etcd/embed"
 	"github.com/signalfx/embetcd/embetcd"
 	"github.com/signalfx/gateway/etcdIntf"
 	"github.com/signalfx/gateway/logkey"
@@ -167,6 +166,8 @@ type GatewayConfig struct {
 	EtcdAutoSyncInterval       *time.Duration `json:"-"`
 	EtcdStartupGracePeriod     *time.Duration `json:"-"`
 	EtcdClusterCleanUpInterval *time.Duration `json:"-"`
+	EtcdHeartBeatInterval      *time.Duration `json:"-"` // maps to TickMs
+	EtcdElectionTimeout        *time.Duration `json:"-"` // maps to ElecitonMs this should be 10x TickMS https://github.com/etcd-io/etcd/blob/release-3.3/Documentation/tuning.md
 }
 
 func stringToURL(s string) (u *url.URL, err error) {
@@ -235,6 +236,13 @@ func (p *GatewayConfig) ToEtcdConfig() *embetcd.Config {
 	etcdCfg.LCUrls = etcdURLHelper(p.ListenOnClientAddress, p.ListenOnClientAddresses)
 	etcdCfg.ACUrls = etcdURLHelper(p.AdvertiseClientAddress, p.AdvertisedClientAddresses)
 
+	if p.EtcdHeartBeatInterval != nil {
+		etcdCfg.TickMs = uint(*p.EtcdHeartBeatInterval / time.Millisecond)
+	}
+	if p.EtcdElectionTimeout != nil {
+		etcdCfg.ElectionMs = uint(*p.EtcdElectionTimeout / time.Millisecond)
+	}
+
 	// signalfx/embetcd config struct
 	cfg := &embetcd.Config{
 		// creates an embedded etcd server config with default values that we'll override
@@ -293,6 +301,9 @@ func DefaultGatewayConfig() *GatewayConfig {
 		AdditionalDimensions:          map[string]string{},
 		ClusterName:                   pointer.String("gateway"),
 		NumProcs:                      pointer.Int(runtime.NumCPU()),
+		EtcdHeartBeatInterval:         pointer.Duration(time.Millisecond * 500),
+		EtcdElectionTimeout:           pointer.Duration(time.Millisecond * 5000), // etcd recommends 10x heartbeat interval https://github.com/etcd-io/etcd/blob/release-3.3/Documentation/tuning.md
+
 	}
 }
 func getDefaultName(osHostname func() (string, error)) string {
@@ -516,5 +527,6 @@ func loadFromEnv(conf *GatewayConfig) {
 	conf.EtcdClusterCleanUpInterval = getDurationEnvVar("SFX_ETCD_CLUSTER_CLEANUP_INTERVAL", conf.EtcdClusterCleanUpInterval)
 	conf.EtcdAutoSyncInterval = getDurationEnvVar("SFX_ETCD_AUTOSYNC_INTERVAL", conf.EtcdAutoSyncInterval)
 	conf.EtcdStartupGracePeriod = getDurationEnvVar("SFX_ETCD_STARTUP_GRACE_PERIOD", conf.EtcdStartupGracePeriod)
-
+	conf.EtcdHeartBeatInterval = getDurationEnvVar("SFX_ETCD_HEARTBEAT_INTERVAL", conf.EtcdHeartBeatInterval)
+	conf.EtcdElectionTimeout = getDurationEnvVar("SFX_ETCD_ELECTION_TIMEOUT", conf.EtcdElectionTimeout)
 }
