@@ -334,8 +334,8 @@ func DefaultGatewayConfig() *GatewayConfig {
 		NumProcs:                      pointer.Int(runtime.NumCPU()),
 		EtcdHeartBeatInterval:         pointer.Duration(time.Millisecond * 500),
 		EtcdElectionTimeout:           pointer.Duration(time.Millisecond * 5000), // etcd recommends 10x heartbeat interval https://github.com/etcd-io/etcd/blob/release-3.3/Documentation/tuning.md
-		EtcdSnapCount:                 pointer.Uint64(1),
-		EtcdMaxSnapFiles:              pointer.Uint(1),
+		EtcdSnapCount:                 pointer.Uint64(100000),
+		EtcdMaxSnapFiles:              pointer.Uint(embed.DefaultMaxSnapshots),
 		EtcdMaxWalFiles:               pointer.Uint(embed.DefaultMaxWALs),
 	}
 }
