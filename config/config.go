@@ -168,7 +168,7 @@ type GatewayConfig struct {
 	EtcdStartupGracePeriod     *time.Duration `json:"-"`
 	EtcdClusterCleanUpInterval *time.Duration `json:"-"`
 	EtcdHeartBeatInterval      *time.Duration `json:"-"` // maps to TickMs
-	EtcdElectionTimeout        *time.Duration `json:"-"` // maps to ElecitonMs this should be 10x TickMS https://github.com/etcd-io/etcd/blob/release-3.3/Documentation/tuning.md
+	EtcdElectionTimeout        *time.Duration `json:"-"` // maps to ElectionMs this should be 10x TickMS https://github.com/etcd-io/etcd/blob/release-3.3/Documentation/tuning.md
 
 	// Etcd configurable file limits
 	EtcdSnapCount    *uint64 `json:",omitempty"`
