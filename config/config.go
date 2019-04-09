@@ -2,18 +2,18 @@ package config
 
 import (
 	"encoding/json"
+	"expvar"
 	"fmt"
-	"github.com/coreos/etcd/embed"
 	"io/ioutil"
 	"net/url"
+	"os"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
-	"expvar"
-	"os"
-
+	"github.com/coreos/etcd/embed"
 	"github.com/signalfx/embetcd/embetcd"
 	"github.com/signalfx/gateway/etcdIntf"
 	"github.com/signalfx/gateway/logkey"
@@ -167,6 +167,13 @@ type GatewayConfig struct {
 	EtcdAutoSyncInterval       *time.Duration `json:"-"`
 	EtcdStartupGracePeriod     *time.Duration `json:"-"`
 	EtcdClusterCleanUpInterval *time.Duration `json:"-"`
+	EtcdHeartBeatInterval      *time.Duration `json:"-"` // maps to TickMs
+	EtcdElectionTimeout        *time.Duration `json:"-"` // maps to ElectionMs this should be 10x TickMS https://github.com/etcd-io/etcd/blob/release-3.3/Documentation/tuning.md
+
+	// Etcd configurable file limits
+	EtcdSnapCount    *uint64 `json:",omitempty"`
+	EtcdMaxSnapFiles *uint   `json:",omitempty"`
+	EtcdMaxWalFiles  *uint   `json:",omitempty"`
 }
 
 func stringToURL(s string) (u *url.URL, err error) {
@@ -205,6 +212,41 @@ var etcdClusterStateMapping = map[string]string{
 	embed.ClusterStateFlagExisting: embed.ClusterStateFlagExisting,
 }
 
+// copyEtcdDurations is a helper function for copying *GatewayConfig to *embed.Config
+func copyEtcdDurations(p *GatewayConfig, etcdCfg *embed.Config) {
+	if p.EtcdHeartBeatInterval != nil {
+		etcdCfg.TickMs = uint(*p.EtcdHeartBeatInterval / time.Millisecond)
+	}
+	if p.EtcdElectionTimeout != nil {
+		etcdCfg.ElectionMs = uint(*p.EtcdElectionTimeout / time.Millisecond)
+	}
+}
+
+// copyEtcdURLs is a helper function for copying *GatewayConfig to *embed.Config
+func copyEtcdURLs(p *GatewayConfig, etcdCfg *embed.Config) {
+	// process urls
+	etcdCfg.ListenMetricsUrls = etcdURLHelper(p.ETCDMetricsAddress, p.EtcdListenOnMetricsAddresses)
+	etcdCfg.LPUrls = etcdURLHelper(p.ListenOnPeerAddress, p.ListenOnPeerAddresses)
+	etcdCfg.APUrls = etcdURLHelper(p.AdvertisePeerAddress, p.AdvertisedPeerAddresses)
+	etcdCfg.LCUrls = etcdURLHelper(p.ListenOnClientAddress, p.ListenOnClientAddresses)
+	etcdCfg.ACUrls = etcdURLHelper(p.AdvertiseClientAddress, p.AdvertisedClientAddresses)
+}
+
+// copyEtcdFileConfigs is a helper function for copying *GatewayConfig to *embed.Config
+func copyEtcdFileConfigs(p *GatewayConfig, etcdCfg *embed.Config) {
+	if p.EtcdSnapCount != nil {
+		etcdCfg.SnapCount = *p.EtcdSnapCount
+	}
+
+	if p.EtcdMaxSnapFiles != nil {
+		etcdCfg.MaxSnapFiles = *p.EtcdMaxSnapFiles
+	}
+
+	if p.EtcdMaxWalFiles != nil {
+		etcdCfg.MaxWalFiles = *p.EtcdMaxWalFiles
+	}
+}
+
 // ToEtcdConfig returns a config struct for github.com/signalfx/embetcd/embetcd
 func (p *GatewayConfig) ToEtcdConfig() *embetcd.Config {
 	// etcd/embed config struct
@@ -228,12 +270,9 @@ func (p *GatewayConfig) ToEtcdConfig() *embetcd.Config {
 		}
 	}
 
-	// process urls
-	etcdCfg.ListenMetricsUrls = etcdURLHelper(p.ETCDMetricsAddress, p.EtcdListenOnMetricsAddresses)
-	etcdCfg.LPUrls = etcdURLHelper(p.ListenOnPeerAddress, p.ListenOnPeerAddresses)
-	etcdCfg.APUrls = etcdURLHelper(p.AdvertisePeerAddress, p.AdvertisedPeerAddresses)
-	etcdCfg.LCUrls = etcdURLHelper(p.ListenOnClientAddress, p.ListenOnClientAddresses)
-	etcdCfg.ACUrls = etcdURLHelper(p.AdvertiseClientAddress, p.AdvertisedClientAddresses)
+	copyEtcdDurations(p, etcdCfg)
+	copyEtcdURLs(p, etcdCfg)
+	copyEtcdFileConfigs(p, etcdCfg)
 
 	// signalfx/embetcd config struct
 	cfg := &embetcd.Config{
@@ -293,6 +332,11 @@ func DefaultGatewayConfig() *GatewayConfig {
 		AdditionalDimensions:          map[string]string{},
 		ClusterName:                   pointer.String("gateway"),
 		NumProcs:                      pointer.Int(runtime.NumCPU()),
+		EtcdHeartBeatInterval:         pointer.Duration(time.Millisecond * 500),
+		EtcdElectionTimeout:           pointer.Duration(time.Millisecond * 5000), // etcd recommends 10x heartbeat interval https://github.com/etcd-io/etcd/blob/release-3.3/Documentation/tuning.md
+		EtcdSnapCount:                 pointer.Uint64(1),
+		EtcdMaxSnapFiles:              pointer.Uint(1),
+		EtcdMaxWalFiles:               pointer.Uint(embed.DefaultMaxWALs),
 	}
 }
 func getDefaultName(osHostname func() (string, error)) string {
@@ -471,6 +515,27 @@ func getDurationEnvVar(envVar string, def *time.Duration) *time.Duration {
 	return def
 }
 
+// getUintEnvVar returns the given env var key's value or the default value
+func getUintEnvVar(envVar string, def *uint) *uint {
+	if strVal := os.Getenv(envVar); strVal != "" {
+		if parsedVal, err := strconv.ParseUint(strVal, 10, 16); err == nil {
+			val := uint(parsedVal)
+			return &val
+		}
+	}
+	return def
+}
+
+// getUint64EnvVar returns the given env var key's value or the default value
+func getUint64EnvVar(envVar string, def *uint64) *uint64 {
+	if strVal := os.Getenv(envVar); strVal != "" {
+		if parsedVal, err := strconv.ParseUint(strVal, 10, 64); err == nil {
+			return &parsedVal
+		}
+	}
+	return def
+}
+
 // getCommaSeparatedStringEnvVar returns the given env var key's value split by comma or the default values
 func getCommaSeparatedStringEnvVar(envVar string, def []string) []string {
 	if val := os.Getenv(envVar); val != "" {
@@ -489,6 +554,11 @@ func loadFromEnv(conf *GatewayConfig) {
 	conf.ClusterName = getStringEnvVar("SFX_GATEWAY_CLUSTER_NAME", conf.ClusterName)
 	conf.ClusterOperation = getStringEnvVar("SFX_CLUSTER_OPERATION", conf.ClusterOperation)
 	conf.ClusterDataDir = getStringEnvVar("SFX_CLUSTER_DATA_DIR", conf.ClusterDataDir)
+
+	// file limits
+	conf.EtcdSnapCount = getUint64EnvVar("SFX_ETCD_SNAP_COUNT", conf.EtcdSnapCount)
+	conf.EtcdMaxSnapFiles = getUintEnvVar("SFX_ETCD_MAX_SNAP_FILES", conf.EtcdMaxSnapFiles)
+	conf.EtcdMaxWalFiles = getUintEnvVar("SFX_ETD_MAX_WAL_FILES", conf.EtcdMaxWalFiles)
 
 	// Target Cluster Addresses
 	conf.TargetClusterAddresses = getCommaSeparatedStringEnvVar("SFX_TARGET_CLUSTER_ADDRESSES", conf.TargetClusterAddresses)
@@ -516,5 +586,6 @@ func loadFromEnv(conf *GatewayConfig) {
 	conf.EtcdClusterCleanUpInterval = getDurationEnvVar("SFX_ETCD_CLUSTER_CLEANUP_INTERVAL", conf.EtcdClusterCleanUpInterval)
 	conf.EtcdAutoSyncInterval = getDurationEnvVar("SFX_ETCD_AUTOSYNC_INTERVAL", conf.EtcdAutoSyncInterval)
 	conf.EtcdStartupGracePeriod = getDurationEnvVar("SFX_ETCD_STARTUP_GRACE_PERIOD", conf.EtcdStartupGracePeriod)
-
+	conf.EtcdHeartBeatInterval = getDurationEnvVar("SFX_ETCD_HEARTBEAT_INTERVAL", conf.EtcdHeartBeatInterval)
+	conf.EtcdElectionTimeout = getDurationEnvVar("SFX_ETCD_ELECTION_TIMEOUT", conf.EtcdElectionTimeout)
 }

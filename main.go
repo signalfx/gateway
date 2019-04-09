@@ -641,8 +641,7 @@ func getTempEtcdClient(ctx context.Context, endpoints []string, etcdCfg *embetcd
 		}
 	}
 
-	loop := true
-	for ctx.Err() == nil && loop {
+	for ctx.Err() == nil {
 		// close previously existing fn
 		if closeCli != nil {
 			closeCli()
@@ -657,7 +656,7 @@ func getTempEtcdClient(ctx context.Context, endpoints []string, etcdCfg *embetcd
 
 		// if successful return
 		if err == nil {
-			loop = false
+			break
 		}
 	}
 

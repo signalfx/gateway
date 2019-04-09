@@ -47,3 +47,18 @@ func URLSToStringSlice(urls []url.URL) []string {
 	}
 	return strs
 }
+
+// CloseServer closes an embetcd server with nil checks
+func CloseServer(s *Server) {
+	// close etcd server if it was improperly created in previous loop iterations
+	if s != nil && s.Etcd != nil {
+		s.Etcd.Close()
+	}
+}
+
+// CloseClient closes an embetcd client with nil checks
+func CloseClient(client *Client) {
+	if client != nil && client.Client != nil {
+		client.Close()
+	}
+}

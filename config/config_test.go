@@ -223,6 +223,30 @@ func TestEnvVarFuncs(t *testing.T) {
 				convey.So(*loaded, convey.ShouldEqual, time.Second*1)
 			})
 		})
+		convey.Convey("getUint64EnvVar", func() {
+			convey.Convey("should return the value if the environment variable is set", func() {
+				testVal := "5"
+				os.Setenv(testKey, testVal)
+				loaded := getUint64EnvVar(testKey, pointer.Uint64(1))
+				convey.So(*loaded, convey.ShouldEqual, 5)
+			})
+			convey.Convey("should return the default value if the environment variable is not set", func() {
+				loaded := getUint64EnvVar(testKey, pointer.Uint64(1))
+				convey.So(*loaded, convey.ShouldEqual, 1)
+			})
+		})
+		convey.Convey("getUintEnvVar", func() {
+			convey.Convey("should return the value if the environment variable is set", func() {
+				testVal := "10"
+				os.Setenv(testKey, testVal)
+				loaded := getUintEnvVar(testKey, pointer.Uint(5))
+				convey.So(*loaded, convey.ShouldEqual, 10)
+			})
+			convey.Convey("should return the default value if the environment variable is not set", func() {
+				loaded := getUintEnvVar(testKey, pointer.Uint(1))
+				convey.So(*loaded, convey.ShouldEqual, 1)
+			})
+		})
 		convey.Reset(func() {
 			os.Unsetenv(testKey)
 		})
@@ -277,6 +301,11 @@ func TestGatewayConfig_ToEtcdConfig(t *testing.T) {
 		EtcdClusterCleanUpInterval     *time.Duration
 		EtcdAutoSyncInterval           *time.Duration
 		EtcdStartupGracePeriod         *time.Duration
+		EtcdHeartBeatInterval          *time.Duration
+		EtcdElectionTimeout            *time.Duration
+		EtcdSnapCount                  *uint64
+		EtcdMaxSnapFiles               *uint
+		EtcdMaxWalFiles                *uint
 	}
 	tests := []struct {
 		name   string
@@ -293,6 +322,11 @@ func TestGatewayConfig_ToEtcdConfig(t *testing.T) {
 				AdvertisePeerAddress:    pointer.String("http://127.0.0.1:9990"),
 				AdvertisedPeerAddresses: []string{"https://127.0.0.1:9991", "http://127.0.0.1:9992", "127.0.0.1:9993"},
 				TargetClusterAddresses:  []string{"https://127.0.0.1:9994"},
+				EtcdHeartBeatInterval:   pointer.Duration(time.Millisecond * 200),
+				EtcdElectionTimeout:     pointer.Duration(time.Millisecond * 2000),
+				EtcdSnapCount:           pointer.Uint64(50),
+				EtcdMaxSnapFiles:        pointer.Uint(100),
+				EtcdMaxWalFiles:         pointer.Uint(150),
 			},
 			want: &embetcd.Config{
 				ClusterName: "testCluster1",
@@ -300,6 +334,11 @@ func TestGatewayConfig_ToEtcdConfig(t *testing.T) {
 					Name:         "testServer1",
 					Dir:          "./etcd-config",
 					ClusterState: "join",
+					TickMs:       200,
+					ElectionMs:   2000,
+					SnapCount:    50,
+					MaxSnapFiles: 100,
+					MaxWalFiles:  150,
 					APUrls:       []url.URL{{Scheme: "http", Host: "127.0.0.1:9990"}, {Scheme: "https", Host: "127.0.0.1:9991"}, {Scheme: "http", Host: "127.0.0.1:9992"}, {Scheme: "http", Host: "127.0.0.1:9993"}},
 				},
 			},
@@ -375,6 +414,11 @@ func TestGatewayConfig_ToEtcdConfig(t *testing.T) {
 				EtcdClusterCleanUpInterval:     tt.fields.EtcdClusterCleanUpInterval,
 				EtcdAutoSyncInterval:           tt.fields.EtcdAutoSyncInterval,
 				EtcdStartupGracePeriod:         tt.fields.EtcdStartupGracePeriod,
+				EtcdHeartBeatInterval:          tt.fields.EtcdHeartBeatInterval,
+				EtcdElectionTimeout:            tt.fields.EtcdElectionTimeout,
+				EtcdSnapCount:                  tt.fields.EtcdSnapCount,
+				EtcdMaxSnapFiles:               tt.fields.EtcdMaxSnapFiles,
+				EtcdMaxWalFiles:                tt.fields.EtcdMaxWalFiles,
 			}
 			got := g.ToEtcdConfig()
 			if !reflect.DeepEqual(got.APUrls, tt.want.APUrls) {

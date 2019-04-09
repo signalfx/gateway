@@ -69,9 +69,7 @@ func (m *Members) Get(member *membership.Member) (info *Member) {
 
 	// create the member if it doesn't
 	if !ok {
-		client, _ := NewClient(clientv3.Config{Endpoints: member.ClientURLs})
 		info = &Member{
-			Client:     client,
 			Discovered: time.Now(),
 			LastHealth: time.Time{},
 		}
@@ -80,11 +78,18 @@ func (m *Members) Get(member *membership.Member) (info *Member) {
 		m.members[uint64(member.ID)] = info
 	}
 
+	// Try creating the client to the node if it doesn't exist
+	// If we get repeated errors creating the client to the member,
+	// then the member will eventually fail it's health check and be removed.
+	if info.Client == nil && member != nil && member.ClientURLs != nil {
+		info.Client, _ = NewClient(clientv3.Config{Endpoints: member.ClientURLs})
+	}
+
 	// update the info with the incoming membership
 	info.Member = member
 
 	// update the member client endpoints
-	if member != nil && member.ClientURLs != nil {
+	if info.Client != nil && member != nil && member.ClientURLs != nil {
 		info.Client.SetEndpoints(member.ClientURLs...)
 	}
 
@@ -94,7 +99,10 @@ func (m *Members) Get(member *membership.Member) (info *Member) {
 // Remove a member from the memberInfo list
 func (m *Members) Remove(id uint64) {
 	if member, ok := m.members[id]; ok {
-		member.Client.Close()
+		// only close the client if it exists
+		if member.Client != nil {
+			member.Client.Close()
+		}
 		delete(m.members, id)
 	}
 }
