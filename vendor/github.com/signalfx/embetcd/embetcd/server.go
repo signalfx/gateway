@@ -228,9 +228,14 @@ func (s *Server) prepareForNewCluster(ctx context.Context) (err error) {
 func (s *Server) prepareForExistingCluster(ctx context.Context) (err error) {
 	// create a temporary client
 	var tempcli *Client
+	defer CloseClient(tempcli)
 
 	// get an etcdclient to the cluster using the config file
 	for ctx.Err() == nil {
+		// close the temporary client if it was created in a previous iteration of the loop
+		CloseClient(tempcli)
+
+		// create the client
 		tempcli, err = s.config.GetClientFromConfig(ctx)
 		if err == nil {
 			// set up the temp cli for the cluster namespace
@@ -284,6 +289,8 @@ func (s *Server) startupValidation(cfg *Config) error {
 func (s *Server) start(ctx context.Context, cfg *Config) (err error) {
 	// retry starting the etcd server until it succeeds
 	for ctx.Err() == nil {
+		CloseServer(s)
+
 		// remove the data dir because we require each server to be completely removed
 		// from the cluster before we can rejoin
 		// TODO: if we ever use snapshotting or want to restore a cluster this will need to be revised
@@ -339,7 +346,7 @@ func (s *Server) Start(ctx context.Context, cfg *Config) (err error) {
 // This is a dedicated function for test coverage purposes.
 func (s *Server) cleanUpStart(err error) {
 	if err != nil && s.isRunning() {
-		s.Shutdown(context.Background())
+		s.shutdown(context.Background())
 	}
 }
 
@@ -353,7 +360,7 @@ func memberKeyRoutine(ctx context.Context, client *Client, lease *cli.LeaseGrant
 	client.Revoke(context.Background(), lease.ID)
 
 	// close the client
-	client.Close()
+	CloseClient(client)
 }
 
 // errorHandlerRoutine waits for errors to occur and attempts
@@ -425,7 +432,7 @@ func (s *Server) cleanCluster(ctx context.Context, members *Members, client *Cli
 // clusterCleanupRoutine iteratively checks member health and removes bad members
 func (s *Server) clusterCleanupRoutine(ctx context.Context, stopCh <-chan struct{}, ttl *time.Duration, cleanUpInterval *time.Duration, memberRemoveTimeout *time.Duration, gracePeriod *time.Duration, client *Client) {
 	// close the client on exit
-	defer client.Close()
+	defer CloseClient(client)
 
 	// set up ticker
 	ticker := time.NewTicker(DurationOrDefault(cleanUpInterval, DefaultCleanUpInterval))
@@ -527,7 +534,7 @@ func (s *Server) waitForShutdown(ctx context.Context, done chan struct{}) (err e
 			if s != nil && s.Etcd != nil && s.Etcd.Server != nil {
 				s.Server.HardStop()
 				// invoke close after hard stop to free up what ever port we're bound too
-				s.Close()
+				CloseServer(s)
 			}
 		}
 	case <-done:
@@ -571,47 +578,47 @@ func (s *Server) removeSelfFromCluster(ctx context.Context) (err error) {
 		}
 	}
 
-	// use a temporary client to try removing ourselves from the cluster
 	var tempcli *Client
-	if tempcli, err = s.getNamespacedClient(ctx, endpoints); tempcli != nil {
-		defer tempcli.Close()
-	}
+	defer CloseClient(tempcli)
 
 	// loop while the context hasn't closed
 	for ctx.Err() == nil {
+		// close the client if it existed from a previous loop iteration
+		CloseClient(tempcli)
 
-		// create a child context with its own timeout
-		timeout, cancel := context.WithTimeout(ctx, DurationOrDefault(s.config.DialTimeout, DefaultDialTimeout))
+		// use a temporary client to try removing ourselves from the cluster
+		tempcli, err = s.getNamespacedClient(ctx, endpoints)
 
-		// use the temporary client to try removing ourselves from the cluster
-		var unlock func(context.Context) error
-		if unlock, err = tempcli.Lock(timeout, s.Server.Cfg.Name); err == nil {
-			_, err = tempcli.MemberRemove(ctx, uint64(s.Server.ID()))
-			unlock(timeout)
-			// mask the member not found err because it could mean a cluster clean up routine cleaned us up already
-			if err == nil || err == rpctypes.ErrMemberNotFound {
-				err = nil
-				cancel()
-				break
+		if err == nil {
+			// create a child context with its own timeout
+			timeout, cancel := context.WithTimeout(ctx, DurationOrDefault(s.config.DialTimeout, DefaultDialTimeout))
+
+			// use the temporary client to try removing ourselves from the cluster
+			var unlock func(context.Context) error
+			if unlock, err = tempcli.Lock(timeout, s.Server.Cfg.Name); err == nil {
+				_, err = tempcli.MemberRemove(ctx, uint64(s.Server.ID()))
+				unlock(timeout)
+				// mask the member not found err because it could mean a cluster clean up routine cleaned us up already
+				if err == nil || err == rpctypes.ErrMemberNotFound {
+					err = nil
+					cancel()
+					break
+				}
 			}
+
+			// wait for the timeout to try again
+			<-timeout.Done()
+
+			// cancel the timeout context
+			cancel()
 		}
-
-		// wait for the until timeout to try again
-		<-timeout.Done()
-
-		// cancel the timeout context
-		cancel()
-
 	}
 
 	return err
 }
 
-// Shutdown shuts down the server with a cancelable context
-func (s *Server) Shutdown(ctx context.Context) (err error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
+// shutdown shuts down the server with a cancelable context and without locking
+func (s *Server) shutdown(ctx context.Context) (err error) {
 	if !s.isRunning() {
 		return ErrAlreadyStopped
 	}
@@ -633,7 +640,7 @@ func (s *Server) Shutdown(ctx context.Context) (err error) {
 	// if the etcd server stalls while shutting down or exceeds the shutdown context
 	go func() {
 		// close the server and signals routines to stop
-		s.Close()
+		CloseServer(s)
 
 		// wait for the running routines to stop
 		s.routineWg.Wait()
@@ -647,6 +654,13 @@ func (s *Server) Shutdown(ctx context.Context) (err error) {
 	s.waitForShutdown(ctx, done)
 
 	return err
+}
+
+// Shutdown shuts down the server with a cancelable context
+func (s *Server) Shutdown(ctx context.Context) (err error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	return s.shutdown(ctx)
 }
 
 // New returns a new etcd Server
