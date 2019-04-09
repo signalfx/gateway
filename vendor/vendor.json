@@ -1259,7 +1259,7 @@
 			"versionExact": "v2.3.2"
 		},
 		{
-			"checksumSHA1": "Zi/0F6vsgYWijssbK2jcoYs85FY=",
+			"checksumSHA1": "rTAGlEZI3IPZCr0r73RqNTVW4ug=",
 			"path": "github.com/signalfx/ondiskencoding",
 			"revision": "facba5fa20cdeb351a4f3f9fbd9faba7700d74d1",
 			"revisionTime": "2019-03-27T21:51:13Z"

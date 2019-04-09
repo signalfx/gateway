@@ -46,6 +46,17 @@ type SpanIdentity struct {
 	Error      bool   `json:",omitempty"`
 }
 
+func (k *SpanIdentity) String() string {
+	s := ""
+	if k.HttpMethod != "" {
+		s += ", HttpMethod:" + k.HttpMethod
+	}
+	if k.HttpMethod != "" {
+		s += ", Kind:" + k.Kind
+	}
+	return fmt.Sprintf("Identity[Service:%s, Operation:%s, Error:%t%s]", k.Service, k.Operation, k.Error, s)
+}
+
 func (k *SpanIdentity) Dims() map[string]string {
 	m := map[string]string{
 		"service":   k.Service,
