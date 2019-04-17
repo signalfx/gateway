@@ -2,29 +2,29 @@ package embetcd
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
-	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
-	"net/url"
+	"github.com/coreos/etcd/etcdserver/api/v3client"
+	"github.com/coreos/etcd/mvcc/mvccpb"
+	"math/rand"
 	"os"
 	"path"
-	"strings"
 	"sync"
 	"time"
 
 	cli "github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/clientv3/namespace"
 	"github.com/coreos/etcd/embed"
-	"github.com/coreos/etcd/etcdserver/api/v3client"
+	"github.com/coreos/etcd/etcdserver"
+	"github.com/coreos/etcd/etcdserver/membership"
+	"github.com/coreos/etcd/pkg/types"
 )
 
 const (
 	// EtcdClusterNamespace is the key namespace used for this package's etcd cluster
-	EtcdClusterNamespace = "__etcd-cluster__"
+	EtcdClusterNamespace = "__etcd-cluster__/"
 	// DefaultUnhealthyTTL is the grace period to wait before removing an unhealthy member
 	DefaultUnhealthyTTL = time.Second * 15
 	// DefaultCleanUpInterval is the interval at which to poll for the health of the cluster
-	DefaultCleanUpInterval = time.Second * 5
+	DefaultCleanUpInterval = time.Second * 15
 	// DefaultStartUpGracePeriod is the graceperiod to wait for new cluster members to startup
 	// before they're subject to health checks
 	DefaultStartUpGracePeriod = time.Second * 60
@@ -36,138 +36,59 @@ const (
 	DefaultAutoSyncInterval = time.Second * 5
 )
 
-// setupClusterNamespace configures the client with the EtcdClusterNamespace prefix
-func setupClusterNamespace(client *Client) {
-	// this package reserves a key namespace defined by the constant
-	client.KV = namespace.NewKV(client.KV, EtcdClusterNamespace)
-	client.Watcher = namespace.NewWatcher(client.Watcher, EtcdClusterNamespace)
-	client.Lease = namespace.NewLease(client.Lease, EtcdClusterNamespace)
+// errNilOrNotServerStopped checks whether the error is nil or is not equal to the etcdserver.ErrStopped error
+func errNilOrNotServerStopped(err error) bool {
+	// note that etcd errors sometimes get mutated somewhere so we can't directly compare errors
+	return err == nil || err.Error() != etcdserver.ErrStopped.Error()
 }
 
-// ServerNameConflicts returns true if the server name conflicts or returns false if it doesn't
-func ServerNameConflicts(ctx context.Context, client *Client, name string) (conflicts bool, err error) {
-	// get the cluster members
-	var members *cli.MemberListResponse
-	if members, err = client.MemberList(ctx); err == nil && ctx.Err() != context.DeadlineExceeded && members != nil {
-		// add members to the initial cluster
-		for _, member := range members.Members {
-			if member.Name == name {
-				conflicts = true
-				err = ErrNameConflict
-			}
-		}
+// printIfErr prints an error to the console
+func printIfErr(msg string, err error) bool {
+	// TODO: figure out if we can get access to the etcd logger
+	if err != nil {
+		fmt.Println(msg, " err: ", err)
+		// this is super hacky but return a bool for testing validation
+		return true
 	}
-	return conflicts, err
+	return false
 }
 
-// dedupPeerString take a peer string and deduplicates it
-func dedupPeerString(peer string) (peers string) {
-	// map to keep track of already used substrings
-	set := make(map[string]struct{})
+// getRemainingTime calculates the time difference between the elapsed time and the interval up to 0 and returns the value
+func getRemainingTime(start time.Time, interval time.Duration) (remainingTime time.Duration) {
+	// if there is remaining time in the configured clean up interval reset the timer with that time
+	remainingTime = interval - time.Since(start)
 
-	// break on , and check if the substring has already been used
-	for _, substr := range strings.Split(peer, ",") {
-		cleansubstr := strings.TrimSpace(substr)
-		if _, ok := set[cleansubstr]; !ok {
-			parts := strings.Split(cleansubstr, "=")
-			if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
-				if len(set) == 0 {
-					// don't use a comma if first element
-					peers = cleansubstr
-				} else {
-					// use comma for everything after the first element
-					peers = fmt.Sprintf("%s,%s", peers, cleansubstr)
-				}
-				set[cleansubstr] = struct{}{}
-			}
-		}
+	// if we're running behind, then return 0
+	if remainingTime < 0 {
+		remainingTime = 0
 	}
-	return peers
+
+	return remainingTime
 }
 
-// getServerPeers returns the peer urls for the cluster formatted for the initialCluster server configuration.
-// The context that is passed in should have a configured timeout.
-func getServerPeers(ctx context.Context, c *Client, initialCluster string) (peers string, err error) {
-	var members *cli.MemberListResponse
-
-	for ctx.Err() == nil {
-		// initialize peers with the supplied initial cluster string
-		peers = initialCluster
-
-		// get the list of members
-		members, err = c.MemberList(ctx)
-
-		if err == nil {
-			// add members to the initial cluster
-			for _, member := range members.Members {
-
-				// if there's at least one peer url add it to the initial cluster
-				if pURLS := member.GetPeerURLs(); len(pURLS) > 0 {
-					// peers should already have this server's address so we can safely append ",%s=%s"
-					for _, url := range member.GetPeerURLs() {
-						peers = fmt.Sprintf("%s,%s=%s", peers, member.Name, url)
-					}
-				}
-
-			}
-			break
+// shutdownServerIfErr is a helper function to shutdown a server if there is a non nil error
+func shutdownServerIfErr(s *Server, err error) bool {
+	if err != nil {
+		if s != nil {
+			timeout, cancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
+			defer cancel()
+			s.Shutdown(timeout)
+			return true
 		}
 	}
-	peers = dedupPeerString(peers)
-	return peers, err
+	return false
 }
 
-// clusterNameConflicts returns an error if the cluster name conflicts
-func clusterNameConflicts(ctx context.Context, client *Client, clusterName string) (err error) {
-	var resp *cli.GetResponse
-	for ctx.Err() == nil {
-		// verify that the cluster name matches before we add a member to the cluster
-		// if you add the member to the cluster and check for the cluster name before you start the server,
-		// then you run the risk of breaking quorum and stalling out on the cluster name check
-		resp, err = client.Get(ctx, "/name")
-		if err == nil {
-
-			if len(resp.Kvs) == 0 || string(resp.Kvs[0].Value) == "" {
-				_, _ = client.Put(ctx, "/name", clusterName)
-				return nil
-			}
-			if len(resp.Kvs) != 0 && string(resp.Kvs[0].Value) != clusterName {
-				return ErrClusterNameConflict
-			}
-			break
-		}
+// waitForCtxErrOrServerStop waits for errors to occur, the context to close, or the stopCh to return
+func waitForCtxErrOrServerStop(ctx context.Context, stopCh <-chan struct{}, errCh <-chan error) error {
+	select {
+	case <-ctx.Done():
+		return nil
+	case <-stopCh:
+		return nil
+	case err := <-errCh:
+		return err
 	}
-	return err
-}
-
-// addMemberToExistingCluster informs an etcd cluster that a server is about to be added to the cluster.  The cluster
-// can premptively reject this addition if it violates quorum
-func addMemberToExistingCluster(ctx context.Context, tempcli *Client, serverName string, apURLs []url.URL) (err error) {
-	// loop while the context hasn't closed
-	var conflict bool
-	for ctx.Err() == nil {
-
-		// Ensure that the server name does not already exist in the cluster.
-		// We want to ensure uniquely named cluster members.
-		// If this member died and is trying to rejoin, we want to retry until
-		// the cluster removes it or our parent context expires.
-		conflict, err = ServerNameConflicts(ctx, tempcli, serverName)
-
-		if !conflict && err == nil {
-
-			// add the member
-			_, err = tempcli.MemberAdd(ctx, URLSToStringSlice(apURLs))
-
-			// break out of loop if we added ourselves cleanly
-			if err == nil {
-				break
-			}
-		}
-
-		time.Sleep(time.Second * 1)
-	}
-
-	return err
 }
 
 // Server manages an etcd embedded server
@@ -191,6 +112,26 @@ type Server struct {
 
 	// routineWg is a wait group used to wait for running routines to complete
 	routineWg sync.WaitGroup
+}
+
+// setClusterName sets the cluster name
+func (s *Server) setClusterName(ctx context.Context, clusterName string) (err error) {
+	var tempcli *Client
+	defer CloseClient(tempcli)
+
+	for ctx.Err() == nil && errNilOrNotServerStopped(err) {
+		CloseClient(tempcli)
+
+		tempcli = s.newServerClient()
+		_, err = tempcli.Put(ctx, "name", clusterName)
+
+		// break if cluster name set successfully
+		if err == nil {
+			break
+		}
+	}
+
+	return err
 }
 
 // indicates whether the server has been stopped or not and is not thread safe
@@ -246,17 +187,20 @@ func (s *Server) prepareForExistingCluster(ctx context.Context) (err error) {
 
 	// check for conflicting server names
 	if err == nil {
-		err = clusterNameConflicts(ctx, tempcli, s.config.ClusterName)
+		var clusterName string
+		if clusterName, err = tempcli.clusterName(ctx); err != nil || (clusterName != "" && clusterName != s.config.ClusterName) {
+			err = ErrClusterNameConflict
+		}
 	}
 
 	// get the peer address string for joining the cluster
 	if err == nil {
-		s.config.Config.InitialCluster, err = getServerPeers(ctx, tempcli, s.config.InitialClusterFromName(s.config.Name))
+		s.config.Config.InitialCluster, err = tempcli.getServerPeers(ctx, s.config.InitialClusterFromName(s.config.Name))
 	}
 
 	// announce to the cluster that we're going to add this server
 	if err == nil {
-		err = addMemberToExistingCluster(ctx, tempcli, s.config.Name, s.config.APUrls)
+		err = tempcli.addMemberToExistingCluster(ctx, s.config.Name, s.config.APUrls)
 	}
 
 	return err
@@ -331,6 +275,11 @@ func (s *Server) Start(ctx context.Context, cfg *Config) (err error) {
 		err = WaitForStructChOrErrCh(ctx, s.Etcd.Server.ReadyNotify(), s.Etcd.Err())
 	}
 
+	// set the cluster name now that the cluster has started without error
+	if err == nil && s.isRunning() {
+		s.setClusterName(ctx, cfg.ClusterName)
+	}
+
 	// initialize the routines that clean up the cluster
 	if err == nil && s.isRunning() {
 		err = s.initializeAdditionalServerRoutines(ctx, s.Etcd, cfg)
@@ -350,96 +299,190 @@ func (s *Server) cleanUpStart(err error) {
 	}
 }
 
+// shouldKeepLeaseAlive waits for a series of stop conditions or for the member key's lease to expire
+func shouldKeepLeaseAlive(ctx context.Context, watchCh cli.WatchChan, stopNotify <-chan struct{}, errCh <-chan error) bool {
+	for {
+		select {
+		case watchMsg := <-watchCh:
+			// for now there are only 2 types of events PUT and DELETE...
+			// We don't care about PUTs because that's us putting the key in
+			// We only want to return true if the key is deleted, signaling that we need to put the key back
+			if watchMsg.Events == nil || watchMsg.Events != nil && len(watchMsg.Events) > 0 && watchMsg.Events[0].Type == mvccpb.DELETE {
+				return true
+			}
+		case <-ctx.Done():
+			return false
+		case <-stopNotify:
+			return false
+		case <-errCh:
+			return false
+		}
+	}
+
+}
+
 // waits for the etcd server to stop or return an err and then revokes the member key lease and closes the client
-func memberKeyRoutine(ctx context.Context, client *Client, lease *cli.LeaseGrantResponse, stopNotify <-chan struct{}, errCh <-chan error) {
-	// wait for the server to stop or for an error to occur
-	WaitForStructChOrErrCh(ctx, stopNotify, errCh)
+func (s *Server) memberKeyRoutine(ctx context.Context, client *Client, stopNotify <-chan struct{}, errCh <-chan error) {
+	// Use the server client to create a key for this server/member under "__etcd-cluster__/members/<name>" with a keep alive lease
+	// this lease will expire when the server goes down indicating to the rest of the cluster that the server actually went down
+	// this offers a little more protection for when a member is unhealthy but still sending keep alives
+	var lease *cli.LeaseGrantResponse
+	var err error
+	var cancelKeepAliveCtx context.CancelFunc
+	var watchCtx context.Context
+	var cancelWatchCtx context.CancelFunc
 
-	// revoke the lease when the server stops or gets into an error state
-	// swallow the error because if the server is stopped we expect an error to occur on revocation
-	client.Revoke(context.Background(), lease.ID)
+	// ttl for keeping the member lease alive
+	ttl := DurationOrDefault(s.config.DialTimeout, DefaultDialTimeout)
 
-	// close the client
-	CloseClient(client)
+	// watch for changes to the member key (like it randomly dropping out)
+	watchCtx, cancelWatchCtx = context.WithCancel(ctx)
+	watchCh := client.Watch(watchCtx, path.Join("members", s.config.Name))
+
+	// continually keep the key in the cluster alive
+	for ctx.Err() == nil && errNilOrNotServerStopped(err) {
+		// clean up previous context
+		CancelContext(cancelKeepAliveCtx)
+		// revoke previous lease
+		RevokeLease(ctx, client, lease)
+
+		// create the client key
+		lease, _, cancelKeepAliveCtx, err = client.PutWithKeepAlive(ctx, path.Join("members", s.config.Name), s.Server.ID().String(), int64(ttl.Seconds()))
+
+		// if the lease shouldn't be kept alive break
+		if err == nil {
+			if !shouldKeepLeaseAlive(watchCtx, watchCh, stopNotify, errCh) {
+				break
+			}
+		}
+	}
+
+	// explicitly cancel context because for some reason go vet doesn't honor them when deferred
+	CancelContext(cancelKeepAliveCtx)
+	CancelContext(cancelWatchCtx)
+	RevokeLease(ctx, client, lease)
+
 }
 
-// errorHandlerRoutine waits for errors to occur and attempts
-// to shutdown the cluster with a 30 second timeout
-func (s *Server) errorHandlerRoutine(ctx context.Context, stopCh <-chan struct{}, errCh <-chan error) {
-	select {
-	case <-ctx.Done():
-		s.routineWg.Done()
-	case <-stopCh:
-		s.routineWg.Done()
-	case <-errCh:
-		// encountered an error
-		// shutdown the server if it is running
-		timeout, cancel := context.WithTimeout(context.Background(), DefaultShutdownTimeout)
-		// Shutdown() blocks and waits for the wait group. We need to mark it as done before
-		// invoking shutdown since this routine is part of that wait group.
-		s.routineWg.Done()
-		s.Shutdown(timeout)
-		cancel()
+// updateCacheWithCurrentCluster will go through and insert current cluster members into the cache
+// and update the client urls of existing cache members
+func updateCacheWithCurrentCluster(cache map[types.ID]*memberHealth, current []*membership.Member) map[types.ID]struct{} {
+	currentMemberMap := make(map[types.ID]struct{}, len(current))
+
+	for _, member := range current {
+		// add id to hash set so we can remove stuff later
+		currentMemberMap[member.ID] = struct{}{}
+
+		if member != nil {
+
+			var healthStats *memberHealth
+			var ok bool
+
+			// retrieve the member from the cache or create a new health struct
+			healthStats, ok = cache[member.ID]
+
+			// create new memberHealth struct if one doesn't already exist in the cache
+			if !ok {
+				healthStats = &memberHealth{
+					Discovered:  time.Now(),
+					LastHealthy: time.Now(),
+					ClientURLs:  []string{},
+				}
+			}
+
+			healthStats.Name = member.Name
+
+			// update client urls on the memberHealthStruct if they're not nil
+			if member.ClientURLs != nil {
+				healthStats.ClientURLs = member.ClientURLs[:]
+			}
+
+			// save health stats back to the cache
+			cache[member.ID] = healthStats
+		}
+	}
+
+	return currentMemberMap
+}
+
+// removeCacheMembersThatAreNotCurrent will remove members from the cache that aren't in the current cluster
+func removeCacheMembersThatAreNotCurrent(cache map[types.ID]*memberHealth, currentMemberMap map[types.ID]struct{}) {
+	// remove members from the cache that are not current
+	for id := range cache {
+		if _, ok := currentMemberMap[id]; !ok {
+			delete(cache, id)
+		}
 	}
 }
 
-func (s *Server) cleanCluster(ctx context.Context, members *Members, client *Client, ttl *time.Duration, cleanUpInterval *time.Duration, memberRemoveTimeout *time.Duration, gracePeriod *time.Duration) *Members {
+// removeUnhealthyMembers removes unhealthy members from the cluster
+func (s *Server) removeUnhealthyMembers(ctx context.Context, cache map[types.ID]*memberHealth, graceperiod *time.Duration, ttl *time.Duration) {
+	for id, m := range cache {
+		if time.Since(m.Discovered) > DurationOrDefault(graceperiod, DefaultStartUpGracePeriod) && time.Since(m.LastHealthy) > DurationOrDefault(ttl, DefaultUnhealthyTTL) {
+			// don't remove yourself
+			if s != nil && s.Server != nil && !s.Server.IsIDRemoved(uint64(s.Server.ID())) && s.Server.ID() != id {
+				// close member's client because we won't be using it any more
+				CloseClient(m.Client)
+
+				// mark the member unreachable
+				s.Server.ReportUnreachable(uint64(id))
+
+				// remove the member from the cluster
+				// we'll clear it out out it's health stat on the next clean up interval
+				_, err := s.Server.RemoveMember(ctx, uint64(id))
+
+				// check for errors and print them if we encountered an unexpected error
+				if err != membership.ErrIDNotFound && err != membership.ErrIDRemoved {
+					// TODO: add a real logger here
+					printIfErr(fmt.Sprintf("embetcd: an error was encountered while removing member: %s", m.Name), err)
+				}
+
+				// only remove one thing at a time ... this should help prevent catastrophes
+				break
+			}
+		}
+	}
+}
+
+// cleanCluster is a series of steps to get the current cluster members, check their health, and remove unhealthy members
+func (s *Server) cleanCluster(ctx context.Context, cache map[types.ID]*memberHealth, client *Client, ttl *time.Duration, cleanUpInterval *time.Duration, gracePeriod *time.Duration) {
 	if s != nil && s.Etcd != nil && s.Server != nil {
-		timeout, cancel := context.WithTimeout(ctx, DurationOrDefault(cleanUpInterval, DefaultCleanUpInterval))
-		unlock, err := client.Lock(timeout, "remove")
-		cancel()
-		if err != nil {
-			return members
-		}
-
 		// get the list of members the server is aware of
-		currentMembers := s.Server.Cluster().Members()
+		currentMemberMap := updateCacheWithCurrentCluster(cache, s.Server.Cluster().Members())
 
-		// create a wait group to wait for health status from each member of the cluster
-		wg := sync.WaitGroup{}
+		// clean cache up if there are entries that the server is no longer aware of they were likely removed
+		removeCacheMembersThatAreNotCurrent(cache, currentMemberMap)
 
-		// members.Clean will use this map to check for members that may have already moved
-		currentMemberIDs := make(map[uint64]struct{}, len(currentMembers))
+		// timeout for updating cluster health stats
+		timeout, cancel := context.WithTimeout(ctx, DurationOrDefault(cleanUpInterval, DefaultCleanUpInterval))
+		defer cancel()
 
-		// get the cluster member health concurrently
-		for _, cmember := range currentMembers {
+		// fetch health status of each entry in the cache
+		updateClusterHealthStats(timeout, client, cache)
 
-			// wait to check health until the member is listed as started
+		// give ourselves extra time to clean up members if necessary
+		removeTimeout, removeCancel := context.WithTimeout(ctx, DurationOrDefault(cleanUpInterval, DefaultCleanUpInterval))
+		defer removeCancel()
 
-			currentMemberIDs[uint64(cmember.ID)] = struct{}{}
-
-			// fetch the health of the member in a separate go routine
-			wg.Add(1)
-			go func(m *Member) {
-				m.Update(client)
-				wg.Done()
-			}(members.Get(cmember))
-
-		}
-
-		// wait for all members to update their health status
-		wg.Wait()
-
-		// clean up the member list
-		members.Clean(ctx, ttl, gracePeriod, memberRemoveTimeout, currentMemberIDs)
-
-		// clean up any members that exceed their ttl and ignore context deadline exceeded error
-		unlock(ctx)
+		// remove find and remove unhealthy members based on cache
+		s.removeUnhealthyMembers(removeTimeout, cache, gracePeriod, ttl)
 	}
-	return members
 }
 
-// clusterCleanupRoutine iteratively checks member health and removes bad members
-func (s *Server) clusterCleanupRoutine(ctx context.Context, stopCh <-chan struct{}, ttl *time.Duration, cleanUpInterval *time.Duration, memberRemoveTimeout *time.Duration, gracePeriod *time.Duration, client *Client) {
-	// close the client on exit
-	defer CloseClient(client)
+// clusterCleanupRoutine iteratively runs cleanCluster() to clean up the members in the cluster
+func (s *Server) clusterCleanupRoutine(ctx context.Context, stopCh <-chan struct{}, ttl *time.Duration, cleanUpInterval *time.Duration, gracePeriod *time.Duration, client *Client) {
+	// sleep some random amount of time to spread out member clean up
+	time.Sleep(time.Duration(rand.Int63n(int64(DefaultCleanUpInterval.Seconds()))) * time.Second)
 
-	// set up ticker
-	ticker := time.NewTicker(DurationOrDefault(cleanUpInterval, DefaultCleanUpInterval))
-	defer ticker.Stop()
+	// set up timer for the cluster clean up interval
+	timer := time.NewTimer(DurationOrDefault(cleanUpInterval, DefaultCleanUpInterval))
+	defer timer.Stop()
 
-	// members is a map of known members and the times the member was discovered and last seen healthy
-	members := NewMembers(client)
+	// cache is a map of known members and the times the member was discovered and last seen healthy
+	cache := make(map[types.ID]*memberHealth)
+
+	// cleanUpStartTime tracks the time we start cleaning
+	var cleanUpStartTime time.Time
 
 	// continuously check the cluster health on the ticker interval
 	for {
@@ -448,14 +491,23 @@ func (s *Server) clusterCleanupRoutine(ctx context.Context, stopCh <-chan struct
 			return
 		case <-stopCh:
 			return
-		case <-ticker.C:
-			members = s.cleanCluster(ctx, members, client, ttl, cleanUpInterval, memberRemoveTimeout, gracePeriod)
+		case <-timer.C:
+			// set the time we started cleaning up
+			cleanUpStartTime = time.Now()
+
+			// clean up the cluster
+			s.cleanCluster(ctx, cache, client, ttl, cleanUpInterval, gracePeriod)
+
+			// reset the timer
+			timer.Reset(getRemainingTime(cleanUpStartTime, DurationOrDefault(cleanUpInterval, DefaultCleanUpInterval)))
 		}
 	}
 }
 
 // newServerClient returns a new client for the server with the server prefix
-func (s *Server) newServerClient() (client *Client, err error) {
+// this function is not thread safe and must be called on the same routine as the server
+// the returned clients are threadsafe
+func (s *Server) newServerClient() (client *Client) {
 	// v3client.New() creates a new v3client that doesn't go out over grpc,
 	// but rather goes directly through the server itself.  This should be fast!
 	client = &Client{Client: v3client.New(s.Etcd.Server)}
@@ -463,62 +515,46 @@ func (s *Server) newServerClient() (client *Client, err error) {
 	// this package reserves a key namespace defined by the constant
 	setupClusterNamespace(client)
 
-	return client, nil
+	return client
 }
 
 // initializeAdditionalServerRoutines launches routines for managing the etcd server
 // including periodic member/server clean up, etcd server errors, and keeping a key alive for this server/member instance.
 func (s *Server) initializeAdditionalServerRoutines(ctx context.Context, server *embed.Etcd, cfg *Config) (err error) {
-	// set up the memberKeyClient client used to keep the member key alive
-	var memberKeyClient *Client
-
-	// s.newServerClient() creates a new etcd client that doesn't go out over the wire via grpc,
-	// but rather invokes functions directly on the server itself.  This should be fast.
-	memberKeyClient, err = s.newServerClient()
-
 	// create cancelable context to signal for the routines to stop.  Shutdown() will cancel the context
 	s.routineContext, s.routineCancel = context.WithCancel(context.Background())
 
-	// store the member name because we've successfully started up
-	if err == nil {
-		// TODO: log this in the future when a upcoming version of etcd gives us access to the etcd logger
-		// put the cluster name will put the configured cluster name
-		// this should already have been validated by join if we're joining an existing cluster
-		_, _ = memberKeyClient.Put(ctx, "/name", cfg.ClusterName)
-	}
-
-	// Use the server client to create a key for this server/member under "__etcd-cluster__/members/<name>" with a keep alive lease
-	// this lease will expire when the server goes down indicating to the rest of the cluster that the server actually went down
-	// this offers a little more protection for when a member is unhealthy but still sending keep alives
-	var lease *cli.LeaseGrantResponse
-	lease, _, _ = memberKeyClient.PutWithKeepAlive(ctx, path.Join("", "members", cfg.Name), fmt.Sprintf("%v", s.Server.ID()), 5)
-
-	// Set up the clusterCleanUp client for the cluster clean up routine to use.
-	// s.newServerClient() creates a new etcd client that doesn't go out over the wire via grpc,
-	// but rather invokes functions directly on the server itself.  This should be fast.
-	var clusterCleanUpClient *Client
-	clusterCleanUpClient, err = s.newServerClient()
-
 	// actually launch the routines
-	if err == nil {
+	if s != nil && s.Server != nil {
 		s.routineWg.Add(3)
 
-		// routine to handle revocation of the lease
-		go func() {
-			memberKeyRoutine(s.routineContext, memberKeyClient, lease, server.Server.StopNotify(), s.Err())
-			s.routineWg.Done()
-		}()
+		// routine to handle keeping the member key alive in the cluster
+		go func(client *Client) {
+			defer s.routineWg.Done()
+			defer CloseClient(client)
 
-		// routine to shutdown the cluster on error
-		// The wait group is marked done inside of this method because it has to invoke Shutdown() which is where
-		// the wait is contained.
-		go s.errorHandlerRoutine(s.routineContext, s.Server.StopNotify(), s.Err())
+			s.memberKeyRoutine(s.routineContext, client, s.Server.StopNotify(), s.Err())
+		}(s.newServerClient())
+
+		// routine to watch for errors from etcd and shutdown
+		go func() {
+			err := waitForCtxErrOrServerStop(s.routineContext, s.Server.StopNotify(), s.Err())
+			printIfErr("embetcd: error routine returned an error", err)
+
+			// in error conditions we have to mark the routine as done because shutdown checks the routineWg
+			s.routineWg.Done()
+
+			// shutdown the server if we encountered an error from etcd's error channel
+			shutdownServerIfErr(s, err)
+		}()
 
 		// routine to remove unhealthy members from the cluster
-		go func() {
-			s.clusterCleanupRoutine(s.routineContext, s.Server.StopNotify(), cfg.UnhealthyTTL, cfg.CleanUpInterval, cfg.RemoveMemberTimeout, cfg.StartupGracePeriod, clusterCleanUpClient)
-			s.routineWg.Done()
-		}()
+		go func(client *Client) {
+			defer s.routineWg.Done()
+			defer CloseClient(client)
+
+			s.clusterCleanupRoutine(s.routineContext, s.Server.StopNotify(), cfg.UnhealthyTTL, cfg.CleanUpInterval, cfg.StartupGracePeriod, client)
+		}(s.newServerClient())
 	}
 
 	return err
@@ -542,27 +578,6 @@ func (s *Server) waitForShutdown(ctx context.Context, done chan struct{}) (err e
 	return
 }
 
-//getNamespacedClient returns an etcd client with the cluster's namespace
-func (s *Server) getNamespacedClient(ctx context.Context, endpoints []string) (tempcli *Client, err error) {
-	for ctx.Err() == nil {
-		// try to create a client to the cluster to remove ourselves
-		tempcli, err = NewClient(cli.Config{
-			Endpoints:        endpoints,
-			DialTimeout:      DurationOrDefault(s.config.DialTimeout, DefaultDialTimeout),
-			TLS:              &tls.Config{InsecureSkipVerify: true}, // insecure for now
-			AutoSyncInterval: DurationOrDefault(s.config.AutoSyncInterval, DefaultAutoSyncInterval),
-			Context:          ctx,
-		})
-
-		// setup the cluster namespace if the client was created successfully
-		if err == nil {
-			setupClusterNamespace(tempcli)
-			break
-		}
-	}
-	return tempcli, err
-}
-
 // removeSelfFromCluster removes this server from it's cluster
 func (s *Server) removeSelfFromCluster(ctx context.Context) (err error) {
 	members := s.Server.Cluster().Members()
@@ -571,47 +586,23 @@ func (s *Server) removeSelfFromCluster(ctx context.Context) (err error) {
 		return err
 	}
 
-	endpoints := make([]string, 0, len(members))
-	for _, member := range members {
-		if len(member.ClientURLs) > 0 {
-			endpoints = append(endpoints, member.ClientURLs...)
+	// continually try transferring leadership from this server unless the server is already stopped or the cluster is already unhealthy
+	// note that etcd errors sometimes get mutated somewhere so we can't directly compare errors
+	for ctx.Err() == nil && (err == nil || (err.Error() != etcdserver.ErrStopped.Error() && err.Error() != etcdserver.ErrUnhealthy.Error())) {
+		err = s.Server.TransferLeadership()
+		if err == nil {
+			break
 		}
 	}
 
-	var tempcli *Client
-	defer CloseClient(tempcli)
-
-	// loop while the context hasn't closed
-	for ctx.Err() == nil {
-		// close the client if it existed from a previous loop iteration
-		CloseClient(tempcli)
-
-		// use a temporary client to try removing ourselves from the cluster
-		tempcli, err = s.getNamespacedClient(ctx, endpoints)
-
+	// continually try removing self from the cluster until we succeed or the server stops
+	// note that etcd errors sometimes get mutated somewhere so we can't directly compare errors
+	for ctx.Err() == nil && errNilOrNotServerStopped(err) {
+		_, err = s.Server.RemoveMember(ctx, uint64(s.Server.ID()))
 		if err == nil {
-			// create a child context with its own timeout
-			timeout, cancel := context.WithTimeout(ctx, DurationOrDefault(s.config.DialTimeout, DefaultDialTimeout))
-
-			// use the temporary client to try removing ourselves from the cluster
-			var unlock func(context.Context) error
-			if unlock, err = tempcli.Lock(timeout, s.Server.Cfg.Name); err == nil {
-				_, err = tempcli.MemberRemove(ctx, uint64(s.Server.ID()))
-				unlock(timeout)
-				// mask the member not found err because it could mean a cluster clean up routine cleaned us up already
-				if err == nil || err == rpctypes.ErrMemberNotFound {
-					err = nil
-					cancel()
-					break
-				}
-			}
-
-			// wait for the timeout to try again
-			<-timeout.Done()
-
-			// cancel the timeout context
-			cancel()
+			break
 		}
+
 	}
 
 	return err
