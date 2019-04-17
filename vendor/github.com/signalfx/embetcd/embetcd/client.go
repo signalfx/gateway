@@ -2,10 +2,47 @@ package embetcd
 
 import (
 	"context"
+	"fmt"
 	cli "github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/clientv3/concurrency"
-	"path"
+	"github.com/coreos/etcd/clientv3/namespace"
+	"github.com/coreos/etcd/etcdserver"
+	"net/url"
+	"strings"
+	"time"
 )
+
+// setupClusterNamespace configures the client with the EtcdClusterNamespace prefix
+func setupClusterNamespace(client *Client) {
+	// this package reserves a key namespace defined by the constant
+	client.KV = namespace.NewKV(client.KV, EtcdClusterNamespace)
+	client.Watcher = namespace.NewWatcher(client.Watcher, EtcdClusterNamespace)
+	client.Lease = namespace.NewLease(client.Lease, EtcdClusterNamespace)
+}
+
+// dedupPeerString take a peer string and deduplicates it
+func dedupPeerString(peer string) (peers string) {
+	// map to keep track of already used substrings
+	set := make(map[string]struct{})
+
+	// break on , and check if the substring has already been used
+	for _, substr := range strings.Split(peer, ",") {
+		cleansubstr := strings.TrimSpace(substr)
+		if _, ok := set[cleansubstr]; !ok {
+			parts := strings.Split(cleansubstr, "=")
+			if len(parts) == 2 && parts[0] != "" && parts[1] != "" {
+				if len(set) == 0 {
+					// don't use a comma if first element
+					peers = cleansubstr
+				} else {
+					// use comma for everything after the first element
+					peers = fmt.Sprintf("%s,%s", peers, cleansubstr)
+				}
+				set[cleansubstr] = struct{}{}
+			}
+		}
+	}
+	return peers
+}
 
 // Client wraps around an etcd v3 client and adds some helper functions
 type Client struct {
@@ -14,62 +51,131 @@ type Client struct {
 
 // PutWithKeepAlive puts a key and value with a keep alive returns
 // a lease, the keep alive response channel, and an err if one occurrs
-func (c *Client) PutWithKeepAlive(ctx context.Context, key string, value string, ttl int64) (lease *cli.LeaseGrantResponse, keepAlive <-chan *cli.LeaseKeepAliveResponse, err error) {
-	// create a lease for the member key
-	if err == nil {
-		// create a new lease with a 5 second ttl
-		lease, err = c.Grant(context.Background(), ttl)
-	}
+func (c *Client) PutWithKeepAlive(ctx context.Context, key string, value string, ttl int64) (lease *cli.LeaseGrantResponse, keepAlive <-chan *cli.LeaseKeepAliveResponse, cancel context.CancelFunc, err error) {
+	var keepAliveCtx context.Context
+	keepAliveCtx, cancel = context.WithCancel(ctx)
 
-	// keep the lease alive if we successfully put the key in
-	if err == nil {
-		keepAlive, err = c.KeepAlive(context.Background(), lease.ID)
-	}
+	// continually try putting out key into the cluster until we succeed
+	// note that etcdserver.ErrStopped is mutated somewhere in etcd so we can't directly compare the errors
+	for ctx.Err() == nil && (err == nil || err.Error() != etcdserver.ErrStopped.Error()) {
 
-	// put in a key for the server
-	if err == nil {
-		_, err = c.Put(ctx, key, value, cli.WithLease(lease.ID))
-	}
+		// create a lease for the member key
+		if err == nil {
+			// create a new lease with a 5 second ttl
+			lease, err = c.Grant(keepAliveCtx, ttl)
+		}
 
-	return lease, keepAlive, err
-}
+		// keep the lease alive if we successfully put the key in
+		if err == nil {
+			keepAlive, err = c.KeepAlive(context.Background(), lease.ID)
+		}
 
-// Lock accepts an etcd client, context (with cancel), and name and creates a concurrent lock
-func (c *Client) Lock(ctx context.Context, name string) (unlock func(context.Context) error, err error) {
-	var session *concurrency.Session
-	session, err = concurrency.NewSession(c.Client)
+		// put in a key for the server
+		if err == nil {
+			_, err = c.Put(ctx, key, value, cli.WithLease(lease.ID))
+		}
 
-	var mutex *concurrency.Mutex
-	if err == nil {
-		// create a mutex using the session under /mutex/name
-		mutex = concurrency.NewMutex(session, path.Join("", "mutex", name))
-
-		// lock the mutex and return a function to unlock the mutex
-		err = mutex.Lock(ctx)
-	}
-
-	// set unlock function
-	if err == nil {
-		unlock = func(ctx context.Context) (err error) {
-			// we need to return the first error we encounter
-			// but we need to do both operations
-			errs := make([]error, 2)
-			errs[0] = mutex.Unlock(ctx)
-			errs[1] = session.Close()
-
-			// return first error
-			for _, err := range errs {
-				if err != nil {
-					return err
-				}
-			}
-
-			// return nil
-			return nil
+		// break if se successfully put in the key
+		if err == nil || err == etcdserver.ErrStopped {
+			break
 		}
 	}
 
-	return unlock, err
+	return lease, keepAlive, cancel, err
+}
+
+// getServerPeers returns the peer urls for the cluster formatted for the initialCluster server configuration.
+// The context that is passed in should have a configured timeout.
+func (c *Client) getServerPeers(ctx context.Context, initialCluster string) (peers string, err error) {
+	var members *cli.MemberListResponse
+
+	for ctx.Err() == nil && (err == nil || err.Error() != etcdserver.ErrStopped.Error()) {
+		// initialize peers with the supplied initial cluster string
+		peers = initialCluster
+
+		// get the list of members
+		members, err = c.MemberList(ctx)
+
+		if err == nil {
+			// add members to the initial cluster
+			for _, member := range members.Members {
+
+				// if there's at least one peer url add it to the initial cluster
+				if pURLS := member.GetPeerURLs(); len(pURLS) > 0 {
+					// peers should already have this server's address so we can safely append ",%s=%s"
+					for _, url := range member.GetPeerURLs() {
+						peers = fmt.Sprintf("%s,%s=%s", peers, member.Name, url)
+					}
+				}
+
+			}
+			break
+		}
+	}
+	peers = dedupPeerString(peers)
+	return peers, err
+}
+
+// serverNameConflicts returns true if the server name conflicts or returns false if it doesn't
+func (c *Client) serverNameConflicts(ctx context.Context, name string) (conflicts bool, err error) {
+	// get the cluster members
+	var members *cli.MemberListResponse
+	if members, err = c.MemberList(ctx); err == nil && ctx.Err() != context.DeadlineExceeded && members != nil {
+		// add members to the initial cluster
+		for _, member := range members.Members {
+			if member.Name == name {
+				conflicts = true
+				err = ErrNameConflict
+			}
+		}
+	}
+	return conflicts, err
+}
+
+// clusterName returns the name of the cluster an error if the cluster name conflicts
+func (c *Client) clusterName(ctx context.Context) (name string, err error) {
+	var resp *cli.GetResponse
+	for ctx.Err() == nil && (err == nil || err.Error() != etcdserver.ErrStopped.Error()) {
+		// verify that the cluster name matches before we add a member to the cluster
+		// if you add the member to the cluster and check for the cluster name before you start the server,
+		// then you run the risk of breaking quorum and stalling out on the cluster name check
+		resp, err = c.Get(ctx, "name")
+		if err == nil && resp != nil && len(resp.Kvs) > 0 {
+			name = string(resp.Kvs[0].Value)
+			break
+		}
+	}
+	return name, err
+}
+
+// addMemberToExistingCluster informs an etcd cluster that a server is about to be added to the cluster.  The cluster
+// can premptively reject this addition if it violates quorum
+func (c *Client) addMemberToExistingCluster(ctx context.Context, serverName string, apURLs []url.URL) (err error) {
+	// loop while the context hasn't closed
+	var conflict bool
+	for ctx.Err() == nil && (err == nil || err.Error() != etcdserver.ErrStopped.Error()) {
+
+		// Ensure that the server name does not already exist in the cluster.
+		// We want to ensure uniquely named cluster members.
+		// If this member died and is trying to rejoin, we want to retry until
+		// the cluster removes it or our parent context expires.
+		conflict, err = c.serverNameConflicts(ctx, serverName)
+
+		if !conflict && err == nil {
+
+			// add the member
+			_, err = c.MemberAdd(ctx, URLSToStringSlice(apURLs))
+
+			// break out of loop if we added ourselves cleanly
+			if err == nil {
+				break
+			}
+		}
+
+		time.Sleep(time.Second * 1)
+	}
+
+	return err
 }
 
 // NewClient returns a new etcd v3client wrapped with some helper functions

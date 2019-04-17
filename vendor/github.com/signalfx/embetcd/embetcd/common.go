@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"time"
+
+	cli "github.com/coreos/etcd/clientv3"
 )
 
 var (
@@ -60,5 +62,19 @@ func CloseServer(s *Server) {
 func CloseClient(client *Client) {
 	if client != nil && client.Client != nil {
 		client.Close()
+	}
+}
+
+// CancelContext is a helper function for canceling context using the context.CancelFunc if it isn't nil
+func CancelContext(cancel context.CancelFunc) {
+	if cancel != nil {
+		cancel()
+	}
+}
+
+// RevokeLease revokes a lease using a client as long as the client and lease are not nil
+func RevokeLease(ctx context.Context, client *Client, lease *cli.LeaseGrantResponse) {
+	if client != nil && lease != nil {
+		client.Revoke(ctx, lease.ID)
 	}
 }
