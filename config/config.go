@@ -270,6 +270,11 @@ func (p *GatewayConfig) ToEtcdConfig() *embetcd.Config {
 		}
 	}
 
+	// set the cluster name as the initial cluster token
+	if p.ClusterName != nil {
+		etcdCfg.InitialClusterToken = *p.ClusterName
+	}
+
 	copyEtcdDurations(p, etcdCfg)
 	copyEtcdURLs(p, etcdCfg)
 	copyEtcdFileConfigs(p, etcdCfg)
