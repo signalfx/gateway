@@ -24,7 +24,7 @@ const (
 	// DefaultUnhealthyTTL is the grace period to wait before removing an unhealthy member
 	DefaultUnhealthyTTL = time.Second * 15
 	// DefaultCleanUpInterval is the interval at which to poll for the health of the cluster
-	DefaultCleanUpInterval = time.Second * 15
+	DefaultCleanUpInterval = time.Second * 10
 	// DefaultStartUpGracePeriod is the graceperiod to wait for new cluster members to startup
 	// before they're subject to health checks
 	DefaultStartUpGracePeriod = time.Second * 60
@@ -159,16 +159,9 @@ func (s *Server) IsRunning() bool {
 	return s.isRunning()
 }
 
-// prepare a new cluster
-func (s *Server) prepareForNewCluster(ctx context.Context) (err error) {
-	s.config.Config.InitialCluster = s.config.InitialClusterFromName(s.config.Name)
-	return err
-}
-
-// prepare for an existing cluster
-func (s *Server) prepareForExistingCluster(ctx context.Context) (err error) {
-	// create a temporary client
+func getClusterClientWithServerNamespace(ctx context.Context, cfg *Config) (*Client, error) {
 	var tempcli *Client
+	var err error
 	defer CloseClient(tempcli)
 
 	// get an etcdclient to the cluster using the config file
@@ -177,42 +170,127 @@ func (s *Server) prepareForExistingCluster(ctx context.Context) (err error) {
 		CloseClient(tempcli)
 
 		// create the client
-		tempcli, err = s.config.GetClientFromConfig(ctx)
+		tempcli, err = cfg.GetClientFromConfig(ctx)
 		if err == nil {
 			// set up the temp cli for the cluster namespace
 			setupClusterNamespace(tempcli)
 			break
 		}
 	}
+	return tempcli, err
+}
 
-	// check for conflicting server names
+func (s *Server) startAsJoiner(ctx context.Context, cfg *Config, tempcli *Client) (err error) {
+	var timeout context.Context
+	var cancel context.CancelFunc
+	defer CancelContext(cancel)
+
+	// continually try to prepare and start the server
+	for ctx.Err() == nil {
+		CloseServer(s)
+
+		// remove old data directory
+		os.RemoveAll(cfg.Dir)
+
+		// Ensure that the server name does not already exist in the cluster.
+		// We want to ensure uniquely named cluster members.
+		// If this member died and is trying to rejoin, we want to retry until
+		// the cluster removes it or our parent context expires.
+		timeout, cancel = context.WithTimeout(ctx, DurationOrDefault(cfg.DialTimeout, DefaultDialTimeout))
+		_, err = tempcli.serverNameConflicts(timeout, cfg.Name)
+		cancel()
+
+		// check for conflicts, get peer urls, and announce that we're joining the cluster
+		if err == nil {
+			serverName := cfg.Name
+			s.config.Config.InitialCluster, err = tempcli.getServerPeers(ctx, cfg.InitialClusterFromName(cfg.Name), &serverName, cfg.APUrls, cfg.DialTimeout)
+		}
+
+		// Announce only once to the cluster that we're going to add this server.
+		// this offers some protection for errors while joining an existing one node cluster.
+		// If we announce this new node and then need to denounce it, we won't be able to because of quorum violations
+		// the cluster is configured to 2 members, but only 1 is started.  Removing 1 member from a 2 node cluster
+		// breaks quorum.
+		if err == nil {
+			timeout, cancel = context.WithTimeout(ctx, DurationOrDefault(cfg.DialTimeout, DefaultDialTimeout))
+			var isIn bool
+			isIn, err = tempcli.arePeerURLSInCluster(timeout, cfg.APUrls)
+			cancel()
+			if err == nil && !isIn {
+				timeout, cancel = context.WithTimeout(ctx, DurationOrDefault(cfg.DialTimeout, DefaultDialTimeout))
+				_, err = tempcli.MemberAdd(timeout, URLSToStringSlice(cfg.APUrls))
+				cancel()
+			}
+		}
+
+		// start the server
+		if err == nil {
+			s.Etcd, err = embed.StartEtcd(cfg.Config)
+		}
+
+		// wait for the server to be ready or error out
+		if err == nil && s.Etcd != nil {
+			err = WaitForStructChOrErrCh(ctx, s.Etcd.Server.ReadyNotify(), s.Etcd.Err())
+		}
+
+		// break the loop if successful
+		if err == nil {
+			break
+		}
+	}
+	return err
+}
+
+// starts the etcd server and joins an existing cluster
+func (s *Server) join(ctx context.Context, cfg *Config) (err error) {
+	// create a temporary client
+	var tempcli *Client
+	defer CloseClient(tempcli)
+
+	tempcli, err = getClusterClientWithServerNamespace(ctx, cfg)
+
 	if err == nil {
+		// check for conflicting cluster names
 		var clusterName string
-		if clusterName, err = tempcli.clusterName(ctx); err != nil || (clusterName != "" && clusterName != s.config.ClusterName) {
+		if clusterName, err = tempcli.clusterName(ctx); err == nil && (clusterName != "" && clusterName != s.config.ClusterName) {
 			err = ErrClusterNameConflict
+			return
 		}
 	}
 
-	// get the peer address string for joining the cluster
+	// start as a joiner
 	if err == nil {
-		s.config.Config.InitialCluster, err = tempcli.getServerPeers(ctx, s.config.InitialClusterFromName(s.config.Name))
-	}
-
-	// announce to the cluster that we're going to add this server
-	if err == nil {
-		err = tempcli.addMemberToExistingCluster(ctx, s.config.Name, s.config.APUrls)
+		err = s.startAsJoiner(ctx, cfg, tempcli)
 	}
 
 	return err
 }
 
-// prepare will either prepare the server to start a new cluster or join an existing cluster
-func (s *Server) prepare(ctx context.Context) (err error) {
-	// prepare the server to start
-	if s.config.ClusterState == embed.ClusterStateFlagNew {
-		err = s.prepareForNewCluster(ctx)
-	} else {
-		err = s.prepareForExistingCluster(ctx)
+// starts the etcd server as a seed node
+func (s *Server) seed(ctx context.Context, cfg *Config) (err error) {
+	for ctx.Err() == nil {
+		CloseServer(s)
+
+		// remove old data directory
+		os.RemoveAll(cfg.Dir)
+
+		// set the initial cluster string
+		s.config.Config.InitialCluster = s.config.InitialClusterFromName(s.config.Name)
+
+		// start the server
+		if err == nil {
+			s.Etcd, err = embed.StartEtcd(cfg.Config)
+		}
+
+		// wait for the server to be ready or error out
+		if err == nil && s.Etcd != nil {
+			err = WaitForStructChOrErrCh(ctx, s.Etcd.Server.ReadyNotify(), s.Etcd.Err())
+		}
+
+		// break the loop if successful
+		if err == nil {
+			break
+		}
 	}
 	return err
 }
@@ -228,27 +306,6 @@ func (s *Server) startupValidation(cfg *Config) error {
 	return cfg.Validate()
 }
 
-// start starts the etcd server after it has been prepared and config has been validated
-// it will retry starting the etcd server until the context is cancelled
-func (s *Server) start(ctx context.Context, cfg *Config) (err error) {
-	// retry starting the etcd server until it succeeds
-	for ctx.Err() == nil {
-		CloseServer(s)
-
-		// remove the data dir because we require each server to be completely removed
-		// from the cluster before we can rejoin
-		// TODO: if we ever use snapshotting or want to restore a cluster this will need to be revised
-		os.RemoveAll(cfg.Dir)
-
-		// create a context for this server
-		s.Etcd, err = embed.StartEtcd(cfg.Config)
-		if err == nil {
-			break
-		}
-	}
-	return err
-}
-
 // Start starts the server with the given config
 func (s *Server) Start(ctx context.Context, cfg *Config) (err error) {
 	s.mutex.Lock()
@@ -262,17 +319,11 @@ func (s *Server) Start(ctx context.Context, cfg *Config) (err error) {
 	// save the config to the server for reference
 	s.config = cfg
 
-	// prepare the server to either start as a new cluster or join an existing cluster
-	err = s.prepare(ctx)
-
-	// start the server
-	if err == nil {
-		err = s.start(ctx, cfg)
-	}
-
-	// wait for the server to be ready or error out
-	if err == nil && s.Etcd != nil {
-		err = WaitForStructChOrErrCh(ctx, s.Etcd.Server.ReadyNotify(), s.Etcd.Err())
+	// start the etcd server as either a seeder or a joiner
+	if s.config.ClusterState == embed.ClusterStateFlagNew {
+		err = s.seed(ctx, cfg)
+	} else {
+		err = s.join(ctx, cfg)
 	}
 
 	// set the cluster name now that the cluster has started without error

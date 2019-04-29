@@ -78,3 +78,14 @@ func RevokeLease(ctx context.Context, client *Client, lease *cli.LeaseGrantRespo
 		client.Revoke(ctx, lease.ID)
 	}
 }
+
+// StringIsInStringSlice returns true if the given string is in the slice of strings
+func StringIsInStringSlice(s string, strs []string) (resp bool) {
+	for _, i := range strs {
+		if s == i {
+			resp = true
+			break
+		}
+	}
+	return
+}
