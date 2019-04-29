@@ -84,30 +84,57 @@ func (c *Client) PutWithKeepAlive(ctx context.Context, key string, value string,
 	return lease, keepAlive, cancel, err
 }
 
+func (c *Client) arePeerURLSInCluster(ctx context.Context, apURLS []url.URL) (areIn bool, err error) {
+	var members *cli.MemberListResponse
+	members, err = c.MemberList(ctx)
+
+	if err == nil && members != nil && members.Members != nil {
+		apStrings := URLSToStringSlice(apURLS)
+
+		for _, member := range members.Members {
+			memberPURLs := member.GetPeerURLs()
+			for _, u := range apStrings {
+				if StringIsInStringSlice(u, memberPURLs) {
+					areIn = true
+					break
+				}
+			}
+		}
+	}
+	return areIn, err
+}
+
 // getServerPeers returns the peer urls for the cluster formatted for the initialCluster server configuration.
 // The context that is passed in should have a configured timeout.
-func (c *Client) getServerPeers(ctx context.Context, initialCluster string) (peers string, err error) {
+func (c *Client) getServerPeers(ctx context.Context, initialCluster string, serverName *string, apURLS []url.URL, dialTimeout *time.Duration) (peers string, err error) {
 	var members *cli.MemberListResponse
+	var timeout context.Context
+	var cancel context.CancelFunc
+	defer CancelContext(cancel)
+
+	apURLStrings := URLSToStringSlice(apURLS)
 
 	for ctx.Err() == nil && (err == nil || err.Error() != etcdserver.ErrStopped.Error()) {
 		// initialize peers with the supplied initial cluster string
 		peers = initialCluster
 
 		// get the list of members
-		members, err = c.MemberList(ctx)
+		timeout, cancel = context.WithTimeout(ctx, DurationOrDefault(dialTimeout, DefaultDialTimeout))
+		members, err = c.MemberList(timeout)
+		cancel()
 
 		if err == nil {
 			// add members to the initial cluster
 			for _, member := range members.Members {
-
 				// if there's at least one peer url add it to the initial cluster
 				if pURLS := member.GetPeerURLs(); len(pURLS) > 0 {
 					// peers should already have this server's address so we can safely append ",%s=%s"
 					for _, url := range member.GetPeerURLs() {
-						peers = fmt.Sprintf("%s,%s=%s", peers, member.Name, url)
+						if !StringIsInStringSlice(url, apURLStrings) {
+							peers = fmt.Sprintf("%s,%s=%s", peers, member.Name, url)
+						}
 					}
 				}
-
 			}
 			break
 		}
@@ -126,6 +153,7 @@ func (c *Client) serverNameConflicts(ctx context.Context, name string) (conflict
 			if member.Name == name {
 				conflicts = true
 				err = ErrNameConflict
+				break
 			}
 		}
 	}
@@ -146,36 +174,6 @@ func (c *Client) clusterName(ctx context.Context) (name string, err error) {
 		}
 	}
 	return name, err
-}
-
-// addMemberToExistingCluster informs an etcd cluster that a server is about to be added to the cluster.  The cluster
-// can premptively reject this addition if it violates quorum
-func (c *Client) addMemberToExistingCluster(ctx context.Context, serverName string, apURLs []url.URL) (err error) {
-	// loop while the context hasn't closed
-	var conflict bool
-	for ctx.Err() == nil && (err == nil || err.Error() != etcdserver.ErrStopped.Error()) {
-
-		// Ensure that the server name does not already exist in the cluster.
-		// We want to ensure uniquely named cluster members.
-		// If this member died and is trying to rejoin, we want to retry until
-		// the cluster removes it or our parent context expires.
-		conflict, err = c.serverNameConflicts(ctx, serverName)
-
-		if !conflict && err == nil {
-
-			// add the member
-			_, err = c.MemberAdd(ctx, URLSToStringSlice(apURLs))
-
-			// break out of loop if we added ourselves cleanly
-			if err == nil {
-				break
-			}
-		}
-
-		time.Sleep(time.Second * 1)
-	}
-
-	return err
 }
 
 // NewClient returns a new etcd v3client wrapped with some helper functions

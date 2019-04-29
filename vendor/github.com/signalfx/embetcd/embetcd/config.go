@@ -2,7 +2,6 @@ package embetcd
 
 import (
 	"context"
-	"crypto/tls"
 	"time"
 
 	cli "github.com/coreos/etcd/clientv3"
@@ -31,7 +30,6 @@ func (c *Config) GetClientFromConfig(ctx context.Context) (*Client, error) {
 	return NewClient(cli.Config{
 		Endpoints:        c.InitialCluster,
 		DialTimeout:      DurationOrDefault(c.DialTimeout, DefaultDialTimeout),
-		TLS:              &tls.Config{InsecureSkipVerify: true}, // insecure for now
 		AutoSyncInterval: DurationOrDefault(c.AutoSyncInterval, DefaultAutoSyncInterval),
 		Context:          ctx, // pass in the context so the temp client closes with a cancelled context
 	})

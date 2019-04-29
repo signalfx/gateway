@@ -270,6 +270,11 @@ func (p *GatewayConfig) ToEtcdConfig() *embetcd.Config {
 		}
 	}
 
+	// set the cluster name as the initial cluster token
+	if p.ClusterName != nil {
+		etcdCfg.InitialClusterToken = *p.ClusterName
+	}
+
 	copyEtcdDurations(p, etcdCfg)
 	copyEtcdURLs(p, etcdCfg)
 	copyEtcdFileConfigs(p, etcdCfg)
@@ -322,7 +327,7 @@ func DefaultGatewayConfig() *GatewayConfig {
 		EtcdServerStartTimeout:        pointer.Duration(time.Second * 90),
 		UnhealthyMemberTTL:            pointer.Duration(embetcd.DefaultUnhealthyTTL),
 		RemoveMemberTimeout:           pointer.Duration(time.Second),
-		EtcdStartupGracePeriod:        pointer.Duration(embetcd.DefaultStartUpGracePeriod),
+		EtcdStartupGracePeriod:        pointer.Duration(time.Second * 120),
 		EtcdDialTimeout:               pointer.Duration(embetcd.DefaultDialTimeout),
 		EtcdClusterCleanUpInterval:    pointer.Duration(embetcd.DefaultCleanUpInterval),
 		EtcdAutoSyncInterval:          pointer.Duration(embetcd.DefaultAutoSyncInterval),
