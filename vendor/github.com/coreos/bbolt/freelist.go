@@ -2,6 +2,7 @@ package bbolt
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"unsafe"
 )
@@ -343,6 +344,30 @@ func (f *freelist) reload(p *page) {
 	for _, id := range f.getFreePageIDs() {
 		if !pcache[id] {
 			a = append(a, id)
+		}
+	}
+
+	f.readIDs(a)
+}
+
+// noSyncReload reads the freelist from pgids and filters out pending items.
+func (f *freelist) noSyncReload(pgids []pgid) {
+	// Build a cache of only pending pages.
+	pcache := make(map[pgid]bool)
+	for _, txp := range f.pending {
+		for _, pendingID := range txp.ids {
+			pcache[pendingID] = true
+		}
+	}
+
+	// Check each page in the freelist and build a new available freelist
+	// with any pages not in the pending lists.
+	var a []pgid
+	for _, id := range pgids {
+		if !pcache[id] {
+			a = append(a, id)
+		} else {
+			log.Printf("page id %d in pending list", id)
 		}
 	}
 

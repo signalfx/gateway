@@ -14,10 +14,11 @@
 			"revisionTime": "2018-03-21T16:47:47Z"
 		},
 		{
-			"checksumSHA1": "pQ9Erdp0Jv+Q8Q2pGi+4yxXSUi4=",
+			"checksumSHA1": "VH2UsbFl/s2cy5NYQOUqffVIUjQ=",
+			"origin": "github.com/WIZARD-CXY/bbolt",
 			"path": "github.com/coreos/bbolt",
-			"revision": "63597a96ec0ad9e6d43c3fc81e809909e0237461",
-			"revisionTime": "2019-01-28T18:11:30Z"
+			"revision": "746c2799f99dc9dc2942985b256fd92b7ae4d6cf",
+			"revisionTime": "2019-03-13T03:34:15Z"
 		},
 		{
 			"checksumSHA1": "sFGNqtSE3WlMiyT+JkVaW2OzstM=",
