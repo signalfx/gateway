@@ -950,11 +950,12 @@ func Test_handleClusterNameResponse(t *testing.T) {
 	resp := &clientv3.GetResponse{
 		Kvs: kvs,
 	}
-	if err := handleClusterNameResponse(context.Background(), tempCli, resp, "bananas"); err == nil {
+	p := &gateway{config: &config.GatewayConfig{EtcdDialTimeout: pointer.Duration(time.Second * 5)}}
+	if err := p.handleClusterNameResponse(context.Background(), tempCli, resp, "bananas"); err == nil {
 		t.Errorf("handleClusterName should have returned an error because the existing key doesn't match")
 		return
 	}
-	if err := handleClusterNameResponse(context.Background(), tempCli, &clientv3.GetResponse{}, "bananas"); err != nil {
+	if err := p.handleClusterNameResponse(context.Background(), tempCli, &clientv3.GetResponse{}, "bananas"); err != nil {
 		t.Errorf("should have created the new cluster name")
 		return
 	}
