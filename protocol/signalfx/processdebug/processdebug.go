@@ -17,6 +17,7 @@ type sink interface {
 
 var _ sink = &ProcessDebug{}
 
+// ProcessDebug checks if a span has debug values set
 type ProcessDebug struct {
 	next sink
 }
