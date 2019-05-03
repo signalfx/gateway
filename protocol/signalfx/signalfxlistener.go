@@ -17,6 +17,7 @@ import (
 	"github.com/signalfx/gateway/protocol"
 	"github.com/signalfx/gateway/protocol/collectd"
 	"github.com/signalfx/gateway/protocol/signalfx/additionalspantags"
+	"github.com/signalfx/gateway/protocol/signalfx/processdebug"
 	"github.com/signalfx/gateway/protocol/signalfx/spanobfuscation"
 	"github.com/signalfx/gateway/protocol/signalfx/tagreplace"
 	"github.com/signalfx/gateway/protocol/zipper"
@@ -265,6 +266,7 @@ func createTraceSink(sink Sink, conf *ListenerConfig) (Sink, error) {
 	if len(conf.AdditionalSpanTags) > 0 {
 		sink = additionalspantags.New(conf.AdditionalSpanTags, sink)
 	}
+	sink = processdebug.New(sink)
 	return sink, nil
 }
 
