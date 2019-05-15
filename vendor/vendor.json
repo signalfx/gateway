@@ -1078,10 +1078,10 @@
 			"revision": ""
 		},
 		{
-			"checksumSHA1": "4Iea5mN5iK+GF4/Mj5co3Ib6qo4=",
+			"checksumSHA1": "mDcjespNSQljJe4S5FVsxTe3VFo=",
 			"path": "github.com/signalfx/go-metrics",
-			"revision": "a8d2e624bfcb707b17b1015bae7a7758c84c8638",
-			"revisionTime": "2019-02-05T00:28:01Z"
+			"revision": "4a52ce3847a5f2d19be7c741e19ee31a2ae3ca1d",
+			"revisionTime": "2019-05-14T23:49:13Z"
 		},
 		{
 			"checksumSHA1": "l9am2jOCG3AsRMZF6yHUJguPWYU=",
