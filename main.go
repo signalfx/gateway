@@ -34,6 +34,7 @@ import (
 	"github.com/signalfx/gateway/protocol"
 	"github.com/signalfx/gateway/protocol/demultiplexer"
 	"github.com/signalfx/gateway/protocol/signalfx"
+	_ "github.com/signalfx/go-distribute"
 	_ "github.com/signalfx/go-metrics"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"

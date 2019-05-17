@@ -1991,35 +1991,13 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding11(in *jlexer.Lexer, o
 		}
 		switch key {
 		case "RebalanceAddress":
-			if in.IsNull() {
-				in.Skip()
-				out.RebalanceAddress = nil
-			} else {
-				if out.RebalanceAddress == nil {
-					out.RebalanceAddress = new(string)
-				}
-				*out.RebalanceAddress = string(in.String())
-			}
+			out.RebalanceAddress = string(in.String())
 		case "IngestAddress":
-			if in.IsNull() {
-				in.Skip()
-				out.IngestAddress = nil
-			} else {
-				if out.IngestAddress == nil {
-					out.IngestAddress = new(string)
-				}
-				*out.IngestAddress = string(in.String())
-			}
+			out.IngestAddress = string(in.String())
 		case "ID":
-			if in.IsNull() {
-				in.Skip()
-				out.ID = nil
-			} else {
-				if out.ID == nil {
-					out.ID = new(string)
-				}
-				*out.ID = string(in.String())
-			}
+			out.ID = string(in.String())
+		case "Weight":
+			out.Weight = int32(in.Int32())
 		default:
 			in.SkipRecursive()
 		}
@@ -2034,7 +2012,7 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding11(out *jwriter.Writer
 	out.RawByte('{')
 	first := true
 	_ = first
-	if in.RebalanceAddress != nil {
+	if in.RebalanceAddress != "" {
 		const prefix string = ",\"RebalanceAddress\":"
 		if first {
 			first = false
@@ -2042,9 +2020,9 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding11(out *jwriter.Writer
 		} else {
 			out.RawString(prefix)
 		}
-		out.String(string(*in.RebalanceAddress))
+		out.String(string(in.RebalanceAddress))
 	}
-	if in.IngestAddress != nil {
+	if in.IngestAddress != "" {
 		const prefix string = ",\"IngestAddress\":"
 		if first {
 			first = false
@@ -2052,9 +2030,9 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding11(out *jwriter.Writer
 		} else {
 			out.RawString(prefix)
 		}
-		out.String(string(*in.IngestAddress))
+		out.String(string(in.IngestAddress))
 	}
-	if in.ID != nil {
+	if in.ID != "" {
 		const prefix string = ",\"ID\":"
 		if first {
 			first = false
@@ -2062,7 +2040,17 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding11(out *jwriter.Writer
 		} else {
 			out.RawString(prefix)
 		}
-		out.String(string(*in.ID))
+		out.String(string(in.ID))
+	}
+	if in.Weight != 0 {
+		const prefix string = ",\"Weight\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int32(int32(in.Weight))
 	}
 	out.RawByte('}')
 }
