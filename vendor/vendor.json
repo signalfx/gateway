@@ -1078,6 +1078,12 @@
 			"revision": ""
 		},
 		{
+			"checksumSHA1": "vwRH8+mXGatdJ0u2qy2HRw+pHFY=",
+			"path": "github.com/signalfx/go-distribute",
+			"revision": "b86b64fd41c7953fe3ccb70d228a753e461bab1c",
+			"revisionTime": "2019-05-20T18:17:33Z"
+		},
+		{
 			"checksumSHA1": "mDcjespNSQljJe4S5FVsxTe3VFo=",
 			"path": "github.com/signalfx/go-metrics",
 			"revision": "4a52ce3847a5f2d19be7c741e19ee31a2ae3ca1d",
@@ -1260,10 +1266,10 @@
 			"versionExact": "v2.3.4"
 		},
 		{
-			"checksumSHA1": "rTAGlEZI3IPZCr0r73RqNTVW4ug=",
+			"checksumSHA1": "eYH1Ms+cQOZJJ0Yi+72bMmU8ALk=",
 			"path": "github.com/signalfx/ondiskencoding",
-			"revision": "facba5fa20cdeb351a4f3f9fbd9faba7700d74d1",
-			"revisionTime": "2019-03-27T21:51:13Z"
+			"revision": "560460c75586ba8a602d3f51e617a9d1dd7c8c93",
+			"revisionTime": "2019-05-17T22:29:17Z"
 		},
 		{
 			"checksumSHA1": "mDNBjIi/nvEt2poJ+qdeyosk/IM=",
@@ -1953,12 +1959,6 @@
 			"path": "gotest.tools/internal/source",
 			"revision": "d1a6560d983a17c84a34edeb67898f2dc00bb646",
 			"revisionTime": "2019-03-15T08:01:53Z"
-		},
-		{
-			"checksumSHA1": "IaJ9sf/1xMXDVNEDpby7jcy7x9M=",
-			"path": "stathat.com/c/consistent",
-			"revision": "ad91dc4a3a642859730ff3d65929fce009bfdc23",
-			"revisionTime": "2017-07-26T18:26:18Z"
 		}
 	],
 	"rootPath": "github.com/signalfx/gateway"

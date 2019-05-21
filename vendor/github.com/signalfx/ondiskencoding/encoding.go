@@ -176,9 +176,10 @@ type SampleEntry struct {
 
 //easyjson:json
 type EtcdConfig struct {
-	RebalanceAddress *string `json:",omitempty"`
-	IngestAddress    *string `json:",omitempty"`
-	ID               *string `json:",omitempty"`
+	RebalanceAddress string `json:",omitempty"`
+	IngestAddress    string `json:",omitempty"`
+	ID               string `json:",omitempty"`
+	Weight           int32  `json:",omitempty"`
 }
 
 //easyjson:json
