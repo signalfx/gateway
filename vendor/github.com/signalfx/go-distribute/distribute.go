@@ -117,10 +117,12 @@ func (c *Continuum) Size() int {
 	return c.size
 }
 
+var errRingZero = errors.New("unable to hash with ring of size 0")
+
 // Hash returns you the bucket label for this thing
-func (c *Continuum) Hash(thing string) string {
+func (c *Continuum) Hash(thing string) (string, error) {
 	if len(c.ring) == 0 {
-		return ""
+		return "", errRingZero
 	}
 
 	h := hashString(thing)
@@ -132,7 +134,7 @@ func (c *Continuum) Hash(thing string) string {
 		i = 0
 	}
 
-	return c.ring[i].bucket.Label
+	return c.ring[i].bucket.Label, nil
 }
 
 // Add a node to the ring
@@ -151,10 +153,12 @@ func (c *Continuum) Add(label string, weight int) error {
 	return err
 }
 
+var errNoLabel = errors.New("this bucket is not part of the ring")
+
 // Remove a node from the ring
 func (c *Continuum) Remove(b string) error {
 	if _, ok := c.buckets[b]; !ok {
-		return errors.New("this bucket is not part of the ring")
+		return errNoLabel
 	}
 	buckets := make([]Bucket, 0, len(c.buckets)-1)
 	for k, v := range c.buckets {

@@ -1078,10 +1078,10 @@
 			"revision": ""
 		},
 		{
-			"checksumSHA1": "vwRH8+mXGatdJ0u2qy2HRw+pHFY=",
+			"checksumSHA1": "NKWpwtNg6Z1yvSxCE+0WZjb8CdI=",
 			"path": "github.com/signalfx/go-distribute",
-			"revision": "b86b64fd41c7953fe3ccb70d228a753e461bab1c",
-			"revisionTime": "2019-05-20T18:17:33Z"
+			"revision": "c279b19461cc12f0f850a7a5c0f620cac8c549c9",
+			"revisionTime": "2019-05-21T18:58:40Z"
 		},
 		{
 			"checksumSHA1": "mDcjespNSQljJe4S5FVsxTe3VFo=",
