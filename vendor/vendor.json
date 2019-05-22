@@ -1959,6 +1959,12 @@
 			"path": "gotest.tools/internal/source",
 			"revision": "d1a6560d983a17c84a34edeb67898f2dc00bb646",
 			"revisionTime": "2019-03-15T08:01:53Z"
+		},
+		{
+			"checksumSHA1": "IaJ9sf/1xMXDVNEDpby7jcy7x9M=",
+			"path": "stathat.com/c/consistent",
+			"revision": "ad91dc4a3a642859730ff3d65929fce009bfdc23",
+			"revisionTime": "2017-07-26T18:26:18Z"
 		}
 	],
 	"rootPath": "github.com/signalfx/gateway"
