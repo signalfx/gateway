@@ -51,6 +51,7 @@ import (
 	_ "github.com/signalfx/ondiskencoding"
 	_ "github.com/spaolacci/murmur3"
 	_ "net/http/pprof"
+	_ "stathat.com/c/consistent"
 )
 
 const (
