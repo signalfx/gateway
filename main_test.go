@@ -674,6 +674,21 @@ func tearDownClusterTest(cancel context.CancelFunc, configFiles []string, etcdDa
 
 }
 
+func TestGetTempEtcdClient(t *testing.T) {
+	Convey("test temp etcd client", t, func() {
+		ctx, cancelFunc := context.WithCancel(context.Background())
+		go func(f context.CancelFunc) {
+			time.Sleep(time.Millisecond * 100)
+			f()
+		}(cancelFunc)
+		_, _, err := getTempEtcdClient(ctx, log.Discard, []string{}, &embetcd.Config{
+			AutoSyncInterval: pointer.Duration(time.Millisecond),
+			DialTimeout:      pointer.Duration(time.Millisecond),
+		})
+		So(err, ShouldNotBeNil)
+	})
+}
+
 func TestProxyCluster(t *testing.T) {
 	Convey("the etcd cluster should...", t, func() {
 		// initialize storage test structures

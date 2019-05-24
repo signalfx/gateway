@@ -308,7 +308,7 @@ func (p *gateway) setupInternalMetricsServer(conf *config.GatewayConfig, logger 
 	return nil
 }
 
-func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler, debugEndpoints map[string]http.Handler) error {
+func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler) error {
 	if conf.LocalDebugServer == nil {
 		return nil
 	}
@@ -322,7 +322,6 @@ func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger
 		ExplorableObj: p,
 	})
 	p.debugServer.Mux.Handle("/debug/dims", &p.debugSink)
-	p.handleEndpoints(debugEndpoints)
 
 	p.debugServer.Exp2.Exported["config"] = conf.Var()
 	p.debugServer.Exp2.Exported["datapoints"] = scheduler.Var()
@@ -349,8 +348,10 @@ func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger
 }
 
 func (p *gateway) handleEndpoints(debugEndpoints map[string]http.Handler) {
-	for k, v := range debugEndpoints {
-		p.debugServer.Mux.Handle(k, v)
+	if p.debugServer != nil {
+		for k, v := range debugEndpoints {
+			p.debugServer.Mux.Handle(k, v)
+		}
 	}
 }
 
@@ -635,7 +636,7 @@ func setClusterName(etcdClient etcdIntf.Client, clusterName string) (err error) 
 	return err
 }
 
-func getTempEtcdClient(ctx context.Context, endpoints []string, etcdCfg *embetcd.Config) (tempCli *embetcd.Client, closeCli func(), err error) {
+func getTempEtcdClient(ctx context.Context, logger log.Logger, endpoints []string, etcdCfg *embetcd.Config) (tempCli *embetcd.Client, closeCli func(), err error) {
 	closeCli = func() {
 		if tempCli != nil {
 			_ = tempCli.Close()
@@ -659,6 +660,7 @@ func getTempEtcdClient(ctx context.Context, endpoints []string, etcdCfg *embetcd
 		if err == nil {
 			break
 		}
+		logger.Log(log.Err, err, "attempt to create temp etcd client failed, retrying")
 	}
 
 	return tempCli, closeCli, err
@@ -677,7 +679,7 @@ func handleClusterNameResponse(ctx context.Context, tempCli etcdIntf.Client, res
 	return err
 }
 
-func (p *gateway) checkForClusterNameConflict(ctx context.Context, etcdCfg *embetcd.Config) (err error) {
+func (p *gateway) checkForClusterNameConflict(ctx context.Context, logger log.Logger, etcdCfg *embetcd.Config) (err error) {
 	var tempCli *embetcd.Client
 	var closeCli func()
 
@@ -685,7 +687,7 @@ func (p *gateway) checkForClusterNameConflict(ctx context.Context, etcdCfg *embe
 	if etcdCfg != nil && etcdCfg.ClusterState == "join" || etcdCfg.ClusterState == "client" {
 
 		// get the a temporary cli for the cluster
-		tempCli, closeCli, err = getTempEtcdClient(ctx, etcdCfg.InitialCluster, etcdCfg)
+		tempCli, closeCli, err = getTempEtcdClient(ctx, logger, etcdCfg.InitialCluster, etcdCfg)
 		defer closeCli()
 
 		var resp *etcdcli.GetResponse
@@ -762,7 +764,7 @@ func (p *gateway) setupEtcd(ctx context.Context, loadedConfig *config.GatewayCon
 	var err error
 
 	// check the for cluster name conflicts
-	err = p.checkForClusterNameConflict(ctx, etcdCfg)
+	err = p.checkForClusterNameConflict(ctx, p.logger, etcdCfg)
 
 	// start the server
 	if *loadedConfig.ClusterOperation != "client" && err == nil {
@@ -773,7 +775,7 @@ func (p *gateway) setupEtcd(ctx context.Context, loadedConfig *config.GatewayCon
 			endpoints := embetcd.URLSToStringSlice(etcdCfg.ACUrls)
 			var tempCli *embetcd.Client
 			var cancel func()
-			tempCli, cancel, err = getTempEtcdClient(ctx, endpoints, etcdCfg)
+			tempCli, cancel, err = getTempEtcdClient(ctx, p.logger, endpoints, etcdCfg)
 			defer cancel()
 
 			// set the cluster name for new clusters
@@ -824,14 +826,19 @@ func (p *gateway) start(ctx context.Context) error {
 		return fmt.Errorf("gateway was not configured properly")
 	}
 
+	// setup scheduler
+	scheduler := p.setupScheduler(p.config)
+
+	if err := p.setupDebugServer(p.config, p.logger, scheduler); err != nil {
+		p.logger.Log(log.Err, "debug server failed", err)
+		return err
+	}
+
 	// handle etcd configurations start server and/or open client if applicable to config
 	if err := p.setupEtcd(ctx, p.config); err != nil {
 		p.logger.Log(log.Err, "failed to set up the etcd server")
 		return err
 	}
-
-	// setup scheduler
-	scheduler := p.setupScheduler(p.config)
 
 	// setup internal metrics server
 	if err := p.setupInternalMetricsServer(p.config, p.logger, scheduler); err != nil {
@@ -847,10 +854,7 @@ func (p *gateway) start(ctx context.Context) error {
 
 	multiplexer, additionalEndpoints, err := p.setupForwardersAndListeners(ctx, loader, p.config, p.logger, scheduler)
 	if err == nil {
-		if err := p.setupDebugServer(p.config, p.logger, scheduler, additionalEndpoints); err != nil {
-			p.logger.Log(log.Err, "debug server failed", err)
-			return err
-		}
+		p.handleEndpoints(additionalEndpoints)
 
 		finishedContext, cancelFunc := p.scheduleStatCollection(ctx, scheduler, p.config, multiplexer)
 
