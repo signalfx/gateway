@@ -180,6 +180,7 @@ type EtcdConfig struct {
 	IngestAddress    string `json:",omitempty"`
 	ID               string `json:",omitempty"`
 	Weight           int32  `json:",omitempty"`
+	Version          int32  `json:",omitempty"`
 }
 
 //easyjson:json

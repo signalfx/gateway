@@ -1998,6 +1998,8 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding11(in *jlexer.Lexer, o
 			out.ID = string(in.String())
 		case "Weight":
 			out.Weight = int32(in.Int32())
+		case "Version":
+			out.Version = int32(in.Int32())
 		default:
 			in.SkipRecursive()
 		}
@@ -2051,6 +2053,16 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding11(out *jwriter.Writer
 			out.RawString(prefix)
 		}
 		out.Int32(int32(in.Weight))
+	}
+	if in.Version != 0 {
+		const prefix string = ",\"Version\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int32(int32(in.Version))
 	}
 	out.RawByte('}')
 }
