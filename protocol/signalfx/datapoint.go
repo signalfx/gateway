@@ -172,7 +172,7 @@ type JSONDecoderV2 struct {
 	invalidValue      int64
 }
 
-var errInvalidJSONFormat = errors.New("invalid JSON format; please see correct format at https://developers.signalfx.com/docs/datapoint")
+var errInvalidJSONFormat = errors.New("invalid JSON format; please see correct format at https://developers.signalfx.com/ingest_data_reference.html")
 
 // Datapoints returns datapoints for json decoder v2
 func (decoder *JSONDecoderV2) Datapoints() []*datapoint.Datapoint {
