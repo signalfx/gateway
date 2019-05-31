@@ -51,9 +51,9 @@ type ForwardTo struct {
 	DimensionsOrder      []string                    `json:",omitempty"`
 	Filters              *filtering.FilterObj        `json:",omitempty"`
 	TraceSample          *sampling.SmartSampleConfig `json:",omitempty"`
+	TraceDistributor     *sampling.SmartSampleConfig `json:",omitempty"`
 	AdditionalDimensions map[string]string           `json:",omitempty"`
 	DisableCompression   *bool                       `json:",omitempty"`
-	Server               etcdIntf.Server             `json:"-"`
 	Client               etcdIntf.Client             `json:"-"`
 	ClusterName          *string                     `json:"-"`
 }

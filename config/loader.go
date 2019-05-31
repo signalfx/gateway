@@ -14,6 +14,7 @@ import (
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
+	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/web"
 )
 
@@ -195,6 +196,8 @@ func (s *signalFxLoader) Listener(sink signalfx.Sink, conf *ListenFrom) (protoco
 	return signalfx.NewListener(sink, &sfConf)
 }
 
+var errIncompatibleTraceConfig = errors.New("please specify only TraceSample or TraceDistributor not both")
+
 func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) {
 	sfConf := signalfx.ForwarderConfig{
 		DatapointURL:       conf.URL,
@@ -208,12 +211,21 @@ func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) 
 		DisableCompression: conf.DisableCompression,
 		Logger:             s.logger,
 		Filters:            conf.Filters,
-		TraceSample:        conf.TraceSample,
 	}
-	if sfConf.TraceSample != nil {
-		sfConf.TraceSample.EtcdServer = conf.Server
+	if conf.TraceSample != nil && conf.TraceDistributor != nil {
+		return nil, errIncompatibleTraceConfig
+	}
+	if conf.TraceSample != nil {
+		sfConf.TraceSample = conf.TraceSample
 		sfConf.TraceSample.EtcdClient = conf.Client
 		sfConf.TraceSample.AdditionalDimensions = datapoint.AddMaps(conf.AdditionalDimensions, conf.TraceSample.AdditionalDimensions)
+		sfConf.TraceSample.ClusterName = conf.ClusterName
+	}
+	if conf.TraceDistributor != nil {
+		sfConf.TraceSample = conf.TraceDistributor
+		sfConf.TraceSample.Distributor = pointer.Bool(true)
+		sfConf.TraceSample.EtcdClient = conf.Client
+		sfConf.TraceSample.AdditionalDimensions = datapoint.AddMaps(conf.AdditionalDimensions, conf.TraceDistributor.AdditionalDimensions)
 		sfConf.TraceSample.ClusterName = conf.ClusterName
 	}
 	return signalfx.NewForwarder(&sfConf)
