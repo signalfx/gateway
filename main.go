@@ -175,7 +175,6 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
 		logCtx := log.NewContext(logger).With(logkey.Protocol, forwardConfig.Type, logkey.Direction, "forwarder")
 		if etcdClient != nil {
-			forwardConfig.Server = etcdServer
 			forwardConfig.Client = etcdClient
 		}
 		forwardConfig.ClusterName = loadedConfig.ClusterName
