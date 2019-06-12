@@ -10,11 +10,12 @@ type Histogram interface {
 	Min() int64
 	Percentile(float64) float64
 	Percentiles([]float64) []float64
+	Ranker() Ranker
 	Sample() Sample
 	Snapshot() Histogram
 	StdDev() float64
 	Sum() int64
-	Update(int64) float64
+	Update(int64)
 	Updates([]int64)
 	Variance() float64
 }
@@ -88,6 +89,9 @@ func (h *HistogramSnapshot) Percentiles(ps []float64) []float64 {
 	return h.sample.Percentiles(ps)
 }
 
+// Ranker returns a read-only Ranker
+func (h *HistogramSnapshot) Ranker() Ranker { return h.sample.Ranker() }
+
 // Sample returns the Sample underlying the histogram.
 func (h *HistogramSnapshot) Sample() Sample { return h.sample }
 
@@ -102,7 +106,7 @@ func (h *HistogramSnapshot) StdDev() float64 { return h.sample.StdDev() }
 func (h *HistogramSnapshot) Sum() int64 { return h.sample.Sum() }
 
 // Update panics.
-func (*HistogramSnapshot) Update(int64) float64 {
+func (*HistogramSnapshot) Update(int64) {
 	panic("Update called on a HistogramSnapshot")
 }
 
@@ -143,6 +147,9 @@ func (NilHistogram) Percentiles(ps []float64) []float64 {
 	return make([]float64, len(ps))
 }
 
+// Ranker is a no-op
+func (NilHistogram) Ranker() Ranker { return &SampleSnapshot{} }
+
 // Sample is a no-op.
 func (NilHistogram) Sample() Sample { return NilSample{} }
 
@@ -156,7 +163,7 @@ func (NilHistogram) StdDev() float64 { return 0.0 }
 func (NilHistogram) Sum() int64 { return 0 }
 
 // Update is a no-op.
-func (NilHistogram) Update(v int64) float64 { return 0.0 }
+func (NilHistogram) Update(v int64) {}
 
 // Updates is a no-op.
 func (NilHistogram) Updates([]int64) {}
@@ -200,6 +207,9 @@ func (h *StandardHistogram) Percentiles(ps []float64) []float64 {
 	return h.sample.Percentiles(ps)
 }
 
+// Ranker returns a read-only Ranker
+func (h *StandardHistogram) Ranker() Ranker { return h.sample.Ranker() }
+
 // Sample returns the Sample underlying the histogram.
 func (h *StandardHistogram) Sample() Sample { return h.sample }
 
@@ -215,7 +225,7 @@ func (h *StandardHistogram) StdDev() float64 { return h.sample.StdDev() }
 func (h *StandardHistogram) Sum() int64 { return h.sample.Sum() }
 
 // Update samples a new value.
-func (h *StandardHistogram) Update(v int64) float64 { return h.sample.Update(v) }
+func (h *StandardHistogram) Update(v int64) { h.sample.Update(v) }
 
 // Updates samples new values
 func (h *StandardHistogram) Updates(v []int64) { h.sample.Updates(v) }
