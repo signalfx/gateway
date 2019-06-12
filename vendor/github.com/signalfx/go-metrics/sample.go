@@ -23,29 +23,29 @@ type Sample interface {
 	Min() int64
 	Percentile(float64) float64
 	Percentiles([]float64) []float64
+	Ranker() Ranker
 	Size() int
 	Snapshot() Sample
 	StdDev() float64
 	Sum() int64
-	Update(int64) float64
+	Update(int64)
 	Updates([]int64)
 	Values() []int64
 	Variance() float64
 }
 
 // ExpDecaySample is an exponentially-decaying sample using a forward-decaying
-// priority reservoir.  See Cormode et al's "Forward Decay: A Practical Time
+// priority reservoir.  This implementation DOES NOT LOCK.  You must handle
+// concurrency yourself. See Cormode et al's "Forward Decay: A Practical Time
 // Decay Model for Streaming Systems".
 //
 // <http://dimacs.rutgers.edu/~graham/pubs/papers/fwddecay.pdf>
 type ExpDecaySample struct {
 	alpha         float64
 	count         int64
-	mutex         sync.Mutex
 	reservoirSize int
 	t0, t1        time.Time
-	heap          *expDecaySampleHeap
-	list          *expLL
+	values        *expDecaySampleHeap
 }
 
 type dump struct {
@@ -73,7 +73,7 @@ func (s *ExpDecaySample) Dump() (bb []byte) {
 			I int64
 		}, 0, s.reservoirSize),
 	}
-	for _, v := range s.heap.Values() {
+	for _, v := range s.values.Values() {
 		d.V = append(d.V, struct {
 			F float64
 			I int64
@@ -98,8 +98,7 @@ func NewExpDecaySample(reservoirSize int, alpha float64) Sample {
 		alpha:         alpha,
 		reservoirSize: reservoirSize,
 		t0:            time.Now(),
-		heap:          newExpDecaySampleHeap(reservoirSize),
-		list:          newExpLL(reservoirSize),
+		values:        newExpDecaySampleHeap(reservoirSize),
 	}
 	s.t1 = s.t0.Add(rescaleThreshold)
 	return s
@@ -123,133 +122,106 @@ func NewExpDecaySampleFromDump(b []byte) Sample {
 			t0:            d.T0,
 			t1:            d.T1,
 		}
-		heap := newExpDecaySampleHeap(d.S)
-		list := newExpLL(d.S)
+		values := newExpDecaySampleHeap(d.S)
 		for _, v := range d.V {
-			heap.Push(expDecaySample{k: v.F, v: v.I})
-			list.Push(v.I)
+			values.Push(expDecaySample{k: v.F, v: v.I})
 		}
-		sample.heap = heap
-		sample.list = list
+		sample.values = values
 	}
 	return sample
 }
 
 // Clear clears all samples.
 func (s *ExpDecaySample) Clear() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	s.count = 0
 	s.t0 = time.Now()
 	s.t1 = s.t0.Add(rescaleThreshold)
-	s.heap.Clear()
-	s.list.Clear()
+	s.values.Clear()
 }
 
 // Count returns the number of samples recorded, which may exceed the
 // reservoir size.
 func (s *ExpDecaySample) Count() int64 {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	return s.count
 }
 
 // ResetCount sets count to 0
 func (s *ExpDecaySample) ResetCount() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	s.count = 0
 }
 
 // Max returns the maximum value in the sample, which may not be the maximum
 // value ever to be part of the sample.
 func (s *ExpDecaySample) Max() int64 {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.list.Max()
+	return SampleMax(s.Values())
 }
 
 // Mean returns the mean of the values in the sample.
 func (s *ExpDecaySample) Mean() float64 {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	if s.list.Size() > 0 {
-		return float64(s.heap.Sum()) / float64(s.heap.Size())
-	}
-	return 0
+	return SampleMean(s.Values())
 }
 
 // Min returns the minimum value in the sample, which may not be the minimum
 // value ever to be part of the sample.
 func (s *ExpDecaySample) Min() int64 {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.list.Min()
+	return SampleMin(s.Values())
 }
 
 // Percentile returns an arbitrary percentile of values in the sample.
 func (s *ExpDecaySample) Percentile(p float64) float64 {
-	return s.Percentiles([]float64{p})[0]
+	return SamplePercentile(s.Values(), p)
 }
 
 // Percentiles returns a slice of arbitrary percentiles of values in the
 // sample.
 func (s *ExpDecaySample) Percentiles(ps []float64) []float64 {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.list.Percentiles(ps)
+	return SamplePercentiles(s.Values(), ps)
 }
+
+// Ranker returns a read-only structure for ranking
+func (s *ExpDecaySample) Ranker() Ranker { return NewSampleSnapshot(s.count, s.Values()) }
 
 // Size returns the size of the sample, which is at most the reservoir size.
 func (s *ExpDecaySample) Size() int {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.heap.Size()
+	return s.values.Size()
 }
 
 // Snapshot returns a read-only copy of the sample.
-func (s *ExpDecaySample) Snapshot() Sample { // TODO duplicate this using a list as well? we don't use it so maybe not?
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	vals := s.heap.Values()
+func (s *ExpDecaySample) Snapshot() Sample {
+	vals := s.values.Values()
 	values := make([]int64, len(vals))
 	for i, v := range vals {
 		values[i] = v.v
 	}
-	return &SampleSnapshot{
-		count:  s.count,
-		values: values,
-	}
+	return NewSampleSnapshot(s.count, values)
 }
 
 // StdDev returns the standard deviation of the values in the sample.
 func (s *ExpDecaySample) StdDev() float64 {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return math.Sqrt(s.list.Variance())
+	return SampleStdDev(s.Values())
 }
 
 // Sum returns the sum of the values in the sample.
 func (s *ExpDecaySample) Sum() int64 {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.heap.Sum()
+	return SampleSum(s.Values())
 }
 
 // Update samples a new value.
-func (s *ExpDecaySample) Update(v int64) float64 {
-	return s.update(time.Now(), v)
+func (s *ExpDecaySample) Update(v int64) {
+	s.update(time.Now(), v)
 }
 
 // Updates samples a new value.
 func (s *ExpDecaySample) Updates(v []int64) {
-	s.updates(time.Now(), v)
+	t := time.Now()
+	for _, val := range v {
+		s.update(t, val)
+	}
 }
+
 // Values returns a copy of the values in the sample.
 func (s *ExpDecaySample) Values() []int64 {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	vals := s.heap.Values()
+	vals := s.values.Values()
 	values := make([]int64, len(vals))
 	for i, v := range vals {
 		values[i] = v.v
@@ -257,59 +229,33 @@ func (s *ExpDecaySample) Values() []int64 {
 	return values
 }
 
-func (s *ExpDecaySample) ListValues() []int64 {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.list.Values()
-}
-
 // Variance returns the variance of the values in the sample.
 func (s *ExpDecaySample) Variance() float64 {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.list.Variance()
+	return SampleVariance(s.Values())
 }
 
 // update samples a new value at a particular timestamp.  This is a method all
 // its own to facilitate testing.
-func (s *ExpDecaySample) update(t time.Time, v int64) float64 {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	i := s.updateInner(t, v)
-	return float64(i) / (float64(s.list.Size()))
-}
-
-// updates does update but several times under one lock acquire
-func (s *ExpDecaySample) updates(t time.Time, vs []int64) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	for _, v := range vs {
-		s.updateInner(t, v)
-	}
-}
-
-func (s *ExpDecaySample) updateInner(t time.Time, v int64) int {
+func (s *ExpDecaySample) update(t time.Time, v int64) {
 	s.count++
-	if s.heap.Size() == s.reservoirSize {
-		v := s.heap.Pop()
-		s.list.Remove(v.v)
+	if s.values.Size() == s.reservoirSize {
+		s.values.Pop()
 	}
-	samp := expDecaySample{k: math.Exp(t.Sub(s.t0).Seconds()*s.alpha) / rand.Float64(), v: v}
-	s.heap.Push(samp)
-	i := s.list.Push(samp.v)
-	// don't need to modify values in list as they're not keyed by time
+	s.values.Push(expDecaySample{
+		k: math.Exp(t.Sub(s.t0).Seconds()*s.alpha) / rand.Float64(),
+		v: v,
+	})
 	if t.After(s.t1) {
-		values := s.heap.Values()
+		values := s.values.Values()
 		t0 := s.t0
-		s.heap.Clear()
+		s.values.Clear()
 		s.t0 = t
 		s.t1 = s.t0.Add(rescaleThreshold)
 		for _, v := range values {
 			v.k = v.k * math.Exp(-s.alpha*s.t0.Sub(t0).Seconds())
-			s.heap.Push(v)
+			s.values.Push(v)
 		}
 	}
-	return i
 }
 
 // NilSample is a no-op Sample.
@@ -341,6 +287,9 @@ func (NilSample) Percentiles(ps []float64) []float64 {
 	return make([]float64, len(ps))
 }
 
+// Ranker is a no-op.
+func (NilSample) Ranker() Ranker { return &SampleSnapshot{} }
+
 // Size is a no-op.
 func (NilSample) Size() int { return 0 }
 
@@ -354,7 +303,7 @@ func (NilSample) StdDev() float64 { return 0.0 }
 func (NilSample) Sum() int64 { return 0 }
 
 // Update is a no-op.
-func (NilSample) Update(v int64) float64 { return 0.0 }
+func (NilSample) Update(v int64) {}
 
 // Updates is a no-op.
 func (NilSample) Updates(v []int64) {}
@@ -436,9 +385,15 @@ type SampleSnapshot struct {
 }
 
 func NewSampleSnapshot(count int64, values []int64) *SampleSnapshot {
+	// cast type
+	v := int64Slice(values)
+
+	// sort the values
+	sort.Sort(v)
+
 	return &SampleSnapshot{
 		count:  count,
-		values: values,
+		values: v,
 	}
 }
 
@@ -456,31 +411,78 @@ func (s *SampleSnapshot) ResetCount() {
 }
 
 // Max returns the maximal value at the time the snapshot was taken.
-func (s *SampleSnapshot) Max() int64 { return SampleMax(s.values) }
+func (s *SampleSnapshot) Max() int64 {
+	if len(s.values) == 0 {
+		return 0
+	}
+	return s.values[len(s.values)-1]
+}
 
 // Mean returns the mean value at the time the snapshot was taken.
 func (s *SampleSnapshot) Mean() float64 { return SampleMean(s.values) }
 
 // Min returns the minimal value at the time the snapshot was taken.
-func (s *SampleSnapshot) Min() int64 { return SampleMin(s.values) }
+func (s *SampleSnapshot) Min() int64 {
+	if len(s.values) == 0 {
+		return 0
+	}
+	return s.values[0]
+}
 
 // Percentile returns an arbitrary percentile of values at the time the
 // snapshot was taken.
 func (s *SampleSnapshot) Percentile(p float64) float64 {
-	return SamplePercentile(s.values, p)
+	return s.Percentiles([]float64{p})[0]
 }
 
 // Percentiles returns a slice of arbitrary percentiles of values at the time
 // the snapshot was taken.
 func (s *SampleSnapshot) Percentiles(ps []float64) []float64 {
-	return SamplePercentiles(s.values, ps)
+	scores := make([]float64, len(ps))
+	size := len(s.values)
+	if size > 0 {
+		for i, p := range ps {
+			pos := p * float64(size+1)
+			if pos < 1.0 {
+				scores[i] = float64(s.values[0])
+			} else if pos >= float64(size) {
+				scores[i] = float64(s.values[size-1])
+			} else {
+				lower := float64(s.values[int(pos)-1])
+				upper := float64(s.values[int(pos)])
+				scores[i] = lower + (pos-math.Floor(pos))*(upper-lower)
+			}
+		}
+	}
+	return scores
 }
+
+// Rank returns the rank of a value against the sample
+func (s *SampleSnapshot) Rank(in int64) float64 {
+	// return -1 if there are no values
+	if len(s.values) == 0 {
+		return -1
+	}
+
+	// return the index of the value or where it should be
+	idx := float64(sort.Search(len(s.values), func(i int) bool { return s.values[i] > in }))
+
+	// add 1 to the length of val since we aren't inserting the value
+	return float64(idx) / float64(len(s.values)+1)
+}
+
+// Ranker returns a read-only Ranker
+func (s *SampleSnapshot) Ranker() Ranker { return NewSampleSnapshot(s.count, s.Values()) }
 
 // Size returns the size of the sample at the time the snapshot was taken.
 func (s *SampleSnapshot) Size() int { return len(s.values) }
 
 // Snapshot returns the snapshot.
-func (s *SampleSnapshot) Snapshot() Sample { return s }
+func (s *SampleSnapshot) Snapshot() Sample {
+	values := make([]int64, len(s.values))
+	copy(values, s.values)
+	return NewSampleSnapshot(s.count, values)
+}
 
 // StdDev returns the standard deviation of values at the time the snapshot was
 // taken.
@@ -490,7 +492,7 @@ func (s *SampleSnapshot) StdDev() float64 { return SampleStdDev(s.values) }
 func (s *SampleSnapshot) Sum() int64 { return SampleSum(s.values) }
 
 // Update panics.
-func (*SampleSnapshot) Update(int64) float64 {
+func (*SampleSnapshot) Update(int64) {
 	panic("Update called on a SampleSnapshot")
 }
 
@@ -620,6 +622,9 @@ func (s *UniformSample) Percentiles(ps []float64) []float64 {
 	return SamplePercentiles(s.values, ps)
 }
 
+// Ranker returns a read-only Ranker
+func (s *UniformSample) Ranker() Ranker { return NewSampleSnapshot(s.count, s.Values()) }
+
 // Size returns the size of the sample, which is at most the reservoir size.
 func (s *UniformSample) Size() int {
 	s.mutex.Lock()
@@ -633,10 +638,7 @@ func (s *UniformSample) Snapshot() Sample {
 	defer s.mutex.Unlock()
 	values := make([]int64, len(s.values))
 	copy(values, s.values)
-	return &SampleSnapshot{
-		count:  s.count,
-		values: values,
-	}
+	return NewSampleSnapshot(s.count, values)
 }
 
 // StdDev returns the standard deviation of the values in the sample.
@@ -654,18 +656,19 @@ func (s *UniformSample) Sum() int64 {
 }
 
 // Update samples a new value.
-func (s *UniformSample) Updates(vv []int64)  {
-	for _,v := range vv {
+func (s *UniformSample) Updates(vv []int64) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	for _, v := range vv {
 		s.updateInner(v)
 	}
 }
 
 // Update samples a new value.
-func (s *UniformSample) Update(v int64) float64 {
+func (s *UniformSample) Update(v int64) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.updateInner(v)
-	return 0.0
 }
 
 func (s *UniformSample) updateInner(v int64) {

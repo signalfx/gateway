@@ -1084,10 +1084,10 @@
 			"revisionTime": "2019-05-21T18:58:40Z"
 		},
 		{
-			"checksumSHA1": "mDcjespNSQljJe4S5FVsxTe3VFo=",
+			"checksumSHA1": "r5RbhnbUnssVASJ9g8qLs+8ehAU=",
 			"path": "github.com/signalfx/go-metrics",
-			"revision": "4a52ce3847a5f2d19be7c741e19ee31a2ae3ca1d",
-			"revisionTime": "2019-05-14T23:49:13Z"
+			"revision": "80d49102c9f6fb0269094ce3db4acf1de087e263",
+			"revisionTime": "2019-06-04T12:59:51Z"
 		},
 		{
 			"checksumSHA1": "l9am2jOCG3AsRMZF6yHUJguPWYU=",
@@ -1722,8 +1722,8 @@
 		{
 			"checksumSHA1": "2yzIL9toaKH47Qdlc6skUmeEsQ4=",
 			"path": "google.golang.org/grpc/channelz",
-			"revision": "22c2121b7df149129bd6bf6c56d464c451284ce5",
-			"revisionTime": "2019-03-21T19:04:35Z"
+			"revision": "cd89eaf40e4cd50ea058ccd4f2f08d5e9ce03316",
+			"revisionTime": "2019-06-12T17:26:18Z"
 		},
 		{
 			"checksumSHA1": "R3tuACGAPyK4lr+oSNt1saUzC0M=",
