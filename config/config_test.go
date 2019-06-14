@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -187,70 +186,6 @@ func TestGracefulDurations(t *testing.T) {
 		convey.So(err, convey.ShouldNotBeNil)
 	})
 
-}
-
-func TestEnvVarFuncs(t *testing.T) {
-	testKey := "SFX_TEST_ENV_VAR"
-	convey.Convey("test the following environment variable helper functions", t, func() {
-		convey.Convey("getCommaSeparatedStringEnvVar should parses comma separated strings", func() {
-			testVal := []string{"127.0.0.1:9999", "127.0.0.2:9999", "127.0.0.3:9999"}
-			os.Setenv(testKey, strings.Join(testVal, ","))
-			loaded := getCommaSeparatedStringEnvVar(testKey, []string{})
-			convey.So(len(loaded), convey.ShouldEqual, 3)
-			convey.So(strings.Join(loaded, ","), convey.ShouldEqual, strings.Join(testVal, ","))
-		})
-		convey.Convey("getStringEnvVar", func() {
-			convey.Convey("should return the value if the environment variable is set", func() {
-				testVal := "testStringValue"
-				os.Setenv(testKey, testVal)
-				loaded := getStringEnvVar(testKey, pointer.String("defaultVal"))
-				convey.So(*loaded, convey.ShouldEqual, testVal)
-			})
-			convey.Convey("should return the default value if the environment variable is not set", func() {
-				loaded := getStringEnvVar(testKey, pointer.String("defaultVal"))
-				convey.So(*loaded, convey.ShouldEqual, "defaultVal")
-			})
-		})
-		convey.Convey("getDurationEnvVar", func() {
-			convey.Convey("should return the value if the environment variable is set", func() {
-				testVal := "5s"
-				os.Setenv(testKey, testVal)
-				loaded := getDurationEnvVar(testKey, pointer.Duration(0*time.Second))
-				convey.So(*loaded, convey.ShouldEqual, time.Second*5)
-			})
-			convey.Convey("should return the default value if the environment variable is not set", func() {
-				loaded := getDurationEnvVar(testKey, pointer.Duration(1*time.Second))
-				convey.So(*loaded, convey.ShouldEqual, time.Second*1)
-			})
-		})
-		convey.Convey("getUint64EnvVar", func() {
-			convey.Convey("should return the value if the environment variable is set", func() {
-				testVal := "5"
-				os.Setenv(testKey, testVal)
-				loaded := getUint64EnvVar(testKey, pointer.Uint64(1))
-				convey.So(*loaded, convey.ShouldEqual, 5)
-			})
-			convey.Convey("should return the default value if the environment variable is not set", func() {
-				loaded := getUint64EnvVar(testKey, pointer.Uint64(1))
-				convey.So(*loaded, convey.ShouldEqual, 1)
-			})
-		})
-		convey.Convey("getUintEnvVar", func() {
-			convey.Convey("should return the value if the environment variable is set", func() {
-				testVal := "10"
-				os.Setenv(testKey, testVal)
-				loaded := getUintEnvVar(testKey, pointer.Uint(5))
-				convey.So(*loaded, convey.ShouldEqual, 10)
-			})
-			convey.Convey("should return the default value if the environment variable is not set", func() {
-				loaded := getUintEnvVar(testKey, pointer.Uint(1))
-				convey.So(*loaded, convey.ShouldEqual, 1)
-			})
-		})
-		convey.Reset(func() {
-			os.Unsetenv(testKey)
-		})
-	})
 }
 
 func TestGatewayConfig_ToEtcdConfig(t *testing.T) {

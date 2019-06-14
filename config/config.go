@@ -9,7 +9,6 @@ import (
 	"os"
 	"path"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +20,7 @@ import (
 	"github.com/signalfx/gateway/protocol/signalfx/spanobfuscation"
 	"github.com/signalfx/gateway/sampling"
 	"github.com/signalfx/gohelpers/stringhelper"
+	"github.com/signalfx/golib/env"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
@@ -502,95 +502,45 @@ func loadNoDefault(configFile string, logger log.Logger) (*GatewayConfig, error)
 	return config, nil
 }
 
-// getStringEnvVar returns the given env var key's value or the default value
-func getStringEnvVar(envVar string, def *string) *string {
-	if val := os.Getenv(envVar); val != "" {
-		return &val
-	}
-	return def
-}
-
-// getDurationEnvVar returns the given env var key's value or the default value
-func getDurationEnvVar(envVar string, def *time.Duration) *time.Duration {
-	if strVal := os.Getenv(envVar); strVal != "" {
-		if dur, err := time.ParseDuration(strVal); err == nil {
-			return &dur
-		}
-	}
-	return def
-}
-
-// getUintEnvVar returns the given env var key's value or the default value
-func getUintEnvVar(envVar string, def *uint) *uint {
-	if strVal := os.Getenv(envVar); strVal != "" {
-		if parsedVal, err := strconv.ParseUint(strVal, 10, 16); err == nil {
-			val := uint(parsedVal)
-			return &val
-		}
-	}
-	return def
-}
-
-// getUint64EnvVar returns the given env var key's value or the default value
-func getUint64EnvVar(envVar string, def *uint64) *uint64 {
-	if strVal := os.Getenv(envVar); strVal != "" {
-		if parsedVal, err := strconv.ParseUint(strVal, 10, 64); err == nil {
-			return &parsedVal
-		}
-	}
-	return def
-}
-
-// getCommaSeparatedStringEnvVar returns the given env var key's value split by comma or the default values
-func getCommaSeparatedStringEnvVar(envVar string, def []string) []string {
-	if val := os.Getenv(envVar); val != "" {
-		def = def[:0]
-		for _, addr := range strings.Split(strings.Replace(val, " ", "", -1), ",") {
-			def = append(def, addr)
-		}
-	}
-	return def
-}
-
 // loadFromEnv loads environment variables to override values in the gateway config file
 func loadFromEnv(conf *GatewayConfig) {
 	// general configs
-	conf.ServerName = getStringEnvVar("SFX_SERVER_NAME", conf.ServerName)
-	conf.ClusterName = getStringEnvVar("SFX_GATEWAY_CLUSTER_NAME", conf.ClusterName)
-	conf.ClusterOperation = getStringEnvVar("SFX_CLUSTER_OPERATION", conf.ClusterOperation)
-	conf.ClusterDataDir = getStringEnvVar("SFX_CLUSTER_DATA_DIR", conf.ClusterDataDir)
+	conf.ServerName = env.GetStringEnvVar("SFX_SERVER_NAME", conf.ServerName)
+	conf.ClusterName = env.GetStringEnvVar("SFX_GATEWAY_CLUSTER_NAME", conf.ClusterName)
+	conf.ClusterOperation = env.GetStringEnvVar("SFX_CLUSTER_OPERATION", conf.ClusterOperation)
+	conf.ClusterDataDir = env.GetStringEnvVar("SFX_CLUSTER_DATA_DIR", conf.ClusterDataDir)
 
 	// file limits
-	conf.EtcdSnapCount = getUint64EnvVar("SFX_ETCD_SNAP_COUNT", conf.EtcdSnapCount)
-	conf.EtcdMaxSnapFiles = getUintEnvVar("SFX_ETCD_MAX_SNAP_FILES", conf.EtcdMaxSnapFiles)
-	conf.EtcdMaxWalFiles = getUintEnvVar("SFX_ETD_MAX_WAL_FILES", conf.EtcdMaxWalFiles)
+	conf.EtcdSnapCount = env.GetUint64EnvVar("SFX_ETCD_SNAP_COUNT", conf.EtcdSnapCount)
+	conf.EtcdMaxSnapFiles = env.GetUintEnvVar("SFX_ETCD_MAX_SNAP_FILES", conf.EtcdMaxSnapFiles)
+	conf.EtcdMaxWalFiles = env.GetUintEnvVar("SFX_ETD_MAX_WAL_FILES", conf.EtcdMaxWalFiles)
 
 	// Target Cluster Addresses
-	conf.TargetClusterAddresses = getCommaSeparatedStringEnvVar("SFX_TARGET_CLUSTER_ADDRESSES", conf.TargetClusterAddresses)
+	conf.TargetClusterAddresses = env.GetCommaSeparatedStringEnvVar("SFX_TARGET_CLUSTER_ADDRESSES", conf.TargetClusterAddresses)
 
 	// Peer Addresses
-	conf.ListenOnPeerAddress = getStringEnvVar("SFX_LISTEN_ON_PEER_ADDRESS", conf.ListenOnPeerAddress)
-	conf.ListenOnPeerAddresses = getCommaSeparatedStringEnvVar("SFX_LISTEN_ON_PEER_ADDRESSES", conf.ListenOnPeerAddresses)
-	conf.AdvertisePeerAddress = getStringEnvVar("SFX_ADVERTISE_PEER_ADDRESS", conf.AdvertisePeerAddress)
-	conf.AdvertisedPeerAddresses = getCommaSeparatedStringEnvVar("SFX_ADVERTISED_PEER_ADDRESSES", conf.AdvertisedPeerAddresses)
+	conf.ListenOnPeerAddress = env.GetStringEnvVar("SFX_LISTEN_ON_PEER_ADDRESS", conf.ListenOnPeerAddress)
+	conf.ListenOnPeerAddresses = env.GetCommaSeparatedStringEnvVar("SFX_LISTEN_ON_PEER_ADDRESSES", conf.ListenOnPeerAddresses)
+	conf.AdvertisePeerAddress = env.GetStringEnvVar("SFX_ADVERTISE_PEER_ADDRESS", conf.AdvertisePeerAddress)
+	conf.AdvertisedPeerAddresses = env.GetCommaSeparatedStringEnvVar("SFX_ADVERTISED_PEER_ADDRESSES", conf.AdvertisedPeerAddresses)
 
 	// Client Addresses
-	conf.ListenOnClientAddress = getStringEnvVar("SFX_LISTEN_ON_CLIENT_ADDRESS", conf.ListenOnClientAddress)
-	conf.ListenOnClientAddresses = getCommaSeparatedStringEnvVar("SFX_LISTEN_ON_CLIENT_ADDRESSES", conf.ListenOnClientAddresses)
-	conf.AdvertiseClientAddress = getStringEnvVar("SFX_ADVERTISE_CLIENT_ADDRESS", conf.AdvertiseClientAddress)
-	conf.AdvertisedClientAddresses = getCommaSeparatedStringEnvVar("SFX_ADVERTISED_CLIENT_ADDRESSES", conf.AdvertisedClientAddresses)
+	conf.ListenOnClientAddress = env.GetStringEnvVar("SFX_LISTEN_ON_CLIENT_ADDRESS", conf.ListenOnClientAddress)
+	conf.ListenOnClientAddresses = env.GetCommaSeparatedStringEnvVar("SFX_LISTEN_ON_CLIENT_ADDRESSES", conf.ListenOnClientAddresses)
+	conf.AdvertiseClientAddress = env.GetStringEnvVar("SFX_ADVERTISE_CLIENT_ADDRESS", conf.AdvertiseClientAddress)
+	conf.AdvertisedClientAddresses = env.GetCommaSeparatedStringEnvVar("SFX_ADVERTISED_CLIENT_ADDRESSES", conf.AdvertisedClientAddresses)
 
 	// Metric Addresses
-	conf.ETCDMetricsAddress = getStringEnvVar("SFX_ETCD_METRICS_ADDRESS", conf.ETCDMetricsAddress)
-	conf.EtcdListenOnMetricsAddresses = getCommaSeparatedStringEnvVar("SFX_ETCD_LISTEN_ON_METRICS_ADDRESSES", conf.EtcdListenOnMetricsAddresses)
+	conf.ETCDMetricsAddress = env.GetStringEnvVar("SFX_ETCD_METRICS_ADDRESS", conf.ETCDMetricsAddress)
+	conf.EtcdListenOnMetricsAddresses = env.GetCommaSeparatedStringEnvVar("SFX_ETCD_LISTEN_ON_METRICS_ADDRESSES", conf.EtcdListenOnMetricsAddresses)
 
 	// Durations
-	conf.UnhealthyMemberTTL = getDurationEnvVar("SFX_UNHEALTHY_MEMBER_TTL", conf.UnhealthyMemberTTL)
-	conf.RemoveMemberTimeout = getDurationEnvVar("SFX_REMOVE_MEMBER_TIMEOUT", conf.RemoveMemberTimeout)
-	conf.EtcdDialTimeout = getDurationEnvVar("SFX_ETCD_DIAL_TIMEOUT", conf.EtcdDialTimeout)
-	conf.EtcdClusterCleanUpInterval = getDurationEnvVar("SFX_ETCD_CLUSTER_CLEANUP_INTERVAL", conf.EtcdClusterCleanUpInterval)
-	conf.EtcdAutoSyncInterval = getDurationEnvVar("SFX_ETCD_AUTOSYNC_INTERVAL", conf.EtcdAutoSyncInterval)
-	conf.EtcdStartupGracePeriod = getDurationEnvVar("SFX_ETCD_STARTUP_GRACE_PERIOD", conf.EtcdStartupGracePeriod)
-	conf.EtcdHeartBeatInterval = getDurationEnvVar("SFX_ETCD_HEARTBEAT_INTERVAL", conf.EtcdHeartBeatInterval)
-	conf.EtcdElectionTimeout = getDurationEnvVar("SFX_ETCD_ELECTION_TIMEOUT", conf.EtcdElectionTimeout)
+	conf.UnhealthyMemberTTL = env.GetDurationEnvVar("SFX_UNHEALTHY_MEMBER_TTL", conf.UnhealthyMemberTTL)
+	conf.RemoveMemberTimeout = env.GetDurationEnvVar("SFX_REMOVE_MEMBER_TIMEOUT", conf.RemoveMemberTimeout)
+	conf.EtcdDialTimeout = env.GetDurationEnvVar("SFX_ETCD_DIAL_TIMEOUT", conf.EtcdDialTimeout)
+	conf.EtcdClusterCleanUpInterval = env.GetDurationEnvVar("SFX_ETCD_CLUSTER_CLEANUP_INTERVAL", conf.EtcdClusterCleanUpInterval)
+	conf.EtcdAutoSyncInterval = env.GetDurationEnvVar("SFX_ETCD_AUTOSYNC_INTERVAL", conf.EtcdAutoSyncInterval)
+	conf.EtcdStartupGracePeriod = env.GetDurationEnvVar("SFX_ETCD_STARTUP_GRACE_PERIOD", conf.EtcdStartupGracePeriod)
+	conf.EtcdHeartBeatInterval = env.GetDurationEnvVar("SFX_ETCD_HEARTBEAT_INTERVAL", conf.EtcdHeartBeatInterval)
+	conf.EtcdElectionTimeout = env.GetDurationEnvVar("SFX_ETCD_ELECTION_TIMEOUT", conf.EtcdElectionTimeout)
 }
