@@ -284,8 +284,14 @@ func Test_Main(t *testing.T) {
 		flags = &gatewayFlags{}
 		flagParse = flag.Parse
 	}()
+
 	flags.configFileName = "__INVALID_FILENAME__"
 	main()
+
+	// check with the version flag set
+	flags.version = true
+	main()
+	assert.Equal(t, false, flags.version, "version flag should reset to false after printing the gateway version")
 }
 
 type ConcurrentByteBuffer struct {
