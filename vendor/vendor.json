@@ -600,6 +600,12 @@
 			"revisionTime": "2019-02-12T21:16:48Z"
 		},
 		{
+			"checksumSHA1": "g8yM1TRZyIjXtopiqbslzgLqtM0=",
+			"path": "github.com/go-logfmt/logfmt",
+			"revision": "07c9b44f60d7ffdfb7d8efe1ad539965737836dc",
+			"revisionTime": "2018-11-22T01:56:15Z"
+		},
+		{
 			"checksumSHA1": "H8wo+NR5z+VRl0wqPYpVQfC06ks=",
 			"path": "github.com/go-stack/stack",
 			"revision": "2fee6af1a9795aafbe0253a0cfbdf668e1fb8a9a",
