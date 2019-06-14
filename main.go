@@ -56,6 +56,7 @@ import (
 
 const (
 	clusterOpFlag = "cluster-op"
+	versionFlag   = "version"
 )
 
 var (
@@ -69,6 +70,7 @@ var (
 type gatewayFlags struct {
 	configFileName string
 	operation      flaghelpers.StringFlag
+	version        bool
 }
 
 // addFlagsToConfig applies the flags to a config struct
@@ -88,6 +90,7 @@ func init() {
 	flagParse = flag.Parse
 	flag.StringVar(&flags.configFileName, "configfile", "sf/gateway.conf", "Name of the db gateway configuration file")
 	flag.Var(&flags.operation, clusterOpFlag, "operation to perform if running in cluster mode [\"seed\", \"join\", \"\"] this overrides the ClusterOperation set in the config file")
+	flag.BoolVar(&flags.version, versionFlag, false, "positional argument to check gateway version")
 }
 
 // TODO: don't make this part of the gateway itself
@@ -943,6 +946,14 @@ func main() {
 
 	// parse runtime flags only once
 	flagParse()
+
+	// if the version flag is present, print the version and return
+	if flags != nil && flags.version {
+		fmt.Println(Version)
+		fmt.Println(BuildDate)
+		flags.version = false
+		return
+	}
 
 	// instantiate a gateway
 	mainInstance := newGateway()
