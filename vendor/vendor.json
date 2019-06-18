@@ -600,6 +600,12 @@
 			"revisionTime": "2019-02-12T21:16:48Z"
 		},
 		{
+			"checksumSHA1": "g8yM1TRZyIjXtopiqbslzgLqtM0=",
+			"path": "github.com/go-logfmt/logfmt",
+			"revision": "07c9b44f60d7ffdfb7d8efe1ad539965737836dc",
+			"revisionTime": "2018-11-22T01:56:15Z"
+		},
+		{
 			"checksumSHA1": "H8wo+NR5z+VRl0wqPYpVQfC06ks=",
 			"path": "github.com/go-stack/stack",
 			"revision": "2fee6af1a9795aafbe0253a0cfbdf668e1fb8a9a",
@@ -1108,162 +1114,170 @@
 		{
 			"checksumSHA1": "W8Ibs3LdnPDMF2++tpXCvOkKOGM=",
 			"path": "github.com/signalfx/golib/datapoint",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "CYj6bWzM1OmhI8Wq7ykPUzik8Sc=",
 			"path": "github.com/signalfx/golib/datapoint/dpsink",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "IJLCUD15/cDRGo6YBAVGYRNP8MQ=",
 			"path": "github.com/signalfx/golib/datapoint/dptest",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
+		},
+		{
+			"checksumSHA1": "Yfg6hqFdVYtqv41t6ZIk/Exvru4=",
+			"path": "github.com/signalfx/golib/env",
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "GuSggAzlI13Uu1yZ9rM8puMTEi8=",
 			"path": "github.com/signalfx/golib/errors",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "wDOXoGg2ALYhvV4GVZEeMqXP7SE=",
 			"path": "github.com/signalfx/golib/event",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "TVb+/MOLmMBr4ZJ2qLQUbsyL5is=",
 			"path": "github.com/signalfx/golib/eventcounter",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "OFrPOY5sCUCxCJwS9EDWACTNksQ=",
 			"path": "github.com/signalfx/golib/explorable",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "DvU/T1x0ZHIfKOdK/T6uzauh/+Y=",
 			"path": "github.com/signalfx/golib/expvar2",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "9u1IVJSTnAac1Ugd/9Hcu3nONiE=",
 			"path": "github.com/signalfx/golib/httpdebug",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
-			"checksumSHA1": "0jcb9ADX0Z4j7ch/vuMxqVQ8oT4=",
+			"checksumSHA1": "qyFP3dLiAD+qOMZYNW8m+Z05Gmo=",
 			"path": "github.com/signalfx/golib/log",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "Jww4G7329IP9YYR4AW7RBurVTdw=",
 			"path": "github.com/signalfx/golib/logkey",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "Rp9SRtpmfC8hbM2DH4Hu/bEYwAM=",
 			"path": "github.com/signalfx/golib/nettest",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "eQNZ3ke9kflUMCintzR47fhT4YI=",
 			"path": "github.com/signalfx/golib/pointer",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "N+OiKDJ+L5TSeYLgbIOfeKDaTo4=",
 			"path": "github.com/signalfx/golib/reportsha",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
-			"checksumSHA1": "7sIQOailCUIajwAAPnYF6idmnqA=",
+			"checksumSHA1": "ggpk76eMFy65ngQO5FaYAM25GcY=",
 			"path": "github.com/signalfx/golib/sfxclient",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "S66r/9t8lohMFtLcHxGifO/09pY=",
 			"path": "github.com/signalfx/golib/sfxclient/spanfilter",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "kLiclgZJImywtHf9fXdY7D0PsvY=",
 			"path": "github.com/signalfx/golib/timekeeper",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "a1T5EKY9A55Ajj9B/rtMwKO5CRA=",
 			"path": "github.com/signalfx/golib/trace",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "9H+7QI8NpjP1UlKwp3arTaTll8E=",
 			"path": "github.com/signalfx/golib/trace/format",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "GLnZRaIECOpsjLGByW1k9dnDwA0=",
 			"path": "github.com/signalfx/golib/web",
-			"revision": "68565cfe71930e812d568bf6fae6026bf6e6edcc",
-			"revisionTime": "2019-04-08T17:24:08Z",
-			"version": "v2.3.4",
-			"versionExact": "v2.3.4"
+			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
+			"revisionTime": "2019-06-14T21:18:56Z",
+			"version": "v2.4.0",
+			"versionExact": "v2.4.0"
 		},
 		{
 			"checksumSHA1": "A787TitoL79AH7rdUEMvf162fuI=",
