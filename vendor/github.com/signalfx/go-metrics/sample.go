@@ -465,10 +465,15 @@ func (s *SampleSnapshot) Rank(in int64) float64 {
 	}
 
 	// return the index of the value or where it should be
-	idx := float64(sort.Search(len(s.values), func(i int) bool { return s.values[i] > in }))
+	idx := sort.Search(len(s.values), func(i int) bool { return s.values[i] > in })
 
-	// add 1 to the length of val since we aren't inserting the value
-	return float64(idx) / float64(len(s.values)+1)
+        l := len(s.values)
+	// only return 1 if it's strictly the largest element in the list
+	if idx == l && in > s.values[l-1] {
+		return 1
+	}
+        // otherwise hedge our bets
+	return float64(idx) / float64(l+1)
 }
 
 // Ranker returns a read-only Ranker
