@@ -6,34 +6,26 @@ import (
 	"expvar"
 	"flag"
 	"fmt"
-	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"gopkg.in/natefinch/lumberjack.v2"
 
 	etcdcli "github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/embed"
 	"github.com/gorilla/mux"
 	"github.com/signalfx/embetcd/embetcd"
-	"github.com/signalfx/gateway/config"
-	"github.com/signalfx/gateway/dp/dpbuffered"
-	"github.com/signalfx/gateway/etcdIntf"
-	"github.com/signalfx/gateway/flaghelpers"
-	"github.com/signalfx/gateway/internal-metrics"
-	"github.com/signalfx/gateway/logkey"
-	"github.com/signalfx/gateway/protocol"
-	"github.com/signalfx/gateway/protocol/demultiplexer"
-	"github.com/signalfx/gateway/protocol/signalfx"
 	_ "github.com/signalfx/go-distribute"
 	_ "github.com/signalfx/go-metrics"
 	"github.com/signalfx/golib/datapoint"
@@ -50,8 +42,17 @@ import (
 	"github.com/signalfx/golib/web"
 	_ "github.com/signalfx/ondiskencoding"
 	_ "github.com/spaolacci/murmur3"
-	_ "net/http/pprof"
 	_ "stathat.com/c/consistent"
+
+	"github.com/signalfx/gateway/config"
+	"github.com/signalfx/gateway/dp/dpbuffered"
+	"github.com/signalfx/gateway/etcdIntf"
+	"github.com/signalfx/gateway/flaghelpers"
+	"github.com/signalfx/gateway/internal-metrics"
+	"github.com/signalfx/gateway/logkey"
+	"github.com/signalfx/gateway/protocol"
+	"github.com/signalfx/gateway/protocol/demultiplexer"
+	"github.com/signalfx/gateway/protocol/signalfx"
 )
 
 const (
@@ -326,7 +327,6 @@ func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger
 	})
 	p.debugServer.Mux.Handle("/debug/dims", &p.debugSink)
 
-	p.debugServer.Exp2.Exported["config"] = conf.Var()
 	p.debugServer.Exp2.Exported["datapoints"] = scheduler.Var()
 	p.debugServer.Exp2.Exported["goruntime"] = expvar.Func(func() interface{} {
 		return runtime.Version()
@@ -889,7 +889,6 @@ func (p *gateway) start(ctx context.Context) error {
 // is used for testing and should be refactored out later
 func loadConfig(configFilePath string, logger log.Logger) (*config.GatewayConfig, error) {
 	logger.Log(logkey.ConfigFile, configFilePath, "Looking for config file")
-	logger.Log(logkey.Env, strings.Join(os.Environ(), "-"), "Looking for config file")
 
 	// load the config file
 	loadedConfig, err := config.Load(configFilePath, logger)
@@ -903,11 +902,10 @@ func loadConfig(configFilePath string, logger log.Logger) (*config.GatewayConfig
 	flags.addFlagsToConfig(loadedConfig)
 
 	// log the config that we loaded
-	var bb []byte
-	if bb, err = json.Marshal(loadedConfig); err == nil {
-		logger.Log(logkey.Config, string(bb), logkey.Env, strings.Join(os.Environ(), "-"), "config loaded")
+	if _, err = json.Marshal(loadedConfig); err != nil {
+		return nil, err
 	}
-
+	logger.Log("config loaded")
 	return loadedConfig, nil
 }
 
