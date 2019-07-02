@@ -1280,10 +1280,16 @@
 			"versionExact": "v2.4.0"
 		},
 		{
-			"checksumSHA1": "A787TitoL79AH7rdUEMvf162fuI=",
+			"checksumSHA1": "3o2HmKdgtDqkP9IX5sE4M/fUMi0=",
 			"path": "github.com/signalfx/ondiskencoding",
-			"revision": "4c50cf88d90bf38fd04a8aea4526b5e7252fd6c9",
-			"revisionTime": "2019-05-17T22:29:17Z"
+			"revision": "a9a721ef65c9fe68859df82ae43455538adbf993",
+			"revisionTime": "2019-07-02T16:40:47Z"
+		},
+		{
+			"checksumSHA1": "LSWT4QwuO6ooGs3KYqHrWuWJovE=",
+			"path": "github.com/signalfx/tdigest",
+			"revision": "bf7c9889ff1a3fef5954322325799e30acffca11",
+			"revisionTime": "2019-07-10T22:02:20Z"
 		},
 		{
 			"checksumSHA1": "mDNBjIi/nvEt2poJ+qdeyosk/IM=",
