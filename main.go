@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"expvar"
 	"flag"
 	"fmt"
@@ -901,10 +900,6 @@ func loadConfig(configFilePath string, logger log.Logger) (*config.GatewayConfig
 	// add flag values to the loadedConfig.  This overrides any values in the config file with runtime flags.
 	flags.addFlagsToConfig(loadedConfig)
 
-	// log the config that we loaded
-	if _, err = json.Marshal(loadedConfig); err != nil {
-		return nil, err
-	}
 	logger.Log("config loaded")
 	return loadedConfig, nil
 }
