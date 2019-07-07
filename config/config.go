@@ -458,10 +458,20 @@ func (p *GatewayConfig) String() string {
 	return "<config object>"
 }
 
-// Var returns the gateway config itself as an expvar
+// Var returns a clone of the gateway config with secrets being redacted
 func (p *GatewayConfig) Var() expvar.Var {
 	return expvar.Func(func() interface{} {
-		return p
+		redacted := "redacted"
+		safeExport := p
+		for _, settings := range safeExport.ForwardTo {
+			if settings.DefaultAuthToken != nil {
+				settings.DefaultAuthToken = &redacted
+			}
+			if settings.AuthTokenEnvVar != nil {
+				settings.AuthTokenEnvVar = &redacted
+			}
+		}
+		return safeExport
 	})
 }
 
