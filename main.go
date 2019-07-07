@@ -326,6 +326,7 @@ func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger
 	})
 	p.debugServer.Mux.Handle("/debug/dims", &p.debugSink)
 
+	p.debugServer.Exp2.Exported["config"] = conf.Var()
 	p.debugServer.Exp2.Exported["datapoints"] = scheduler.Var()
 	p.debugServer.Exp2.Exported["goruntime"] = expvar.Func(func() interface{} {
 		return runtime.Version()
