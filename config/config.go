@@ -467,9 +467,6 @@ func (p *GatewayConfig) Var() expvar.Var {
 			if settings.DefaultAuthToken != nil {
 				settings.DefaultAuthToken = &redacted
 			}
-			if settings.AuthTokenEnvVar != nil {
-				settings.AuthTokenEnvVar = &redacted
-			}
 		}
 		return safeExport
 	})
