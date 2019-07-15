@@ -56,8 +56,9 @@ import (
 )
 
 const (
-	clusterOpFlag = "cluster-op"
-	versionFlag   = "version"
+	clusterOpFlag        = "cluster-op"
+	versionFlag          = "version"
+	gatewayMetricsPrefix = "gateway."
 )
 
 var (
@@ -173,7 +174,7 @@ func forwarderName(f *config.ForwardTo) string {
 
 var errDupeForwarder = errors.New("cannot duplicate forwarder names or types without names")
 
-func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, etcdServer *embetcd.Server, etcdClient *embetcd.Client) ([]protocol.Forwarder, error) {
+func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler, defaultDelayScheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, etcdServer *embetcd.Server, etcdClient *embetcd.Client) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	nameMap := make(map[string]bool)
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
@@ -205,6 +206,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 			Logger:        limitedLogger,
 			DroppedReason: "downstream",
 		}
+		defaultDelayScheduler.AddCallback(dcount)
 		count := signalfx.UnifyNextSinkWrap(dcount)
 		endingSink := signalfx.FromChain(forwarder, signalfx.NextWrap(count))
 		bconf := &dpbuffered.Config{
@@ -240,7 +242,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 
 var errDupeListener = errors.New("cannot duplicate listener names or types without names")
 
-func setupListeners(tk timekeeper.TimeKeeper, hostname string, loadedConfig *config.GatewayConfig, loader *config.Loader, listenFrom []*config.ListenFrom, multiplexer signalfx.Sink, logger log.Logger, scheduler *sfxclient.Scheduler) ([]protocol.Listener, error) {
+func setupListeners(tk timekeeper.TimeKeeper, hostname string, loadedConfig *config.GatewayConfig, loader *config.Loader, listenFrom []*config.ListenFrom, multiplexer signalfx.Sink, logger log.Logger, scheduler *sfxclient.Scheduler, defaultDelayScheduler *sfxclient.Scheduler) ([]protocol.Listener, error) {
 	listeners := make([]protocol.Listener, 0, len(listenFrom))
 	nameMap := make(map[string]bool)
 	for idx, listenConfig := range listenFrom {
@@ -256,6 +258,16 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loadedConfig *con
 			return nil, errDupeListener
 		}
 		nameMap[name] = true
+		limitedLogger := &log.RateLimitedLogger{
+			EventCounter: eventcounter.New(tk.Now(), time.Second),
+			Limit:        16,
+			Logger:       logCtx,
+			Now:          tk.Now,
+		}
+		listenConfig.Counter = &dpsink.Counter{
+			Logger:        limitedLogger,
+			DroppedReason: "mux",
+		}
 
 		listener, err := loader.Listener(multiplexer, listenConfig)
 		if err != nil {
@@ -266,6 +278,15 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loadedConfig *con
 		groupName := fmt.Sprintf("%s_l_%d", name, idx)
 		scheduler.AddGroupedCallback(groupName, listener)
 		scheduler.GroupedDefaultDimensions(groupName, datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
+			"name":      name,
+			"direction": "listener",
+			"source":    "gateway",
+			"host":      hostname,
+			"type":      listenConfig.Type,
+			"cluster":   *loadedConfig.ClusterName,
+		}))
+		defaultDelayScheduler.AddGroupedCallback(groupName, listener)
+		defaultDelayScheduler.GroupedDefaultDimensions(groupName, datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
 			"name":      name,
 			"direction": "listener",
 			"source":    "gateway",
@@ -312,7 +333,7 @@ func (p *gateway) setupInternalMetricsServer(conf *config.GatewayConfig, logger 
 	return nil
 }
 
-func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler) error {
+func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler, defaultDelayScheduler *sfxclient.Scheduler) error {
 	if conf.LocalDebugServer == nil {
 		return nil
 	}
@@ -342,6 +363,7 @@ func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger
 	p.debugServer.Exp2.Exported["source"] = expvar.Func(func() interface{} {
 		return fmt.Sprintf("https://github.com/signalfx/gateway/tree/%s", Version)
 	})
+	p.debugServer.Exp2.Exported["gateway_metrics"] = defaultDelayScheduler.Var()
 
 	go func() {
 		err := p.debugServer.Serve(listener)
@@ -583,9 +605,23 @@ func (p *gateway) scheduleStatCollection(ctx context.Context, scheduler *sfxclie
 	return finishedContext, cancelFunc
 }
 
-func (p *gateway) setupForwardersAndListeners(ctx context.Context, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler) (signalfx.Sink, map[string]http.Handler, error) {
+func (p *gateway) scheduleStatCollectionWithDefaultDelay(ctx context.Context, scheduler *sfxclient.Scheduler, loadedConfig *config.GatewayConfig, multiplexer signalfx.Sink) (context.Context, context.CancelFunc) {
+	// We still want to schedule stat collection so people can debug the server if they want
+	scheduler.Sink = dpsink.Discard
+	scheduler.ReportingDelayNs = (time.Second * 10).Nanoseconds()
+	finishedContext, cancelFunc := context.WithCancel(ctx)
+	if loadedConfig.InternalMetricsReportingDelayDuration != nil && *loadedConfig.InternalMetricsReportingDelayDuration != 0 {
+		scheduler.Sink = multiplexer
+		scheduler.ReportingDelayNs = loadedConfig.InternalMetricsReportingDelayDuration.Nanoseconds()
+	} else {
+		p.logger.Log("skipping internal metrics stat keeping")
+	}
+	return finishedContext, cancelFunc
+}
+
+func (p *gateway) setupForwardersAndListeners(ctx context.Context, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, scheduler *sfxclient.Scheduler, defaultDelayScheduler *sfxclient.Scheduler) (signalfx.Sink, map[string]http.Handler, error) {
 	var err error
-	p.forwarders, err = setupForwarders(ctx, p.tk, loader, loadedConfig, logger, scheduler, &p.debugSink, &p.ctxDims, p.etcdServer, p.etcdClient)
+	p.forwarders, err = setupForwarders(ctx, p.tk, loader, loadedConfig, logger, scheduler, defaultDelayScheduler, &p.debugSink, &p.ctxDims, p.etcdServer, p.etcdClient)
 	if err != nil {
 		p.logger.Log(log.Err, err, "Unable to setup forwarders")
 		return nil, nil, errors.Annotate(err, "unable to setup forwarders")
@@ -602,14 +638,12 @@ func (p *gateway) setupForwardersAndListeners(ctx context.Context, loader *confi
 		FutureDuration: loadedConfig.FutureThresholdDuration,
 	}
 	scheduler.AddCallback(dmux)
-
 	p.versionMetric.RepoURL = "https://github.com/signalfx/gateway"
 	p.versionMetric.FileName = "/buildInfo.json"
 	scheduler.AddCallback(&p.versionMetric)
-
 	multiplexer := signalfx.FromChain(dmux, signalfx.NextWrap(signalfx.UnifyNextSinkWrap(&p.debugSink)))
 
-	p.listeners, err = setupListeners(p.tk, *loadedConfig.ServerName, loadedConfig, loader, loadedConfig.ListenFrom, multiplexer, logger, scheduler)
+	p.listeners, err = setupListeners(p.tk, *loadedConfig.ServerName, loadedConfig, loader, loadedConfig.ListenFrom, multiplexer, logger, scheduler, defaultDelayScheduler)
 	if err != nil {
 		p.logger.Log(log.Err, err, "Unable to setup listeners")
 		return nil, nil, errors.Annotate(err, "cannot setup listeners from configuration")
@@ -833,7 +867,11 @@ func (p *gateway) start(ctx context.Context) error {
 	// setup scheduler
 	scheduler := p.setupScheduler(p.config)
 
-	if err := p.setupDebugServer(p.config, p.logger, scheduler); err != nil {
+	// set up defaultDelayScheduler
+	defaultDelayScheduler := p.setupScheduler(p.config)
+	defaultDelayScheduler.Prefix = gatewayMetricsPrefix
+
+	if err := p.setupDebugServer(p.config, p.logger, scheduler, defaultDelayScheduler); err != nil {
 		p.logger.Log(log.Err, "debug server failed", err)
 		return err
 	}
@@ -856,19 +894,26 @@ func (p *gateway) start(ctx context.Context) error {
 	// create
 	loader := config.NewLoader(ctx, p.logger, Version, &p.debugContext, &p.debugSink, &p.ctxDims, chain)
 
-	multiplexer, additionalEndpoints, err := p.setupForwardersAndListeners(ctx, loader, p.config, p.logger, scheduler)
+	multiplexer, additionalEndpoints, err := p.setupForwardersAndListeners(ctx, loader, p.config, p.logger, scheduler, defaultDelayScheduler)
 	if err == nil {
 		p.handleEndpoints(additionalEndpoints)
 
 		finishedContext, cancelFunc := p.scheduleStatCollection(ctx, scheduler, p.config, multiplexer)
 
+		finishedContextDefaultDelay, cancelFuncDefaultDelay := p.scheduleStatCollectionWithDefaultDelay(ctx, defaultDelayScheduler, p.config, multiplexer)
 		// Schedule datapoint collection to a Discard sink so we can get the stats in Expvar()
 		wg := sync.WaitGroup{}
 
-		wg.Add(1)
+		wg.Add(2)
 		go func() {
 			err := scheduler.Schedule(finishedContext)
 			p.logger.Log(log.Err, err, logkey.Struct, "scheduler", "Schedule finished")
+			wg.Done()
+		}()
+
+		go func() {
+			err := defaultDelayScheduler.Schedule(finishedContextDefaultDelay)
+			p.logger.Log(log.Err, err, logkey.Struct, "default stats delay scheduler", "Schedule finished")
 			wg.Done()
 		}()
 
@@ -880,6 +925,7 @@ func (p *gateway) start(ctx context.Context) error {
 		err = p.runningLoop(ctx)
 
 		cancelFunc()
+		cancelFuncDefaultDelay()
 		wg.Wait()
 	}
 

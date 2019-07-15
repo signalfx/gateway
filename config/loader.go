@@ -192,6 +192,7 @@ func (s *signalFxLoader) Listener(sink signalfx.Sink, conf *ListenFrom) (protoco
 		AdditionalSpanTags:                 conf.AdditionalSpanTags,
 		RemoveSpanTags:                     conf.RemoveSpanTags,
 		ObfuscateSpanTags:                  conf.ObfuscateSpanTags,
+		Counter:                            conf.Counter,
 	}
 	return signalfx.NewListener(sink, &sfConf)
 }

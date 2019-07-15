@@ -206,7 +206,8 @@ const emptyConfig = `
     ],
     "ForwardTo":[
     ],
-    "StatsDelay": "5s"
+    "StatsDelay": "5s",
+	"InternalMetricsReportingDelay": "5s"
   }
 `
 

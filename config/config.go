@@ -20,6 +20,7 @@ import (
 	"github.com/signalfx/gateway/protocol/signalfx/spanobfuscation"
 	"github.com/signalfx/gateway/sampling"
 	"github.com/signalfx/gohelpers/stringhelper"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/env"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
@@ -79,6 +80,7 @@ type ListenFrom struct {
 	AdditionalSpanTags                 map[string]string                     `json:",omitempty"`
 	RemoveSpanTags                     []*spanobfuscation.TagMatchRuleConfig `json:",omitempty"`
 	ObfuscateSpanTags                  []*spanobfuscation.TagMatchRuleConfig `json:",omitempty"`
+	Counter                            *dpsink.Counter
 }
 
 func (listenFrom *ListenFrom) String() string {
@@ -174,6 +176,10 @@ type GatewayConfig struct {
 	EtcdSnapCount    *uint64 `json:",omitempty"`
 	EtcdMaxSnapFiles *uint   `json:",omitempty"`
 	EtcdMaxWalFiles  *uint   `json:",omitempty"`
+
+	// Default reporting delay for gateway internal metrics
+	InternalMetricsReportingDelay         *string
+	InternalMetricsReportingDelayDuration *time.Duration
 }
 
 func stringToURL(s string) (u *url.URL, err error) {
@@ -362,6 +368,13 @@ func decodeConfig(configBytes []byte) (*GatewayConfig, error) {
 		config.StatsDelayDuration = &duration
 		if err != nil {
 			return nil, errors.Annotatef(err, "cannot parse stats delay %s", *config.StatsDelay)
+		}
+	}
+	if config.InternalMetricsReportingDelay != nil {
+		duration, err := time.ParseDuration(*config.InternalMetricsReportingDelay)
+		config.InternalMetricsReportingDelayDuration = &duration
+		if err != nil {
+			return nil, errors.Annotatef(err, "cannot parse internal metrics delay %s", *config.InternalMetricsReportingDelay)
 		}
 	}
 	err := config.decodeTimeouts()

@@ -109,6 +109,7 @@ type ListenerConfig struct {
 	AdditionalSpanTags                 map[string]string
 	RemoveSpanTags                     []*spanobfuscation.TagMatchRuleConfig
 	ObfuscateSpanTags                  []*spanobfuscation.TagMatchRuleConfig
+	Counter                            *dpsink.Counter
 }
 
 var defaultListenerConfig = &ListenerConfig{
@@ -213,15 +214,15 @@ func NewListener(sink Sink, conf *ListenerConfig) (*ListenerServer, error) {
 
 	listenServer.internalCollectors = sfxclient.NewMultiCollector(
 		setupNotFoundHandler(conf.RootContext, r),
-		setupProtobufV1(conf.RootContext, r, sink, &listenServer.metricHandler, conf.Logger, conf.HTTPChain),
-		setupJSONV1(conf.RootContext, r, sink, &listenServer.metricHandler, conf.Logger, conf.HTTPChain),
-		setupProtobufV2(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain),
-		setupProtobufEventV2(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain),
-		setupJSONV2(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain),
-		setupJSONEventV2(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain),
-		setupCollectd(conf.RootContext, r, sink, conf.DebugContext, conf.HTTPChain, conf.Logger),
-		setupThriftTraceV1(conf.RootContext, r, traceSink, conf.Logger, conf.HTTPChain),
-		setupJSONTraceV1(conf.RootContext, r, traceSink, conf.Logger, conf.HTTPChain),
+		setupProtobufV1(conf.RootContext, r, sink, &listenServer.metricHandler, conf.Logger, conf.HTTPChain, conf.Counter),
+		setupJSONV1(conf.RootContext, r, sink, &listenServer.metricHandler, conf.Logger, conf.Counter, conf.HTTPChain),
+		setupProtobufV2(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain, conf.Counter),
+		setupProtobufEventV2(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain, conf.Counter),
+		setupJSONV2(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain, conf.Counter),
+		setupJSONEventV2(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain, conf.Counter),
+		setupCollectd(conf.RootContext, r, sink, conf.DebugContext, conf.HTTPChain, conf.Logger, conf.Counter),
+		setupThriftTraceV1(conf.RootContext, r, traceSink, conf.Logger, conf.HTTPChain, conf.Counter),
+		setupJSONTraceV1(conf.RootContext, r, traceSink, conf.Logger, conf.HTTPChain, conf.Counter),
 	)
 
 	go func() {
@@ -272,13 +273,8 @@ func createTraceSink(sink Sink, conf *ListenerConfig) (Sink, error) {
 
 // SetupChain wraps the reader returned by getReader in an http.Handler along
 // with some middleware that calculates internal metrics about requests.
-func SetupChain(ctx context.Context, sink Sink, chainType string, getReader func(Sink) ErrorReader, httpChain web.NextConstructor, logger log.Logger, moreConstructors ...web.Constructor) (http.Handler, sfxclient.Collector) {
+func SetupChain(ctx context.Context, sink Sink, chainType string, getReader func(Sink) ErrorReader, httpChain web.NextConstructor, logger log.Logger, counter *dpsink.Counter, moreConstructors ...web.Constructor) (http.Handler, sfxclient.Collector) {
 	zippers := zipper.NewZipper()
-
-	counter := &dpsink.Counter{
-		Logger:        logger,
-		DroppedReason: "mux",
-	}
 
 	ucount := UnifyNextSinkWrap(counter)
 	finalSink := FromChain(sink, NextWrap(ucount))
@@ -315,11 +311,7 @@ func SetupJSONByPaths(r *mux.Router, handler http.Handler, endpoint string) {
 	r.Path(endpoint).Methods("POST").Handler(handler)
 }
 
-func setupCollectd(ctx context.Context, r *mux.Router, sink dpsink.Sink, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor, logger log.Logger) sfxclient.Collector {
-	counter := &dpsink.Counter{
-		Logger:        logger,
-		DroppedReason: "mux",
-	}
+func setupCollectd(ctx context.Context, r *mux.Router, sink dpsink.Sink, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor, logger log.Logger, counter *dpsink.Counter) sfxclient.Collector {
 	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
 	decoder := collectd.JSONDecoder{
 		Logger: logger,
