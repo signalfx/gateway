@@ -591,6 +591,16 @@ func (p *gateway) setupScheduler(loadedConfig *config.GatewayConfig) *sfxclient.
 	return scheduler
 }
 
+func (p *gateway) setupDefaultDelayScheduler(loadedConfig *config.GatewayConfig) *sfxclient.Scheduler {
+	scheduler := sfxclient.NewScheduler()
+	scheduler.DefaultDimensions(datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
+		"source":  "gateway",
+		"host":    *loadedConfig.ServerName,
+		"cluster": *loadedConfig.ClusterName,
+	}))
+	return scheduler
+}
+
 func (p *gateway) scheduleStatCollection(ctx context.Context, scheduler *sfxclient.Scheduler, loadedConfig *config.GatewayConfig, multiplexer signalfx.Sink) (context.Context, context.CancelFunc) {
 	// We still want to schedule stat collection so people can debug the server if they want
 	scheduler.Sink = dpsink.Discard
@@ -606,8 +616,6 @@ func (p *gateway) scheduleStatCollection(ctx context.Context, scheduler *sfxclie
 }
 
 func (p *gateway) scheduleStatCollectionWithDefaultDelay(ctx context.Context, scheduler *sfxclient.Scheduler, loadedConfig *config.GatewayConfig, multiplexer signalfx.Sink) (context.Context, context.CancelFunc) {
-	// We still want to schedule stat collection so people can debug the server if they want
-	scheduler.Sink = dpsink.Discard
 	scheduler.ReportingDelayNs = (time.Second * 10).Nanoseconds()
 	finishedContext, cancelFunc := context.WithCancel(ctx)
 	if loadedConfig.InternalMetricsReportingDelayDuration != nil && *loadedConfig.InternalMetricsReportingDelayDuration != 0 {
@@ -868,7 +876,7 @@ func (p *gateway) start(ctx context.Context) error {
 	scheduler := p.setupScheduler(p.config)
 
 	// set up defaultDelayScheduler
-	defaultDelayScheduler := p.setupScheduler(p.config)
+	defaultDelayScheduler := p.setupDefaultDelayScheduler(p.config)
 	defaultDelayScheduler.Prefix = gatewayMetricsPrefix
 
 	if err := p.setupDebugServer(p.config, p.logger, scheduler, defaultDelayScheduler); err != nil {
