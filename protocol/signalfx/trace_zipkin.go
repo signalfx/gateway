@@ -3,6 +3,7 @@ package signalfx
 import (
 	"context"
 	"fmt"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -590,10 +591,10 @@ func (decoder *JSONTraceDecoderV1) Read(ctx context.Context, req *http.Request) 
 	return conversionErrs.ToError(err)
 }
 
-func setupJSONTraceV1(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, httpChain web.NextConstructor) sfxclient.Collector {
+func setupJSONTraceV1(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, httpChain web.NextConstructor, counter *dpsink.Counter) sfxclient.Collector {
 	handler, st := SetupChain(ctx, sink, ZipkinV1, func(s Sink) ErrorReader {
 		return &JSONTraceDecoderV1{Logger: logger, Sink: sink}
-	}, httpChain, logger)
+	}, httpChain, logger, counter)
 	SetupJSONByPaths(r, handler, DefaultTracePathV1)
 	return st
 }

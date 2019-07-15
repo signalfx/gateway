@@ -243,7 +243,7 @@ func SetupProtobufV2ByPaths(r *mux.Router, handler http.Handler, path string) {
 	r.Path(path).Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
 }
 
-func setupJSONV2(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor) sfxclient.Collector {
+func setupJSONV2(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor, counter *dpsink.Counter) sfxclient.Collector {
 	var additionalConstructors []web.Constructor
 	if debugContext != nil {
 		additionalConstructors = append(additionalConstructors, debugContext)
@@ -252,7 +252,7 @@ func setupJSONV2(ctx context.Context, r *mux.Router, sink Sink, logger log.Logge
 	handler, st := SetupChain(ctx, sink, "json_v2", func(s Sink) ErrorReader {
 		j2 = &JSONDecoderV2{Sink: s, Logger: logger}
 		return j2
-	}, httpChain, logger, additionalConstructors...)
+	}, httpChain, logger, counter, additionalConstructors...)
 	multi := sfxclient.NewMultiCollector(st, j2)
 	SetupJSONV2DatapointPaths(r, handler)
 	return multi
@@ -263,10 +263,10 @@ func SetupJSONV2DatapointPaths(r *mux.Router, handler http.Handler) {
 	SetupJSONByPaths(r, handler, "/v2/datapoint")
 }
 
-func setupProtobufV1(ctx context.Context, r *mux.Router, sink Sink, typeGetter MericTypeGetter, logger log.Logger, httpChain web.NextConstructor) sfxclient.Collector {
+func setupProtobufV1(ctx context.Context, r *mux.Router, sink Sink, typeGetter MericTypeGetter, logger log.Logger, httpChain web.NextConstructor, counter *dpsink.Counter) sfxclient.Collector {
 	handler, st := SetupChain(ctx, sink, "protobuf_v1", func(s Sink) ErrorReader {
 		return &ProtobufDecoderV1{Sink: s, TypeGetter: typeGetter, Logger: logger}
-	}, httpChain, logger)
+	}, httpChain, logger, counter)
 
 	SetupProtobufV1Paths(r, handler)
 	return st
@@ -278,10 +278,10 @@ func SetupProtobufV1Paths(r *mux.Router, handler http.Handler) {
 	r.Path("/v1/datapoint").Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
 }
 
-func setupJSONV1(ctx context.Context, r *mux.Router, sink Sink, typeGetter MericTypeGetter, logger log.Logger, httpChain web.NextConstructor) sfxclient.Collector {
+func setupJSONV1(ctx context.Context, r *mux.Router, sink Sink, typeGetter MericTypeGetter, logger log.Logger, counter *dpsink.Counter, httpChain web.NextConstructor) sfxclient.Collector {
 	handler, st := SetupChain(ctx, sink, "json_v1", func(s Sink) ErrorReader {
 		return &JSONDecoderV1{Sink: s, TypeGetter: typeGetter, Logger: logger}
-	}, httpChain, logger)
+	}, httpChain, logger, counter)
 	SetupJSONV1Paths(r, handler)
 
 	return st
@@ -293,14 +293,14 @@ func SetupJSONV1Paths(r *mux.Router, handler http.Handler) {
 	SetupJSONByPaths(r, handler, "/v1/datapoint")
 }
 
-func setupProtobufV2(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor) sfxclient.Collector {
+func setupProtobufV2(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor, counter *dpsink.Counter) sfxclient.Collector {
 	var additionalConstructors []web.Constructor
 	if debugContext != nil {
 		additionalConstructors = append(additionalConstructors, debugContext)
 	}
 	handler, st := SetupChain(ctx, sink, "protobuf_v2", func(s Sink) ErrorReader {
 		return &ProtobufDecoderV2{Sink: s, Logger: logger}
-	}, httpChain, logger, additionalConstructors...)
+	}, httpChain, logger, counter, additionalConstructors...)
 	SetupProtobufV2DatapointPaths(r, handler)
 
 	return st

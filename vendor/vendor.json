@@ -1232,12 +1232,10 @@
 			"versionExact": "v2.4.0"
 		},
 		{
-			"checksumSHA1": "ggpk76eMFy65ngQO5FaYAM25GcY=",
+			"checksumSHA1": "KGuHJxtCIbBpOUAC3Hd363pIqTI=",
 			"path": "github.com/signalfx/golib/sfxclient",
-			"revision": "801c88406bf41fe1a96bda8319f9667a60e4e3c6",
-			"revisionTime": "2019-06-14T21:18:56Z",
-			"version": "v2.4.0",
-			"versionExact": "v2.4.0"
+			"revision": "24bdfeda7f24fd47209420b52fdbeea814e1f264",
+			"revisionTime": "2019-07-12T20:13:20Z"
 		},
 		{
 			"checksumSHA1": "S66r/9t8lohMFtLcHxGifO/09pY=",

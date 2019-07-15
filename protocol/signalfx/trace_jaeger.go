@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"io"
 	"net"
 	"net/http"
@@ -53,10 +54,10 @@ const (
 	JaegerV1 = "jaeger_thrift_v1"
 )
 
-func setupThriftTraceV1(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, httpChain web.NextConstructor) sfxclient.Collector {
+func setupThriftTraceV1(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, httpChain web.NextConstructor, counter *dpsink.Counter) sfxclient.Collector {
 	handler, st := SetupChain(ctx, sink, JaegerV1, func(s Sink) ErrorReader {
 		return NewJaegerThriftTraceDecoderV1(logger, sink)
-	}, httpChain, logger)
+	}, httpChain, logger, counter)
 
 	SetupThriftByPaths(r, handler, DefaultTracePathV1)
 	return st
