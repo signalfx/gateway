@@ -178,8 +178,8 @@ type GatewayConfig struct {
 	EtcdMaxWalFiles  *uint   `json:",omitempty"`
 
 	// Default reporting delay for gateway internal metrics
-	InternalMetricsReportingDelay         *string
-	InternalMetricsReportingDelayDuration *time.Duration
+	InternalMetricsReportingDelay         *string        `json:",omitempty"`
+	InternalMetricsReportingDelayDuration *time.Duration `json:"-"`
 }
 
 func stringToURL(s string) (u *url.URL, err error) {
