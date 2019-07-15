@@ -178,7 +178,7 @@ type GatewayConfig struct {
 	EtcdMaxWalFiles  *uint   `json:",omitempty"`
 
 	// Default reporting delay for gateway internal metrics
-	InternalMetricsReportingDelay         *string        `json:",omitempty"`
+	InternalMetricsReportingDelay         *string        `json:",omitempty"` // default delay for reporting internal gateway metrics
 	InternalMetricsReportingDelayDuration *time.Duration `json:"-"`
 }
 
