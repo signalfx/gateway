@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/signalfx/gateway/protocol/signalfx/spanobfuscation"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -273,6 +274,9 @@ func TestSignalfxListener(t *testing.T) {
 					Service: pointer.String("*-obf"),
 					Tags:    []string{"obfuscate-me"},
 				},
+			},
+			Counter: &dpsink.Counter{
+				DroppedReason: "downstream",
 			},
 		}
 		listener, err := NewListener(sendTo, listenConf)
