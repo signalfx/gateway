@@ -46,16 +46,16 @@ func TestGetDefaultName(t *testing.T) {
 }
 
 func TestParseStatsDelay(t *testing.T) {
-	config, _ := decodeConfig([]byte(`{"InternalMetricsReportingDelay":"3s"}`))
-	assert.Equal(t, *config.InternalMetricsReportingDelayDuration, time.Second*3)
-	_, err := decodeConfig([]byte(`{"InternalMetricsReportingDelay":"3r"}`))
+	config, _ := decodeConfig([]byte(`{"StatsDelay":"3s"}`))
+	assert.Equal(t, *config.StatsDelayDuration, time.Second*3)
+	_, err := decodeConfig([]byte(`{"StatsDelay":"3r"}`))
 	assert.Error(t, err)
 }
 
 func TestParseInternalMetricsReportingDelay(t *testing.T) {
-	config, _ := decodeConfig([]byte(`{"StatsDelay":"3s"}`))
-	assert.Equal(t, *config.StatsDelayDuration, time.Second*3)
-	_, err := decodeConfig([]byte(`{"StatsDelay":"3r"}`))
+	config, _ := decodeConfig([]byte(`{"InternalMetricsReportingDelay":"3s"}`))
+	assert.Equal(t, *config.InternalMetricsReportingDelayDuration, time.Second*3)
+	_, err := decodeConfig([]byte(`{"InternalMetricsReportingDelay":"3r"}`))
 	assert.Error(t, err)
 }
 
