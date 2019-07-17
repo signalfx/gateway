@@ -130,7 +130,8 @@ const config1 = `
 	"GracefulCheckInterval":   "<<CHECK>>ms",
 	"MinimalGracefulWaitTime": "<<MIN>>ms",
 	"SilentGracefulTime": "50ms",
-	"InternalMetricsListenerAddress": "<<INTERNALMETRICS>>"
+	"InternalMetricsListenerAddress": "<<INTERNALMETRICS>>",
+	"InternalMetricsReportingDelay": "1s"
   }
 `
 
@@ -489,6 +490,18 @@ func TestProxy1(t *testing.T) {
 			So(p.forwarders[0].AddDatapoints(ctx, []*datapoint.Datapoint{dp}), ShouldBeNil)
 			seenDatapoint := sendTo.Next()
 			So(seenDatapoint, ShouldNotBeNil)
+		})
+
+		Convey("should prepend prefixes to gateway internal metrics", func() {
+			setUp(1000, 0, 25, "0.0.0.0:2501")
+			So(p, ShouldNotBeNil)
+			dp := dptest.DP()
+			dp.Dimensions = nil
+			dp.Timestamp = dp.Timestamp.Round(time.Second)
+			So(p.forwarders[1].AddDatapoints(ctx, []*datapoint.Datapoint{dp}), ShouldBeNil)
+			seenDatapoint := sendTo.Next()
+			So(seenDatapoint, ShouldNotBeNil)
+			So(strings.HasPrefix(seenDatapoint.Metric, gatewayMetricsPrefix), ShouldBeTrue)
 		})
 
 		Convey("getLogOutput should work correctly", func() {
