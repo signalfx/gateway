@@ -599,6 +599,13 @@ func (p *gateway) setupDefaultDelayScheduler(loadedConfig *config.GatewayConfig)
 		"host":    *loadedConfig.ServerName,
 		"cluster": *loadedConfig.ClusterName,
 	}))
+	scheduler.Prefix = gatewayMetricsPrefix
+	scheduler.ReportingDelayNs = (time.Second * 10).Nanoseconds()
+	if loadedConfig.InternalMetricsReportingDelayDuration != nil && *loadedConfig.InternalMetricsReportingDelayDuration != 0 {
+		scheduler.ReportingDelayNs = loadedConfig.InternalMetricsReportingDelayDuration.Nanoseconds()
+	} else {
+		p.logger.Log("setting internal metrics reporting time to default")
+	}
 	return scheduler
 }
 
@@ -612,18 +619,6 @@ func (p *gateway) scheduleStatCollection(ctx context.Context, scheduler *sfxclie
 		scheduler.ReportingDelayNs = loadedConfig.StatsDelayDuration.Nanoseconds()
 	} else {
 		p.logger.Log("skipping stat keeping")
-	}
-	return finishedContext, cancelFunc
-}
-
-func (p *gateway) scheduleStatCollectionWithDefaultDelay(ctx context.Context, scheduler *sfxclient.Scheduler, loadedConfig *config.GatewayConfig, multiplexer signalfx.Sink) (context.Context, context.CancelFunc) {
-	scheduler.ReportingDelayNs = (time.Second * 10).Nanoseconds()
-	finishedContext, cancelFunc := context.WithCancel(ctx)
-	if loadedConfig.InternalMetricsReportingDelayDuration != nil && *loadedConfig.InternalMetricsReportingDelayDuration != 0 {
-		scheduler.Sink = multiplexer
-		scheduler.ReportingDelayNs = loadedConfig.InternalMetricsReportingDelayDuration.Nanoseconds()
-	} else {
-		p.logger.Log("skipping internal metrics stat keeping")
 	}
 	return finishedContext, cancelFunc
 }
@@ -876,9 +871,8 @@ func (p *gateway) start(ctx context.Context) error {
 	// setup scheduler
 	scheduler := p.setupScheduler(p.config)
 
-	// set up defaultDelayScheduler
+	// setup the default delay scheduler
 	defaultDelayScheduler := p.setupDefaultDelayScheduler(p.config)
-	defaultDelayScheduler.Prefix = gatewayMetricsPrefix
 
 	if err := p.setupDebugServer(p.config, p.logger, scheduler, defaultDelayScheduler); err != nil {
 		p.logger.Log(log.Err, "debug server failed", err)
@@ -909,7 +903,8 @@ func (p *gateway) start(ctx context.Context) error {
 
 		finishedContext, cancelFunc := p.scheduleStatCollection(ctx, scheduler, p.config, multiplexer)
 
-		finishedContextDefaultDelay, cancelFuncDefaultDelay := p.scheduleStatCollectionWithDefaultDelay(ctx, defaultDelayScheduler, p.config, multiplexer)
+		defaultDelayScheduler.Sink = multiplexer
+		finishedContextDefaultDelay, cancelFuncDefaultDelay := context.WithCancel(ctx)
 		// Schedule datapoint collection to a Discard sink so we can get the stats in Expvar()
 		wg := sync.WaitGroup{}
 
@@ -1038,7 +1033,6 @@ func main() {
 
 	// start the gateway
 	log.IfErr(logger, mainInstance.start(context.Background()))
-
 }
 
 // FirstNonNil returns what it says it does
