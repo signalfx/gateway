@@ -17,6 +17,7 @@ message MergingDigestData {
     double reciprocalSum = 5;
     double decay = 6;
     int32 decayEvery = 7;
+    int64 count = 8;
 }
 
 message Centroid {
