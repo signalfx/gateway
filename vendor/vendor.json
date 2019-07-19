@@ -1080,10 +1080,6 @@
 			"versionExact": "v0.0.8"
 		},
 		{
-			"path": "github.com/signalfx/gateway/cluster/etcd/etcdutil",
-			"revision": ""
-		},
-		{
 			"checksumSHA1": "NKWpwtNg6Z1yvSxCE+0WZjb8CdI=",
 			"path": "github.com/signalfx/go-distribute",
 			"revision": "c279b19461cc12f0f850a7a5c0f620cac8c549c9",
