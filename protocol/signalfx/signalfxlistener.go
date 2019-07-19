@@ -290,10 +290,7 @@ func SetupChain(ctx context.Context, sink Sink, chainType string, getReader func
 	}
 	st := &sfxclient.WithDimensions{
 		Collector: sfxclient.NewMultiCollector(
-			&metricTracking,
-			&errorTracker,
 			counter,
-			zippers,
 		),
 		Dimensions: map[string]string{
 			"protocol": "sfx_" + chainType,
