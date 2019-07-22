@@ -135,6 +135,37 @@ const config1 = `
   }
 `
 
+const config2 = `
+  {
+    "LogFormat": "logfmt",
+    "LogDir": "-",
+    "NumProcs":4,
+    "DebugFlag": "debugme",
+    "ListenFrom":[
+      {
+      	"Type":"signalfx",
+      	"ListenAddr": "127.0.0.1:0"
+      }
+    ],
+    "LocalDebugServer": "127.0.0.1:0",
+    "ForwardTo":[
+    {
+      "type": "signalfx-json",
+      "DefaultAuthToken": "AAA",
+      "url": "http://localhost:<<PORT>>/v2/datapoint",
+      "eventURL": "http://localhost:<<PORT>>/v2/event",
+      "FormatVersion": 3
+    }
+    ],
+	"MaxGracefulWaitTime":     "<<MAX>>ms",
+	"GracefulCheckInterval":   "<<CHECK>>ms",
+	"MinimalGracefulWaitTime": "<<MIN>>ms",
+	"SilentGracefulTime": "50ms",
+	"InternalMetricsListenerAddress": "<<INTERNALMETRICS>>",
+	"InternalMetricsReportingDelay": "1s"
+  }
+`
+
 const invalidForwarderConfig = `
   {
     "LogDir": "-",
@@ -562,6 +593,80 @@ func TestProxy1(t *testing.T) {
 }
 
 var errTest = errors.New("test")
+
+func TestProxy2(t *testing.T) {
+	var cancelfunc context.CancelFunc
+	Convey("a setup signalfx gateway", t, func() {
+		sendTo := dptest.NewBasicSink()
+		var ctx context.Context
+		ctx, cancelfunc = context.WithCancel(context.Background())
+		var p *gateway
+		var mainDoneChan chan error
+		var filename string
+		var sl *signalfx.ListenerServer
+		checkError := false
+
+		setUp := func(max int, min int, check int, internalMetricsAddress string) {
+			logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
+			logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
+			fileObj, err := ioutil.TempFile("", "TestProxy")
+			So(err, ShouldBeNil)
+			etcdDataDir, err := ioutil.TempDir("", "TestProxy2")
+			So(err, ShouldBeNil)
+			So(os.RemoveAll(etcdDataDir), ShouldBeNil)
+			filename = fileObj.Name()
+			So(os.Remove(filename), ShouldBeNil)
+			sconf := &signalfx.ListenerConfig{}
+			sl, err = signalfx.NewListener(sendTo, sconf)
+			So(err, ShouldBeNil)
+			openPort := nettest.TCPPort(sl)
+			proxyConf := strings.Replace(config2, "<<PORT>>", strconv.FormatInt(int64(openPort), 10), -1)
+			proxyConf = strings.Replace(proxyConf, "<<MAX>>", strconv.FormatInt(int64(max), 10), -1)
+			proxyConf = strings.Replace(proxyConf, "<<MIN>>", strconv.FormatInt(int64(min), 10), -1)
+			proxyConf = strings.Replace(proxyConf, "<<CHECK>>", strconv.FormatInt(int64(check), 10), -1)
+			proxyConf = strings.Replace(proxyConf, "<<INTERNALMETRICS>>", internalMetricsAddress, -1)
+			So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
+			fmt.Println("Launching server...")
+			p = newGateway()
+			p.logger = logger
+			loadedConfig, _ := loadConfig(filename, logger)
+			p.configure(loadedConfig)
+			mainDoneChan = make(chan error)
+			go func() {
+				mainDoneChan <- p.start(ctx)
+				close(mainDoneChan)
+			}()
+			<-p.setupDoneSignal
+		}
+
+		Convey("default delay scheduler should append prefixes to internal gateway metrics", func() {
+			setUp(1000, 0, 25, "0.0.0.0:2500")
+			So(p, ShouldNotBeNil)
+			dp := dptest.DP()
+			dp.Dimensions = nil
+			dp.Timestamp = dp.Timestamp.Round(time.Second)
+			So(p.forwarders[0].AddDatapoints(ctx, []*datapoint.Datapoint{dp}), ShouldBeNil)
+			seenDatapoint := sendTo.Next()
+			So(seenDatapoint, ShouldNotBeNil)
+			So(strings.HasPrefix(seenDatapoint.Metric, gatewayMetricsPrefix), ShouldBeTrue)
+		})
+
+		Reset(func() {
+			p.signalChan <- syscall.SIGTERM
+			time.Sleep(time.Millisecond)
+			err := <-mainDoneChan
+			if checkError {
+				So(err, ShouldNotBeNil)
+				checkError = false
+			}
+			So(os.Remove(filename), ShouldBeNil)
+			So(sl.Close(), ShouldBeNil)
+			if cancelfunc != nil {
+				cancelfunc()
+			}
+		})
+	})
+}
 
 func Test_NonNil(t *testing.T) {
 	assert.Equal(t, FirstNonNil(errTest), errTest)
