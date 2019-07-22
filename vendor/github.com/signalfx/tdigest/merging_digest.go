@@ -36,7 +36,8 @@ type MergingDigest struct {
 	min           float64
 	max           float64
 	reciprocalSum float64
-	count         int32
+	count         int64
+	decayCount    int32
 	decayEvery    int32
 	decayValue    float64
 }
@@ -116,6 +117,9 @@ func (td *MergingDigest) Clone() *MergingDigest {
 		max:           td.max,
 		reciprocalSum: td.reciprocalSum,
 		count:         td.count,
+		decayCount:    td.decayCount,
+		decayEvery:    td.decayEvery,
+		decayValue:    td.decayValue,
 		mainCentroids: make([]Centroid, len(td.mainCentroids)),
 		tempCentroids: make([]Centroid, 0, estimateTempBuffer(td.compression)),
 	}
@@ -154,11 +158,12 @@ func (td *MergingDigest) Add(value float64, weight float64) {
 	}
 	td.tempCentroids = append(td.tempCentroids, next)
 	td.tempWeight += weight
+	td.count++
 	if td.decayValue > 0 {
-		td.count++
-		if td.count >= td.decayEvery {
+		td.decayCount++
+		if td.decayCount >= td.decayEvery {
 			td.decay()
-			td.count = 0
+			td.decayCount = 0
 		}
 	}
 }
@@ -358,12 +363,21 @@ func (td *MergingDigest) Quantile(quantile float64) float64 {
 func (td *MergingDigest) Min() float64 {
 	return td.min
 }
+
 func (td *MergingDigest) Max() float64 {
 	return td.max
 }
-func (td *MergingDigest) Count() float64 {
+
+// Count returns the total number of elements added
+func (td *MergingDigest) Count() int64 {
+	return td.count
+}
+
+// Weight returns the decayed weight
+func (td *MergingDigest) Weight() float64 {
 	return td.mainWeight + td.tempWeight
 }
+
 func (td *MergingDigest) ReciprocalSum() float64 {
 	return td.reciprocalSum
 }
@@ -515,8 +529,12 @@ func (td *MergingDigest) Data() *MergingDigestData {
 		ReciprocalSum: td.reciprocalSum,
 		Decay:         td.decayValue,
 		DecayEvery:    td.decayEvery,
+		Count:         td.count,
 	}
 }
+
+// decayLimit is 0.9**100, maybe configurable?
+const decayLimit = 0.00002656139889
 
 // decay decays the histo to make values at the top less interesting over time
 // the total digest count will converge to `bufferSize / (1 - decayFactor)`
@@ -524,8 +542,6 @@ func (td *MergingDigest) Data() *MergingDigestData {
 // so 99th percentile will not be overly influenced by a few bad values
 // and similarly the ranking/selection will not be
 // (provided we use scale function which keeps small enough bins towards the top)
-const decayLimit = 0.00002656139889
-
 func (td *MergingDigest) decay() {
 	td.mergeAllTemps()
 	var weight float64
@@ -554,5 +570,4 @@ func (td *MergingDigest) decay() {
 	}
 
 	td.mainWeight = weight
-
 }
