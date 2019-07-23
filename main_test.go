@@ -134,38 +134,6 @@ const config1 = `
 	"InternalMetricsReportingDelay": "1s"
   }
 `
-
-const config2 = `
-  {
-    "LogFormat": "logfmt",
-    "LogDir": "-",
-    "NumProcs":4,
-    "DebugFlag": "debugme",
-    "ListenFrom":[
-      {
-      	"Type":"signalfx",
-      	"ListenAddr": "127.0.0.1:0"
-      }
-    ],
-    "LocalDebugServer": "127.0.0.1:0",
-    "ForwardTo":[
-    {
-      "type": "signalfx-json",
-      "DefaultAuthToken": "AAA",
-      "url": "http://localhost:<<PORT>>/v2/datapoint",
-      "eventURL": "http://localhost:<<PORT>>/v2/event",
-      "FormatVersion": 3
-    }
-    ],
-	"MaxGracefulWaitTime":     "<<MAX>>ms",
-	"GracefulCheckInterval":   "<<CHECK>>ms",
-	"MinimalGracefulWaitTime": "<<MIN>>ms",
-	"SilentGracefulTime": "50ms",
-	"InternalMetricsListenerAddress": "<<INTERNALMETRICS>>",
-	"InternalMetricsReportingDelay": "1s"
-  }
-`
-
 const invalidForwarderConfig = `
   {
     "LogDir": "-",
