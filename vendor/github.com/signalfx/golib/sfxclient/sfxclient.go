@@ -61,6 +61,7 @@ import (
 	"expvar"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -180,6 +181,7 @@ type Scheduler struct {
 		resetIntervalCounts    int64
 		reportingTimeoutCounts int64
 	}
+	Prefix string
 }
 
 // NewScheduler creates a default SignalFx scheduler that can report metrics to SignalFx at some
@@ -290,7 +292,20 @@ func (s *Scheduler) ReportOnce(ctx context.Context) error {
 		s.previousDatapoints = datapoints
 		return datapoints
 	}()
+	s.prependPrefix(datapoints)
 	return s.Sink.AddDatapoints(ctx, datapoints)
+}
+
+// Add prefix to metrics if specified in scheduler
+func (s *Scheduler) prependPrefix(datapoints []*datapoint.Datapoint) {
+	if s.Prefix != "" {
+		for _, datapoint := range datapoints {
+			var sb strings.Builder
+			sb.WriteString(s.Prefix)
+			sb.WriteString(datapoint.Metric)
+			datapoint.Metric = sb.String()
+		}
+	}
 }
 
 // ReportingDelay sets the interval metrics are reported to SignalFx.
