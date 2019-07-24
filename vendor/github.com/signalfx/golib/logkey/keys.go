@@ -31,7 +31,7 @@ var (
 	DistconfNewVal = log.Key("distconf_newval")
 
 	// DiscoService is the name of a service in disco
-	DiscoService = log.Key("service")
+	DiscoService = log.Key("disco_service")
 	// DiscoNode is the name of an ephemeral node in disco
 	DiscoNode = log.Key("node")
 	// GUID is the ID attached to a disco advertiser
