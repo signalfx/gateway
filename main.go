@@ -284,7 +284,7 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loadedConfig *con
 			"type":      listenConfig.Type,
 			"cluster":   *loadedConfig.ClusterName,
 		}))
-		defaultDelayScheduler.AddGroupedCallback(groupName, listener)
+		defaultDelayScheduler.AddGroupedCallback(groupName, listenConfig.Counter)
 		defaultDelayScheduler.GroupedDefaultDimensions(groupName, datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
 			"name":      name,
 			"direction": "listener",

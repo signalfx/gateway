@@ -44,6 +44,8 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	_ "github.com/spaolacci/murmur3"
 	"gotest.tools/assert"
+	"github.com/signalfx/golib/datapoint/dpsink"
+	"github.com/signalfx/golib/web"
 )
 
 const configEtcd = `
@@ -976,3 +978,121 @@ func Test_handleClusterNameResponse(t *testing.T) {
 		t.Errorf("the new key %s does not match what it should be %s", string(resp.Kvs[0].Value), "bananas")
 	}
 }
+
+func TestProxy2(t *testing.T) {
+	var cancelfunc context.CancelFunc
+	Convey("a setup carbon gateway", t, func() {
+		sendTo := dptest.NewBasicSink()
+		var ctx context.Context
+		ctx, cancelfunc = context.WithCancel(context.Background())
+		var p *gateway
+		var mainDoneChan chan error
+		var filename string
+		var cl *signalfx.ListenerServer
+		checkError := false
+
+
+		setUp := func() {
+			logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
+			logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
+			fileObj, err := ioutil.TempFile("", "TestProxy")
+			So(err, ShouldBeNil)
+			etcdDataDir, err := ioutil.TempDir("", "TestProxy1")
+			So(err, ShouldBeNil)
+			So(os.RemoveAll(etcdDataDir), ShouldBeNil)
+			filename = fileObj.Name()
+			So(os.Remove(filename), ShouldBeNil)
+			cconf := &signalfx.ListenerConfig{}
+			cconf.ListenAddr = pointer.String("127.0.0.1:0")
+			cconf.Counter = &dpsink.Counter{DroppedReason:"test"}
+			var callCount int64
+			cconf.HTTPChain = func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
+				atomic.AddInt64(&callCount, 1)
+				next.ServeHTTPC(ctx, rw, r)
+			}
+			cl, err = signalfx.NewListener(sendTo, cconf)
+			So(err, ShouldBeNil)
+			So(cl, ShouldNotBeNil)
+			openPort := nettest.TCPPort(cl)
+			proxyConf := strings.Replace(config2, "<<PORT>>", strconv.FormatInt(int64(openPort), 10), -1)
+			So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
+			fmt.Println("Launching server...")
+			p = newGateway()
+			p.logger = logger
+			loadedConfig, _ := loadConfig(filename, logger)
+			p.configure(loadedConfig)
+			mainDoneChan = make(chan error)
+			go func() {
+				mainDoneChan <- p.start(ctx)
+				close(mainDoneChan)
+			}()
+			<-p.setupDoneSignal
+		}
+
+
+		Convey("should gateway a carbon point", func() {
+			setUp()
+			So(p, ShouldNotBeNil)
+			time.Sleep(time.Second*2)
+			dps := <- sendTo.PointsChan
+			for _,v := range dps {
+				fmt.Println(v)
+			}
+			fmt.Println( "imalength", len(sendTo.PointsChan))
+			fmt.Println("Test is finished")
+		})
+
+		Reset(func() {
+			p.signalChan <- syscall.SIGTERM
+			time.Sleep(time.Millisecond)
+			err := <-mainDoneChan
+			if checkError {
+				So(err, ShouldNotBeNil)
+				checkError = false
+			}
+			So(os.Remove(filename), ShouldBeNil)
+			So(cl.Close(), ShouldBeNil)
+			if cancelfunc != nil {
+				cancelfunc()
+			}
+		})
+	})
+}
+
+// TODOs
+/*
+ - change test to use timekeepertest.Stub, not tk.Realtime (you will have to have a routine incrementing the tk or nothing will happen)
+ - change name proxy gateway please
+ - go through a couple iterations and verify we get exactly the metrics we expect
+ - statsdelay should be added so you can verify that the dps from default are distict from statsdelay dps
+ - remove all my printlns if i left any
+ */
+
+const config2 = `
+ {
+   "LogFormat": "logfmt",
+   "LogDir": "-",
+   "NumProcs":4,
+   "DebugFlag": "debugme",
+   "ListenFrom":[
+     {
+         "Type":"signalfx",
+         "ListenAddr": "127.0.0.1:0"
+     }
+   ],
+   "LocalDebugServer": "127.0.0.1:0",
+   "ForwardTo":[
+   {
+     "type": "signalfx-json",
+     "DefaultAuthToken": "AAA",
+     "url": "http://localhost:<<PORT>>/v2/datapoint",
+     "eventURL": ""
+   }
+   ],
+    "MaxGracefulWaitTime":     "10ms",
+    "GracefulCheckInterval":   "10ms",
+    "MinimalGracefulWaitTime": "10ms",
+    "SilentGracefulTime": "50ms",
+    "InternalMetricsReportingDelay": "1s"
+ }
+`

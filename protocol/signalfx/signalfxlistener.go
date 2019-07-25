@@ -28,6 +28,7 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/web"
+	"fmt"
 )
 
 // ListenerServer controls listening on a socket for SignalFx connections
@@ -183,7 +184,7 @@ func (handler *metricHandler) GetMetricTypeFromMap(metricName string) com_signal
 // NewListener servers http requests for Signalfx datapoints
 func NewListener(sink Sink, conf *ListenerConfig) (*ListenerServer, error) {
 	conf = pointer.FillDefaultFrom(conf, defaultListenerConfig).(*ListenerConfig)
-
+	fmt.Println( conf.Counter)
 	listener, err := net.Listen("tcp", *conf.ListenAddr)
 	if err != nil {
 		return nil, errors.Annotatef(err, "cannot open listening address %s", *conf.ListenAddr)
@@ -292,7 +293,6 @@ func SetupChain(ctx context.Context, sink Sink, chainType string, getReader func
 		Collector: sfxclient.NewMultiCollector(
 			&metricTracking,
 			&errorTracker,
-			counter,
 			zippers,
 		),
 		Dimensions: map[string]string{
