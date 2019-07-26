@@ -1009,6 +1009,7 @@ const internalMetricsReportingConfig = `
 
 func TestPrefixAddition(t *testing.T) {
 	var cancelfunc context.CancelFunc
+	checkError := false
 	Convey("a setup for signalfx gateway", t, func() {
 		sendTo := dptest.NewBasicSink()
 		var ctx context.Context
@@ -1065,24 +1066,38 @@ func TestPrefixAddition(t *testing.T) {
 				close(mainDoneChan)
 			}()
 			<-sfxGateway.setupDoneSignal
-			if cancelfunc != nil {
-				cancelfunc()
-			}
 		}
 		Convey("should add prefixes to gateway internal metrics", func() {
 			setUp()
+			//close(sendTo.PointsChan)
 			So(sfxGateway, ShouldNotBeNil)
-			time.Sleep(1 * time.Second)
+			time.Sleep(2 * time.Second)
 			dps := <-sendTo.PointsChan
 			for _, dp := range dps {
+				fmt.Println("Inside for loop with metric ", dp.Metric)
 				_, ok := prefixedMetrics[dp.Metric]
 				So(ok, ShouldBeTrue)
+			}
+		})
+
+		Reset(func() {
+			sfxGateway.signalChan <- syscall.SIGTERM
+			time.Sleep(time.Millisecond)
+			err := <-mainDoneChan
+			if checkError {
+				So(err, ShouldNotBeNil)
+				checkError = false
+			}
+			So(os.Remove(filename), ShouldBeNil)
+			So(cl.Close(), ShouldBeNil)
+			if cancelfunc != nil {
+				cancelfunc()
 			}
 		})
 	})
 }
 
-/*const statsDelayConfig = `
+const statsDelayConfig = `
  {
    "LogFormat": "logfmt",
    "LogDir": "-",
@@ -1112,6 +1127,8 @@ func TestPrefixAddition(t *testing.T) {
 `
 
 func TestPrefixExclusionForDatapoints(t *testing.T) {
+	var cancelfunc context.CancelFunc
+	var checkError = false
 	Convey("a setup for signalfx gateway", t, func() {
 		sendTo := dptest.NewBasicSink()
 		var ctx context.Context
@@ -1178,5 +1195,20 @@ func TestPrefixExclusionForDatapoints(t *testing.T) {
 				So(ok, ShouldBeFalse)
 			}
 		})
+
+		Reset(func() {
+			sfxGateway.signalChan <- syscall.SIGTERM
+			time.Sleep(time.Millisecond)
+			err := <-mainDoneChan
+			if checkError {
+				So(err, ShouldNotBeNil)
+				checkError = false
+			}
+			So(os.Remove(filename), ShouldBeNil)
+			So(cl.Close(), ShouldBeNil)
+			if cancelfunc != nil {
+				cancelfunc()
+			}
+		})
 	})
-}*/
+}
