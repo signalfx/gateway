@@ -132,8 +132,7 @@ const config1 = `
 	"GracefulCheckInterval":   "<<CHECK>>ms",
 	"MinimalGracefulWaitTime": "<<MIN>>ms",
 	"SilentGracefulTime": "50ms",
-	"InternalMetricsListenerAddress": "<<INTERNALMETRICS>>",
-	"StatsDelay": "1s"
+	"InternalMetricsListenerAddress": "<<INTERNALMETRICS>>"
   }
 `
 const invalidForwarderConfig = `
