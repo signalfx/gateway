@@ -34,18 +34,18 @@ import (
 	"github.com/signalfx/gateway/protocol/signalfx"
 	_ "github.com/signalfx/go-metrics"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/timekeeper"
+	"github.com/signalfx/golib/web"
 	_ "github.com/signalfx/ondiskencoding"
 	. "github.com/smartystreets/goconvey/convey"
 	_ "github.com/spaolacci/murmur3"
 	"gotest.tools/assert"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/web"
 )
 
 const configEtcd = `
@@ -133,7 +133,7 @@ const config1 = `
 	"MinimalGracefulWaitTime": "<<MIN>>ms",
 	"SilentGracefulTime": "50ms",
 	"InternalMetricsListenerAddress": "<<INTERNALMETRICS>>",
-	"InternalMetricsReportingDelay": "1s"
+	"StatsDelay": "1s"
   }
 `
 const invalidForwarderConfig = `
@@ -757,7 +757,6 @@ func TestProxyCluster(t *testing.T) {
 					setupDoneSignal: make(chan struct{}),
 					signalChan:      make(chan os.Signal),
 				}
-
 				flags = &gatewayFlags{}
 				flags.operation = flaghelpers.NewStringFlag()
 				if index == 0 {
@@ -979,96 +978,7 @@ func Test_handleClusterNameResponse(t *testing.T) {
 	}
 }
 
-func TestProxy2(t *testing.T) {
-	var cancelfunc context.CancelFunc
-	Convey("a setup carbon gateway", t, func() {
-		sendTo := dptest.NewBasicSink()
-		var ctx context.Context
-		ctx, cancelfunc = context.WithCancel(context.Background())
-		var p *gateway
-		var mainDoneChan chan error
-		var filename string
-		var cl *signalfx.ListenerServer
-		checkError := false
-
-
-		setUp := func() {
-			logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
-			logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
-			fileObj, err := ioutil.TempFile("", "TestProxy")
-			So(err, ShouldBeNil)
-			etcdDataDir, err := ioutil.TempDir("", "TestProxy1")
-			So(err, ShouldBeNil)
-			So(os.RemoveAll(etcdDataDir), ShouldBeNil)
-			filename = fileObj.Name()
-			So(os.Remove(filename), ShouldBeNil)
-			cconf := &signalfx.ListenerConfig{}
-			cconf.ListenAddr = pointer.String("127.0.0.1:0")
-			cconf.Counter = &dpsink.Counter{DroppedReason:"test"}
-			var callCount int64
-			cconf.HTTPChain = func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
-				atomic.AddInt64(&callCount, 1)
-				next.ServeHTTPC(ctx, rw, r)
-			}
-			cl, err = signalfx.NewListener(sendTo, cconf)
-			So(err, ShouldBeNil)
-			So(cl, ShouldNotBeNil)
-			openPort := nettest.TCPPort(cl)
-			proxyConf := strings.Replace(config2, "<<PORT>>", strconv.FormatInt(int64(openPort), 10), -1)
-			So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
-			fmt.Println("Launching server...")
-			p = newGateway()
-			p.logger = logger
-			loadedConfig, _ := loadConfig(filename, logger)
-			p.configure(loadedConfig)
-			mainDoneChan = make(chan error)
-			go func() {
-				mainDoneChan <- p.start(ctx)
-				close(mainDoneChan)
-			}()
-			<-p.setupDoneSignal
-		}
-
-
-		Convey("should gateway a carbon point", func() {
-			setUp()
-			So(p, ShouldNotBeNil)
-			time.Sleep(time.Second*2)
-			dps := <- sendTo.PointsChan
-			for _,v := range dps {
-				fmt.Println(v)
-			}
-			fmt.Println( "imalength", len(sendTo.PointsChan))
-			fmt.Println("Test is finished")
-		})
-
-		Reset(func() {
-			p.signalChan <- syscall.SIGTERM
-			time.Sleep(time.Millisecond)
-			err := <-mainDoneChan
-			if checkError {
-				So(err, ShouldNotBeNil)
-				checkError = false
-			}
-			So(os.Remove(filename), ShouldBeNil)
-			So(cl.Close(), ShouldBeNil)
-			if cancelfunc != nil {
-				cancelfunc()
-			}
-		})
-	})
-}
-
-// TODOs
-/*
- - change test to use timekeepertest.Stub, not tk.Realtime (you will have to have a routine incrementing the tk or nothing will happen)
- - change name proxy gateway please
- - go through a couple iterations and verify we get exactly the metrics we expect
- - statsdelay should be added so you can verify that the dps from default are distict from statsdelay dps
- - remove all my printlns if i left any
- */
-
-const config2 = `
+const internalMetricsReportingConfig = `
  {
    "LogFormat": "logfmt",
    "LogDir": "-",
@@ -1096,3 +1006,173 @@ const config2 = `
     "InternalMetricsReportingDelay": "1s"
  }
 `
+
+func TestPrefixAddition(t *testing.T) {
+	Convey("a setup for signalfx gateway", t, func() {
+		sendTo := dptest.NewBasicSink()
+		var ctx context.Context
+		ctx, _ = context.WithCancel(context.Background())
+		var sfxGateway *gateway
+		var mainDoneChan chan error
+		var filename string
+		var cl *signalfx.ListenerServer
+		prefixedMetrics := map[string]bool{
+			"gateway.total_process_errors": true,
+			"gateway.total_datapoints":     true,
+			"gateway.total_events":         true,
+			"gateway.total_spans":          true,
+			"gateway.total_process_calls":  true,
+			"gateway.dropped_points":       true,
+			"gateway.dropped_events":       true,
+			"gateway.dropped_spans":        true,
+			"gateway.process_time_ns":      true,
+			"gateway.calls_in_flight":      true,
+		}
+
+		setUp := func() {
+			logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
+			logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
+			fileObj, err := ioutil.TempFile("", "TestProxy")
+			So(err, ShouldBeNil)
+			etcdDataDir, err := ioutil.TempDir("", "TestProxy1")
+			So(err, ShouldBeNil)
+			So(os.RemoveAll(etcdDataDir), ShouldBeNil)
+			filename = fileObj.Name()
+			So(os.Remove(filename), ShouldBeNil)
+			cconf := &signalfx.ListenerConfig{}
+			cconf.ListenAddr = pointer.String("127.0.0.1:0")
+			cconf.Counter = &dpsink.Counter{DroppedReason: "test"}
+			var callCount int64
+			cconf.HTTPChain = func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
+				atomic.AddInt64(&callCount, 1)
+				next.ServeHTTPC(ctx, rw, r)
+			}
+			cl, err = signalfx.NewListener(sendTo, cconf)
+			So(err, ShouldBeNil)
+			So(cl, ShouldNotBeNil)
+			openPort := nettest.TCPPort(cl)
+			proxyConf := strings.Replace(internalMetricsReportingConfig, "<<PORT>>", strconv.FormatInt(int64(openPort), 10), -1)
+			So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
+			fmt.Println("Launching server...")
+			sfxGateway = newGateway()
+			sfxGateway.logger = logger
+			loadedConfig, _ := loadConfig(filename, logger)
+			sfxGateway.configure(loadedConfig)
+			mainDoneChan = make(chan error)
+			go func() {
+				mainDoneChan <- sfxGateway.start(ctx)
+				close(mainDoneChan)
+			}()
+			<-sfxGateway.setupDoneSignal
+		}
+		Convey("should add prefixes to gateway internal metrics", func() {
+			setUp()
+			So(sfxGateway, ShouldNotBeNil)
+			time.Sleep(1 * time.Second)
+			dps := <-sendTo.PointsChan
+			for _, dp := range dps {
+				_, ok := prefixedMetrics[dp.Metric]
+				So(ok, ShouldBeTrue)
+			}
+		})
+	})
+}
+
+const statsDelayConfig = `
+ {
+   "LogFormat": "logfmt",
+   "LogDir": "-",
+   "NumProcs":4,
+   "DebugFlag": "debugme",
+   "ListenFrom":[
+     {
+         "Type":"signalfx",
+         "ListenAddr": "127.0.0.1:0"
+     }
+   ],
+   "LocalDebugServer": "127.0.0.1:0",
+   "ForwardTo":[
+   {
+     "type": "signalfx-json",
+     "DefaultAuthToken": "AAA",
+     "url": "http://localhost:<<PORT>>/v2/datapoint",
+     "eventURL": ""
+   }
+   ],
+    "MaxGracefulWaitTime":     "10ms",
+    "GracefulCheckInterval":   "10ms",
+    "MinimalGracefulWaitTime": "10ms",
+    "SilentGracefulTime": "50ms",
+    "StatsDelay": "1s"
+ }
+`
+
+func TestPrefixExclusionForDatapoints(t *testing.T) {
+	Convey("a setup for signalfx gateway", t, func() {
+		sendTo := dptest.NewBasicSink()
+		var ctx context.Context
+		ctx, _ = context.WithCancel(context.Background())
+		var sfxGateway *gateway
+		var mainDoneChan chan error
+		var filename string
+		var cl *signalfx.ListenerServer
+		prefixedMetrics := map[string]bool{
+			"total_process_errors": true,
+			"total_datapoints":     true,
+			"total_events":         true,
+			"total_spans":          true,
+			"total_process_calls":  true,
+			"dropped_events":       true,
+			"dropped_spans":        true,
+			"process_time_ns":      true,
+			"calls_in_flight":      true,
+		}
+		setUp := func() {
+			logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
+			logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
+			fileObj, err := ioutil.TempFile("", "TestProxy")
+			So(err, ShouldBeNil)
+			etcdDataDir, err := ioutil.TempDir("", "TestProxy1")
+			So(err, ShouldBeNil)
+			So(os.RemoveAll(etcdDataDir), ShouldBeNil)
+			filename = fileObj.Name()
+			So(os.Remove(filename), ShouldBeNil)
+			cconf := &signalfx.ListenerConfig{}
+			cconf.ListenAddr = pointer.String("127.0.0.1:0")
+			cconf.Counter = &dpsink.Counter{DroppedReason: "test"}
+			var callCount int64
+			cconf.HTTPChain = func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
+				atomic.AddInt64(&callCount, 1)
+				next.ServeHTTPC(ctx, rw, r)
+			}
+			cl, err = signalfx.NewListener(sendTo, cconf)
+			So(err, ShouldBeNil)
+			So(cl, ShouldNotBeNil)
+			openPort := nettest.TCPPort(cl)
+			proxyConf := strings.Replace(statsDelayConfig, "<<PORT>>", strconv.FormatInt(int64(openPort), 10), -1)
+			So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
+			fmt.Println("Launching server...")
+			sfxGateway = newGateway()
+			sfxGateway.logger = logger
+			loadedConfig, _ := loadConfig(filename, logger)
+			sfxGateway.configure(loadedConfig)
+			mainDoneChan = make(chan error)
+			go func() {
+				mainDoneChan <- sfxGateway.start(ctx)
+				close(mainDoneChan)
+			}()
+			<-sfxGateway.setupDoneSignal
+		}
+
+		Convey("should not add prefix to metrics not reported by statsDelay scheduler", func() {
+			setUp()
+			So(sfxGateway, ShouldNotBeNil)
+			time.Sleep(1 * time.Second)
+			dps := <-sendTo.PointsChan
+			for _, dp := range dps {
+				_, ok := prefixedMetrics[dp.Metric]
+				So(ok, ShouldBeFalse)
+			}
+		})
+	})
+}
