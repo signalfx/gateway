@@ -1097,7 +1097,7 @@ func TestPrefixAddition(t *testing.T) {
 	})
 }
 
-const statsDelayConfig = `
+/*const statsDelayConfig = `
  {
    "LogFormat": "logfmt",
    "LogDir": "-",
@@ -1211,4 +1211,4 @@ func TestPrefixExclusionForDatapoints(t *testing.T) {
 			}
 		})
 	})
-}
+}*/
