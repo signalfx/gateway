@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"context"
 
+	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/gateway/logkey"
@@ -28,7 +29,6 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/web"
-	"fmt"
 )
 
 // ListenerServer controls listening on a socket for SignalFx connections
@@ -184,7 +184,7 @@ func (handler *metricHandler) GetMetricTypeFromMap(metricName string) com_signal
 // NewListener servers http requests for Signalfx datapoints
 func NewListener(sink Sink, conf *ListenerConfig) (*ListenerServer, error) {
 	conf = pointer.FillDefaultFrom(conf, defaultListenerConfig).(*ListenerConfig)
-	fmt.Println( conf.Counter)
+	fmt.Println(conf.Counter)
 	listener, err := net.Listen("tcp", *conf.ListenAddr)
 	if err != nil {
 		return nil, errors.Annotatef(err, "cannot open listening address %s", *conf.ListenAddr)
@@ -323,7 +323,6 @@ func setupCollectd(ctx context.Context, r *mux.Router, sink dpsink.Sink, debugCo
 	return &sfxclient.WithDimensions{
 		Collector: sfxclient.NewMultiCollector(
 			metricTracking,
-			counter,
 			&decoder,
 		),
 		Dimensions: map[string]string{

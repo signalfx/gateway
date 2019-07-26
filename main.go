@@ -227,7 +227,6 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 
 		scheduler.AddGroupedCallback(groupName, forwarder)
 		scheduler.AddGroupedCallback(groupName, bf)
-		scheduler.AddGroupedCallback(groupName, dcount)
 		scheduler.GroupedDefaultDimensions(groupName, datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
 			"name":      name,
 			"direction": "forwarder",
