@@ -1008,10 +1008,11 @@ const internalMetricsReportingConfig = `
 `
 
 func TestPrefixAddition(t *testing.T) {
+	var cancelfunc context.CancelFunc
 	Convey("a setup for signalfx gateway", t, func() {
 		sendTo := dptest.NewBasicSink()
 		var ctx context.Context
-		ctx, _ = context.WithCancel(context.Background())
+		ctx, cancelfunc = context.WithCancel(context.Background())
 		var sfxGateway *gateway
 		var mainDoneChan chan error
 		var filename string
@@ -1064,6 +1065,9 @@ func TestPrefixAddition(t *testing.T) {
 				close(mainDoneChan)
 			}()
 			<-sfxGateway.setupDoneSignal
+			if cancelfunc != nil {
+				cancelfunc()
+			}
 		}
 		Convey("should add prefixes to gateway internal metrics", func() {
 			setUp()
