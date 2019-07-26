@@ -1074,7 +1074,6 @@ func TestPrefixAddition(t *testing.T) {
 			time.Sleep(2 * time.Second)
 			dps := <-sendTo.PointsChan
 			for _, dp := range dps {
-				fmt.Println("Inside for loop with metric ", dp.Metric)
 				_, ok := prefixedMetrics[dp.Metric]
 				So(ok, ShouldBeTrue)
 			}
