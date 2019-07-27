@@ -5,8 +5,29 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/embed"
 	"github.com/coreos/etcd/mvcc/mvccpb"
+	"github.com/signalfx/embetcd/embetcd"
+	"github.com/signalfx/gateway/config"
+	"github.com/signalfx/gateway/flaghelpers"
+	"github.com/signalfx/gateway/protocol/carbon"
+	"github.com/signalfx/gateway/protocol/signalfx"
+	_ "github.com/signalfx/go-metrics"
+	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/datapoint/dpsink"
+	"github.com/signalfx/golib/datapoint/dptest"
+	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/httpdebug"
+	"github.com/signalfx/golib/log"
+	"github.com/signalfx/golib/nettest"
+	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/timekeeper"
+	"github.com/signalfx/golib/web"
+	_ "github.com/signalfx/ondiskencoding"
+	. "github.com/smartystreets/goconvey/convey"
+	_ "github.com/spaolacci/murmur3"
+	"gotest.tools/assert"
 	"io"
 	"io/ioutil"
 	"net"
@@ -24,28 +45,6 @@ import (
 	"syscall"
 	"testing"
 	"time"
-
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/embed"
-	"github.com/signalfx/embetcd/embetcd"
-	"github.com/signalfx/gateway/config"
-	"github.com/signalfx/gateway/flaghelpers"
-	"github.com/signalfx/gateway/protocol/carbon"
-	"github.com/signalfx/gateway/protocol/signalfx"
-	_ "github.com/signalfx/go-metrics"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/datapoint/dptest"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/nettest"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/timekeeper"
-	"github.com/signalfx/golib/web"
-	_ "github.com/signalfx/ondiskencoding"
-	. "github.com/smartystreets/goconvey/convey"
-	_ "github.com/spaolacci/murmur3"
-	"gotest.tools/assert"
 )
 
 const configEtcd = `
@@ -1064,122 +1063,6 @@ func TestPrefixAddition(t *testing.T) {
 			for _, dp := range dps {
 				_, ok := prefixedMetrics[dp.Metric]
 				So(ok, ShouldBeTrue)
-			}
-		})
-
-		Reset(func() {
-			sfxGateway.signalChan <- syscall.SIGTERM
-			time.Sleep(time.Millisecond)
-			err := <-mainDoneChan
-			if checkError {
-				So(err, ShouldNotBeNil)
-				checkError = false
-			}
-			So(os.Remove(filename), ShouldBeNil)
-			So(cl.Close(), ShouldBeNil)
-			if cancelfunc != nil {
-				cancelfunc()
-			}
-		})
-	})
-}
-
-const statsDelayConfig = `
- {
-   "LogFormat": "logfmt",
-   "LogDir": "-",
-   "NumProcs":4,
-   "DebugFlag": "debugme",
-   "ListenFrom":[
-     {
-         "Type":"signalfx",
-         "ListenAddr": "127.0.0.1:0"
-     }
-   ],
-   "LocalDebugServer": "127.0.0.1:0",
-   "ForwardTo":[
-   {
-     "type": "signalfx-json",
-     "DefaultAuthToken": "AAA",
-     "url": "http://localhost:<<PORT>>/v2/datapoint",
-     "eventURL": ""
-   }
-   ],
-    "MaxGracefulWaitTime":     "10ms",
-    "GracefulCheckInterval":   "10ms",
-    "MinimalGracefulWaitTime": "10ms",
-    "SilentGracefulTime": "50ms",
-    "StatsDelay": "1s"
- }
-`
-
-func TestPrefixExclusionForDatapoints(t *testing.T) {
-	var cancelfunc context.CancelFunc
-	var checkError = false
-	Convey("a setup for signalfx gateway", t, func() {
-		sendTo := dptest.NewBasicSink()
-		var ctx context.Context
-		ctx, _ = context.WithCancel(context.Background())
-		var sfxGateway *gateway
-		var mainDoneChan chan error
-		var filename string
-		var cl *signalfx.ListenerServer
-		prefixedMetrics := map[string]bool{
-			"total_process_errors": true,
-			"total_datapoints":     true,
-			"total_events":         true,
-			"total_spans":          true,
-			"total_process_calls":  true,
-			"dropped_events":       true,
-			"dropped_spans":        true,
-			"process_time_ns":      true,
-			"calls_in_flight":      true,
-		}
-		setUp := func() {
-			logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
-			logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
-			fileObj, err := ioutil.TempFile("", "TestProxy")
-			So(err, ShouldBeNil)
-			etcdDataDir, err := ioutil.TempDir("", "TestProxy1")
-			So(err, ShouldBeNil)
-			So(os.RemoveAll(etcdDataDir), ShouldBeNil)
-			filename = fileObj.Name()
-			So(os.Remove(filename), ShouldBeNil)
-			cconf := &signalfx.ListenerConfig{}
-			cconf.ListenAddr = pointer.String("127.0.0.1:0")
-			cconf.Counter = &dpsink.Counter{DroppedReason: "test"}
-			var callCount int64
-			cconf.HTTPChain = func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
-				atomic.AddInt64(&callCount, 1)
-				next.ServeHTTPC(ctx, rw, r)
-			}
-			cl, err = signalfx.NewListener(sendTo, cconf)
-			So(err, ShouldBeNil)
-			So(cl, ShouldNotBeNil)
-			openPort := nettest.TCPPort(cl)
-			proxyConf := strings.Replace(statsDelayConfig, "<<PORT>>", strconv.FormatInt(int64(openPort), 10), -1)
-			So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
-			fmt.Println("Launching server...")
-			sfxGateway = newGateway()
-			sfxGateway.logger = logger
-			loadedConfig, _ := loadConfig(filename, logger)
-			sfxGateway.configure(loadedConfig)
-			mainDoneChan = make(chan error)
-			go func() {
-				mainDoneChan <- sfxGateway.start(ctx)
-				close(mainDoneChan)
-			}()
-			<-sfxGateway.setupDoneSignal
-		}
-
-		Convey("should not add prefix to metrics not reported by statsDelay scheduler", func() {
-			setUp()
-			So(sfxGateway, ShouldNotBeNil)
-			time.Sleep(1 * time.Second)
-			dps := <-sendTo.PointsChan
-			for _, dp := range dps {
-				_, ok := prefixedMetrics[dp.Metric]
-				So(ok, ShouldBeFalse)
 			}
 		})
 
