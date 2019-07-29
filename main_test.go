@@ -1035,12 +1035,12 @@ func TestPrefixAddition(t *testing.T) {
 	}
 
 	Convey("should not add prefixes to metrics that are not internal to the gateway", t, func() {
-		_, cancelfunc, sfxGateway, cl, sendTo := setUpSfxGateway(statsDelayConfig)
+		_, cancelfunc, sfxGateway, sl, sendTo := setUpSfxGateway(statsDelayConfig)
 		time.Sleep(2 * time.Second)
 		sfxGateway.signalChan <- syscall.SIGTERM
 		time.Sleep(time.Millisecond)
 
-		So(cl.Close(), ShouldBeNil)
+		So(sl.Close(), ShouldBeNil)
 		if cancelfunc != nil {
 			cancelfunc()
 		}
@@ -1051,12 +1051,12 @@ func TestPrefixAddition(t *testing.T) {
 		}
 	})
 	Convey("should add prefixes to gateway internal metrics", t, func() {
-		_, cancelfunc, sfxGateway, cl, sendTo := setUpSfxGateway(internalMetricsReportingConfig)
+		_, cancelfunc, sfxGateway, sl, sendTo := setUpSfxGateway(internalMetricsReportingConfig)
 		time.Sleep(2 * time.Second)
 		sfxGateway.signalChan <- syscall.SIGTERM
 		time.Sleep(time.Millisecond)
 
-		So(cl.Close(), ShouldBeNil)
+		So(sl.Close(), ShouldBeNil)
 		if cancelfunc != nil {
 			cancelfunc()
 		}
@@ -1073,14 +1073,14 @@ func setUpSfxGateway(config string) (context.Context, context.CancelFunc, *gatew
 	var sfxGateway *gateway
 	var mainDoneChan chan error
 	var filename string
-	var cl *signalfx.ListenerServer
+	var sl *signalfx.ListenerServer
 	sendTo := dptest.NewBasicSink()
 
 	logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
 	logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
-	fileObj, err := ioutil.TempFile("", "TestProxy")
+	fileObj, err := ioutil.TempFile("", "TestPrefix")
 	So(err, ShouldBeNil)
-	etcdDataDir, err := ioutil.TempDir("", "TestProxy1")
+	etcdDataDir, err := ioutil.TempDir("", "TestPrefix1")
 	So(err, ShouldBeNil)
 	So(os.RemoveAll(etcdDataDir), ShouldBeNil)
 	filename = fileObj.Name()
@@ -1093,10 +1093,10 @@ func setUpSfxGateway(config string) (context.Context, context.CancelFunc, *gatew
 		atomic.AddInt64(&callCount, 1)
 		next.ServeHTTPC(ctx, rw, r)
 	}
-	cl, err = signalfx.NewListener(sendTo, cconf)
+	sl, err = signalfx.NewListener(sendTo, cconf)
 	So(err, ShouldBeNil)
-	So(cl, ShouldNotBeNil)
-	openPort := nettest.TCPPort(cl)
+	So(sl, ShouldNotBeNil)
+	openPort := nettest.TCPPort(sl)
 	proxyConf := strings.Replace(config, "<<PORT>>", strconv.FormatInt(int64(openPort), 10), -1)
 	So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
 	fmt.Println("Launching server...")
@@ -1112,5 +1112,5 @@ func setUpSfxGateway(config string) (context.Context, context.CancelFunc, *gatew
 	<-sfxGateway.setupDoneSignal
 	So(os.Remove(filename), ShouldBeNil)
 
-	return ctx, cancelfunc, sfxGateway, cl, sendTo
+	return ctx, cancelfunc, sfxGateway, sl, sendTo
 }
