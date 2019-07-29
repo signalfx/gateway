@@ -994,96 +994,6 @@ const internalMetricsReportingConfig = `
     "InternalMetricsReportingDelay": "1s"
  }
 `
-
-func TestPrefixAddition(t *testing.T) {
-	var cancelfunc context.CancelFunc
-	checkError := false
-	Convey("a setup for signalfx gateway", t, func() {
-		sendTo := dptest.NewBasicSink()
-		var ctx context.Context
-		ctx, cancelfunc = context.WithCancel(context.Background())
-		var sfxGateway *gateway
-		var mainDoneChan chan error
-		var filename string
-		var cl *signalfx.ListenerServer
-		prefixedMetrics := map[string]bool{
-			"gateway.total_process_errors": true,
-			"gateway.total_datapoints":     true,
-			"gateway.total_events":         true,
-			"gateway.total_spans":          true,
-			"gateway.total_process_calls":  true,
-			"gateway.dropped_points":       true,
-			"gateway.dropped_events":       true,
-			"gateway.dropped_spans":        true,
-			"gateway.process_time_ns":      true,
-			"gateway.calls_in_flight":      true,
-		}
-
-		setUp := func() {
-			logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
-			logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
-			fileObj, err := ioutil.TempFile("", "TestProxy")
-			So(err, ShouldBeNil)
-			etcdDataDir, err := ioutil.TempDir("", "TestProxy1")
-			So(err, ShouldBeNil)
-			So(os.RemoveAll(etcdDataDir), ShouldBeNil)
-			filename = fileObj.Name()
-			So(os.Remove(filename), ShouldBeNil)
-			cconf := &signalfx.ListenerConfig{}
-			cconf.ListenAddr = pointer.String("127.0.0.1:0")
-			cconf.Counter = &dpsink.Counter{DroppedReason: "test"}
-			var callCount int64
-			cconf.HTTPChain = func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
-				atomic.AddInt64(&callCount, 1)
-				next.ServeHTTPC(ctx, rw, r)
-			}
-			cl, err = signalfx.NewListener(sendTo, cconf)
-			So(err, ShouldBeNil)
-			So(cl, ShouldNotBeNil)
-			openPort := nettest.TCPPort(cl)
-			proxyConf := strings.Replace(internalMetricsReportingConfig, "<<PORT>>", strconv.FormatInt(int64(openPort), 10), -1)
-			So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
-			fmt.Println("Launching server...")
-			sfxGateway = newGateway()
-			sfxGateway.logger = logger
-			loadedConfig, _ := loadConfig(filename, logger)
-			sfxGateway.configure(loadedConfig)
-			mainDoneChan = make(chan error)
-			go func() {
-				mainDoneChan <- sfxGateway.start(ctx)
-				close(mainDoneChan)
-			}()
-			<-sfxGateway.setupDoneSignal
-		}
-		Convey("should add prefixes to gateway internal metrics", func() {
-			setUp()
-			//close(sendTo.PointsChan)
-			So(sfxGateway, ShouldNotBeNil)
-			time.Sleep(2 * time.Second)
-			dps := <-sendTo.PointsChan
-			for _, dp := range dps {
-				_, ok := prefixedMetrics[dp.Metric]
-				So(ok, ShouldBeTrue)
-			}
-		})
-
-		Reset(func() {
-			sfxGateway.signalChan <- syscall.SIGTERM
-			time.Sleep(time.Millisecond)
-			err := <-mainDoneChan
-			if checkError {
-				So(err, ShouldNotBeNil)
-				checkError = false
-			}
-			So(os.Remove(filename), ShouldBeNil)
-			So(cl.Close(), ShouldBeNil)
-			if cancelfunc != nil {
-				cancelfunc()
-			}
-		})
-	})
-}
-
 const statsDelayConfig = `
  {
    "LogFormat": "logfmt",
@@ -1110,85 +1020,97 @@ const statsDelayConfig = `
  }
 `
 
-func TestPrefixExclusion(t *testing.T) {
-	var cancelfunc context.CancelFunc
-	checkError := false
-	Convey("a setup for signalfx gateway", t, func() {
-		sendTo := dptest.NewBasicSink()
-		var ctx context.Context
-		ctx, cancelfunc = context.WithCancel(context.Background())
-		var sfxGateway *gateway
-		var mainDoneChan chan error
-		var filename string
-		var cl *signalfx.ListenerServer
-		prefixedMetrics := map[string]bool{
-			"gateway.total_process_errors": true,
-			"gateway.total_datapoints":     true,
-			"gateway.total_events":         true,
-			"gateway.total_spans":          true,
-			"gateway.total_process_calls":  true,
-			"gateway.dropped_points":       true,
-			"gateway.dropped_events":       true,
-			"gateway.dropped_spans":        true,
-			"gateway.process_time_ns":      true,
-			"gateway.calls_in_flight":      true,
-		}
+func TestPrefixAddition(t *testing.T) {
+	prefixedMetrics := map[string]bool{
+		"gateway.total_process_errors": true,
+		"gateway.total_datapoints":     true,
+		"gateway.total_events":         true,
+		"gateway.total_spans":          true,
+		"gateway.total_process_calls":  true,
+		"gateway.dropped_points":       true,
+		"gateway.dropped_events":       true,
+		"gateway.dropped_spans":        true,
+		"gateway.process_time_ns":      true,
+		"gateway.calls_in_flight":      true,
+	}
 
-		setUp := func() {
-			logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
-			logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
-			fileObj, err := ioutil.TempFile("", "TestProxy")
-			So(err, ShouldBeNil)
-			etcdDataDir, err := ioutil.TempDir("", "TestProxy1")
-			So(err, ShouldBeNil)
-			So(os.RemoveAll(etcdDataDir), ShouldBeNil)
-			filename = fileObj.Name()
-			So(os.Remove(filename), ShouldBeNil)
-			cconf := &signalfx.ListenerConfig{}
-			cconf.ListenAddr = pointer.String("127.0.0.1:0")
-			cconf.Counter = &dpsink.Counter{DroppedReason: "test"}
-			var callCount int64
-			cconf.HTTPChain = func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
-				atomic.AddInt64(&callCount, 1)
-				next.ServeHTTPC(ctx, rw, r)
-			}
-			cl, err = signalfx.NewListener(sendTo, cconf)
-			So(err, ShouldBeNil)
-			So(cl, ShouldNotBeNil)
-			openPort := nettest.TCPPort(cl)
-			proxyConf := strings.Replace(statsDelayConfig, "<<PORT>>", strconv.FormatInt(int64(openPort), 10), -1)
-			So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
-			fmt.Println("Launching server...")
-			sfxGateway = newGateway()
-			sfxGateway.logger = logger
-			loadedConfig, _ := loadConfig(filename, logger)
-			sfxGateway.configure(loadedConfig)
-			mainDoneChan = make(chan error)
-			go func() {
-				mainDoneChan <- sfxGateway.start(ctx)
-				close(mainDoneChan)
-			}()
-			<-sfxGateway.setupDoneSignal
-		}
-		setUp()
+	Convey("should not add prefixes to metrics that are not internal to the gateway", t, func() {
+		_, cancelfunc, sfxGateway, cl, sendTo := setUpSfxGateway(statsDelayConfig)
 		time.Sleep(2 * time.Second)
 		sfxGateway.signalChan <- syscall.SIGTERM
 		time.Sleep(time.Millisecond)
-		err := <-mainDoneChan
-		if checkError {
-			So(err, ShouldNotBeNil)
-			checkError = false
-		}
-		So(os.Remove(filename), ShouldBeNil)
+
 		So(cl.Close(), ShouldBeNil)
 		if cancelfunc != nil {
 			cancelfunc()
 		}
-
 		dps := <-sendTo.PointsChan
 		for _, dp := range dps {
 			_, ok := prefixedMetrics[dp.Metric]
 			So(ok, ShouldBeFalse)
 		}
 	})
+	Convey("should add prefixes to gateway internal metrics", t, func() {
+		_, cancelfunc, sfxGateway, cl, sendTo := setUpSfxGateway(internalMetricsReportingConfig)
+		time.Sleep(2 * time.Second)
+		sfxGateway.signalChan <- syscall.SIGTERM
+		time.Sleep(time.Millisecond)
+
+		So(cl.Close(), ShouldBeNil)
+		if cancelfunc != nil {
+			cancelfunc()
+		}
+		dps := <-sendTo.PointsChan
+		for _, dp := range dps {
+			_, ok := prefixedMetrics[dp.Metric]
+			So(ok, ShouldBeTrue)
+		}
+	})
+}
+
+func setUpSfxGateway(config string) (context.Context, context.CancelFunc, *gateway, *signalfx.ListenerServer, *dptest.BasicSink) {
+	ctx, cancelfunc := context.WithCancel(context.Background())
+	var sfxGateway *gateway
+	var mainDoneChan chan error
+	var filename string
+	var cl *signalfx.ListenerServer
+	sendTo := dptest.NewBasicSink()
+
+	logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
+	logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
+	fileObj, err := ioutil.TempFile("", "TestProxy")
+	So(err, ShouldBeNil)
+	etcdDataDir, err := ioutil.TempDir("", "TestProxy1")
+	So(err, ShouldBeNil)
+	So(os.RemoveAll(etcdDataDir), ShouldBeNil)
+	filename = fileObj.Name()
+	So(os.Remove(filename), ShouldBeNil)
+	cconf := &signalfx.ListenerConfig{}
+	cconf.ListenAddr = pointer.String("127.0.0.1:0")
+	cconf.Counter = &dpsink.Counter{DroppedReason: "test"}
+	var callCount int64
+	cconf.HTTPChain = func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
+		atomic.AddInt64(&callCount, 1)
+		next.ServeHTTPC(ctx, rw, r)
+	}
+	cl, err = signalfx.NewListener(sendTo, cconf)
+	So(err, ShouldBeNil)
+	So(cl, ShouldNotBeNil)
+	openPort := nettest.TCPPort(cl)
+	proxyConf := strings.Replace(config, "<<PORT>>", strconv.FormatInt(int64(openPort), 10), -1)
+	So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
+	fmt.Println("Launching server...")
+	sfxGateway = newGateway()
+	sfxGateway.logger = logger
+	loadedConfig, _ := loadConfig(filename, logger)
+	sfxGateway.configure(loadedConfig)
+	mainDoneChan = make(chan error)
+	go func() {
+		mainDoneChan <- sfxGateway.start(ctx)
+		close(mainDoneChan)
+	}()
+	<-sfxGateway.setupDoneSignal
+	So(os.Remove(filename), ShouldBeNil)
+
+	return ctx, cancelfunc, sfxGateway, cl, sendTo
 }
