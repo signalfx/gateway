@@ -41,6 +41,7 @@ import (
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/timekeeper"
+	"github.com/signalfx/golib/timekeeper/timekeepertest"
 	"github.com/signalfx/golib/web"
 	_ "github.com/signalfx/ondiskencoding"
 	. "github.com/smartystreets/goconvey/convey"
@@ -1035,11 +1036,24 @@ func TestPrefixAddition(t *testing.T) {
 	}
 
 	Convey("should not add prefixes to metrics that are not internal to the gateway", t, func() {
-		_, cancelfunc, sfxGateway, sl, sendTo := setUpSfxGateway(statsDelayConfig)
-		time.Sleep(2 * time.Second)
-		sfxGateway.signalChan <- syscall.SIGTERM
-		time.Sleep(time.Millisecond)
+		cancelfunc, sfxGateway, sl, sendTo := setUpSfxGateway(statsDelayConfig)
+		tk := timekeepertest.NewStubClock(time.Now())
+		sfxGateway.tk = tk
+		endSignal := make(chan bool, 1)
+		var end bool
+		go func() {
+			time.Sleep(*sfxGateway.config.StatsDelayDuration)
+			endSignal <- true
+		}()
 
+		for !end {
+			select {
+			case <-time.After(*sfxGateway.config.StatsDelayDuration * 2):
+				end = true
+			}
+		}
+
+		sfxGateway.signalChan <- syscall.SIGTERM
 		So(sl.Close(), ShouldBeNil)
 		if cancelfunc != nil {
 			cancelfunc()
@@ -1050,12 +1064,24 @@ func TestPrefixAddition(t *testing.T) {
 			So(ok, ShouldBeFalse)
 		}
 	})
-	Convey("should add prefixes to gateway internal metrics", t, func() {
-		_, cancelfunc, sfxGateway, sl, sendTo := setUpSfxGateway(internalMetricsReportingConfig)
-		time.Sleep(2 * time.Second)
-		sfxGateway.signalChan <- syscall.SIGTERM
-		time.Sleep(time.Millisecond)
 
+	Convey("should add prefixes to metrics that are internal to the gateway", t, func() {
+		cancelfunc, sfxGateway, sl, sendTo := setUpSfxGateway(internalMetricsReportingConfig)
+		tk := timekeepertest.NewStubClock(time.Now())
+		sfxGateway.tk = tk
+		endSignal := make(chan bool, 1)
+		var end bool
+		go func() {
+			time.Sleep(*sfxGateway.config.InternalMetricsReportingDelayDuration)
+			endSignal <- true
+		}()
+		for !end {
+			select {
+			case <-time.After(*sfxGateway.config.InternalMetricsReportingDelayDuration * 2):
+				end = true
+			}
+		}
+		sfxGateway.signalChan <- syscall.SIGTERM
 		So(sl.Close(), ShouldBeNil)
 		if cancelfunc != nil {
 			cancelfunc()
@@ -1068,7 +1094,7 @@ func TestPrefixAddition(t *testing.T) {
 	})
 }
 
-func setUpSfxGateway(config string) (context.Context, context.CancelFunc, *gateway, *signalfx.ListenerServer, *dptest.BasicSink) {
+func setUpSfxGateway(config string) (context.CancelFunc, *gateway, *signalfx.ListenerServer, *dptest.BasicSink) {
 	ctx, cancelfunc := context.WithCancel(context.Background())
 	var sfxGateway *gateway
 	var mainDoneChan chan error
@@ -1101,6 +1127,8 @@ func setUpSfxGateway(config string) (context.Context, context.CancelFunc, *gatew
 	So(ioutil.WriteFile(filename, []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
 	fmt.Println("Launching server...")
 	sfxGateway = newGateway()
+	tk := timekeepertest.NewStubClock(time.Now())
+	sfxGateway.tk = tk
 	sfxGateway.logger = logger
 	loadedConfig, _ := loadConfig(filename, logger)
 	sfxGateway.configure(loadedConfig)
@@ -1111,6 +1139,5 @@ func setUpSfxGateway(config string) (context.Context, context.CancelFunc, *gatew
 	}()
 	<-sfxGateway.setupDoneSignal
 	So(os.Remove(filename), ShouldBeNil)
-
-	return ctx, cancelfunc, sfxGateway, sl, sendTo
+	return cancelfunc, sfxGateway, sl, sendTo
 }
