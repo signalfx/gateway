@@ -1052,13 +1052,13 @@ func TestPrefixAddition(t *testing.T) {
 				end = true
 			}
 		}
-
 		sfxGateway.signalChan <- syscall.SIGTERM
 		So(sl.Close(), ShouldBeNil)
 		if cancelfunc != nil {
 			cancelfunc()
 		}
 		dps := <-sendTo.PointsChan
+		So(len(dps), ShouldNotEqual, 0)
 		for _, dp := range dps {
 			_, ok := prefixedMetrics[dp.Metric]
 			So(ok, ShouldBeFalse)
@@ -1087,6 +1087,7 @@ func TestPrefixAddition(t *testing.T) {
 			cancelfunc()
 		}
 		dps := <-sendTo.PointsChan
+		So(len(dps), ShouldNotEqual, 0)
 		for _, dp := range dps {
 			_, ok := prefixedMetrics[dp.Metric]
 			So(ok, ShouldBeTrue)
