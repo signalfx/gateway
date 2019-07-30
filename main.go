@@ -49,6 +49,7 @@ import (
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
 	_ "github.com/signalfx/ondiskencoding"
+	_ "github.com/signalfx/tdigest"
 	_ "github.com/spaolacci/murmur3"
 	_ "net/http/pprof"
 	_ "stathat.com/c/consistent"

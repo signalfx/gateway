@@ -16,6 +16,7 @@ import (
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
 	"net/http"
+	"runtime"
 )
 
 // Config controls BufferedForwarder limits
@@ -42,7 +43,7 @@ var DefaultConfig = &Config{
 	MaxTotalEvents:     pointer.Int64(1000000),
 	MaxTotalSpans:      pointer.Int64(1000000),
 	MaxDrainSize:       pointer.Int64(30000),
-	NumDrainingThreads: pointer.Int64(10),
+	NumDrainingThreads: pointer.Int64(int64(runtime.NumCPU())),
 	Name:               pointer.String(""),
 }
 
