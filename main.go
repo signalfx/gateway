@@ -592,7 +592,6 @@ func (p *gateway) setupScheduler(loadedConfig *config.GatewayConfig) *sfxclient.
 
 func (p *gateway) setupDefaultDelayScheduler(loadedConfig *config.GatewayConfig) *sfxclient.Scheduler {
 	scheduler := sfxclient.NewScheduler()
-	scheduler.ReportingDelayNs = 0
 	scheduler.DefaultDimensions(datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
 		"source":  "gateway",
 		"host":    *loadedConfig.ServerName,
