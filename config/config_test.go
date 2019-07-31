@@ -52,6 +52,13 @@ func TestParseStatsDelay(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestParseInternalMetricsReportingDelay(t *testing.T) {
+	config, _ := decodeConfig([]byte(`{"InternalMetricsReportingDelay":"3s"}`))
+	assert.Equal(t, *config.InternalMetricsReportingDelayDuration, time.Second*3)
+	_, err := decodeConfig([]byte(`{"InternalMetricsReportingDelay":"3r"}`))
+	assert.Error(t, err)
+}
+
 func TestParseForwardTimeout(t *testing.T) {
 	config, err := decodeConfig([]byte(`{"ForwardTo":[{"Timeout":"3s"}]}`))
 	assert.Nil(t, err)

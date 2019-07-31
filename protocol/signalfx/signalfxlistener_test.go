@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/signalfx/gateway/protocol/signalfx/spanobfuscation"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -274,6 +275,9 @@ func TestSignalfxListener(t *testing.T) {
 					Tags:    []string{"obfuscate-me"},
 				},
 			},
+			Counter: &dpsink.Counter{
+				DroppedReason: "downstream",
+			},
 		}
 		listener, err := NewListener(sendTo, listenConf)
 		So(err, ShouldBeNil)
@@ -462,15 +466,15 @@ func TestSignalfxListener(t *testing.T) {
 			verifyStatusCode(`[{"sf_metric":"bob", "sf_metricType":"GAU_GE"}]`, "application/json", "/v1/metric", http.StatusBadRequest)
 			verifyStatusCode("INVALID_JSON", "application/json", "/v2/event", http.StatusBadRequest)
 			verifyStatusCode("INVALID_PROTOBUF", "application/x-protobuf", "/v2/event", http.StatusBadRequest)
-
 			verifyStatusCode("INVALID_JSON", "application/json", "/v1/event", http.StatusNotFound)
 
 			dps := listener.Datapoints()
 			So(dptest.ExactlyOneDims(dps, "total_errors", map[string]string{"protocol": "sfx_protobuf_v2"}).Value.String(), ShouldEqual, "0")
+
 			verifyStatusCode("INVALID_PROTOBUF", "application/x-protobuf", "/v2/datapoint", http.StatusBadRequest)
 			dps = listener.Datapoints()
 			So(dptest.ExactlyOneDims(dps, "total_errors", map[string]string{"protocol": "sfx_protobuf_v2"}).Value.String(), ShouldEqual, "1")
-			So(len(dps), ShouldEqual, 165)
+			So(len(dps), ShouldEqual, 75)
 			So(dptest.ExactlyOneDims(dps, "dropped_points", map[string]string{"protocol": "sfx_json_v2", "reason": "unknown_metric_type"}).Value.String(), ShouldEqual, "0")
 			So(dptest.ExactlyOneDims(dps, "dropped_points", map[string]string{"protocol": "sfx_json_v2", "reason": "invalid_value"}).Value.String(), ShouldEqual, "0")
 		})

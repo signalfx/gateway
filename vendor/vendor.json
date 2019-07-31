@@ -1252,6 +1252,12 @@
 			"versionExact": "v2.4.0"
 		},
 		{
+			"checksumSHA1": "LGiqYL4IfW+l/4h1A08VkfFM/AY=",
+			"path": "github.com/signalfx/golib/timekeeper/timekeepertest",
+			"revision": "bf587f53c5a98a208bc34645c717f8cd114adba3",
+			"revisionTime": "2019-07-24T23:56:31Z"
+		},
+		{
 			"checksumSHA1": "a1T5EKY9A55Ajj9B/rtMwKO5CRA=",
 			"path": "github.com/signalfx/golib/trace",
 			"revision": "aad86c38e558d5ba9030b37c185f8c81af3503a8",
