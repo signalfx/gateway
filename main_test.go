@@ -1039,13 +1039,7 @@ func TestPrefixAddition(t *testing.T) {
 		cancelfunc, sfxGateway, sl, sendTo := setUpSfxGateway(statsDelayConfig)
 		tk := timekeepertest.NewStubClock(time.Now())
 		sfxGateway.tk = tk
-		endSignal := make(chan bool, 1)
 		var end bool
-		go func() {
-			time.Sleep(*sfxGateway.config.StatsDelayDuration)
-			endSignal <- true
-		}()
-
 		for !end {
 			select {
 			case <-time.After(*sfxGateway.config.StatsDelayDuration * 2):
@@ -1069,12 +1063,7 @@ func TestPrefixAddition(t *testing.T) {
 		cancelfunc, sfxGateway, sl, sendTo := setUpSfxGateway(internalMetricsReportingConfig)
 		tk := timekeepertest.NewStubClock(time.Now())
 		sfxGateway.tk = tk
-		endSignal := make(chan bool, 1)
 		var end bool
-		go func() {
-			time.Sleep(*sfxGateway.config.InternalMetricsReportingDelayDuration)
-			endSignal <- true
-		}()
 		for !end {
 			select {
 			case <-time.After(*sfxGateway.config.InternalMetricsReportingDelayDuration * 2):
