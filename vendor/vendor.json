@@ -954,6 +954,12 @@
 			"revisionTime": "2018-12-31T17:19:20Z"
 		},
 		{
+			"checksumSHA1": "IYn1Hyy1siCxPUn3Pi+lQdGZ3As=",
+			"path": "github.com/mdubbyap/tdigest",
+			"revision": "5b582dc8b9fde7a9110e13313d68355c73e29aba",
+			"revisionTime": "2019-08-05T18:35:08Z"
+		},
+		{
 			"checksumSHA1": "bjhbz+Ie79EfFEPVGocK89USabo=",
 			"path": "github.com/mdubbyap/timespan",
 			"revision": "96e435f01fb4f075efc20c24ab907f35c01f1060",
