@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"expvar"
 	"flag"
 	"fmt"
@@ -16,7 +15,6 @@ import (
 	"path"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -938,7 +936,6 @@ func (p *gateway) start(ctx context.Context) error {
 // is used for testing and should be refactored out later
 func loadConfig(configFilePath string, logger log.Logger) (*config.GatewayConfig, error) {
 	logger.Log(logkey.ConfigFile, configFilePath, "Looking for config file")
-	logger.Log(logkey.Env, strings.Join(os.Environ(), "-"), "Looking for config file")
 
 	// load the config file
 	loadedConfig, err := config.Load(configFilePath, logger)
@@ -951,12 +948,7 @@ func loadConfig(configFilePath string, logger log.Logger) (*config.GatewayConfig
 	// add flag values to the loadedConfig.  This overrides any values in the config file with runtime flags.
 	flags.addFlagsToConfig(loadedConfig)
 
-	// log the config that we loaded
-	var bb []byte
-	if bb, err = json.Marshal(loadedConfig); err == nil {
-		logger.Log(logkey.Config, string(bb), logkey.Env, strings.Join(os.Environ(), "-"), "config loaded")
-	}
-
+	logger.Log("config loaded")
 	return loadedConfig, nil
 }
 
