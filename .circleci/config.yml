@@ -15,7 +15,7 @@ jobs:
 
     docker:
       - image: circleci/build-image:ubuntu-14.04-XXL-upstart-1189-5614f37
-        command: /sbin/init
+        command: /bin/bash
 
     steps:
       - checkout
@@ -31,7 +31,7 @@ jobs:
 
       - run:
           working_directory: ~/signalfx/gateway
-          command: 'sudo docker info >/dev/null 2>&1 || sudo service docker start; '
+          command: 'docker info >/dev/null 2>&1 || sudo service docker start; '
 
       - restore_cache:
           keys:
@@ -83,7 +83,7 @@ jobs:
 
     docker:
       - image: circleci/build-image:ubuntu-14.04-XXL-upstart-1189-5614f37
-        command: /sbin/init
+        command: /bin/bash
 
     steps:
       - checkout
@@ -99,7 +99,7 @@ jobs:
 
       - run:
           working_directory: ~/signalfx/gateway
-          command: 'sudo docker info >/dev/null 2>&1 || sudo service docker start; '
+          command: 'docker info >/dev/null 2>&1 || sudo service docker start; '
 
       - restore_cache:
           keys:
