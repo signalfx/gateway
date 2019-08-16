@@ -121,7 +121,7 @@ Name | License
 `github.com/signalfx/gohistogram`                            | [MIT](./vendor/github.com/signalfx/gohistogram/LICENSE)
 `github.com/signalfx/golib`                                  | [Apache Software License v2.0](./vendor/github.com/signalfx/golib/LICENSE)
 `github.com/signalfx/ondiskencoding`                         | [Apache Software License v2.0](./vendor/github.com/signalfx/ondiskencoding/LICENSE)
-`github.com/signalfx/tdigest`                                | [Apache Software License v2.0](./vendor/github.com/signalfx/tdigest/LICENSE)
+`github.com/mdubbyap/tdigest`                                | [Apache Software License v2.0](./vendor/github.com/mdubbyap/tdigest/LICENSE)
 `github.com/signalfx/xdgbasedir`                             | [Apache Software License v2.0](./vendor/github.com/signalfx/xdgbasedir/LICENSE)
 `github.com/sirupsen/logrus`                                 | [MIT](./vendor/github.com/sirupsen/logrus/LICENSE)
 `github.com/smartystreets/assertions`                        | [MIT](./vendor/github.com/smartystreets/assertions/LICENSE.md)
