@@ -24,11 +24,11 @@ import (
 	"github.com/gorilla/mux"
 	_ "github.com/mdubbyap/tdigest"
 	"github.com/signalfx/embetcd/embetcd"
+	"github.com/signalfx/gateway/collectorhandler"
 	"github.com/signalfx/gateway/config"
 	"github.com/signalfx/gateway/dp/dpbuffered"
 	"github.com/signalfx/gateway/etcdIntf"
 	"github.com/signalfx/gateway/flaghelpers"
-	"github.com/signalfx/gateway/internal-metrics"
 	"github.com/signalfx/gateway/logkey"
 	"github.com/signalfx/gateway/protocol"
 	"github.com/signalfx/gateway/protocol/demultiplexer"
@@ -131,7 +131,7 @@ type gateway struct {
 	tk                      timekeeper.TimeKeeper
 	debugServer             *httpdebug.Server
 	debugServerListener     net.Listener
-	internalMetricsServer   *internal.Collector
+	internalMetricsServer   *collectorhandler.CollectorHandler
 	internalMetricsListener net.Listener
 	stdout                  io.Writer
 	debugContext            web.HeaderCtxFlag
@@ -318,9 +318,9 @@ func (p *gateway) setupInternalMetricsServer(conf *config.GatewayConfig, logger 
 	}
 	p.internalMetricsListener = listener
 
-	collector := internal.NewCollector(logger, debugMetricsScheduler)
+	collector := collectorhandler.NewCollectorHandler(logger, debugMetricsScheduler)
 	handler := mux.NewRouter()
-	handler.Path("/internal-metrics").HandlerFunc(collector.MetricsHandler)
+	handler.Path("/internal-metrics").HandlerFunc(collector.DatapointsHandler)
 	p.internalMetricsServer = collector
 
 	go func() {
