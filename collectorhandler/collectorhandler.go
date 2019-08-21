@@ -2,7 +2,6 @@ package collectorhandler
 
 import (
 	"encoding/json"
-	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	"net/http"
 	"strconv"
@@ -11,15 +10,13 @@ import (
 // CollectorHandler collects datapoints
 type CollectorHandler struct {
 	scheduler *sfxclient.Scheduler
-	logger    log.Logger
 	jsonfunc  func(v interface{}) ([]byte, error)
 }
 
 // NewCollectorHandler gets you the new CollectorHandler
-func NewCollectorHandler(logger log.Logger, scheduler *sfxclient.Scheduler) *CollectorHandler {
+func NewCollectorHandler(scheduler *sfxclient.Scheduler) *CollectorHandler {
 	return &CollectorHandler{
 		scheduler: scheduler,
-		logger:    logger,
 		jsonfunc:  json.Marshal,
 	}
 }

@@ -2,7 +2,6 @@ package collectorhandler
 
 import (
 	"errors"
-	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	. "github.com/smartystreets/goconvey/convey"
 	"net/http/httptest"
@@ -12,7 +11,7 @@ import (
 func Test(t *testing.T) {
 	Convey("test internal metrics", t, func() {
 		sched := sfxclient.NewScheduler()
-		c := NewCollectorHandler(log.Discard, sched)
+		c := NewCollectorHandler(sched)
 		req := httptest.NewRequest("GET", "/internal-metrics", nil)
 		w := httptest.NewRecorder()
 		c.DatapointsHandler(w, req)
@@ -20,7 +19,7 @@ func Test(t *testing.T) {
 	})
 	Convey("test internal metrics", t, func() {
 		sched := sfxclient.NewScheduler()
-		c := NewCollectorHandler(log.Discard, sched)
+		c := NewCollectorHandler(sched)
 		c.jsonfunc = func(v interface{}) ([]byte, error) {
 			return nil, errors.New("blarg")
 		}

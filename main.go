@@ -318,7 +318,7 @@ func (p *gateway) setupInternalMetricsServer(conf *config.GatewayConfig, logger 
 	}
 	p.internalMetricsListener = listener
 
-	collector := collectorhandler.NewCollectorHandler(logger, debugMetricsScheduler)
+	collector := collectorhandler.NewCollectorHandler(debugMetricsScheduler)
 	handler := mux.NewRouter()
 	handler.Path("/internal-metrics").HandlerFunc(collector.DatapointsHandler)
 	p.internalMetricsServer = collector
