@@ -2,6 +2,7 @@ package collectorhandler
 
 import (
 	"encoding/json"
+	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/sfxclient"
 	"net/http"
 	"strconv"
@@ -9,21 +10,24 @@ import (
 
 // CollectorHandler collects datapoints
 type CollectorHandler struct {
-	scheduler          *sfxclient.Scheduler
+	schedulers         []*sfxclient.Scheduler
 	jsonMarshallerFunc func(v interface{}) ([]byte, error)
 }
 
 // NewCollectorHandler gets you the new CollectorHandler
-func NewCollectorHandler(scheduler *sfxclient.Scheduler) *CollectorHandler {
+func NewCollectorHandler(schedulers ...*sfxclient.Scheduler) *CollectorHandler {
 	return &CollectorHandler{
-		scheduler:          scheduler,
+		schedulers:          schedulers,
 		jsonMarshallerFunc: json.Marshal,
 	}
 }
 
 // DatapointsHandler exposes a handler func
 func (c *CollectorHandler) DatapointsHandler(w http.ResponseWriter, req *http.Request) {
-	dps := c.scheduler.CollectDatapoints()
+	dps := make([]*datapoint.Datapoint, 0, len(c.schedulers))
+	for _, scheduler := range c.schedulers {
+		dps = append(dps, scheduler.CollectDatapoints()...)
+	}
 	b, err := c.jsonMarshallerFunc(dps)
 	if err == nil {
 		w.Header().Set("Content-Type", "application/json")
