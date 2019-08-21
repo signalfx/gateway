@@ -9,22 +9,22 @@ import (
 
 // CollectorHandler collects datapoints
 type CollectorHandler struct {
-	scheduler *sfxclient.Scheduler
-	jsonfunc  func(v interface{}) ([]byte, error)
+	scheduler          *sfxclient.Scheduler
+	jsonMarshallerFunc func(v interface{}) ([]byte, error)
 }
 
 // NewCollectorHandler gets you the new CollectorHandler
 func NewCollectorHandler(scheduler *sfxclient.Scheduler) *CollectorHandler {
 	return &CollectorHandler{
-		scheduler: scheduler,
-		jsonfunc:  json.Marshal,
+		scheduler:          scheduler,
+		jsonMarshallerFunc: json.Marshal,
 	}
 }
 
 // DatapointsHandler exposes a handler func
 func (c *CollectorHandler) DatapointsHandler(w http.ResponseWriter, req *http.Request) {
 	dps := c.scheduler.CollectDatapoints()
-	b, err := c.jsonfunc(dps)
+	b, err := c.jsonMarshallerFunc(dps)
 	if err == nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Length", strconv.Itoa(len(b)))

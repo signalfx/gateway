@@ -20,7 +20,7 @@ func Test(t *testing.T) {
 	Convey("test internal metrics", t, func() {
 		sched := sfxclient.NewScheduler()
 		c := NewCollectorHandler(sched)
-		c.jsonfunc = func(v interface{}) ([]byte, error) {
+		c.jsonMarshallerFunc = func(v interface{}) ([]byte, error) {
 			return nil, errors.New("blarg")
 		}
 		req := httptest.NewRequest("GET", "/internal-metrics", nil)
