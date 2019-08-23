@@ -308,25 +308,29 @@ func splitSinks(forwarders []protocol.Forwarder) ([]dpsink.DSink, []dpsink.ESink
 	return dsinks, esinks, tsinks
 }
 
-func (p *gateway) setupInternalMetricsServer(conf *config.GatewayConfig, logger log.Logger, debugMetricsScheduler *sfxclient.Scheduler) error {
-	if conf.InternalMetricsListenerAddress == nil {
-		return nil
-	}
-	listener, err := net.Listen("tcp", *conf.InternalMetricsListenerAddress)
-	if err != nil {
-		return errors.Annotate(err, "cannot setup internal metrics server")
-	}
-	p.internalMetricsListener = listener
+func (p *gateway) setupInternalMetricsServer(conf *config.GatewayConfig, logger log.Logger, schedulersMap map[string]*sfxclient.Scheduler) error {
+	if conf.InternalMetricsListenerAddress != nil && *conf.InternalMetricsListenerAddress != "" {
+		listener, err := net.Listen("tcp", *conf.InternalMetricsListenerAddress)
+		if err != nil {
+			return errors.Annotate(err, "cannot setup internal metrics server")
+		}
+		p.internalMetricsListener = listener
 
-	collector := collectorhandler.NewCollectorHandler(debugMetricsScheduler)
-	handler := mux.NewRouter()
-	handler.Path("/internal-metrics").HandlerFunc(collector.DatapointsHandler)
-	p.internalMetricsServer = collector
+		schedulers := make([]*sfxclient.Scheduler, 0, len(schedulersMap))
+		for _, s := range schedulersMap {
+			schedulers = append(schedulers, s)
+		}
 
-	go func() {
-		err := http.Serve(listener, handler)
-		logger.Log(log.Msg, err, "Finished serving internal metrics server")
-	}()
+		collector := collectorhandler.NewCollectorHandler(schedulers...)
+		handler := mux.NewRouter()
+		handler.Path("/internal-metrics").HandlerFunc(collector.DatapointsHandler)
+		p.internalMetricsServer = collector
+
+		go func() {
+			err := http.Serve(listener, handler)
+			logger.Log(log.Msg, err, "Finished serving internal metrics server")
+		}()
+	}
 	return nil
 }
 
@@ -577,46 +581,15 @@ func (p *gateway) createCommonHTTPChain(loadedConfig *config.GatewayConfig) web.
 	})
 }
 
-func (p *gateway) setupDebugMetricsScheduler(loadedConfig *config.GatewayConfig) *sfxclient.Scheduler {
-	scheduler := sfxclient.NewScheduler()
-	scheduler.AddCallback(sfxclient.GoMetricsSource)
-	scheduler.DefaultDimensions(datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
-		"source":  "gateway",
-		"host":    *loadedConfig.ServerName,
-		"cluster": *loadedConfig.ClusterName,
-	}))
-	return scheduler
-}
-
-func (p *gateway) setupMetricsScheduler(loadedConfig *config.GatewayConfig) *sfxclient.Scheduler {
+func (p *gateway) setupScheduler(loadedConfig *config.GatewayConfig, prefix string) *sfxclient.Scheduler {
 	scheduler := sfxclient.NewScheduler()
 	scheduler.DefaultDimensions(datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
 		"source":  "gateway",
 		"host":    *loadedConfig.ServerName,
 		"cluster": *loadedConfig.ClusterName,
 	}))
-	scheduler.Prefix = gatewayMetricsPrefix
-	scheduler.ReportingDelayNs = (time.Second * 10).Nanoseconds()
-	if loadedConfig.InternalMetricsReportingDelayDuration != nil && *loadedConfig.InternalMetricsReportingDelayDuration != 0 {
-		scheduler.ReportingDelayNs = loadedConfig.InternalMetricsReportingDelayDuration.Nanoseconds()
-	} else {
-		p.logger.Log("setting internal metrics reporting time to default")
-	}
+	scheduler.Prefix = prefix
 	return scheduler
-}
-
-func (p *gateway) scheduleStatCollection(ctx context.Context, scheduler *sfxclient.Scheduler, loadedConfig *config.GatewayConfig, multiplexer signalfx.Sink) (context.Context, context.CancelFunc) {
-	// We still want to schedule stat collection so people can debug the server if they want
-	scheduler.Sink = dpsink.Discard
-	scheduler.ReportingDelayNs = (time.Second * 30).Nanoseconds()
-	finishedContext, cancelFunc := context.WithCancel(ctx)
-	if loadedConfig.StatsDelayDuration != nil && *loadedConfig.StatsDelayDuration != 0 {
-		scheduler.Sink = multiplexer
-		scheduler.ReportingDelayNs = loadedConfig.StatsDelayDuration.Nanoseconds()
-	} else {
-		p.logger.Log("skipping stat keeping")
-	}
-	return finishedContext, cancelFunc
 }
 
 func (p *gateway) setupForwardersAndListeners(ctx context.Context, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, debugMetricsScheduler *sfxclient.Scheduler, metricsScheduler *sfxclient.Scheduler) (signalfx.Sink, map[string]http.Handler, error) {
@@ -637,10 +610,10 @@ func (p *gateway) setupForwardersAndListeners(ctx context.Context, loader *confi
 		LateDuration:   loadedConfig.LateThresholdDuration,
 		FutureDuration: loadedConfig.FutureThresholdDuration,
 	}
+
+	// Add metrics from dmux to the to debug metrics scheduler
 	debugMetricsScheduler.AddCallback(dmux)
-	p.versionMetric.RepoURL = "https://github.com/signalfx/gateway"
-	p.versionMetric.FileName = "/buildInfo.json"
-	debugMetricsScheduler.AddCallback(&p.versionMetric)
+
 	multiplexer := signalfx.FromChain(dmux, signalfx.NextWrap(signalfx.UnifyNextSinkWrap(&p.debugSink)))
 
 	p.listeners, err = setupListeners(p.tk, *loadedConfig.ServerName, loadedConfig, loader, loadedConfig.ListenFrom, multiplexer, logger, debugMetricsScheduler, metricsScheduler)
@@ -876,17 +849,85 @@ func (p *gateway) runningLoop(ctx context.Context) (err error) {
 	}
 }
 
+// getSchedulerReportingDelay evaluates config to determine the reporting delay time for schedulers
+func getSchedulerReportingDelay(config *config.GatewayConfig) int64 {
+	var reportingDelayNs int64
+
+	// only set ReportingDelay on the scheduler if the internal metrics server is off
+	// or the local debug server is on.
+	if (config.LocalDebugServer != nil && *config.LocalDebugServer != "") || (config.InternalMetricsListenerAddress == nil || *config.InternalMetricsListenerAddress == "") {
+		// default scheduler interval when StatsDelay is not set and debug server is on
+		reportingDelayNs = (30 * time.Second).Nanoseconds()
+
+		// return StatsDelay as reportingDelay when it is configured
+		if config.StatsDelayDuration != nil && *config.StatsDelayDuration != 0 {
+			reportingDelayNs = config.StatsDelayDuration.Nanoseconds()
+		}
+	}
+
+	return reportingDelayNs
+}
+
+func (p *gateway) scheduleStatCollection(ctx context.Context, schedulers map[string]*sfxclient.Scheduler, multiplexer signalfx.Sink) func() {
+	// Schedule datapoint collection to a Discard sink so we can get the stats in Expvar()
+	wg := sync.WaitGroup{}
+
+	// finishedContext and cancelFunc are used
+	finishedContext, cancelFunc := context.WithCancel(ctx)
+
+	// schedule the schedulers
+	for name, scheduler := range schedulers {
+		scheduler.Sink = dpsink.Discard
+		scheduler.ReportingDelayNs = getSchedulerReportingDelay(p.config)
+
+		// only configure the scheduler sink to emit through the multiplexer
+		// when the internal metrics server is off and StatsDelay is greater than 0
+		if p.config.StatsDelayDuration != nil && *p.config.StatsDelayDuration != 0 && (p.config.InternalMetricsListenerAddress == nil || *p.config.InternalMetricsListenerAddress == "") {
+			scheduler.Sink = multiplexer
+		}
+
+		wg.Add(1)
+		go func() {
+			err := scheduler.Schedule(finishedContext)
+			p.logger.Log(log.Err, err, logkey.Struct, name, "Schedule finished")
+			wg.Done()
+		}()
+	}
+
+	return func() {
+		cancelFunc()
+		wg.Wait()
+	}
+}
+
 func (p *gateway) start(ctx context.Context) error {
 	if p.config == nil {
 		return fmt.Errorf("gateway was not configured properly")
 	}
 
-	// setup debugMetricsScheduler
-	debugMetricsScheduler := p.setupDebugMetricsScheduler(p.config)
-
 	// setup the metrics scheduler
-	metricsScheduler := p.setupMetricsScheduler(p.config)
+	metricsScheduler := p.setupScheduler(p.config, gatewayMetricsPrefix)
 
+	// setup debugMetricsScheduler
+	debugMetricsScheduler := p.setupScheduler(p.config, "")
+
+	// attach go metrics to debug metric scheduler
+	debugMetricsScheduler.AddCallback(sfxclient.GoMetricsSource)
+
+	// report version metric to debug metric scheduler
+	p.versionMetric.RepoURL = "https://github.com/signalfx/gateway"
+	p.versionMetric.FileName = "/buildInfo.json"
+	debugMetricsScheduler.AddCallback(&p.versionMetric)
+
+	// instantiate schedulers
+	schedulers := map[string]*sfxclient.Scheduler{"gateway_metrics": metricsScheduler}
+
+	// only create the debug scheduler if EmitDebugMetrics is true
+	if p.config.EmitDebugMetrics != nil && *p.config.EmitDebugMetrics {
+		schedulers["debug_metrics"] = debugMetricsScheduler
+	}
+
+	// setup debug server
 	if err := p.setupDebugServer(p.config, p.logger, debugMetricsScheduler, metricsScheduler); err != nil {
 		p.logger.Log(log.Err, "debug server failed", err)
 		return err
@@ -898,52 +939,33 @@ func (p *gateway) start(ctx context.Context) error {
 		return err
 	}
 
-	// setup internal metrics server
-	if err := p.setupInternalMetricsServer(p.config, p.logger, debugMetricsScheduler); err != nil {
-		p.logger.Log(log.Err, "internal metrics server failed", err)
-		return err
-	}
-
 	// create http chain
 	chain := p.createCommonHTTPChain(p.config)
-
-	// create
 	loader := config.NewLoader(ctx, p.logger, Version, &p.debugContext, &p.debugSink, &p.ctxDims, chain)
 
 	multiplexer, additionalEndpoints, err := p.setupForwardersAndListeners(ctx, loader, p.config, p.logger, debugMetricsScheduler, metricsScheduler)
 	if err == nil {
 		p.handleEndpoints(additionalEndpoints)
 
-		finishedContext, cancelFunc := p.scheduleStatCollection(ctx, debugMetricsScheduler, p.config, multiplexer)
+		// schedule the schedulers
+		stopSchedulers := p.scheduleStatCollection(ctx, schedulers, multiplexer)
 
-		metricsScheduler.Sink = multiplexer
-		finishedContextDefaultDelay, cancelFuncDefaultDelay := context.WithCancel(ctx)
-		// Schedule datapoint collection to a Discard sink so we can get the stats in Expvar()
-		wg := sync.WaitGroup{}
+		// setup the internal metrics server
+		if err := p.setupInternalMetricsServer(p.config, p.logger, schedulers); err != nil {
+			p.logger.Log(log.Err, "internal metrics server failed", err)
+			return err
+		}
 
-		wg.Add(2)
-		go func() {
-			err := debugMetricsScheduler.Schedule(finishedContext)
-			p.logger.Log(log.Err, err, logkey.Struct, "debugMetricsScheduler", "Schedule finished")
-			wg.Done()
-		}()
-
-		go func() {
-			err := metricsScheduler.Schedule(finishedContextDefaultDelay)
-			p.logger.Log(log.Err, err, logkey.Struct, "metrics scheduler", "Schedule finished")
-			wg.Done()
-		}()
-
+		// wait for setup to complete
 		if p.setupDoneSignal != nil {
 			close(p.setupDoneSignal)
 		}
 
+		// wait for the gateway to shutdown
 		p.logger.Log("Setup done.  Blocking!")
 		err = p.runningLoop(ctx)
 
-		cancelFunc()
-		cancelFuncDefaultDelay()
-		wg.Wait()
+		stopSchedulers()
 	}
 
 	return err

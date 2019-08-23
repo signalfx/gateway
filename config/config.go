@@ -177,9 +177,7 @@ type GatewayConfig struct {
 	EtcdMaxSnapFiles *uint   `json:",omitempty"`
 	EtcdMaxWalFiles  *uint   `json:",omitempty"`
 
-	// Default reporting delay for gateway internal metrics
-	InternalMetricsReportingDelay         *string        `json:",omitempty"` // default delay for reporting internal gateway metrics
-	InternalMetricsReportingDelayDuration *time.Duration `json:"-"`
+	EmitDebugMetrics *bool 	`json:",omitempty"`	// indicates whether debug metrics should be emitted or not
 }
 
 func stringToURL(s string) (u *url.URL, err error) {
@@ -348,6 +346,9 @@ func DefaultGatewayConfig() *GatewayConfig {
 		EtcdSnapCount:                 pointer.Uint64(100000),
 		EtcdMaxSnapFiles:              pointer.Uint(embed.DefaultMaxSnapshots),
 		EtcdMaxWalFiles:               pointer.Uint(embed.DefaultMaxWALs),
+		StatsDelay: 				   pointer.String("10s"),
+		StatsDelayDuration: 		   pointer.Duration(10*time.Second),
+		EmitDebugMetrics: 			   pointer.Bool(false),
 	}
 }
 func getDefaultName(osHostname func() (string, error)) string {
@@ -368,13 +369,6 @@ func decodeConfig(configBytes []byte) (*GatewayConfig, error) {
 		config.StatsDelayDuration = &duration
 		if err != nil {
 			return nil, errors.Annotatef(err, "cannot parse stats delay %s", *config.StatsDelay)
-		}
-	}
-	if config.InternalMetricsReportingDelay != nil {
-		duration, err := time.ParseDuration(*config.InternalMetricsReportingDelay)
-		config.InternalMetricsReportingDelayDuration = &duration
-		if err != nil {
-			return nil, errors.Annotatef(err, "cannot parse internal metrics delay %s", *config.InternalMetricsReportingDelay)
 		}
 	}
 	err := config.decodeTimeouts()

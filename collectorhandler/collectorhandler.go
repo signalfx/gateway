@@ -17,7 +17,7 @@ type CollectorHandler struct {
 // NewCollectorHandler gets you the new CollectorHandler
 func NewCollectorHandler(schedulers ...*sfxclient.Scheduler) *CollectorHandler {
 	return &CollectorHandler{
-		schedulers:          schedulers,
+		schedulers:         schedulers,
 		jsonMarshallerFunc: json.Marshal,
 	}
 }
