@@ -22,6 +22,7 @@ type TDigest struct {
 	decayCount        int32
 	decayEvery        int32
 	decayValue        float64
+	flip              bool
 }
 
 func New() *TDigest {
@@ -32,15 +33,21 @@ func NewWithCompression(c float64) *TDigest {
 	return NewWithDecay(c, 0, 0)
 }
 
+var defaultScaler = &K3Spliced{}
+
 func NewWithDecay(compression, decayValue float64, decayEvery int32) *TDigest {
+	return NewWithScaler(defaultScaler, compression, decayValue, decayEvery)
+}
+
+func NewWithScaler(scale scaler, compression, decayValue float64, decayEvery int32) *TDigest {
 	t := &TDigest{
 		Compression: compression,
-		Scaler:      &K1{},
+		Scaler:      scale,
 		decayValue:  decayValue,
 		decayEvery:  decayEvery,
 	}
-	t.maxProcessed = processedSize(0, t.Compression)
-	t.maxUnprocessed = unprocessedSize(0, t.Compression)
+	t.maxProcessed = t.Scaler.processedSize(t.Compression)
+	t.maxUnprocessed = t.Scaler.unprocessedSize(t.Compression)
 	t.processed = make([]Centroid, 0, t.maxProcessed)
 	t.unprocessed = make([]Centroid, 0, t.maxUnprocessed+1)
 	t.cumulative = make([]float64, 0, t.maxProcessed+1)
@@ -49,24 +56,39 @@ func NewWithDecay(compression, decayValue float64, decayEvery int32) *TDigest {
 	return t
 }
 
+func (t *TDigest) Clear() {
+	t.processed.Clear()
+	t.unprocessed.Clear()
+	t.cumulative = t.cumulative[:0]
+	t.min = math.MaxFloat64
+	t.max = -math.MaxFloat64
+	t.count = 0
+	t.decayCount = 0
+	t.processedWeight = 0
+	t.unprocessedWeight = 0
+}
+
 func (t *TDigest) Add(x, w float64) {
 	if math.IsNaN(x) {
 		return
 	}
 	t.AddCentroid(Centroid{Mean: x, Weight: w})
-
-	t.handleDecay()
 }
 
-func (t *TDigest) handleDecay() {
+func (t *TDigest) handleDecay(w float64) {
 	t.count++
 	if t.decayValue > 0 {
-		t.decayCount++
+		t.decayCount += int32(w)
 		if t.decayCount >= t.decayEvery {
 			t.decay()
 			t.decayCount = 0
 		}
 	}
+}
+
+func (t *TDigest) Centroids() CentroidList {
+	t.process()
+	return t.processed
 }
 
 func (t *TDigest) AddCentroidList(c CentroidList) {
@@ -89,10 +111,10 @@ func (t *TDigest) AddCentroid(c Centroid) {
 	t.unprocessed = append(t.unprocessed, c)
 	t.unprocessedWeight += c.Weight
 
-	if t.processed.Len() > t.maxProcessed ||
-		t.unprocessed.Len() > t.maxUnprocessed {
+	if t.processed.Len() >= t.maxProcessed || t.unprocessed.Len() > (t.maxUnprocessed-t.processed.Len()) {
 		t.process()
 	}
+	t.handleDecay(c.Weight)
 }
 
 func (t *TDigest) process() {
@@ -100,12 +122,14 @@ func (t *TDigest) process() {
 }
 
 func (t *TDigest) processIt(updateCumulative bool) {
-	if t.unprocessed.Len() > 0 ||
-		t.processed.Len() > t.maxProcessed {
-
+	if t.unprocessed.Len() > 0 || t.processed.Len() > t.maxProcessed {
 		// Append all processed centroids to the unprocessed list and sort
 		t.unprocessed = append(t.unprocessed, t.processed...)
 		sort.Sort(&t.unprocessed)
+		if t.flip {
+			sort.Reverse(&t.unprocessed)
+		}
+		t.flip = !t.flip
 
 		// Reset processed list with first centroid
 		t.processed.Clear()
@@ -113,16 +137,18 @@ func (t *TDigest) processIt(updateCumulative bool) {
 
 		t.processedWeight += t.unprocessedWeight
 		t.unprocessedWeight = 0
+		normalizer := t.Scaler.normalizer(t.Compression, t.processedWeight)
 		soFar := t.unprocessed[0].Weight
-		limit := t.processedWeight * t.Scaler.integratedQ(1.0, t.Compression)
+		k1 := t.Scaler.k(0, normalizer)
+		limit := t.processedWeight * t.Scaler.q(k1+1, normalizer)
 		for _, centroid := range t.unprocessed[1:] {
 			projected := soFar + centroid.Weight
 			if projected <= limit {
 				soFar = projected
-				(&t.processed[t.processed.Len()-1]).Add(centroid)
+				_ = (&t.processed[t.processed.Len()-1]).Add(centroid) // igonoring error, would have errored when we first added it not here
 			} else {
-				k1 := t.Scaler.integratedLocation(soFar/t.processedWeight, t.Compression)
-				limit = t.processedWeight * t.Scaler.integratedQ(k1+1.0, t.Compression)
+				k1 = t.Scaler.k(soFar/t.processedWeight, normalizer)
+				limit = t.processedWeight * t.Scaler.q(k1+1.0, normalizer)
 				soFar += centroid.Weight
 				t.processed = append(t.processed, centroid)
 			}
@@ -142,7 +168,7 @@ func (t *TDigest) updateCumulative() {
 	for _, centroid := range t.processed {
 		cur := centroid.Weight
 		t.cumulative = append(t.cumulative, prev+cur/2.0)
-		prev = prev + cur
+		prev += cur
 	}
 	t.cumulative = append(t.cumulative, prev)
 }
@@ -181,13 +207,13 @@ func (t *TDigest) CDF(x float64) float64 {
 	case 0:
 		return 0.0
 	case 1:
-		width := t.max - t.min
 		if x <= t.min {
 			return 0.0
 		}
 		if x >= t.max {
 			return 1.0
 		}
+		width := t.max - t.min
 		if (x - t.min) <= width {
 			// min and max are too close together to do any viable interpolation
 			return 0.5
@@ -227,21 +253,6 @@ func (t *TDigest) CDF(x float64) float64 {
 	return weightedAverage(t.cumulative[upper-1], z2, t.cumulative[upper], z1) / t.processedWeight
 }
 
-type scaler interface {
-	integratedQ(k, compression float64) float64
-	integratedLocation(q, compression float64) float64
-}
-
-type K1 struct{}
-
-func (*K1) integratedQ(k, compression float64) float64 {
-	return (math.Sin(math.Min(k, compression)*math.Pi/compression-math.Pi/2.0) + 1.0) / 2.0
-}
-
-func (*K1) integratedLocation(q, compression float64) float64 {
-	return compression * (math.Asin(2.0*q-1.0) + math.Pi/2.0) / math.Pi
-}
-
 func weightedAverage(x1, w1, x2, w2 float64) float64 {
 	if x1 <= x2 {
 		return weightedAverageSorted(x1, w1, x2, w2)
@@ -252,20 +263,6 @@ func weightedAverage(x1, w1, x2, w2 float64) float64 {
 func weightedAverageSorted(x1, w1, x2, w2 float64) float64 {
 	x := (x1*w1 + x2*w2) / (w1 + w2)
 	return math.Max(x1, math.Min(x, x2))
-}
-
-func processedSize(size int, compression float64) int {
-	if size == 0 {
-		return int(2 * math.Ceil(compression))
-	}
-	return size
-}
-
-func unprocessedSize(size int, compression float64) int {
-	if size == 0 {
-		return int(8 * math.Ceil(compression))
-	}
-	return size
 }
 
 // decayLimit is 0.9**100, maybe configurable?
@@ -285,14 +282,14 @@ func (t *TDigest) decay() {
 	prev := 0.0
 	for i := range t.processed {
 		c := &t.processed[i]
-		c.Weight = c.Weight * t.decayValue
+		c.Weight *= t.decayValue
 		if c.Weight < decayLimit {
 			remove = append(remove, i)
 		} else {
 			weight += c.Weight
 			// do cumulative work inline
 			t.cumulative = append(t.cumulative, prev+c.Weight/2.0)
-			prev = prev + c.Weight
+			prev += c.Weight
 		}
 	}
 	t.cumulative = append(t.cumulative, prev)
@@ -331,15 +328,11 @@ func (t *TDigest) Clone() *TDigest {
 		decayCount:        t.decayCount,
 		decayEvery:        t.decayEvery,
 		decayValue:        t.decayValue,
+		Scaler:            t.Scaler,
 	}
 
-	for _, c := range t.processed {
-		td.processed = append(td.processed, c)
-	}
-
-	for _, c := range t.cumulative {
-		td.cumulative = append(td.cumulative, c)
-	}
+	td.processed = append(td.processed, t.processed...)
+	td.cumulative = append(td.cumulative, t.cumulative...)
 	// we've processed so unprocessed will be empty
 
 	return td
@@ -368,4 +361,8 @@ func (t *TDigest) Min() float64 {
 
 func (t *TDigest) Max() float64 {
 	return t.max
+}
+
+func (t *TDigest) TotalWeight() float64 {
+	return t.processedWeight
 }
