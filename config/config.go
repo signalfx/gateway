@@ -177,7 +177,7 @@ type GatewayConfig struct {
 	EtcdMaxSnapFiles *uint   `json:",omitempty"`
 	EtcdMaxWalFiles  *uint   `json:",omitempty"`
 
-	EmitDebugMetrics *bool 	`json:",omitempty"`	// indicates whether debug metrics should be emitted or not
+	EmitDebugMetrics *bool `json:",omitempty"` // indicates whether debug metrics should be emitted or not
 }
 
 func stringToURL(s string) (u *url.URL, err error) {
@@ -346,9 +346,9 @@ func DefaultGatewayConfig() *GatewayConfig {
 		EtcdSnapCount:                 pointer.Uint64(100000),
 		EtcdMaxSnapFiles:              pointer.Uint(embed.DefaultMaxSnapshots),
 		EtcdMaxWalFiles:               pointer.Uint(embed.DefaultMaxWALs),
-		StatsDelay: 				   pointer.String("10s"),
-		StatsDelayDuration: 		   pointer.Duration(10*time.Second),
-		EmitDebugMetrics: 			   pointer.Bool(false),
+		StatsDelay:                    pointer.String("10s"),
+		StatsDelayDuration:            pointer.Duration(10 * time.Second),
+		EmitDebugMetrics:              pointer.Bool(false),
 	}
 }
 func getDefaultName(osHostname func() (string, error)) string {

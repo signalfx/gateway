@@ -83,11 +83,21 @@ func (f *Forwarder) Close() error {
 	return f.pool.Close()
 }
 
-// Datapoints returns connection pool datapoints
-func (f *Forwarder) Datapoints() []*datapoint.Datapoint {
+// DebugDatapoints returns connection pool datapoints
+func (f *Forwarder) DebugDatapoints() []*datapoint.Datapoint {
 	datapoints := f.pool.Datapoints()
 	datapoints = append(datapoints, f.GetFilteredDatapoints()...)
 	return datapoints
+}
+
+// DefaultDatapoints does nothing and exists to satisfy the protocol.Forwarder interface
+func (f *Forwarder) DefaultDatapoints() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{}
+}
+
+// Datapoints satisfies the sfxclient.Collector interface
+func (f *Forwarder) Datapoints() []*datapoint.Datapoint {
+	return append(f.DebugDatapoints(), f.DefaultDatapoints()...)
 }
 
 func (f *Forwarder) datapointToGraphite(dp *datapoint.Datapoint) string {

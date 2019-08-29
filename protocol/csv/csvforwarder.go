@@ -58,9 +58,19 @@ func (f *Forwarder) StartupFinished() error {
 	return nil
 }
 
-// Datapoints returns nothing and exists to satisfy the protocol.Forwarder interface
-func (f *Forwarder) Datapoints() []*datapoint.Datapoint {
+// DebugDatapoints returns datapoints that are used for debugging
+func (f *Forwarder) DebugDatapoints() []*datapoint.Datapoint {
 	return f.GetFilteredDatapoints()
+}
+
+// DefaultDatapoints returns a set of default datapoints about the forwarder
+func (f *Forwarder) DefaultDatapoints() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{}
+}
+
+// Datapoints implements the sfxclient.Collector interface and returns all datapoints
+func (f *Forwarder) Datapoints() []*datapoint.Datapoint {
+	return append(f.DebugDatapoints(), f.DefaultDatapoints()...)
 }
 
 // AddDatapoints writes the points to a file

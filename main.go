@@ -223,8 +223,17 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 
 		groupName := fmt.Sprintf("%s_f_%d", name, idx)
 
-		debugMetricsScheduler.AddGroupedCallback(groupName, forwarder)
-		debugMetricsScheduler.AddGroupedCallback(groupName, bf)
+		metricsScheduler.GroupedDefaultDimensions(groupName, datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
+			"name":      name,
+			"direction": "forwarder",
+			"source":    "gateway",
+			"host":      *loadedConfig.ServerName,
+			"type":      forwardConfig.Type,
+			"cluster":   *loadedConfig.ClusterName,
+		}))
+		metricsScheduler.AddGroupedCallback(groupName, sfxclient.CollectorFunc(forwarder.DefaultDatapoints))
+		metricsScheduler.AddGroupedCallback(groupName, sfxclient.CollectorFunc(bf.DefaultDatapoints))
+
 		debugMetricsScheduler.GroupedDefaultDimensions(groupName, datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
 			"name":      name,
 			"direction": "forwarder",
@@ -233,6 +242,9 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 			"type":      forwardConfig.Type,
 			"cluster":   *loadedConfig.ClusterName,
 		}))
+		debugMetricsScheduler.AddGroupedCallback(groupName, sfxclient.CollectorFunc(forwarder.DebugDatapoints))
+		debugMetricsScheduler.AddGroupedCallback(groupName, sfxclient.CollectorFunc(bf.DebugDatapoints))
+
 	}
 	return allForwarders, nil
 }
@@ -887,11 +899,11 @@ func (p *gateway) scheduleStatCollection(ctx context.Context, schedulers map[str
 		}
 
 		wg.Add(1)
-		go func() {
+		go func(scheduler *sfxclient.Scheduler, name string) {
 			err := scheduler.Schedule(finishedContext)
 			p.logger.Log(log.Err, err, logkey.Struct, name, "Schedule finished")
 			wg.Done()
-		}()
+		}(scheduler, name)
 	}
 
 	return func() {
