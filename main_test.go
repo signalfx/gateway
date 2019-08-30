@@ -969,35 +969,6 @@ func Test_handleClusterNameResponse(t *testing.T) {
 	}
 }
 
-const internalMetricsReportingConfig = `
-{
-  "LogFormat": "logfmt",
-  "LogDir": "-",
-  "NumProcs":4,
-  "DebugFlag": "debugme",
-  "ListenFrom":[z
-    {
-        "Type":"signalfx",
-        "ListenAddr": "127.0.0.1:0"
-    }
-  ],
-  "LocalDebugServer": "127.0.0.1:0",
-  "ForwardTo":[
-  {
-    "type": "signalfx-json",
-    "DefaultAuthToken": "AAA",
-    "url": "http://localhost:<<PORT>>/v2/datapoint",
-    "eventURL": ""
-  }
-  ],
-   "MaxGracefulWaitTime":     "10ms",
-   "GracefulCheckInterval":   "10ms",
-   "MinimalGracefulWaitTime": "10ms",
-   "SilentGracefulTime": "50ms",
-   "StatsDelay": "1s"
-}
-`
-
 const statsDelayConfig = `
 	{
 	  <<STATSDELAY>>
