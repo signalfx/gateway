@@ -1311,7 +1311,6 @@ func TestInternalMetricsServer(t *testing.T) {
 				So(err, ShouldBeNil)
 				bts, err := ioutil.ReadAll(resp.Body)
 				So(err, ShouldBeNil)
-				fmt.Println(bts)
 				So(json.Unmarshal(bts, &dps), ShouldBeNil)
 			}
 
