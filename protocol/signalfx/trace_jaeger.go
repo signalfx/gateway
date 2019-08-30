@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"github.com/signalfx/golib/datapoint/dpsink"
 	"io"
 	"net"
 	"net/http"
@@ -14,14 +13,11 @@ import (
 	"sync"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/gorilla/mux"
 	jThrift "github.com/jaegertracing/jaeger/thrift-gen/jaeger"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
-	"github.com/signalfx/golib/web"
 )
 
 // JaegerThriftTraceDecoderV1 decodes Jaeger thrift spans to structs
@@ -53,21 +49,6 @@ const (
 	// JaegerV1 binary thrift protocol
 	JaegerV1 = "jaeger_thrift_v1"
 )
-
-func setupThriftTraceV1(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, httpChain web.NextConstructor, counter *dpsink.Counter) sfxclient.Collector {
-	handler, st := SetupChain(ctx, sink, JaegerV1, func(s Sink) ErrorReader {
-		return NewJaegerThriftTraceDecoderV1(logger, sink)
-	}, httpChain, logger, counter)
-
-	SetupThriftByPaths(r, handler, DefaultTracePathV1)
-	return st
-}
-
-// SetupThriftByPaths tells the router which paths the given handler (which should handle the given endpoint) should see
-func SetupThriftByPaths(r *mux.Router, handler http.Handler, endpoint string) {
-	r.Path(endpoint).Methods("POST").Headers("Content-Type", "application/x-thrift").Handler(handler)
-	r.Path(endpoint).Methods("POST").Headers("Content-Type", "application/vnd.apache.thrift.binary").Handler(handler)
-}
 
 // Code inspired by
 // https://github.com/jaegertracing/jaeger/blob/89f3ccaef21d256728f02ec9d73b31f9c3bde71a/cmd/collector/app/http_handler.go#L61

@@ -5,11 +5,11 @@ import (
 	"expvar"
 	"flag"
 	"fmt"
-	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"path"
@@ -21,7 +21,7 @@ import (
 
 	etcdcli "github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/embed"
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 	"github.com/signalfx/embetcd/embetcd"
 	"github.com/signalfx/gateway/collectorhandler"
 	"github.com/signalfx/gateway/config"
@@ -30,6 +30,7 @@ import (
 	"github.com/signalfx/gateway/flaghelpers"
 	"github.com/signalfx/gateway/logkey"
 	"github.com/signalfx/gateway/protocol"
+	"github.com/signalfx/gateway/protocol/common"
 	"github.com/signalfx/gateway/protocol/demultiplexer"
 	"github.com/signalfx/gateway/protocol/signalfx"
 	_ "github.com/signalfx/go-distribute"
@@ -49,7 +50,7 @@ import (
 	_ "github.com/signalfx/ondiskencoding"
 	_ "github.com/signalfx/tdigest"
 	_ "github.com/spaolacci/murmur3"
-	_ "net/http/pprof"
+	"gopkg.in/natefinch/lumberjack.v2"
 	_ "stathat.com/c/consistent"
 )
 
@@ -328,10 +329,18 @@ func (p *gateway) setupInternalMetricsServer(conf *config.GatewayConfig, logger 
 		}
 		p.internalMetricsListener = listener
 
+<<<<<<< HEAD
 		schedulers := make([]*sfxclient.Scheduler, 0, len(schedulersMap))
 		for _, s := range schedulersMap {
 			schedulers = append(schedulers, s)
 		}
+=======
+	collector := internal.NewCollector(logger, scheduler)
+	handler := common.InitDefaultGin(false, gin.ReleaseMode)
+	handler.GET("/internal-metrics", gin.WrapF(collector.MetricsHandler))
+	// handler.Path("/internal-metrics").HandlerFunc(collector.MetricsHandler)
+	p.internalMetricsServer = collector
+>>>>>>> replacing gorilla mux with gin mux
 
 		collector := collectorhandler.NewCollectorHandler(schedulers...)
 		handler := mux.NewRouter()

@@ -4,16 +4,19 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dptest"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/web"
-	. "github.com/smartystreets/goconvey/convey"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"gotest.tools/assert"
+
+	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/datapoint/dptest"
+	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/web"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 const testCollectdBody = `[
@@ -281,4 +284,38 @@ func BenchmarkCollectdListener(b *testing.B) {
 		}
 	}
 	b.SetBytes(bytes)
+}
+
+func TestDummy(t *testing.T) {
+	debugContext := &web.HeaderCtxFlag{
+		HeaderName: "X-Test",
+	}
+	callCount := int64(0)
+	conf := &ListenerConfig{
+		ListenAddr:   pointer.String("127.0.0.1:0"),
+		DebugContext: debugContext,
+		HTTPChain: func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
+			atomic.AddInt64(&callCount, 1)
+			next.ServeHTTPC(ctx, rw, r)
+		},
+	}
+	sendTo := dptest.NewBasicSink()
+
+	listener, _ := NewListener(sendTo, conf)
+	// So(err, ShouldBeNil)
+	client := &http.Client{}
+	baseURL := fmt.Sprintf("http://%s/post-collectd", listener.server.Addr)
+	var datapoints []*datapoint.Datapoint
+	sendTo.Resize(10)
+	req, _ := http.NewRequest("POST", baseURL, strings.NewReader(testCollectdBody))
+	// So(err, ShouldBeNil)
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := client.Do(req)
+	// So(err, ShouldBeNil)
+	// So(resp.StatusCode, ShouldEqual, http.StatusOK)
+	assert.Equal(t, resp.StatusCode, http.StatusOK)
+	datapoints = <-sendTo.PointsChan
+	// So(len(datapoints), ShouldEqual, 8)
+	// So(dptest.ExactlyOne(datapoints, "load.shortterm").Value.String(), ShouldEqual, "0.37")
+	assert.Equal(t, len(datapoints), 8)
 }

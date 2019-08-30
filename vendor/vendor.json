@@ -600,6 +600,52 @@
 			"revisionTime": "2019-02-12T21:16:48Z"
 		},
 		{
+			"checksumSHA1": "qlEzrgKgIkh7y0ePm9BNo1cNdXo=",
+			"path": "github.com/gin-contrib/sse",
+			"revision": "54d8467d122d380a14768b6b4e5cd7ca4755938f",
+			"revisionTime": "2019-06-02T15:02:53Z"
+		},
+		{
+			"checksumSHA1": "90S9sFqcIo/uuwQzz1t/wYs7GEs=",
+			"path": "github.com/gin-gonic/gin",
+			"revision": "b869fe1415e4b9eb52f247441830d502aece2d4d",
+			"revisionTime": "2018-08-14T08:58:52Z",
+			"version": "v1.3.0",
+			"versionExact": "v1.3.0"
+		},
+		{
+			"checksumSHA1": "BjShmaQTKI8+411rCb7LFqJkLA0=",
+			"path": "github.com/gin-gonic/gin/binding",
+			"revision": "b869fe1415e4b9eb52f247441830d502aece2d4d",
+			"revisionTime": "2018-08-14T08:58:52Z",
+			"version": "v1.3.0",
+			"versionExact": "v1.3.0"
+		},
+		{
+			"checksumSHA1": "rST0S8cuVbM57VmJhWXhKNUkKTc=",
+			"path": "github.com/gin-gonic/gin/internal/json",
+			"revision": "b75d67cd51eb53c3c3a2fc406524c940021ffbda",
+			"revisionTime": "2019-05-07T11:43:05Z",
+			"version": "v1.4.0",
+			"versionExact": "v1.4.0"
+		},
+		{
+			"checksumSHA1": "woO1qIxIeQ1bcbPSiMfAKk3r4xg=",
+			"path": "github.com/gin-gonic/gin/json",
+			"revision": "b869fe1415e4b9eb52f247441830d502aece2d4d",
+			"revisionTime": "2018-08-14T08:58:52Z",
+			"version": "v1.3.0",
+			"versionExact": "v1.3.0"
+		},
+		{
+			"checksumSHA1": "f1n8P2YAi3o+X0//dkoDJ822zW0=",
+			"path": "github.com/gin-gonic/gin/render",
+			"revision": "b869fe1415e4b9eb52f247441830d502aece2d4d",
+			"revisionTime": "2018-08-14T08:58:52Z",
+			"version": "v1.3.0",
+			"versionExact": "v1.3.0"
+		},
+		{
 			"checksumSHA1": "g8yM1TRZyIjXtopiqbslzgLqtM0=",
 			"path": "github.com/go-logfmt/logfmt",
 			"revision": "07c9b44f60d7ffdfb7d8efe1ad539965737836dc",
@@ -846,12 +892,6 @@
 			"revision": "a8d44e7d8e4d532b6a27a02dd82abb31cc1b01bd"
 		},
 		{
-			"checksumSHA1": "xF+WqeL9eAlbUkiO2bLghMQzO4k=",
-			"comment": "v1.1",
-			"path": "github.com/gorilla/mux",
-			"revision": "0eeaf8392f5b04950925b8a69fe70f110fa7cbfc"
-		},
-		{
 			"checksumSHA1": "gr0edNJuVv4+olNNZl5ZmwLgscA=",
 			"path": "github.com/gorilla/websocket",
 			"revision": "0ec3d1bd7fe50c503d6df98ee649d81f4857c564",
@@ -906,6 +946,12 @@
 			"revisionTime": "2019-01-14T14:18:12Z"
 		},
 		{
+			"checksumSHA1": "4DgEcOv2o9NyZAHCbdS76mToqpU=",
+			"path": "github.com/json-iterator/go",
+			"revision": "27518f6661eba504be5a7a9a9f6d9460d892ade3",
+			"revisionTime": "2019-06-21T16:12:01Z"
+		},
+		{
 			"checksumSHA1": "cIiyvAduLLFvu+tg1Qr5Jw3jeWo=",
 			"path": "github.com/jtolds/gls",
 			"revision": "b4936e06046bbecbb94cae9c18127ebe510a2cb9",
@@ -948,6 +994,12 @@
 			"revisionTime": "2019-03-12T14:32:42Z"
 		},
 		{
+			"checksumSHA1": "C3Xbt5Nq5Wez3B5cyi8vQlVkP1g=",
+			"path": "github.com/mattn/go-isatty",
+			"revision": "bf9a1dea1961e1d831824fb135332bfb8c10e8b8",
+			"revisionTime": "2019-08-18T12:36:53Z"
+		},
+		{
 			"checksumSHA1": "bKMZjd2wPw13VwoE7mBeSv5djFA=",
 			"path": "github.com/matttproud/golang_protobuf_extensions/pbutil",
 			"revision": "c182affec369e30f25d3eb8cd8a478dee585ae7d",
@@ -958,6 +1010,18 @@
 			"path": "github.com/mdubbyap/timespan",
 			"revision": "96e435f01fb4f075efc20c24ab907f35c01f1060",
 			"revisionTime": "2019-03-19T18:37:43Z"
+		},
+		{
+			"checksumSHA1": "ZTcgWKWHsrX0RXYVXn5Xeb8Q0go=",
+			"path": "github.com/modern-go/concurrent",
+			"revision": "bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94",
+			"revisionTime": "2018-03-06T01:26:44Z"
+		},
+		{
+			"checksumSHA1": "qvH48wzTIV3QKSDqI0dLFtVjaDI=",
+			"path": "github.com/modern-go/reflect2",
+			"revision": "94122c33edd36123c84d5368cfb2b69df93a0ec8",
+			"revisionTime": "2018-07-18T01:23:57Z"
 		},
 		{
 			"checksumSHA1": "wIcN7tZiF441h08RHAm4NV8cYO4=",
@@ -1928,6 +1992,12 @@
 			"path": "google.golang.org/grpc/transport",
 			"revision": "f3955b8e9e244dd4dd4bc4f7b7a23a8445400a76",
 			"revisionTime": "2018-01-02T23:19:09Z"
+		},
+		{
+			"checksumSHA1": "P/k5ZGf0lEBgpKgkwy++F7K1PSg=",
+			"path": "gopkg.in/go-playground/validator.v8",
+			"revision": "5f1438d3fca68893a817e4a66806cea46a9e4ebf",
+			"revisionTime": "2017-07-30T05:02:35Z"
 		},
 		{
 			"checksumSHA1": "gpZUOj4F6rm+QSVylJfegSXEG/k=",

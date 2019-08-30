@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/gorilla/mux"
 	"github.com/mailru/easyjson"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/gateway/protocol/signalfx/format"
@@ -14,8 +13,6 @@ import (
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/web"
 )
 
 // ProtobufEventDecoderV2 decodes protocol buffers in signalfx's v2 format and sends them to Sink
@@ -74,39 +71,4 @@ func (decoder *JSONEventDecoderV2) Read(ctx context.Context, req *http.Request) 
 		evts = append(evts, evt)
 	}
 	return decoder.Sink.AddEvents(ctx, evts)
-}
-
-func setupJSONEventV2(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor, counter *dpsink.Counter) sfxclient.Collector {
-	additionalConstructors := []web.Constructor{}
-	if debugContext != nil {
-		additionalConstructors = append(additionalConstructors, debugContext)
-	}
-	handler, st := SetupChain(ctx, sink, "json_event_v2", func(s Sink) ErrorReader {
-		return &JSONEventDecoderV2{Sink: s, Logger: logger}
-	}, httpChain, logger, counter, additionalConstructors...)
-	SetupJSONV2EventPaths(r, handler)
-	return st
-}
-
-// SetupJSONV2EventPaths tells the router which paths the given handler (which should handle v2 protobufs)
-func SetupJSONV2EventPaths(r *mux.Router, handler http.Handler) {
-	SetupJSONByPaths(r, handler, "/v2/event")
-}
-
-func setupProtobufEventV2(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor, counter *dpsink.Counter) sfxclient.Collector {
-	additionalConstructors := []web.Constructor{}
-	if debugContext != nil {
-		additionalConstructors = append(additionalConstructors, debugContext)
-	}
-	handler, st := SetupChain(ctx, sink, "protobuf_event_v2", func(s Sink) ErrorReader {
-		return &ProtobufEventDecoderV2{Sink: s, Logger: logger}
-	}, httpChain, logger, counter, additionalConstructors...)
-	SetupProtobufV2EventPaths(r, handler)
-
-	return st
-}
-
-// SetupProtobufV2EventPaths tells the router which paths the given handler (which should handle v2 protobufs)
-func SetupProtobufV2EventPaths(r *mux.Router, handler http.Handler) {
-	SetupProtobufV2ByPaths(r, handler, "/v2/event")
 }

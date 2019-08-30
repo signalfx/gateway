@@ -1,6 +1,8 @@
 package signalfx
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -8,14 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"bytes"
-	"context"
-
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/gateway/logkey"
 	"github.com/signalfx/gateway/protocol"
 	"github.com/signalfx/gateway/protocol/collectd"
+	"github.com/signalfx/gateway/protocol/common"
 	"github.com/signalfx/gateway/protocol/signalfx/additionalspantags"
 	"github.com/signalfx/gateway/protocol/signalfx/processdebug"
 	"github.com/signalfx/gateway/protocol/signalfx/spanobfuscation"
@@ -202,7 +202,8 @@ func NewListener(sink Sink, conf *ListenerConfig) (*ListenerServer, error) {
 	if err != nil {
 		return nil, errors.Annotatef(err, "cannot open listening address %s", *conf.ListenAddr)
 	}
-	r := mux.NewRouter()
+
+	r := common.InitDefaultGin(false, gin.ReleaseMode)
 
 	server := http.Server{
 		Handler:      r,
@@ -222,22 +223,19 @@ func NewListener(sink Sink, conf *ListenerConfig) (*ListenerServer, error) {
 	}
 	listenServer.SetupHealthCheck(conf.HealthCheck, r, conf.Logger)
 
-	r.Handle("/v1/metric", &listenServer.metricHandler)
-	r.Handle("/metric", &listenServer.metricHandler)
+	// r.Handle("/v1/metric", &listenServer.metricHandler)
+	// r.Handle("/metric", &listenServer.metricHandler)
+	r.POST("/v1/metric", gin.WrapH(&listenServer.metricHandler))
+	r.POST("/metric", gin.WrapH(&listenServer.metricHandler))
 
 	traceSink, err := createTraceSink(sink, conf)
 
 	listenServer.internalCollectors = sfxclient.NewMultiCollector(
 		setupNotFoundHandler(conf.RootContext, r),
-		setupProtobufV1(conf.RootContext, r, sink, &listenServer.metricHandler, conf.Logger, conf.HTTPChain, conf.Counter),
-		setupJSONV1(conf.RootContext, r, sink, &listenServer.metricHandler, conf.Logger, conf.Counter, conf.HTTPChain),
-		setupProtobufV2(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain, conf.Counter),
-		setupProtobufEventV2(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain, conf.Counter),
-		setupJSONV2(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain, conf.Counter),
-		setupJSONEventV2(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain, conf.Counter),
+		setupV1Paths(conf.RootContext, r, sink, &listenServer.metricHandler, conf.Logger, conf.HTTPChain, conf.Counter),
+		setupV2Paths(conf.RootContext, r, sink, conf.Logger, conf.DebugContext, conf.HTTPChain, conf.Counter),
 		setupCollectd(conf.RootContext, r, sink, conf.DebugContext, conf.HTTPChain, conf.Logger, conf.Counter),
-		setupThriftTraceV1(conf.RootContext, r, traceSink, conf.Logger, conf.HTTPChain, conf.Counter),
-		setupJSONTraceV1(conf.RootContext, r, traceSink, conf.Logger, conf.HTTPChain, conf.Counter),
+		setupTraceV1Paths(conf.RootContext, r, traceSink, conf.Logger, conf.HTTPChain, conf.Counter),
 	)
 
 	go func() {
@@ -246,9 +244,9 @@ func NewListener(sink Sink, conf *ListenerConfig) (*ListenerServer, error) {
 	return &listenServer, err
 }
 
-func setupNotFoundHandler(ctx context.Context, r *mux.Router) sfxclient.Collector {
+func setupNotFoundHandler(ctx context.Context, r *gin.Engine) sfxclient.Collector {
 	metricTracking := web.RequestCounter{}
-	r.NotFoundHandler = web.NewHandler(ctx, web.FromHTTP(http.NotFoundHandler())).Add(web.NextHTTP(metricTracking.ServeHTTP))
+	r.NoRoute(gin.WrapH(web.NewHandler(ctx, web.FromHTTP(http.NotFoundHandler())).Add(web.NextHTTP(metricTracking.ServeHTTP))))
 	return &sfxclient.WithDimensions{
 		Dimensions: map[string]string{"protocol": "http404"},
 		Collector:  &metricTracking,
@@ -316,16 +314,7 @@ func SetupChain(ctx context.Context, sink Sink, chainType string, getReader func
 	return zippers.GzipHandler(handler), st
 }
 
-// SetupJSONByPaths tells the router which paths the given handler (which should handle the given
-// endpoint) should see
-func SetupJSONByPaths(r *mux.Router, handler http.Handler, endpoint string) {
-	r.Path(endpoint).Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
-	r.Path(endpoint).Methods("POST").Headers("Content-Type", "application/json; charset=UTF-8").Handler(handler)
-	r.Path(endpoint).Methods("POST").Headers("Content-Type", "").HandlerFunc(web.InvalidContentType)
-	r.Path(endpoint).Methods("POST").Handler(handler)
-}
-
-func setupCollectd(ctx context.Context, r *mux.Router, sink dpsink.Sink, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor, logger log.Logger, counter *dpsink.Counter) sfxclient.Collector {
+func setupCollectd(ctx context.Context, r *gin.Engine, sink dpsink.Sink, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor, logger log.Logger, counter *dpsink.Counter) sfxclient.Collector {
 	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
 	decoder := collectd.JSONDecoder{
 		Logger: logger,

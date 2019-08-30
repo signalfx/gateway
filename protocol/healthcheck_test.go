@@ -3,7 +3,11 @@ package protocol
 import (
 	"context"
 	"fmt"
-	"github.com/gorilla/mux"
+	"net"
+	"net/http"
+	"testing"
+
+	"github.com/gin-gonic/gin"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/log"
@@ -11,9 +15,6 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/web"
 	. "github.com/smartystreets/goconvey/convey"
-	"net"
-	"net/http"
-	"testing"
 )
 
 type listenerServer struct {
@@ -57,7 +58,8 @@ func TestHealthCheck(t *testing.T) {
 		sendTo.Resize(1)
 		listener, err := net.Listen("tcp", listenAddr)
 		So(err, ShouldBeNil)
-		r := mux.NewRouter()
+		// r := mux.NewRouter()
+		r := gin.Default()
 		fullHandler := web.NewHandler(context.Background(), web.FromHTTP(r))
 		listenServer := &listenerServer{
 			listener: listener,
