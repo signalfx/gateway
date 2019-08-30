@@ -3,12 +3,15 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/signalfx/gateway/protocol/carbon"
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/httpdebug"
+	"github.com/signalfx/golib/web"
 	"io"
 	"io/ioutil"
 	"net"
@@ -34,7 +37,6 @@ import (
 	"github.com/signalfx/gateway/flaghelpers"
 	"github.com/signalfx/gateway/protocol/signalfx"
 	_ "github.com/signalfx/go-metrics"
-	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
@@ -42,7 +44,6 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/golib/timekeeper/timekeepertest"
-	"github.com/signalfx/golib/web"
 	_ "github.com/signalfx/ondiskencoding"
 	. "github.com/smartystreets/goconvey/convey"
 	_ "github.com/spaolacci/murmur3"
@@ -968,131 +969,128 @@ func Test_handleClusterNameResponse(t *testing.T) {
 	}
 }
 
-//const internalMetricsReportingConfig = `
-// {
-//   "LogFormat": "logfmt",
-//   "LogDir": "-",
-//   "NumProcs":4,
-//   "DebugFlag": "debugme",
-//   "ListenFrom":[
-//     {
-//         "Type":"signalfx",
-//         "ListenAddr": "127.0.0.1:0"
-//     }
-//   ],
-//   "LocalDebugServer": "127.0.0.1:0",
-//   "ForwardTo":[
-//   {
-//     "type": "signalfx-json",
-//     "DefaultAuthToken": "AAA",
-//     "url": "http://localhost:<<PORT>>/v2/datapoint",
-//     "eventURL": ""
-//   }
-//   ],
-//    "MaxGracefulWaitTime":     "10ms",
-//    "GracefulCheckInterval":   "10ms",
-//    "MinimalGracefulWaitTime": "10ms",
-//    "SilentGracefulTime": "50ms",
-//    "StatsDelay": "1s"
-// }
-//`
-//const statsDelayConfig = `
-// {
-//   "LogFormat": "logfmt",
-//   "LogDir": "-",
-//   "NumProcs":4,
-//   "DebugFlag": "debugme",
-//   "ListenFrom":[
-//     {
-//         "Type":"signalfx",
-//         "ListenAddr": "127.0.0.1:0"
-//     }
-//   ],
-//   "LocalDebugServer": "127.0.0.1:0",
-//   "ForwardTo":[
-//   {
-//     "type": "signalfx-json",
-//     "DefaultAuthToken": "AAA",
-//     "url": "http://localhost:<<PORT>>/v2/datapoint",
-//     "eventURL": ""
-//   }
-//   ],
-//
-//    "StatsDelay": "1s"
-// }
-//`
-//
-//func TestPrefixAddition(t *testing.T) {
-//	prefixedMetrics := map[string]bool{
-//		"gateway.total_process_errors": true,
-//		"gateway.total_datapoints":     true,
-//		"gateway.total_events":         true,
-//		"gateway.total_spans":          true,
-//		"gateway.total_process_calls":  true,
-//		"gateway.dropped_points":       true,
-//		"gateway.dropped_events":       true,
-//		"gateway.dropped_spans":        true,
-//		"gateway.process_time_ns":      true,
-//		"gateway.calls_in_flight":      true,
-//	}
-//
-//	Convey("should not add prefixes to metrics that are not internal to the gateway", t, func() {
-//		cancelfunc, sfxGateway, sl, sendTo := setUpSfxGateway(statsDelayConfig)
-//		tk := timekeepertest.NewStubClock(time.Now())
-//		sfxGateway.tk = tk
-//		var end bool
-//		for !end {
-//			select {
-//			case <-time.After(*sfxGateway.config.StatsDelayDuration * 2):
-//				end = true
-//			}
-//		}
-//		sfxGateway.signalChan <- syscall.SIGTERM
-//		So(sl.Close(), ShouldBeNil)
-//		if cancelfunc != nil {
-//			cancelfunc()
-//		}
-//		dps := <-sendTo.PointsChan
-//		So(len(dps), ShouldNotEqual, 0)
-//		for _, dp := range dps {
-//			fmt.Println(dps)
-//			_, ok := prefixedMetrics[dp.Metric]
-//			So(ok, ShouldBeFalse)
-//		}
-//	})
-//
-//	Convey("should add prefixes to metrics that are internal to the gateway", t, func() {
-//		cancelfunc, sfxGateway, sl, sendTo := setUpSfxGateway(internalMetricsReportingConfig)
-//		tk := timekeepertest.NewStubClock(time.Now())
-//		sfxGateway.tk = tk
-//		var end bool
-//		for !end {
-//			select {
-//			case <-time.After(*sfxGateway.config.StatsDelayDuration * 2):
-//				end = true
-//			}
-//		}
-//		sfxGateway.signalChan <- syscall.SIGTERM
-//		So(sl.Close(), ShouldBeNil)
-//		if cancelfunc != nil {
-//			cancelfunc()
-//		}
-//		dps := <-sendTo.PointsChan
-//		So(len(dps), ShouldNotEqual, 0)
-//		for _, dp := range dps {
-//			_, ok := prefixedMetrics[dp.Metric]
-//			So(ok, ShouldBeTrue)
-//		}
-//	})
-//}
+const internalMetricsReportingConfig = `
+{
+  "LogFormat": "logfmt",
+  "LogDir": "-",
+  "NumProcs":4,
+  "DebugFlag": "debugme",
+  "ListenFrom":[z
+    {
+        "Type":"signalfx",
+        "ListenAddr": "127.0.0.1:0"
+    }
+  ],
+  "LocalDebugServer": "127.0.0.1:0",
+  "ForwardTo":[
+  {
+    "type": "signalfx-json",
+    "DefaultAuthToken": "AAA",
+    "url": "http://localhost:<<PORT>>/v2/datapoint",
+    "eventURL": ""
+  }
+  ],
+   "MaxGracefulWaitTime":     "10ms",
+   "GracefulCheckInterval":   "10ms",
+   "MinimalGracefulWaitTime": "10ms",
+   "SilentGracefulTime": "50ms",
+   "StatsDelay": "1s"
+}
+`
 
-func setUpSfxGateway(config string) (context.CancelFunc, *gateway, *signalfx.ListenerServer, *dptest.BasicSink) {
+const statsDelayConfig = `
+	{
+	  <<STATSDELAY>>
+	  <<EMITDEBUGMETRICS>>
+	  <<INTERNALMETRICSLISTENER>>
+	  "LogFormat": "logfmt",
+	  "LogDir": "-",
+	  "NumProcs":4,
+	  "DebugFlag": "debugme",
+	  "ListenFrom":[
+		{
+			"Type":"signalfx",
+			"ListenAddr": "127.0.0.1:0"
+		}
+	  ],
+	  "LocalDebugServer": "127.0.0.1:0",
+	  "ForwardTo":[
+		  {
+			"type": "signalfx-json",
+			"DefaultAuthToken": "AAA",
+			"url": "http://localhost:<<PORT>>/v2/datapoint",
+			"eventURL": "http://localhost:<<PORT>>/v2/event",
+			"traceURL": "http://localhost:<<PORT>>/v1/trace"
+		  }
+	  ]
+	}
+`
+
+func getStatsDelayConfig(statsDelay *string, emitDebugMetrics *bool, internalMetricsListenerAddress *string) string {
+	config := statsDelayConfig
+	var statsDelayRep = ""
+	if statsDelay != nil {
+		statsDelayRep = fmt.Sprintf("\"StatsDelay\": \"%s\",", *statsDelay)
+	}
+	config = strings.Replace(config, "<<STATSDELAY>>", statsDelayRep, -1)
+
+	var emitDebugMetricsRep = ""
+	if emitDebugMetrics != nil {
+		emitDebugMetricsRep = fmt.Sprintf("\"EmitDebugMetrics\": %t,", *emitDebugMetrics)
+	}
+	config = strings.Replace(config, "<<EMITDEBUGMETRICS>>", emitDebugMetricsRep, -1)
+
+	var internalMetricsListenerAddressRep = ""
+	if internalMetricsListenerAddress != nil {
+		internalMetricsListenerAddressRep = fmt.Sprintf("\"InternalMetricsListenerAddress\": \"%s\",", *internalMetricsListenerAddress)
+	}
+	config = strings.Replace(config, "<<INTERNALMETRICSLISTENER>>", internalMetricsListenerAddressRep, -1)
+	return config
+}
+
+// shutDownGatewayAfter is a test helper that will shutdown the gateway after the specified length of time
+func shutDownGatewayAfter(sfxGateway *gateway, gatewayDoneCh chan error, length time.Duration) error {
+	tk := timekeepertest.NewStubClock(time.Now())
+	sfxGateway.tk = tk
+	var end bool
+	for !end {
+		select {
+		case <-time.After(length):
+			end = true
+		}
+	}
+
+	// signal for the gateway to shutdown
+	sfxGateway.signalChan <- syscall.SIGTERM
+
+	// wait for the main gateway routine to return
+	return <-gatewayDoneCh
+}
+
+func getAllDatapointsFromChannel(ch chan []*datapoint.Datapoint) []*datapoint.Datapoint {
+	var dps = make([]*datapoint.Datapoint, 0)
+GOTO:
+	for {
+		select {
+		case pts := <-ch:
+			dps = append(dps, pts...)
+		default:
+			break GOTO
+		}
+	}
+	return dps
+}
+
+func setUpSfxGateway(config string) (context.CancelFunc, *gateway, chan error, *signalfx.ListenerServer, *dptest.BasicSink) {
 	ctx, cancelfunc := context.WithCancel(context.Background())
 	var sfxGateway *gateway
 	var mainDoneChan chan error
 	var filename string
 	var sl *signalfx.ListenerServer
 	sendTo := dptest.NewBasicSink()
+	// resize the test sink because we have have metrics comming in multiple batches
+	// this is a side affect of having multiple schedulers
+	sendTo.Resize(50)
 
 	logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
 	logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
@@ -1131,5 +1129,215 @@ func setUpSfxGateway(config string) (context.CancelFunc, *gateway, *signalfx.Lis
 	}()
 	<-sfxGateway.setupDoneSignal
 	So(os.Remove(filename), ShouldBeNil)
-	return cancelfunc, sfxGateway, sl, sendTo
+	return cancelfunc, sfxGateway, mainDoneChan, sl, sendTo
+}
+
+func isMetricInList(dps []*datapoint.Datapoint, metricName string) bool {
+	var isIn bool
+	for _, dp := range dps {
+		if dp.Metric == metricName {
+			isIn = true
+		}
+	}
+	return isIn
+}
+
+func TestMetricsWithStatsDelay(t *testing.T) {
+	type input struct {
+		StatsDelay                     *string
+		EmitDebugMetrics               *bool
+		InternalMetricsListenerAddress *string
+	}
+	type want struct {
+		emittedDPSAssertion     func(actual interface{}, expected ...interface{}) string
+		emittedDPSThreshold     *int
+		metricNameToTestFor     *string
+		metricNameTestAssertion func(actual interface{}, expected ...interface{}) string
+	}
+	cases := []struct {
+		testID string
+		in     input
+		want   want
+	}{
+		{
+			testID: "metrics should not be emitted when StatsDelay is 0s",
+			in: input{
+				StatsDelay: pointer.String("0s"),
+			},
+			want: want{
+				emittedDPSAssertion: ShouldEqual,
+				emittedDPSThreshold: pointer.Int(0),
+			},
+		},
+		{
+			testID: "metrics should be emitted whens StatsDelay is greater than 0",
+			in: input{
+				StatsDelay: pointer.String("1s"),
+			},
+			want: want{
+				emittedDPSAssertion: ShouldBeGreaterThan,
+				emittedDPSThreshold: pointer.Int(0),
+			},
+		},
+		{
+			testID: "metrics should not be emitted when InternalMetricsListenerAddress is configured",
+			in: input{
+				StatsDelay:                     pointer.String("1s"),
+				InternalMetricsListenerAddress: pointer.String("localhost:0"),
+			},
+			want: want{
+				emittedDPSAssertion: ShouldEqual,
+				emittedDPSThreshold: pointer.Int(0),
+			},
+		},
+		{
+			testID: "debug metrics should NOT be emitted when EmitDebugMetrics is false",
+			in: input{
+				StatsDelay:       pointer.String("1s"),
+				EmitDebugMetrics: pointer.Bool(false),
+			},
+			want: want{
+				metricNameToTestFor:     pointer.String("fileinfo_commit"),
+				metricNameTestAssertion: ShouldBeFalse,
+			},
+		},
+		{
+			testID: "debug metrics should be emitted when EmitDebugMetrics is true",
+			in: input{
+				StatsDelay:       pointer.String("1s"),
+				EmitDebugMetrics: pointer.Bool(true),
+			},
+			want: want{
+				metricNameToTestFor:     pointer.String("fileinfo_commit"),
+				metricNameTestAssertion: ShouldBeTrue,
+			},
+		},
+	}
+	for _, c := range cases {
+		Convey(fmt.Sprintf(c.testID), t, func() {
+			config := getStatsDelayConfig(c.in.StatsDelay, c.in.EmitDebugMetrics, c.in.InternalMetricsListenerAddress)
+			cancelfunc, sfxGateway, gatewayDoneCh, sl, sendTo := setUpSfxGateway(config)
+
+			// sometimes the gateway could be forcibly shutdown because it exceeds graceful shutdown...
+			// we don't care about that error in this test.
+			_ = shutDownGatewayAfter(sfxGateway, gatewayDoneCh, *sfxGateway.config.StatsDelayDuration*2)
+
+			// Shutdown the server the gateway was sending datapoints to
+			So(sl.Close(), ShouldBeNil)
+			if cancelfunc != nil {
+				cancelfunc()
+			}
+
+			// gather datapoints from the server the gateway emitted to
+			dps := getAllDatapointsFromChannel(sendTo.PointsChan)
+
+			// test the gathered datapoints
+			if c.want.emittedDPSThreshold != nil {
+				So(len(dps), c.want.emittedDPSAssertion, *c.want.emittedDPSThreshold)
+			}
+
+			// look for a specific metric name in the gathered datapoints
+			if c.want.metricNameToTestFor != nil {
+				So(isMetricInList(dps, *c.want.metricNameToTestFor), c.want.metricNameTestAssertion)
+			}
+		})
+	}
+}
+
+func TestInternalMetricsServer(t *testing.T) {
+	type input struct {
+		StatsDelay                     *string
+		EmitDebugMetrics               *bool
+		InternalMetricsListenerAddress *string
+	}
+	type want struct {
+		emittedDPSAssertion     func(actual interface{}, expected ...interface{}) string
+		emittedDPSThreshold     *int
+		metricNameToTestFor     *string
+		metricNameTestAssertion func(actual interface{}, expected ...interface{}) string
+	}
+	cases := []struct {
+		testID string
+		in     input
+		want   want
+	}{
+		{
+			testID: "internal metrics server should still be scrape-able when StatsDelay is 0s and internal metrics server is configured",
+			in: input{
+				StatsDelay:                     pointer.String("0s"),
+				InternalMetricsListenerAddress: pointer.String("localhost:0"),
+			},
+			want: want{
+				emittedDPSAssertion: ShouldBeGreaterThan,
+				emittedDPSThreshold: pointer.Int(0),
+			},
+		},
+		{
+			testID: "debug metrics should NOT be scraped when EmitDebugMetrics is false",
+			in: input{
+				StatsDelay:                     pointer.String("2s"),
+				InternalMetricsListenerAddress: pointer.String("localhost:0"),
+				EmitDebugMetrics:               pointer.Bool(false),
+			},
+			want: want{
+				metricNameToTestFor:     pointer.String("fileinfo_commit"),
+				metricNameTestAssertion: ShouldBeFalse,
+			},
+		},
+		{
+			testID: "debug metrics should be scraped when EmitDebugMetrics is true",
+			in: input{
+				StatsDelay:                     pointer.String("2s"),
+				InternalMetricsListenerAddress: pointer.String("localhost:0"),
+				EmitDebugMetrics:               pointer.Bool(true),
+			},
+			want: want{
+				metricNameToTestFor:     pointer.String("fileinfo_commit"),
+				metricNameTestAssertion: ShouldBeTrue,
+			},
+		},
+	}
+	for _, c := range cases {
+		Convey(fmt.Sprintf(c.testID), t, func() {
+			config := getStatsDelayConfig(c.in.StatsDelay, c.in.EmitDebugMetrics, c.in.InternalMetricsListenerAddress)
+			cancelfunc, sfxGateway, gatewayDoneCh, sl, sendTo := setUpSfxGateway(config)
+
+			var dps = make([]*datapoint.Datapoint, 0)
+
+			// scrape datapoints from the internal metrics server while the gateway is running
+			if c.in.InternalMetricsListenerAddress != nil && *c.in.InternalMetricsListenerAddress != "" {
+				openPort := nettest.TCPPort(sfxGateway.internalMetricsListener)
+				resp, err := http.Get(fmt.Sprintf("http://localhost:%d/internal-metrics", openPort))
+				So(err, ShouldBeNil)
+				bts, err := ioutil.ReadAll(resp.Body)
+				So(err, ShouldBeNil)
+				fmt.Println(bts)
+				So(json.Unmarshal(bts, &dps), ShouldBeNil)
+			}
+
+			// sometimes the gateway could be forcibly shutdown because it exceeds graceful shutdown...
+			// we don't care about that error in this test.
+			_ = shutDownGatewayAfter(sfxGateway, gatewayDoneCh, *sfxGateway.config.StatsDelayDuration*2)
+
+			// Shutdown the server the gateway was sending datapoints to
+			So(sl.Close(), ShouldBeNil)
+			if cancelfunc != nil {
+				cancelfunc()
+			}
+
+			// gather datapoints from the server the gateway emitted to
+			// this should always be empty when internalMetricsListener is configured
+			So(len(getAllDatapointsFromChannel(sendTo.PointsChan)), ShouldEqual, 0)
+
+			// test the gathered datapoints
+			if c.want.emittedDPSThreshold != nil {
+				So(len(dps), c.want.emittedDPSAssertion, *c.want.emittedDPSThreshold)
+			}
+
+			// look for a specific metric name in the gathered datapoints
+			if c.want.metricNameToTestFor != nil {
+				So(isMetricInList(dps, *c.want.metricNameToTestFor), c.want.metricNameTestAssertion)
+			}
+		})
+	}
 }
