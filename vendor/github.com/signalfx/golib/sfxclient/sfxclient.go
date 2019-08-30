@@ -206,8 +206,15 @@ func (s *Scheduler) Var() expvar.Var {
 	})
 }
 
-// CollectDatapoints gives a scheduler an external endpoint to be called
+// CollectDatapoints gives a scheduler an external endpoint to be called and is thread safe
 func (s *Scheduler) CollectDatapoints() []*datapoint.Datapoint {
+	s.callbackMutex.Lock()
+	defer s.callbackMutex.Unlock()
+	return s.collectDatapoints()
+}
+
+// collectDatapoints gives a scheduler an external endpoint to be called and is not thread safe
+func (s *Scheduler) collectDatapoints() []*datapoint.Datapoint {
 	ret := make([]*datapoint.Datapoint, 0, len(s.previousDatapoints))
 	now := s.Timer.Now()
 	if s.debug {
@@ -288,7 +295,7 @@ func (s *Scheduler) ReportOnce(ctx context.Context) error {
 	datapoints := func() []*datapoint.Datapoint {
 		s.callbackMutex.Lock()
 		defer s.callbackMutex.Unlock()
-		datapoints := s.CollectDatapoints()
+		datapoints := s.collectDatapoints()
 		s.previousDatapoints = datapoints
 		return datapoints
 	}()
@@ -318,7 +325,7 @@ func (s *Scheduler) ReportingTimeout(timeout time.Duration) {
 	atomic.StoreInt64(&s.ReportingTimeoutNs, timeout.Nanoseconds())
 }
 
-// Debug used for debugging CollectDatapoints()
+// Debug used for debugging collectDatapoints()
 func (s *Scheduler) Debug(debug bool) {
 	s.debug = debug
 }
