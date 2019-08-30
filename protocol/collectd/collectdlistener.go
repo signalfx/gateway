@@ -7,11 +7,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/signalfx/gateway/protocol/common"
+
+	"github.com/gin-gonic/gin"
 
 	"strings"
 
 	"context"
+
 	"github.com/mailru/easyjson"
 	"github.com/signalfx/gateway/protocol"
 	"github.com/signalfx/gateway/protocol/collectd/format"
@@ -171,7 +174,8 @@ func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer,
 		return nil, err
 	}
 
-	r := mux.NewRouter()
+	r := common.InitDefaultGin(false, gin.ReleaseMode)
+
 	metricTracking := &web.RequestCounter{}
 	fullHandler := web.NewHandler(conf.StartingContext, web.FromHTTP(r))
 	if conf.HTTPChain != nil {
@@ -212,8 +216,10 @@ func NewListener(sink dpsink.Sink, passedConf *ListenerConfig) (*ListenerServer,
 
 // SetupCollectdPaths tells the router which paths the given handler (which should handle collectd json)
 // should see
-func SetupCollectdPaths(r *mux.Router, handler http.Handler, endpoint string) {
-	r.Path(endpoint).Methods("POST").Headers("Content-Type", "application/json").Handler(handler)
-	r.Path(endpoint).Methods("POST").Headers("Content-Type", "application/json; charset=UTF-8").Handler(handler)
-	r.Path(endpoint).Methods("POST").Headers("Content-Type", "").HandlerFunc(web.InvalidContentType)
+func SetupCollectdPaths(r *gin.Engine, handler http.Handler, endpoint string) {
+	r.POST(endpoint, func(gCtx *gin.Context) {
+		if common.IsContentTypeJSON(gCtx.ContentType()) {
+			handler.ServeHTTP(gCtx.Writer, gCtx.Request)
+		}
+	}, gin.WrapF(web.InvalidContentType))
 }

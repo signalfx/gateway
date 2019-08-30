@@ -80,6 +80,7 @@ func BenchmarkZipkinV2TraceDecoder(b *testing.B) {
 		Body: ioutil.NopCloser(bytes.NewBufferString(reqBody)),
 	}
 	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		err := decoder.Read(context.Background(), &req)
 		if err != nil {

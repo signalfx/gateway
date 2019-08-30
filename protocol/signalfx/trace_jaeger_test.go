@@ -533,6 +533,7 @@ func BenchmarkJaegerTraceDecoder(b *testing.B) {
 		Body: reqBody,
 	}
 	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		err := decoder.Read(context.Background(), &req)
 		if err != nil {

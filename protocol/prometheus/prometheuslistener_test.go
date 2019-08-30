@@ -5,6 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"math"
+	"net/http"
+	"runtime"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
 	"github.com/prometheus/common/model"
@@ -15,13 +23,6 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/web"
 	. "github.com/smartystreets/goconvey/convey"
-	"io"
-	"math"
-	"net/http"
-	"runtime"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 func getPayload(incoming *prompb.WriteRequest) []byte {
@@ -30,6 +31,7 @@ func getPayload(incoming *prompb.WriteRequest) []byte {
 	}
 	bytes, err := proto.Marshal(incoming)
 	So(err, ShouldBeNil)
+	// assert.NilError(t, err)
 	return snappy.Encode(nil, bytes)
 }
 
@@ -86,6 +88,35 @@ func (e *errSink) AddEvents(ctx context.Context, points []*event.Event) error {
 	return errors.New("nope")
 }
 
+// func TestServer_Datapoints(t *testing.T) {
+// 	callCount := int64(0)
+// 	conf := &Config{
+// 		ListenAddr: pointer.String("127.0.0.1:0"),
+// 		HTTPChain: func(ctx context.Context, rw http.ResponseWriter, r *http.Request, next web.ContextHandler) {
+// 			atomic.AddInt64(&callCount, 1)
+// 			next.ServeHTTPC(ctx, rw, r)
+// 		},
+// 	}
+// 	sendTo := dptest.NewBasicSink()
+// 	listener, err := NewListener(sendTo, conf)
+// 	assert.NilError(t, err)
+// 	client := &http.Client{}
+// 	baseURL := fmt.Sprintf("http://%s/write", listener.server.Addr)
+// 	fmt.Println(baseURL)
+// 	fmt.Println("Should be able to receive datapoints started", baseURL)
+// 	sendTo.Resize(10)
+// 	req, err := http.NewRequest("POST", baseURL, bytes.NewReader(getPayload(nil)))
+// 	// So(err, ShouldBeNil)
+// 	req.Header.Set("Content-Type", "application/x-protobuf")
+// 	resp, err := client.Do(req)
+// 	// So(err, ShouldBeNil)
+// 	assert.Equal(t, resp.StatusCode, http.StatusOK)
+// 	datapoints := <-sendTo.PointsChan
+// 	// So(len(datapoints), ShouldEqual, 1)
+// 	assert.Equal(t, len(datapoints), 1)
+// 	fmt.Println("Should be able to receive datapoints done")
+// }
+
 func TestListener(t *testing.T) {
 	Convey("test listener", t, func() {
 		callCount := int64(0)
@@ -101,15 +132,19 @@ func TestListener(t *testing.T) {
 		So(err, ShouldBeNil)
 		client := &http.Client{}
 		baseURL := fmt.Sprintf("http://%s/write", listener.server.Addr)
+		// fmt.Println(baseURL)
 		Convey("Should expose health check", func() {
+			fmt.Println("should expose health check")
 			req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/healthz", listener.server.Addr), nil)
 			So(err, ShouldBeNil)
 			resp, err := client.Do(req)
 			So(err, ShouldBeNil)
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)
 			So(atomic.LoadInt64(&callCount), ShouldEqual, 1)
+			// fmt.Println("should expose health check done")
 		})
 		Convey("Should be able to receive datapoints", func() {
+			// fmt.Println("Should be able to receive datapoints started", baseURL)
 			sendTo.Resize(10)
 			req, err := http.NewRequest("POST", baseURL, bytes.NewReader(getPayload(nil)))
 			So(err, ShouldBeNil)
@@ -119,6 +154,7 @@ func TestListener(t *testing.T) {
 			So(resp.StatusCode, ShouldEqual, http.StatusOK)
 			datapoints := <-sendTo.PointsChan
 			So(len(datapoints), ShouldEqual, 1)
+			// fmt.Println("Should be able to receive datapoints done")
 		})
 		Convey("Is a Collector", func() {
 			dps := listener.Datapoints()

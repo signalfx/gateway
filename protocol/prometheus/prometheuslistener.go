@@ -2,18 +2,6 @@ package prometheus
 
 import (
 	"context"
-	"github.com/gogo/protobuf/proto"
-	"github.com/golang/snappy"
-	"github.com/gorilla/mux"
-	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/prompb"
-	"github.com/signalfx/gateway/protocol"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/web"
 	"io"
 	"io/ioutil"
 	"math"
@@ -22,6 +10,20 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/gogo/protobuf/proto"
+	"github.com/golang/snappy"
+	"github.com/prometheus/common/model"
+	"github.com/prometheus/prometheus/prompb"
+	"github.com/signalfx/gateway/protocol"
+	"github.com/signalfx/gateway/protocol/common"
+	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/datapoint/dpsink"
+	"github.com/signalfx/golib/log"
+	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/sfxclient"
+	"github.com/signalfx/golib/web"
 )
 
 // Server is the prometheus server
@@ -212,7 +214,7 @@ func NewListener(sink dpsink.Sink, passedConf *Config) (*Server, error) {
 		return nil, err
 	}
 
-	r := mux.NewRouter()
+	r := common.InitDefaultGin(false, gin.ReleaseMode)
 	metricTracking := &web.RequestCounter{}
 	fullHandler := web.NewHandler(conf.StartingContext, web.FromHTTP(r))
 	if conf.HTTPChain != nil {
@@ -256,6 +258,10 @@ func NewListener(sink dpsink.Sink, passedConf *Config) (*Server, error) {
 }
 
 // SetupPrometheusPaths tells the router which paths the given handler should handle
-func SetupPrometheusPaths(r *mux.Router, handler http.Handler, endpoint string) {
-	r.Path(endpoint).Methods("POST").Headers("Content-Type", "application/x-protobuf").Handler(handler)
+func SetupPrometheusPaths(r *gin.Engine, handler http.Handler, endpoint string) {
+	r.POST(endpoint, func(gCtx *gin.Context) {
+		if common.IsContentTypeXProtobuf(gCtx.ContentType()) {
+			handler.ServeHTTP(gCtx.Writer, gCtx.Request)
+		}
+	})
 }

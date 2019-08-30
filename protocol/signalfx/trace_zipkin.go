@@ -3,20 +3,16 @@ package signalfx
 import (
 	"context"
 	"fmt"
-	"github.com/signalfx/golib/datapoint/dpsink"
 	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/mailru/easyjson"
 	"github.com/signalfx/gateway/protocol/signalfx/format"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
-	"github.com/signalfx/golib/web"
 )
 
 const (
@@ -589,12 +585,4 @@ func (decoder *JSONTraceDecoderV1) Read(ctx context.Context, req *http.Request) 
 
 	err := decoder.Sink.AddSpans(ctx, spans)
 	return conversionErrs.ToError(err)
-}
-
-func setupJSONTraceV1(ctx context.Context, r *mux.Router, sink Sink, logger log.Logger, httpChain web.NextConstructor, counter *dpsink.Counter) sfxclient.Collector {
-	handler, st := SetupChain(ctx, sink, ZipkinV1, func(s Sink) ErrorReader {
-		return &JSONTraceDecoderV1{Logger: logger, Sink: sink}
-	}, httpChain, logger, counter)
-	SetupJSONByPaths(r, handler, DefaultTracePathV1)
-	return st
 }

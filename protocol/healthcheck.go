@@ -1,12 +1,13 @@
 package protocol
 
 import (
-	"github.com/gorilla/mux"
+	"net/http"
+	"sync/atomic"
+
+	"github.com/gin-gonic/gin"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
-	"net/http"
-	"sync/atomic"
 )
 
 // CloseableHealthCheck is a helper class intended to be used as an anonymous field
@@ -26,7 +27,8 @@ func (c *CloseableHealthCheck) HealthDatapoints() []*datapoint.Datapoint {
 }
 
 // SetupHealthCheck sets up a closeable healthcheck, when open returns 200, when closed returns 404 and close the connection
-func (c *CloseableHealthCheck) SetupHealthCheck(healthCheck *string, r *mux.Router, logger log.Logger) {
+// func (c *CloseableHealthCheck) SetupHealthCheck(healthCheck *string, r *mux.Router, logger log.Logger) {
+func (c *CloseableHealthCheck) SetupHealthCheck(healthCheck *string, r *gin.Engine, logger log.Logger) {
 	f := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		atomic.AddInt64(&c.totalHealthChecks, 1)
 		if atomic.LoadInt32(&c.setCloseHeader) != 0 {
@@ -39,5 +41,6 @@ func (c *CloseableHealthCheck) SetupHealthCheck(healthCheck *string, r *mux.Rout
 		_, err := rw.Write([]byte("OK"))
 		log.IfErr(logger, err)
 	})
-	r.Handle(*healthCheck, f)
+
+	r.GET(*healthCheck, gin.WrapH(f))
 }
