@@ -869,7 +869,7 @@ func getSchedulerReportingDelay(config *config.GatewayConfig) int64 {
 	// or the local debug server is on.
 	if (config.LocalDebugServer != nil && *config.LocalDebugServer != "") || (config.InternalMetricsListenerAddress == nil || *config.InternalMetricsListenerAddress == "") {
 		// default scheduler interval when StatsDelay is not set and debug server is on
-		reportingDelayNs = (30 * time.Second).Nanoseconds()
+		reportingDelayNs = (10 * time.Second).Nanoseconds()
 
 		// return StatsDelay as reportingDelay when it is configured
 		if config.StatsDelayDuration != nil && *config.StatsDelayDuration != 0 {
