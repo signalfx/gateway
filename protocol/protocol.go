@@ -44,6 +44,8 @@ type Listener interface {
 	sfxclient.Collector
 	io.Closer
 	HealthChecker
+	DebugDatapoints() []*datapoint.Datapoint
+	DefaultDatapoints() []*datapoint.Datapoint
 }
 
 // HealthChecker interface is anything that exports a healthcheck that would need to be invalidated on graceful shutdown

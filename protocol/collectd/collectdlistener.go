@@ -42,9 +42,20 @@ func (s *ListenerServer) Close() error {
 	return s.listener.Close()
 }
 
+// DebugDatapoints returns datapoints that are used for debugging the listener
+func (s *ListenerServer) DebugDatapoints() []*datapoint.Datapoint {
+	// returns JSON decoder datapoints
+	return append(s.collector.Datapoints(), s.HealthDatapoints()...)
+}
+
+// DefaultDatapoints returns datapoints that should always be reported from the listener
+func (s *ListenerServer) DefaultDatapoints() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{}
+}
+
 // Datapoints returns JSON decoder datapoints
 func (s *ListenerServer) Datapoints() []*datapoint.Datapoint {
-	return append(s.collector.Datapoints(), s.HealthDatapoints()...)
+	return append(s.DebugDatapoints(), s.DefaultDatapoints()...)
 }
 
 // JSONDecoder can decode collectd's native JSON datapoint format

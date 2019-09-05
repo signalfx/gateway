@@ -38,9 +38,19 @@ func (s *Server) Close() error {
 	return s.listener.Close()
 }
 
+// DebugDatapoints returns datapoints that are used for debugging the listener
+func (s *Server) DebugDatapoints() []*datapoint.Datapoint {
+	return append(s.collector.Datapoints(), s.HealthDatapoints()...)
+}
+
+// DefaultDatapoints returns datapoints that should always be reported from the listener
+func (s *Server) DefaultDatapoints() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{}
+}
+
 // Datapoints returns decoder datapoints
 func (s *Server) Datapoints() []*datapoint.Datapoint {
-	return append(s.collector.Datapoints(), s.HealthDatapoints()...)
+	return append(s.DebugDatapoints(), s.DefaultDatapoints()...)
 }
 
 var _ protocol.Listener = &Server{}

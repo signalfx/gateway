@@ -38,6 +38,7 @@ type ListenerServer struct {
 
 	internalCollectors sfxclient.Collector
 	metricHandler      metricHandler
+	counter            *dpsink.Counter
 }
 
 // Close the exposed socket listening for new connections
@@ -50,9 +51,23 @@ func (streamer *ListenerServer) Addr() net.Addr {
 	return streamer.listener.Addr()
 }
 
+// DebugDatapoints returns datapoints that are used for debugging the listener
+func (streamer *ListenerServer) DebugDatapoints() []*datapoint.Datapoint {
+	return append(streamer.internalCollectors.Datapoints(), streamer.HealthDatapoints()...)
+}
+
+// DefaultDatapoints returns datapoints that should always be reported from the listener
+func (streamer *ListenerServer) DefaultDatapoints() []*datapoint.Datapoint {
+	var dps = make([]*datapoint.Datapoint, 0, 1)
+	if streamer.counter != nil {
+		dps = append(dps, streamer.counter.Datapoints()...)
+	}
+	return dps
+}
+
 // Datapoints returns the datapoints about various internal endpoints
 func (streamer *ListenerServer) Datapoints() []*datapoint.Datapoint {
-	return append(streamer.internalCollectors.Datapoints(), streamer.HealthDatapoints()...)
+	return append(streamer.DebugDatapoints(), streamer.DefaultDatapoints()...)
 }
 
 // MericTypeGetter is an old metric interface that returns the type of a metric name
@@ -203,6 +218,7 @@ func NewListener(sink Sink, conf *ListenerConfig) (*ListenerServer, error) {
 			logger:             log.NewContext(conf.Logger).With(logkey.Struct, "metricHandler"),
 			jsonMarshal:        conf.JSONMarshal,
 		},
+		counter: conf.Counter,
 	}
 	listenServer.SetupHealthCheck(conf.HealthCheck, r, conf.Logger)
 

@@ -285,7 +285,7 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loadedConfig *con
 		}
 		listeners = append(listeners, listener)
 		groupName := fmt.Sprintf("%s_l_%d", name, idx)
-		debugMetricsScheduler.AddGroupedCallback(groupName, listener)
+		debugMetricsScheduler.AddGroupedCallback(groupName, sfxclient.CollectorFunc(listener.DebugDatapoints))
 		debugMetricsScheduler.GroupedDefaultDimensions(groupName, datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
 			"name":      name,
 			"direction": "listener",
@@ -294,7 +294,7 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loadedConfig *con
 			"type":      listenConfig.Type,
 			"cluster":   *loadedConfig.ClusterName,
 		}))
-		metricsScheduler.AddGroupedCallback(groupName, listenConfig.Counter)
+		metricsScheduler.AddGroupedCallback(groupName, sfxclient.CollectorFunc(listener.DefaultDatapoints))
 		metricsScheduler.GroupedDefaultDimensions(groupName, datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
 			"name":      name,
 			"direction": "listener",
