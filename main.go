@@ -362,7 +362,9 @@ func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger
 	p.debugServer.Mux.Handle("/debug/dims", &p.debugSink)
 
 	p.debugServer.Exp2.Exported["config"] = conf.Var()
-	p.debugServer.Exp2.Exported["datapoints"] = debugMetricsScheduler.Var()
+	p.debugServer.Exp2.Exported["datapoints"] = expvar.Func(func() interface{} {
+		return debugMetricsScheduler.CollectDatapoints()
+	})
 	p.debugServer.Exp2.Exported["goruntime"] = expvar.Func(func() interface{} {
 		return runtime.Version()
 	})
@@ -376,7 +378,9 @@ func (p *gateway) setupDebugServer(conf *config.GatewayConfig, logger log.Logger
 	p.debugServer.Exp2.Exported["source"] = expvar.Func(func() interface{} {
 		return fmt.Sprintf("https://github.com/signalfx/gateway/tree/%s", Version)
 	})
-	p.debugServer.Exp2.Exported["gateway_metrics"] = metricsScheduler.Var()
+	p.debugServer.Exp2.Exported["gateway_metrics"] = expvar.Func(func() interface{} {
+		return metricsScheduler.CollectDatapoints()
+	})
 
 	go func() {
 		err := p.debugServer.Serve(listener)
@@ -861,25 +865,6 @@ func (p *gateway) runningLoop(ctx context.Context) (err error) {
 	}
 }
 
-// getSchedulerReportingDelay evaluates config to determine the reporting delay time for schedulers
-func getSchedulerReportingDelay(config *config.GatewayConfig) int64 {
-	var reportingDelayNs int64
-
-	// only set ReportingDelay on the scheduler if the internal metrics server is off
-	// or the local debug server is on.
-	if (config.LocalDebugServer != nil && *config.LocalDebugServer != "") || (config.InternalMetricsListenerAddress == nil || *config.InternalMetricsListenerAddress == "") {
-		// default scheduler interval when StatsDelay is not set and debug server is on
-		reportingDelayNs = (10 * time.Second).Nanoseconds()
-
-		// return StatsDelay as reportingDelay when it is configured
-		if config.StatsDelayDuration != nil && *config.StatsDelayDuration != 0 {
-			reportingDelayNs = config.StatsDelayDuration.Nanoseconds()
-		}
-	}
-
-	return reportingDelayNs
-}
-
 func (p *gateway) scheduleStatCollection(ctx context.Context, schedulers map[string]*sfxclient.Scheduler, multiplexer signalfx.Sink) func() {
 	// Schedule datapoint collection to a Discard sink so we can get the stats in Expvar()
 	wg := sync.WaitGroup{}
@@ -890,20 +875,18 @@ func (p *gateway) scheduleStatCollection(ctx context.Context, schedulers map[str
 	// schedule the schedulers
 	for name, scheduler := range schedulers {
 		scheduler.Sink = dpsink.Discard
-		scheduler.ReportingDelayNs = getSchedulerReportingDelay(p.config)
-
-		// only configure the scheduler sink to emit through the multiplexer
-		// when the internal metrics server is off and StatsDelay is greater than 0
-		if p.config.StatsDelayDuration != nil && *p.config.StatsDelayDuration != 0 && (p.config.InternalMetricsListenerAddress == nil || *p.config.InternalMetricsListenerAddress == "") {
+		if (p.config.InternalMetricsListenerAddress == nil || *p.config.InternalMetricsListenerAddress == "") && (p.config.StatsDelayDuration != nil && *p.config.StatsDelayDuration != 0) {
+			// only configure the scheduler sink to emit through the multiplexer
+			// when the internal metrics server is off and StatsDelay is greater than 0
+			scheduler.ReportingDelayNs = p.config.StatsDelayDuration.Nanoseconds()
 			scheduler.Sink = multiplexer
+			wg.Add(1)
+			go func(scheduler *sfxclient.Scheduler, name string) {
+				err := scheduler.Schedule(finishedContext)
+				p.logger.Log(log.Err, err, logkey.Struct, name, "Schedule finished")
+				wg.Done()
+			}(scheduler, name)
 		}
-
-		wg.Add(1)
-		go func(scheduler *sfxclient.Scheduler, name string) {
-			err := scheduler.Schedule(finishedContext)
-			p.logger.Log(log.Err, err, logkey.Struct, name, "Schedule finished")
-			wg.Done()
-		}(scheduler, name)
 	}
 
 	return func() {
