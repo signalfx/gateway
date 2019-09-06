@@ -14,7 +14,7 @@ Events Ingest and Trace Ingest APIs.
 ## Usage and Configuration
 
 Please refer to the usage and configuration documentation located
-[here](https://github.com/signalfx/integrations/tree/master/gateway) for more
+[here](https://github.com/signalfx/integrations/tree/release/gateway) for more
 information on operating the SignalFx Gateway.
 
 ## Development
