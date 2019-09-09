@@ -10,6 +10,7 @@ import (
 
 const (
 	magic           = int16(0xc80)
+	centroidmagic   = int16(0xc81)
 	encodingVersion = int32(1)
 )
 
@@ -63,8 +64,21 @@ func unmarshalBinary(d *TDigest, p []byte) error {
 		return fmt.Errorf("data corruption detected: invalid encoding version %d", ev)
 	}
 	r.readValue(&d.Compression)
-	d.maxProcessed = processedSize(0, d.Compression)
-	d.maxUnprocessed = unprocessedSize(0, d.Compression)
+	if d.Compression < 0 {
+		return fmt.Errorf("data corruption detected: invalid compression %f", d.Compression)
+	}
+	if d.Scaler == nil {
+		d.Scaler = defaultScaler
+	}
+	d.maxProcessed = d.Scaler.processedSize(d.Compression)
+	if d.maxProcessed < 0 {
+		return fmt.Errorf("data corruption detected: invalid maxProcessed %d", d.maxProcessed)
+	}
+	d.maxUnprocessed = d.Scaler.unprocessedSize(d.Compression)
+	if d.maxUnprocessed < 0 {
+		return fmt.Errorf("data corruption detected: invalid maxProcessed %d", d.maxUnprocessed)
+	}
+
 	d.processed = make([]Centroid, 0, d.maxProcessed)
 	d.unprocessed = make([]Centroid, 0, d.maxUnprocessed+1)
 	d.cumulative = make([]float64, 0, d.maxProcessed+1)
@@ -160,6 +174,7 @@ func unmarshalBinary(d *TDigest, p []byte) error {
 		return fmt.Errorf("found %d unexpected bytes trailing the tdigest", n)
 	}
 
+	d.Scaler = defaultScaler
 	return nil
 }
 
