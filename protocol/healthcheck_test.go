@@ -7,7 +7,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/gin-gonic/gin"
+	"github.com/signalfx/gateway/protocol/common"
+
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/log"
@@ -50,8 +51,7 @@ func TestHealthCheck(t *testing.T) {
 		sendTo.Resize(1)
 		listener, err := net.Listen("tcp", listenAddr)
 		So(err, ShouldBeNil)
-		// r := mux.NewRouter()
-		r := gin.Default()
+		r := common.InitDefaultGin(true, "")
 		fullHandler := web.NewHandler(context.Background(), web.FromHTTP(r))
 		listenServer := &listenerServer{
 			listener: listener,

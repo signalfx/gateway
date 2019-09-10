@@ -207,8 +207,6 @@ func NewListener(sink Sink, conf *ListenerConfig) (*ListenerServer, error) {
 	}
 	listenServer.SetupHealthCheck(conf.HealthCheck, r, conf.Logger)
 
-	// r.Handle("/v1/metric", &listenServer.metricHandler)
-	// r.Handle("/metric", &listenServer.metricHandler)
 	r.POST("/v1/metric", gin.WrapH(&listenServer.metricHandler))
 	r.POST("/metric", gin.WrapH(&listenServer.metricHandler))
 

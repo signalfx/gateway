@@ -322,7 +322,6 @@ func (p *gateway) setupInternalMetricsServer(conf *config.GatewayConfig, logger 
 	collector := internal.NewCollector(logger, scheduler)
 	handler := common.InitDefaultGin(false, gin.ReleaseMode)
 	handler.GET("/internal-metrics", gin.WrapF(collector.MetricsHandler))
-	// handler.Path("/internal-metrics").HandlerFunc(collector.MetricsHandler)
 	p.internalMetricsServer = collector
 
 	go func() {
