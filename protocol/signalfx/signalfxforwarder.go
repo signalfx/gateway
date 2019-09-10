@@ -137,13 +137,24 @@ func NewForwarder(conf *ForwarderConfig) (ret *Forwarder, err error) {
 	return nil, err
 }
 
-// Datapoints returns datapoints
-func (connector *Forwarder) Datapoints() []*datapoint.Datapoint {
+// DebugDatapoints returns datapoints that are used for debugging
+func (connector *Forwarder) DebugDatapoints() []*datapoint.Datapoint {
 	dps := connector.stats.requests.Datapoints()
 	dps = append(dps, connector.stats.drainSize.Datapoints()...)
 	dps = append(dps, connector.GetFilteredDatapoints()...)
-	dps = append(dps, connector.sampler.Datapoints()...)
+	dps = append(dps, connector.sampler.DebugDatapoints()...)
 	return dps
+}
+
+// DefaultDatapoints returns a set of default datapoints about the forwarder
+func (connector *Forwarder) DefaultDatapoints() []*datapoint.Datapoint {
+	dps := connector.sampler.DefaultDatapoints()
+	return dps
+}
+
+// Datapoints implements the sfxclient.Collector interface and returns all datapoints
+func (connector *Forwarder) Datapoints() []*datapoint.Datapoint {
+	return append(connector.DebugDatapoints(), connector.DefaultDatapoints()...)
 }
 
 // Close will terminate idle HTTP client connections

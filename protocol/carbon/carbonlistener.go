@@ -51,8 +51,8 @@ type listenerStats struct {
 	activeConnections   int64
 }
 
-// Datapoints reports information about the total points seen by carbon
-func (listener *Listener) Datapoints() []*datapoint.Datapoint {
+// DebugDatapoints returns datapoints that are used for debugging the listener
+func (listener *Listener) DebugDatapoints() []*datapoint.Datapoint {
 	return []*datapoint.Datapoint{
 		sfxclient.Cumulative("invalid_datapoints", nil, atomic.LoadInt64(&listener.stats.invalidDatapoints)),
 		sfxclient.Cumulative("total_connections", nil, atomic.LoadInt64(&listener.stats.totalConnections)),
@@ -60,6 +60,16 @@ func (listener *Listener) Datapoints() []*datapoint.Datapoint {
 		sfxclient.Cumulative("idle_timeouts", nil, atomic.LoadInt64(&listener.stats.idleTimeouts)),
 		sfxclient.Cumulative("retry_listen_errors", nil, atomic.LoadInt64(&listener.stats.retriedListenErrors)),
 	}
+}
+
+// DefaultDatapoints returns datapoints that should always be reported from the listener
+func (listener *Listener) DefaultDatapoints() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{}
+}
+
+// Datapoints reports information about the total points seen by carbon
+func (listener *Listener) Datapoints() []*datapoint.Datapoint {
+	return append(listener.DebugDatapoints(), listener.DefaultDatapoints()...)
 }
 
 // Close the exposed carbon port

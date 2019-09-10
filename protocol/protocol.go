@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"github.com/signalfx/golib/datapoint"
 	"io"
 
 	"context"
@@ -16,6 +17,8 @@ type DatapointForwarder interface {
 	sfxclient.Collector
 	io.Closer
 	dpsink.DSink
+	DebugDatapoints() []*datapoint.Datapoint
+	DefaultDatapoints() []*datapoint.Datapoint
 }
 
 // DebugEndpointer gives an object a chance to expose http endpoints
@@ -32,6 +35,8 @@ type Forwarder interface {
 	io.Closer
 	StartupHook
 	DebugEndpointer
+	DebugDatapoints() []*datapoint.Datapoint
+	DefaultDatapoints() []*datapoint.Datapoint
 }
 
 // Listener is the basic interface anything that listens for new metrics must implement
@@ -39,6 +44,8 @@ type Listener interface {
 	sfxclient.Collector
 	io.Closer
 	HealthChecker
+	DebugDatapoints() []*datapoint.Datapoint
+	DefaultDatapoints() []*datapoint.Datapoint
 }
 
 // HealthChecker interface is anything that exports a healthcheck that would need to be invalidated on graceful shutdown

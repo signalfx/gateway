@@ -1,6 +1,7 @@
 package sampling
 
 import (
+	"github.com/signalfx/golib/sfxclient"
 	"testing"
 
 	"context"
@@ -30,6 +31,7 @@ func Test(t *testing.T) {
 	Convey("test smart sampler stub", t, func() {
 		obj := new(SmartSampleConfig)
 		n, err := New(obj, log.Discard, nil)
+		n.ConfigureHTTPSink(sfxclient.NewHTTPSink())
 		So(n, ShouldBeNil)
 		So(err, ShouldNotBeNil)
 		So(n.AddSpans(context.Background(), []*trace.Span{}, &end{}), ShouldBeNil)

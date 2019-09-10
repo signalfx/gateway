@@ -27,8 +27,16 @@ func (c *listenerServer) Close() error {
 	return err
 }
 
-func (c *listenerServer) Datapoints() []*datapoint.Datapoint {
+func (c *listenerServer) DebugDatapoints() []*datapoint.Datapoint {
 	return c.HealthDatapoints()
+}
+
+func (c *listenerServer) DefaultDatapoints() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{}
+}
+
+func (c *listenerServer) Datapoints() []*datapoint.Datapoint {
+	return append(c.DebugDatapoints(), c.DefaultDatapoints()...)
 }
 
 var _ Listener = &listenerServer{}

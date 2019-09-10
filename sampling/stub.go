@@ -39,9 +39,19 @@ func (f *SmartSampler) AddSpans(context context.Context, spans []*trace.Span, si
 	return sink.AddSpans(context, spans)
 }
 
-// Datapoints adheres to the sfxclient.Collector interface
-func (f *SmartSampler) Datapoints() []*datapoint.Datapoint {
+// DebugDatapoints returns datapoints that are used for debugging
+func (f *SmartSampler) DebugDatapoints() []*datapoint.Datapoint {
 	return []*datapoint.Datapoint{}
+}
+
+// DefaultDatapoints returns a set of default datapoints about the sampler
+func (f *SmartSampler) DefaultDatapoints() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{}
+}
+
+// Datapoints implements the sfxclient.Collector interface and returns all datapoints
+func (f *SmartSampler) Datapoints() []*datapoint.Datapoint {
+	return append(f.DebugDatapoints(), f.DefaultDatapoints()...)
 }
 
 // Close does nothing

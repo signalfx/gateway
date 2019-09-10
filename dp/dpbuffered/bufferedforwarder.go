@@ -163,8 +163,8 @@ func (forwarder *BufferedForwarder) AddSpans(ctx context.Context, traces []*trac
 	}
 }
 
-// Datapoints related to this forwarder, including errors processing datapoints
-func (forwarder *BufferedForwarder) Datapoints() []*datapoint.Datapoint {
+// DebugDatapoints returns debug level datapoints about this forwarder, including errors processing datapoints
+func (forwarder *BufferedForwarder) DebugDatapoints() []*datapoint.Datapoint {
 	return []*datapoint.Datapoint{
 		sfxclient.Gauge("datapoint_chan_backup_size", nil, int64(len(forwarder.dpChan))),
 		sfxclient.Gauge("event_chan_backup_size", nil, int64(len(forwarder.eChan))),
@@ -173,6 +173,16 @@ func (forwarder *BufferedForwarder) Datapoints() []*datapoint.Datapoint {
 		sfxclient.Gauge("trace_chan_backup_size", nil, int64(len(forwarder.tChan))),
 		sfxclient.Gauge("trace_backup_size", nil, atomic.LoadInt64(&forwarder.stats.totalTracesBuffered)),
 	}
+}
+
+// DefaultDatapoints does nothing and exists to satisfy the protocol.forwarder interface
+func (forwarder *BufferedForwarder) DefaultDatapoints() []*datapoint.Datapoint {
+	return []*datapoint.Datapoint{}
+}
+
+// Datapoints implements the sfxclient.Collector interface and returns all datapoints about the buffered forwarder
+func (forwarder *BufferedForwarder) Datapoints() []*datapoint.Datapoint {
+	return append(forwarder.DebugDatapoints(), forwarder.DefaultDatapoints()...)
 }
 
 // Pipeline for a BufferedForwarder is the total of all buffers and what is in flight
