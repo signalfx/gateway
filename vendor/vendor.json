@@ -1358,10 +1358,10 @@
 			"revisionTime": "2019-07-02T16:40:47Z"
 		},
 		{
-			"checksumSHA1": "d3M7jFJMcwwSo2mh2WsLg45dNac=",
+			"checksumSHA1": "5mSIypR+OyBCZzvzjojj6BvZ6e8=",
 			"path": "github.com/signalfx/tdigest",
-			"revision": "363c04877f539a19000e2eb497fb047216ab7e62",
-			"revisionTime": "2019-07-18T17:30:27Z"
+			"revision": "9869c446f1457ef0b2d7154abfcbca96ab012e95",
+			"revisionTime": "2019-09-06T21:01:31Z"
 		},
 		{
 			"checksumSHA1": "mDNBjIi/nvEt2poJ+qdeyosk/IM=",
