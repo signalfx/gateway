@@ -26,8 +26,8 @@ func InitDefaultGin(defaultMode bool, debugMode string) (r *gin.Engine) {
 	if defaultMode {
 		return gin.Default()
 	}
-	r = gin.New()
 	gin.SetMode(debugMode)
+	r = gin.New()
 	r.Use(gin.Recovery())
 	return r
 }

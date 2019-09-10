@@ -329,22 +329,14 @@ func (p *gateway) setupInternalMetricsServer(conf *config.GatewayConfig, logger 
 		}
 		p.internalMetricsListener = listener
 
-<<<<<<< HEAD
 		schedulers := make([]*sfxclient.Scheduler, 0, len(schedulersMap))
 		for _, s := range schedulersMap {
 			schedulers = append(schedulers, s)
 		}
-=======
-	collector := internal.NewCollector(logger, scheduler)
-	handler := common.InitDefaultGin(false, gin.ReleaseMode)
-	handler.GET("/internal-metrics", gin.WrapF(collector.MetricsHandler))
-	// handler.Path("/internal-metrics").HandlerFunc(collector.MetricsHandler)
-	p.internalMetricsServer = collector
->>>>>>> replacing gorilla mux with gin mux
 
 		collector := collectorhandler.NewCollectorHandler(schedulers...)
-		handler := mux.NewRouter()
-		handler.Path("/internal-metrics").HandlerFunc(collector.DatapointsHandler)
+		handler := common.InitDefaultGin(false, gin.ReleaseMode)
+		handler.GET("/internal-metrics", gin.WrapF(collector.DatapointsHandler))
 		p.internalMetricsServer = collector
 
 		go func() {

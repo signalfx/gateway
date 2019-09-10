@@ -30,21 +30,23 @@ func setupV1Paths(ctx context.Context, r *gin.Engine, sink Sink, typeGetter Meri
 // SetupV1Paths will register paths for all given handlers/content-type
 func SetupV1Paths(r *gin.Engine, protobufDpHandler, jsonDpHandler http.Handler) {
 	r.POST("/datapoint", func(gCtx *gin.Context) {
-		if common.IsContentTypeXProtobuf(gCtx.ContentType()) {
+		switch gCtx.ContentType() {
+		case common.XProtobuf:
 			protobufDpHandler.ServeHTTP(gCtx.Writer, gCtx.Request)
-		} else if common.IsContentTypeJSON(gCtx.ContentType()) {
+		case common.JSONString, common.JSONCharUtf8String:
 			jsonDpHandler.ServeHTTP(gCtx.Writer, gCtx.Request)
-		} else {
+		default:
 			web.InvalidContentType(gCtx.Writer, gCtx.Request)
 		}
 	})
 
 	r.POST("/v1/datapoint", func(gCtx *gin.Context) {
-		if common.IsContentTypeXProtobuf(gCtx.ContentType()) {
+		switch gCtx.ContentType() {
+		case common.XProtobuf:
 			protobufDpHandler.ServeHTTP(gCtx.Writer, gCtx.Request)
-		} else if common.IsContentTypeJSON(gCtx.ContentType()) {
+		case common.JSONString, common.JSONCharUtf8String:
 			jsonDpHandler.ServeHTTP(gCtx.Writer, gCtx.Request)
-		} else {
+		default:
 			web.InvalidContentType(gCtx.Writer, gCtx.Request)
 		}
 	})
@@ -95,21 +97,23 @@ func setupV2Paths(ctx context.Context, r *gin.Engine, sink Sink, logger log.Logg
 // SetupV2Paths will register paths for all given handlers/content-type
 func SetupV2Paths(r *gin.Engine, protobufDpHandler, jsonDpHandler, protobufEventHandler, jsonEventHandler http.Handler) {
 	r.POST("/v2/datapoint", func(gCtx *gin.Context) {
-		if common.IsContentTypeXProtobuf(gCtx.ContentType()) {
+		switch gCtx.ContentType() {
+		case common.XProtobuf:
 			protobufDpHandler.ServeHTTP(gCtx.Writer, gCtx.Request)
-		} else if common.IsContentTypeJSON(gCtx.ContentType()) {
+		case common.JSONString, common.JSONCharUtf8String:
 			jsonDpHandler.ServeHTTP(gCtx.Writer, gCtx.Request)
-		} else {
+		default:
 			web.InvalidContentType(gCtx.Writer, gCtx.Request)
 		}
 	})
 
 	r.POST("/v2/event", func(gCtx *gin.Context) {
-		if common.IsContentTypeXProtobuf(gCtx.ContentType()) {
+		switch gCtx.ContentType() {
+		case common.XProtobuf:
 			protobufEventHandler.ServeHTTP(gCtx.Writer, gCtx.Request)
-		} else if common.IsContentTypeJSON(gCtx.ContentType()) {
+		case common.JSONString, common.JSONCharUtf8String:
 			jsonEventHandler.ServeHTTP(gCtx.Writer, gCtx.Request)
-		} else {
+		default:
 			web.InvalidContentType(gCtx.Writer, gCtx.Request)
 		}
 	})
@@ -133,11 +137,12 @@ func setupTraceV1Paths(ctx context.Context, r *gin.Engine, sink Sink, logger log
 // SetupTraceV1Paths will register paths for all handler/content-types
 func SetupTraceV1Paths(r *gin.Engine, thriftHandler, jsonTraceHandler http.Handler) {
 	r.POST(DefaultTracePathV1, func(gCtx *gin.Context) {
-		if common.IsContentTypeThrift(gCtx.ContentType()) {
+		switch gCtx.ContentType() {
+		case common.XThrift, common.VndApacheThrift:
 			thriftHandler.ServeHTTP(gCtx.Writer, gCtx.Request)
-		} else if common.IsContentTypeJSON(gCtx.ContentType()) {
+		case common.JSONString, common.JSONCharUtf8String:
 			jsonTraceHandler.ServeHTTP(gCtx.Writer, gCtx.Request)
-		} else {
+		default:
 			web.InvalidContentType(gCtx.Writer, gCtx.Request)
 		}
 	})
