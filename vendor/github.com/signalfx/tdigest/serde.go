@@ -42,6 +42,7 @@ func marshalBinary(d *TDigest) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// nolint: gocyclo
 func unmarshalBinary(d *TDigest, p []byte) error {
 	var (
 		mv int16

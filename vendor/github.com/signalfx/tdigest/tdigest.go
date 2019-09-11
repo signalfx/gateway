@@ -1,6 +1,7 @@
 package tdigest
 
 import (
+	"fmt"
 	"math"
 	"sort"
 )
@@ -22,7 +23,6 @@ type TDigest struct {
 	decayCount        int32
 	decayEvery        int32
 	decayValue        float64
-	flip              bool
 }
 
 func New() *TDigest {
@@ -126,10 +126,6 @@ func (t *TDigest) processIt(updateCumulative bool) {
 		// Append all processed centroids to the unprocessed list and sort
 		t.unprocessed = append(t.unprocessed, t.processed...)
 		sort.Sort(&t.unprocessed)
-		if t.flip {
-			sort.Reverse(&t.unprocessed)
-		}
-		t.flip = !t.flip
 
 		// Reset processed list with first centroid
 		t.processed.Clear()
@@ -145,16 +141,20 @@ func (t *TDigest) processIt(updateCumulative bool) {
 			projected := soFar + centroid.Weight
 			if projected <= limit {
 				soFar = projected
-				_ = (&t.processed[t.processed.Len()-1]).Add(centroid) // igonoring error, would have errored when we first added it not here
+				_ = (&t.processed[t.processed.Len()-1]).Add(centroid) // igonoring error, would have erred when we first added it not here
 			} else {
 				k1 = t.Scaler.k(soFar/t.processedWeight, normalizer)
 				limit = t.processedWeight * t.Scaler.q(k1+1.0, normalizer)
 				soFar += centroid.Weight
 				t.processed = append(t.processed, centroid)
 			}
+			if centroid.Mean < t.min {
+				t.min = centroid.Mean
+			}
+			if centroid.Mean > t.max {
+				t.max = centroid.Mean
+			}
 		}
-		t.min = math.Min(t.min, t.processed[0].Mean)
-		t.max = math.Max(t.max, t.processed[t.processed.Len()-1].Mean)
 		if updateCumulative {
 			t.updateCumulative()
 		}
@@ -280,6 +280,10 @@ func (t *TDigest) decay() {
 	var remove []int
 	t.cumulative = t.cumulative[:0]
 	prev := 0.0
+
+	min := t.processed[0].Mean
+	max := t.processed[len(t.processed)-1].Mean
+
 	for i := range t.processed {
 		c := &t.processed[i]
 		c.Weight *= t.decayValue
@@ -300,8 +304,13 @@ func (t *TDigest) decay() {
 			t.processed = append(t.processed[:calculated], t.processed[calculated+1:]...)
 		}
 		if len(t.processed) > 0 {
-			t.max = t.processed[len(t.processed)-1].Mean
-			t.min = t.processed[0].Mean
+			// only set these if we've removed those centroids
+			if min != t.processed[0].Mean {
+				t.min = t.processed[0].Mean
+			}
+			if max != t.processed[len(t.processed)-1].Mean {
+				t.max = t.processed[len(t.processed)-1].Mean
+			}
 		} else {
 			t.min = math.Inf(+1)
 			t.max = math.Inf(-1)
@@ -365,4 +374,46 @@ func (t *TDigest) Max() float64 {
 
 func (t *TDigest) TotalWeight() float64 {
 	return t.processedWeight
+}
+
+func (t *TDigest) CheckWeights() int {
+	t.process()
+	return t.checkWeights(t.processed, t.processedWeight)
+}
+
+func (t *TDigest) checkWeights(w CentroidList, total float64) int {
+	badCount := 0
+	n := len(w) - 1
+	if w[n].Weight > 0 {
+		n++
+	}
+
+	normalizer := t.Scaler.normalizer(t.Compression, t.processedWeight)
+	k1 := t.Scaler.k(0, normalizer)
+	q := float64(0)
+	left := float64(0)
+	header := "\n"
+	for i := 0; i < n; i++ {
+		dq := w[i].Weight / total
+		k2 := t.Scaler.k(q+dq, normalizer)
+		q += dq / 2
+		if k2-k1 > 1 && w[i].Weight != 1 {
+			fmt.Printf("%sOversize centroid at "+
+				"%d, k0=%.2f, k1=%.2f, dk=%.2f, w=%.2f, q=%.4f, dq=%.4f, left=%.1f, current=%.2f maxw=%.2f\n",
+				header, i, k1, k2, k2-k1, w[i], q, dq, left, w[i], t.processedWeight*t.Scaler.max(q, normalizer))
+			header = ""
+			badCount++
+		}
+		if k2-k1 > 4 && w[i].Weight != 1 {
+			panic(
+				fmt.Sprintf("Egregiously oversized centroid at "+
+					"%d, k0=%.2f, k1=%.2f, dk=%.2f, w=%.2f, q=%.4f, dq=%.4f, left=%.1f, current=%.2f, maxw=%.2f\n",
+					i, k1, k2, k2-k1, w[i], q, dq, left, w[i], t.processedWeight*t.Scaler.max(q, normalizer)))
+		}
+		q += dq / 2
+		left += w[i].Weight
+		k1 = k2
+	}
+
+	return badCount
 }
