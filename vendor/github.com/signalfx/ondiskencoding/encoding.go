@@ -39,11 +39,12 @@ func (id *ID) String() string {
 // SpanIdentity is a tuple of Service and Operation
 //easyjson:json
 type SpanIdentity struct {
-	Service    string `json:",omitempty"`
-	Operation  string `json:",omitempty"`
-	HttpMethod string `json:",omitempty"`
-	Kind       string `json:",omitempty"`
-	Error      bool   `json:",omitempty"`
+	Service     string `json:",omitempty"`
+	Operation   string `json:",omitempty"`
+	HttpMethod  string `json:",omitempty"`
+	Kind        string `json:",omitempty"`
+	Error       bool   `json:",omitempty"`
+	ServiceMesh bool   `json:",omitempty"`
 }
 
 func (k *SpanIdentity) String() string {
@@ -53,6 +54,9 @@ func (k *SpanIdentity) String() string {
 	}
 	if k.Kind != "" {
 		s += ", Kind:" + k.Kind
+	}
+	if k.ServiceMesh {
+		s += ", ServiceMesh:true" + k.Kind
 	}
 	return fmt.Sprintf("Identity[Service:%s, Operation:%s, Error:%t%s]", k.Service, k.Operation, k.Error, s)
 }
@@ -72,6 +76,9 @@ func (k *SpanIdentity) Dims() map[string]string {
 	}
 	if k.Kind != "" {
 		m["kind"] = k.Kind
+	}
+	if k.ServiceMesh {
+		m["serviceMesh"] = "true"
 	}
 	return m
 }

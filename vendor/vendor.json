@@ -1284,10 +1284,10 @@
 			"versionExact": "v2.4.2"
 		},
 		{
-			"checksumSHA1": "3o2HmKdgtDqkP9IX5sE4M/fUMi0=",
+			"checksumSHA1": "Yvq7CCHUclpNx1fM8uvlwHUJfLo=",
 			"path": "github.com/signalfx/ondiskencoding",
-			"revision": "a9a721ef65c9fe68859df82ae43455538adbf993",
-			"revisionTime": "2019-07-02T16:40:47Z"
+			"revision": "7cc5824c2a9583816b1f7cb6447f8114ef564da3",
+			"revisionTime": "2019-09-13T16:30:40Z"
 		},
 		{
 			"checksumSHA1": "A4tC+Xu+6V94PcwRst16FPpVHHk=",
