@@ -2,9 +2,8 @@ package spanobfuscation
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/gobwas/glob"
+	"github.com/signalfx/gateway/config/globbing"
 )
 
 type rule struct {
@@ -38,8 +37,8 @@ func getRules(ruleConfigs []*TagMatchRuleConfig) ([]*rule, error) {
 			return nil, fmt.Errorf("must include Tags for %s:%s", service, operation)
 		}
 
-		serviceGlob := getGlob(service)
-		operationGlob := getGlob(operation)
+		serviceGlob := globbing.GetGlob(service)
+		operationGlob := globbing.GetGlob(operation)
 		for _, t := range r.Tags {
 			if t == "" {
 				return nil, fmt.Errorf("found empty tag in %s:%s", service, operation)
@@ -54,12 +53,4 @@ func getRules(ruleConfigs []*TagMatchRuleConfig) ([]*rule, error) {
 			})
 	}
 	return rules, nil
-}
-
-func getGlob(pattern string) glob.Glob {
-	patternParts := strings.Split(pattern, "*")
-	for i := 0; i < len(patternParts); i++ {
-		patternParts[i] = glob.QuoteMeta(patternParts[i])
-	}
-	return glob.MustCompile(strings.Join(patternParts, "*"))
 }
