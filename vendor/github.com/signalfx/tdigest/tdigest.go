@@ -365,11 +365,17 @@ func (t *TDigest) Count() int64 {
 }
 
 func (t *TDigest) Min() float64 {
+	t.process()
 	return t.min
 }
 
 func (t *TDigest) Max() float64 {
+	t.process()
 	return t.max
+}
+
+func (t *TDigest) Process() {
+	t.process()
 }
 
 func (t *TDigest) TotalWeight() float64 {
