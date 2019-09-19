@@ -3,9 +3,10 @@ package encoding
 import (
 	"errors"
 	"fmt"
-	"github.com/signalfx/golib/trace"
 	"strconv"
 	"time"
+
+	"github.com/signalfx/golib/trace"
 )
 
 // low, high
@@ -78,7 +79,7 @@ func (k *SpanIdentity) Dims() map[string]string {
 		m["kind"] = k.Kind
 	}
 	if k.ServiceMesh {
-		m["serviceMesh"] = "true"
+		m["sf_serviceMesh"] = "true"
 	}
 	return m
 }
