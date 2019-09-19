@@ -65,12 +65,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding(out *jwriter.Writer, 
 	_ = first
 	if in.Service != "" {
 		const prefix string = ",\"Service\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		out.String(string(in.Service))
 	}
 	if in.Operation != "" {
@@ -295,12 +291,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding2(out *jwriter.Writer,
 	_ = first
 	if in.ID != nil {
 		const prefix string = ",\"ID\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		(*in.ID).MarshalEasyJSON(out)
 	}
 	if len(in.Samples) != 0 {
@@ -439,12 +431,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding3(out *jwriter.Writer,
 	_ = first
 	if len(in.Buffers) != 0 {
 		const prefix string = ",\"Buffers\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		{
 			out.RawByte('{')
 			v9First := true
@@ -616,12 +604,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding4(out *jwriter.Writer,
 	_ = first
 	if len(in.Buffers) != 0 {
 		const prefix string = ",\"Buffers\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		{
 			out.RawByte('[')
 			for v13, v14 := range in.Buffers {
@@ -736,12 +720,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding5(out *jwriter.Writer,
 	_ = first
 	if len(in.Digest) != 0 {
 		const prefix string = ",\"Digest\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		out.Base64Bytes(in.Digest)
 	}
 	if true {
@@ -856,12 +836,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding6(out *jwriter.Writer,
 	_ = first
 	if len(in.Entries) != 0 {
 		const prefix string = ",\"Entries\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		{
 			out.RawByte('{')
 			v21First := true
@@ -969,12 +945,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding7(out *jwriter.Writer,
 	_ = first
 	if in.Error != nil {
 		const prefix string = ",\"Error\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		(*in.Error).MarshalEasyJSON(out)
 	}
 	if in.Span != nil {
@@ -1067,7 +1039,7 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding8(in *jlexer.Lexer, ou
 				if out.Initiating == nil {
 					out.Initiating = new(trace.Span)
 				}
-				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in, &*out.Initiating)
+				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in, out.Initiating)
 			}
 		default:
 			in.SkipRecursive()
@@ -1085,12 +1057,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding8(out *jwriter.Writer,
 	_ = first
 	if in.NewSpanSeen {
 		const prefix string = ",\"NewSpanSeen\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		out.Bool(bool(in.NewSpanSeen))
 	}
 	if in.Released {
@@ -1290,7 +1258,7 @@ func easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in *jlexer.Lexer, out *tr
 				if out.LocalEndpoint == nil {
 					out.LocalEndpoint = new(trace.Endpoint)
 				}
-				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace1(in, &*out.LocalEndpoint)
+				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace1(in, out.LocalEndpoint)
 			}
 		case "remoteEndpoint":
 			if in.IsNull() {
@@ -1300,7 +1268,7 @@ func easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in *jlexer.Lexer, out *tr
 				if out.RemoteEndpoint == nil {
 					out.RemoteEndpoint = new(trace.Endpoint)
 				}
-				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace1(in, &*out.RemoteEndpoint)
+				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace1(in, out.RemoteEndpoint)
 			}
 		case "annotations":
 			if in.IsNull() {
@@ -1326,7 +1294,7 @@ func easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in *jlexer.Lexer, out *tr
 						if v22 == nil {
 							v22 = new(trace.Annotation)
 						}
-						easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace2(in, &*v22)
+						easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace2(in, v22)
 					}
 					out.Annotations = append(out.Annotations, v22)
 					in.WantComma()
@@ -1369,122 +1337,62 @@ func easyjsonE453ad8fEncodeGithubComSignalfxGolibTrace(out *jwriter.Writer, in t
 	_ = first
 	{
 		const prefix string = ",\"traceId\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix[1:])
 		out.String(string(in.TraceID))
 	}
 	if in.Name != nil {
 		const prefix string = ",\"name\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(*in.Name))
 	}
 	if in.ParentID != nil {
 		const prefix string = ",\"parentId\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(*in.ParentID))
 	}
 	{
 		const prefix string = ",\"id\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(in.ID))
 	}
 	if in.Kind != nil {
 		const prefix string = ",\"kind\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(*in.Kind))
 	}
 	if in.Timestamp != nil {
 		const prefix string = ",\"timestamp\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Int64(int64(*in.Timestamp))
 	}
 	if in.Duration != nil {
 		const prefix string = ",\"duration\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Int64(int64(*in.Duration))
 	}
 	if in.Debug != nil {
 		const prefix string = ",\"debug\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Bool(bool(*in.Debug))
 	}
 	if in.Shared != nil {
 		const prefix string = ",\"shared\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Bool(bool(*in.Shared))
 	}
 	if in.LocalEndpoint != nil {
 		const prefix string = ",\"localEndpoint\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		easyjsonE453ad8fEncodeGithubComSignalfxGolibTrace1(out, *in.LocalEndpoint)
 	}
 	if in.RemoteEndpoint != nil {
 		const prefix string = ",\"remoteEndpoint\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		easyjsonE453ad8fEncodeGithubComSignalfxGolibTrace1(out, *in.RemoteEndpoint)
 	}
 	if len(in.Annotations) != 0 {
 		const prefix string = ",\"annotations\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		{
 			out.RawByte('[')
 			for v24, v25 := range in.Annotations {
@@ -1502,12 +1410,7 @@ func easyjsonE453ad8fEncodeGithubComSignalfxGolibTrace(out *jwriter.Writer, in t
 	}
 	if len(in.Tags) != 0 {
 		const prefix string = ",\"tags\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		{
 			out.RawByte('{')
 			v26First := true
@@ -1581,12 +1484,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxGolibTrace2(out *jwriter.Writer, in 
 	_ = first
 	if in.Timestamp != nil {
 		const prefix string = ",\"timestamp\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		out.Int64(int64(*in.Timestamp))
 	}
 	if in.Value != nil {
@@ -1676,12 +1575,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxGolibTrace1(out *jwriter.Writer, in 
 	_ = first
 	if in.ServiceName != nil {
 		const prefix string = ",\"serviceName\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		out.String(string(*in.ServiceName))
 	}
 	if in.Ipv4 != nil {
@@ -1784,12 +1679,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding9(out *jwriter.Writer,
 	_ = first
 	if true {
 		const prefix string = ",\"TraceID\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		out.RawByte('[')
 		for v28 := range in.TraceID {
 			if v28 > 0 {
@@ -2028,12 +1919,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding11(out *jwriter.Writer
 	_ = first
 	if in.RebalanceAddress != "" {
 		const prefix string = ",\"RebalanceAddress\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		out.String(string(in.RebalanceAddress))
 	}
 	if in.IngestAddress != "" {
@@ -2225,12 +2112,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding12(out *jwriter.Writer
 	_ = first
 	if in.NumSpans != 0 {
 		const prefix string = ",\"NumSpans\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		out.Int64(int64(in.NumSpans))
 	}
 	if len(in.Entries) != 0 {
@@ -2427,7 +2310,7 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding13(in *jlexer.Lexer, o
 				if out.Initiating == nil {
 					out.Initiating = new(trace.Span)
 				}
-				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in, &*out.Initiating)
+				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in, out.Initiating)
 			}
 		case "CountOfSpans":
 			out.CountOfSpans = int32(in.Int32())
@@ -2449,12 +2332,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding13(out *jwriter.Writer
 	_ = first
 	if len(in.Spans) != 0 {
 		const prefix string = ",\"Spans\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		{
 			out.RawByte('[')
 			for v45, v46 := range in.Spans {
@@ -2633,7 +2512,7 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding14(in *jlexer.Lexer, o
 						if v50 == nil {
 							v50 = new(trace.Span)
 						}
-						easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in, &*v50)
+						easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in, v50)
 					}
 					out.Spans = append(out.Spans, v50)
 					in.WantComma()
@@ -2662,7 +2541,7 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding14(in *jlexer.Lexer, o
 				if out.Initiating == nil {
 					out.Initiating = new(trace.Span)
 				}
-				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in, &*out.Initiating)
+				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in, out.Initiating)
 			}
 		default:
 			in.SkipRecursive()
@@ -2680,12 +2559,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding14(out *jwriter.Writer
 	_ = first
 	if len(in.Spans) != 0 {
 		const prefix string = ",\"Spans\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		{
 			out.RawByte('[')
 			for v51, v52 := range in.Spans {
@@ -2834,7 +2709,7 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding15(in *jlexer.Lexer, o
 				if out.Initiating == nil {
 					out.Initiating = new(trace.Span)
 				}
-				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in, &*out.Initiating)
+				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in, out.Initiating)
 			}
 		default:
 			in.SkipRecursive()
@@ -2852,12 +2727,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding15(out *jwriter.Writer
 	_ = first
 	if in.TraceID != "" {
 		const prefix string = ",\"TraceID\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		out.String(string(in.TraceID))
 	}
 	if true {
@@ -2980,7 +2851,7 @@ func easyjsonE453ad8fDecodeGithubComSignalfxOndiskencoding16(in *jlexer.Lexer, o
 				if out.Initiating == nil {
 					out.Initiating = new(trace.Span)
 				}
-				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in, &*out.Initiating)
+				easyjsonE453ad8fDecodeGithubComSignalfxGolibTrace(in, out.Initiating)
 			}
 		case "CountOfSpans":
 			out.CountOfSpans = int32(in.Int32())
@@ -3002,12 +2873,8 @@ func easyjsonE453ad8fEncodeGithubComSignalfxOndiskencoding16(out *jwriter.Writer
 	_ = first
 	if true {
 		const prefix string = ",\"TraceID\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		first = false
+		out.RawString(prefix[1:])
 		out.RawByte('[')
 		for v54 := range in.TraceID {
 			if v54 > 0 {
