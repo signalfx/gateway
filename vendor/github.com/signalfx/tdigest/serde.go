@@ -158,6 +158,7 @@ func unmarshalBinary(d *TDigest, p []byte) error {
 	if r.err != nil {
 		return r.err
 	}
+
 	r.readValue(&d.count)
 	if r.err != nil {
 		return r.err
