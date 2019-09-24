@@ -25,6 +25,8 @@ type TDigest struct {
 	decayValue        float64
 }
 
+var defaultScaler = &K3Spliced{}
+
 func New() *TDigest {
 	return NewWithCompression(1000)
 }
@@ -32,8 +34,6 @@ func New() *TDigest {
 func NewWithCompression(c float64) *TDigest {
 	return NewWithDecay(c, 0, 0)
 }
-
-var defaultScaler = &K3Spliced{}
 
 func NewWithDecay(compression, decayValue float64, decayEvery int32) *TDigest {
 	return NewWithScaler(defaultScaler, compression, decayValue, decayEvery)
@@ -75,12 +75,15 @@ func (t *TDigest) Add(x, w float64) {
 	t.AddCentroid(Centroid{Mean: x, Weight: w})
 }
 
+// decayLimit is 0.9**100
+const decayLimit = 0.00002656139889
+
 func (t *TDigest) handleDecay(w float64) {
 	t.count++
 	if t.decayValue > 0 {
 		t.decayCount += int32(w)
 		if t.decayCount >= t.decayEvery {
-			t.decay()
+			t.Decay(t.decayValue, decayLimit)
 			t.decayCount = 0
 		}
 	}
@@ -141,7 +144,7 @@ func (t *TDigest) processIt(updateCumulative bool) {
 			projected := soFar + centroid.Weight
 			if projected <= limit {
 				soFar = projected
-				_ = (&t.processed[t.processed.Len()-1]).Add(centroid) // igonoring error, would have erred when we first added it not here
+				_ = (&t.processed[t.processed.Len()-1]).Add(centroid) // ignoring error, would have erred when we first added it not here
 			} else {
 				k1 = t.Scaler.k(soFar/t.processedWeight, normalizer)
 				limit = t.processedWeight * t.Scaler.q(k1+1.0, normalizer)
@@ -265,16 +268,13 @@ func weightedAverageSorted(x1, w1, x2, w2 float64) float64 {
 	return math.Max(x1, math.Min(x, x2))
 }
 
-// decayLimit is 0.9**100, maybe configurable?
-const decayLimit = 0.00002656139889
-
 // decay decays the histo to make values at the top less interesting over time
 // the total digest count will converge to `bufferSize / (1 - decayFactor)`
 // if we use `decayFactor` 0.9 and `bufferSize` 1000, this means total count 10000
 // so 99th percentile will not be overly influenced by a few bad values
 // and similarly the ranking/selection will not be
 // (provided we use scale function which keeps small enough bins towards the top)
-func (t *TDigest) decay() {
+func (t *TDigest) Decay(decayValue, decayLimit float64) {
 	t.processIt(false) // don't update cumulative as we'll do that below inline
 	var weight float64
 	var remove []int
@@ -286,7 +286,7 @@ func (t *TDigest) decay() {
 
 	for i := range t.processed {
 		c := &t.processed[i]
-		c.Weight *= t.decayValue
+		c.Weight *= decayValue
 		if c.Weight < decayLimit {
 			remove = append(remove, i)
 		} else {
@@ -379,7 +379,7 @@ func (t *TDigest) Process() {
 }
 
 func (t *TDigest) TotalWeight() float64 {
-	return t.processedWeight
+	return t.processedWeight + t.unprocessedWeight
 }
 
 func (t *TDigest) CheckWeights() int {
