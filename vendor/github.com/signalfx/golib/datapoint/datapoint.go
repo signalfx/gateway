@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/signalfx/golib/errors"
@@ -31,6 +32,56 @@ const (
 	// Timestamp value represents a unix timestamp
 	Timestamp
 )
+
+func (mt MetricType) String() string {
+	switch mt {
+	case Count:
+		return "counter"
+	case Counter:
+		return "cumulative counter"
+	case Gauge:
+		return "gauge"
+	case Enum:
+		return "enum"
+	case Rate:
+		return "rate"
+	case Timestamp:
+		return "timestamp"
+	default:
+		return fmt.Sprintf("MetricType(%d)", int(mt))
+	}
+}
+
+// UnmarshalText decodes text as a MetricType in a case-insensitive way
+func (mt *MetricType) UnmarshalText(text []byte) error {
+	switch strings.ToLower(string(text)) {
+	case "counter":
+		*mt = Count
+	case "cumulative counter":
+		*mt = Counter
+	case "gauge":
+		*mt = Gauge
+	case "enum":
+		*mt = Enum
+	case "rate":
+		*mt = Rate
+	case "timestamp":
+		*mt = Timestamp
+	default:
+		return fmt.Errorf("unrecognized metric type: %q", text)
+	}
+	return nil
+}
+
+// UnmarshalJSON decodes JSON number as a MetricType
+func (mt *MetricType) UnmarshalJSON(b []byte) error {
+	var n int
+	if err := json.Unmarshal(b, &n); err != nil {
+		return err
+	}
+	*mt = MetricType(n)
+	return nil
+}
 
 // A Datapoint is the metric that is saved.  Designed around http://metrics20.org/spec/
 type Datapoint struct {

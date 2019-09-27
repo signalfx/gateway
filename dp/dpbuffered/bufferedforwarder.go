@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/signalfx/gateway/logkey"
-	"github.com/signalfx/gateway/protocol/signalfx"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/event"
@@ -47,6 +46,12 @@ var DefaultConfig = &Config{
 	Name:               pointer.String(""),
 }
 
+// Sink is a dpsink and trace.sink
+type Sink interface {
+	dpsink.Sink
+	trace.Sink
+}
+
 type stats struct {
 	totalDatapointsBuffered int64
 	totalEventsBuffered     int64
@@ -73,7 +78,7 @@ type BufferedForwarder struct {
 	cdim                        *log.CtxDimensions
 	identifier                  string
 
-	sendTo         signalfx.Sink
+	sendTo         Sink
 	stopContext    context.Context
 	stopFunc       context.CancelFunc
 	closeSender    func() error
@@ -373,7 +378,7 @@ func (forwarder *BufferedForwarder) StartupFinished() error {
 
 // NewBufferedForwarder is used only by this package to create a forwarder that buffers its
 // datapoint channel
-func NewBufferedForwarder(ctx context.Context, config *Config, sendTo signalfx.Sink, closeIt, afterStartup func() error, logger log.Logger, debugEnpoints func() map[string]http.Handler) *BufferedForwarder {
+func NewBufferedForwarder(ctx context.Context, config *Config, sendTo Sink, closeIt, afterStartup func() error, logger log.Logger, debugEnpoints func() map[string]http.Handler) *BufferedForwarder {
 	config = pointer.FillDefaultFrom(config, DefaultConfig).(*Config)
 	logCtx := log.NewContext(logger).With(logkey.Struct, "BufferedForwarder")
 	logCtx.Log(logkey.Config, config)
