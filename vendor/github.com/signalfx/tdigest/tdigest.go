@@ -138,6 +138,10 @@ func (t *TDigest) processIt(updateCumulative bool) {
 		t.unprocessedWeight = 0
 		normalizer := t.Scaler.normalizer(t.Compression, t.processedWeight)
 		soFar := t.unprocessed[0].Weight
+		if t.min == math.MaxFloat64 {
+			t.min = t.unprocessed[0].Mean
+			t.max = t.unprocessed[0].Mean
+		}
 		k1 := t.Scaler.k(0, normalizer)
 		limit := t.processedWeight * t.Scaler.q(k1+1, normalizer)
 		for _, centroid := range t.unprocessed[1:] {
@@ -312,8 +316,8 @@ func (t *TDigest) Decay(decayValue, decayLimit float64) {
 				t.max = t.processed[len(t.processed)-1].Mean
 			}
 		} else {
-			t.min = math.Inf(+1)
-			t.max = math.Inf(-1)
+			t.min = math.MaxFloat64
+			t.max = -math.MaxFloat64
 		}
 	}
 

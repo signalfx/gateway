@@ -88,7 +88,7 @@ func (h *HTTPSink) handleResponse(resp *http.Response, respValidator responseVal
 	atomic.AddInt64(&h.stats.readingBody, 1)
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return errors.Annotate(err, "cannot fully read response body")
+		return fmt.Errorf("cannot fully read response body: %s: %v", err, resp.Header)
 	}
 
 	// all 2XXs
@@ -126,22 +126,46 @@ func (h *HTTPSink) doBottom(ctx context.Context, f func() (io.Reader, bool, erro
 	for k, v := range h.AdditionalHeaders {
 		req.Header.Set(k, v)
 	}
+	h.setHeadersOnBottom(ctx, req, contentType, compressed)
+	resp, err := h.Client.Do(req)
+	if err != nil {
+		// According to docs, resp can be ignored since err is non-nil, so we
+		// don't have to close body.
+		return fmt.Errorf("failed to send/recieve http request: %s: %v", err, req.Header)
+	}
+
+	return h.handleResponse(resp, respValidator)
+}
+
+type xKeyContextValue string
+
+var (
+	// XDebugID Debugs the transaction via signalscope if value matches known secret
+	XDebugID xKeyContextValue = "X-Debug-Id"
+	// XTracingDebug Sets debug flag on trace if value matches known secret
+	XTracingDebug xKeyContextValue = "X-SF-Trace-Token"
+	// XTracingID if set accompanies the tracingDebug and gives a client the ability to put a value into a tag on the ingest span
+	XTracingID xKeyContextValue = "X-SF-Tracing-ID"
+)
+
+func (h *HTTPSink) setHeadersOnBottom(ctx context.Context, req *http.Request, contentType string, compressed bool) {
 	// set these below so if someone accidentally uses the same as below we wil override appropriately
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set(TokenHeaderName, h.AuthToken)
 	req.Header.Set("User-Agent", h.UserAgent)
 	req.Header.Set("Connection", "keep-alive")
+	if v := ctx.Value(XDebugID); v != nil {
+		req.Header.Set(string(XDebugID), v.(string))
+	}
+	if v := ctx.Value(XTracingDebug); v != nil {
+		req.Header.Set(string(XTracingDebug), v.(string))
+		if v := ctx.Value(XTracingID); v != nil {
+			req.Header.Set(string(XTracingID), v.(string))
+		}
+	}
 	if compressed {
 		req.Header.Set("Content-Encoding", "gzip")
 	}
-	resp, err := h.Client.Do(req)
-	if err != nil {
-		// According to docs, resp can be ignored since err is non-nil, so we
-		// don't have to close body.
-		return errors.Annotatef(err, "failed to send/recieve http request")
-	}
-
-	return h.handleResponse(resp, respValidator)
 }
 
 // AddDatapoints forwards the datapoints to SignalFx.
