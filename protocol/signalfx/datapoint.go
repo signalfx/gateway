@@ -224,7 +224,7 @@ func (decoder *JSONDecoderV2) Read(ctx context.Context, req *http.Request) error
 
 func getTokenLogFormat(req *http.Request) (ret []interface{}) {
 	h := sha1.New()
-	head := req.Header.Get(TokenHeaderName)
+	head := req.Header.Get(sfxclient.TokenHeaderName)
 	if _, err := io.WriteString(h, head); err != nil || head == "" {
 		return ret
 	}

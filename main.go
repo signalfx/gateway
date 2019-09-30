@@ -217,6 +217,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 			NumDrainingThreads: forwardConfig.DrainingThreads,
 			Name:               forwardConfig.Name,
 			Cdim:               cdim,
+			UseAuthFromRequest: forwardConfig.UseAuthFromRequest,
 		}
 		bf := dpbuffered.NewBufferedForwarder(ctx, bconf, endingSink, forwarder.Close, forwarder.StartupFinished, limitedLogger, forwarder.DebugEndpoints)
 		allForwarders = append(allForwarders, bf)

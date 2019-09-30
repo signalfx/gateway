@@ -41,6 +41,11 @@ func (streamer *Demultiplexer) AddDatapoints(ctx context.Context, points []*data
 		return nil
 	}
 	streamer.handleLateOrFuturePoints(points)
+	if v := ctx.Value(sfxclient.TokenHeaderName); v != nil {
+		for _, d := range points {
+			d.Meta[sfxclient.TokenHeaderName] = v
+		}
+	}
 	var errs []error
 	for _, sendTo := range streamer.DatapointSinks {
 		if err := sendTo.AddDatapoints(ctx, points); err != nil {
@@ -73,6 +78,11 @@ func (streamer *Demultiplexer) AddEvents(ctx context.Context, events []*event.Ev
 		return nil
 	}
 	streamer.handleLateOrFutureEvents(events)
+	if v := ctx.Value(sfxclient.TokenHeaderName); v != nil {
+		for _, e := range events {
+			addMeta(&e.Meta, sfxclient.TokenHeaderName, v)
+		}
+	}
 	var errs []error
 	for _, sendTo := range streamer.EventSinks {
 		if err := sendTo.AddEvents(ctx, events); err != nil {
@@ -98,6 +108,13 @@ func (streamer *Demultiplexer) handleLateOrFutureEvents(events []*event.Event) {
 	}
 }
 
+func addMeta(m *map[interface{}]interface{}, k interface{}, v interface{}) {
+	if *m == nil {
+		*m = make(map[interface{}]interface{})
+	}
+	(*m)[k] = v
+}
+
 // AddSpans forwards all traces to each sentTo sink. Returns the error of the last sink to have an error.
 // to avoid conflicts with adding tags in forwarders, each span needs to be a copy to avoid concurrent modification issues
 func (streamer *Demultiplexer) AddSpans(ctx context.Context, spans []*trace.Span) error {
@@ -105,10 +122,16 @@ func (streamer *Demultiplexer) AddSpans(ctx context.Context, spans []*trace.Span
 		return nil
 	}
 	streamer.handleLateOrFutureSpans(spans)
+	if v := ctx.Value(sfxclient.TokenHeaderName); v != nil {
+		for _, s := range spans {
+			addMeta(&s.Meta, sfxclient.TokenHeaderName, v)
+		}
+	}
 	var errs []error
 	for i, sendTo := range streamer.TraceSinks {
 		toSend := spans
 		if i < len(streamer.TraceSinks)-1 {
+			// this is because of smart samplers
 			toSend = deepCopySpans(spans)
 		}
 		if err := sendTo.AddSpans(ctx, toSend); err != nil {

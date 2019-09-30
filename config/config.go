@@ -40,6 +40,7 @@ type ForwardTo struct {
 	Timeout              *string                     `json:",omitempty"`
 	DefaultSource        *string                     `json:",omitempty"`
 	DefaultAuthToken     *string                     `json:",omitempty"`
+	UseAuthFromRequest   *bool                       `json:",omitempty"`
 	AuthTokenEnvVar      *string                     `json:",omitempty"`
 	BufferSize           *int64                      `json:",omitempty"`
 	Name                 *string                     `json:",omitempty"`
@@ -80,7 +81,7 @@ type ListenFrom struct {
 	AdditionalSpanTags                 map[string]string                     `json:",omitempty"`
 	RemoveSpanTags                     []*spanobfuscation.TagMatchRuleConfig `json:",omitempty"`
 	ObfuscateSpanTags                  []*spanobfuscation.TagMatchRuleConfig `json:",omitempty"`
-	Counter                            *dpsink.Counter
+	Counter                            *dpsink.Counter                       `json:"-"`
 }
 
 func (listenFrom *ListenFrom) String() string {

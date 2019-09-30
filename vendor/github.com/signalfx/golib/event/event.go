@@ -50,6 +50,8 @@ type Event struct {
 	// information about the metric. changes in this set doesn't change the metric identity
 	Properties map[string]interface{}
 	Timestamp  time.Time
+	// Meta is for internal purposes, it does not come in or leave with it.
+	Meta map[interface{}]interface{}
 }
 
 func (e *Event) String() string {
