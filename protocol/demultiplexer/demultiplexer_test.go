@@ -12,12 +12,14 @@ import (
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNew(t *testing.T) {
 	ctx := context.Background()
+	ctx = context.WithValue(ctx, sfxclient.TokenHeaderName, "foo")
 	sendTo1 := dptest.NewBasicSink()
 	sendTo2 := dptest.NewBasicSink()
 	sendTo3 := dptest.NewBasicSink()

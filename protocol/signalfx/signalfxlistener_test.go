@@ -27,10 +27,12 @@ import (
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
+	"net/http/httptest"
 )
 
 var errReadErr = errors.New("could not read")
@@ -587,6 +589,16 @@ func TestSignalfxListener(t *testing.T) {
 		Reset(func() {
 			So(listener.Close(), ShouldBeNil)
 		})
+	})
+}
+
+func TestAddTokenToContext(t *testing.T) {
+	Convey("add token to context", t, func() {
+		ctx := context.Background()
+		req := httptest.NewRequest("post", "/index.html", nil)
+		req.Header.Set(sfxclient.TokenHeaderName, "foo")
+		ctx = addTokenToContext(ctx, req)
+		So(ctx.Value(sfxclient.TokenHeaderName).(string), ShouldEqual, "foo")
 	})
 }
 

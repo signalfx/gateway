@@ -9,12 +9,14 @@ import (
 	"io"
 	"sync"
 
+	"github.com/signalfx/gateway/logkey"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
 	. "github.com/smartystreets/goconvey/convey"
@@ -246,13 +248,13 @@ func TestBufferedForwarderBlockingDrain(t *testing.T) {
 	f.eChan <- []*event.Event{dptest.E()}
 	f.eChan <- []*event.Event{dptest.E(), dptest.E()}
 
-	evs := f.blockingDrainEventsUpTo()
+	evs, _ := f.blockingDrainEventsUpTo()
 	assert.True(t, len(evs) == 3)
 
 	f.tChan <- []*trace.Span{{}}
 	f.tChan <- []*trace.Span{{}, {}}
 
-	spans := f.blockingDrainSpansUpTo()
+	spans, _ := f.blockingDrainSpansUpTo()
 	assert.True(t, len(spans) == 3)
 }
 
@@ -382,4 +384,93 @@ func TestBufferedForwarderMaxTotalEvents(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "With small buffer size, I should error out with a full buffer")
+}
+
+func TestTokenContext(t *testing.T) {
+	Convey("test token context", t, func() {
+		ctx := context.Background()
+		flagCheck := boolChecker(false)
+		checker := &dpsink.ItemFlagger{
+			CtxFlagCheck:        &flagCheck,
+			EventMetaName:       "meta_event",
+			MetricDimensionName: "sf_metric",
+		}
+		config := &Config{
+			BufferSize:         pointer.Int64(200),
+			MaxTotalDatapoints: pointer.Int64(1000),
+			MaxTotalEvents:     pointer.Int64(1000),
+			MaxTotalSpans:      pointer.Int64(1000),
+			NumDrainingThreads: pointer.Int64(2),
+			MaxDrainSize:       pointer.Int64(1000),
+			Checker:            checker,
+			UseAuthFromRequest: pointer.Bool(true),
+		}
+		sendTo := dptest.NewBasicSink()
+		config = pointer.FillDefaultFrom(config, DefaultConfig).(*Config)
+		logCtx := log.NewContext(log.DefaultLogger).With(logkey.Struct, "BufferedForwarder")
+		logCtx.Log(logkey.Config, config)
+		nctx, cancel := context.WithCancel(ctx)
+		bf := &BufferedForwarder{
+			stopFunc:           cancel,
+			stopContext:        nctx,
+			dpChan:             make(chan []*datapoint.Datapoint, *config.BufferSize),
+			eChan:              make(chan []*event.Event, *config.BufferSize),
+			tChan:              make(chan []*trace.Span, *config.BufferSize),
+			config:             config,
+			sendTo:             sendTo,
+			closeSender:        c,
+			afterStartup:       c,
+			logger:             logCtx,
+			checker:            config.Checker,
+			cdim:               config.Cdim,
+			identifier:         *config.Name,
+			debugEndpoints:     d,
+			useAuthFromRequest: *config.UseAuthFromRequest,
+		}
+		Convey("test the datapoint stuff", func() {
+			So(bf.AddDatapoints(context.Background(), []*datapoint.Datapoint{{Meta: map[interface{}]interface{}{sfxclient.TokenHeaderName: "foo"}}}), ShouldBeNil)
+			So(bf.AddDatapoints(context.Background(), []*datapoint.Datapoint{{Meta: map[interface{}]interface{}{sfxclient.TokenHeaderName: "bar"}}}), ShouldBeNil)
+			So(bf.AddDatapoints(context.Background(), []*datapoint.Datapoint{{}}), ShouldBeNil)
+			dps, ctx := bf.blockingDrainUpTo()
+			So(len(dps), ShouldEqual, 1)
+			So(ctx.Value(sfxclient.TokenHeaderName).(string), ShouldEqual, "foo")
+			dps, ctx = bf.blockingDrainUpTo()
+			So(len(dps), ShouldEqual, 1)
+			So(ctx.Value(sfxclient.TokenHeaderName).(string), ShouldEqual, "bar")
+			dps, ctx = bf.blockingDrainUpTo()
+			So(len(dps), ShouldEqual, 1)
+			So(ctx.Value(sfxclient.TokenHeaderName), ShouldBeNil)
+			So(len(bf.holdDatapoints), ShouldEqual, 0)
+		})
+		Convey("test the event stuff", func() {
+			So(bf.AddEvents(context.Background(), []*event.Event{{Meta: map[interface{}]interface{}{sfxclient.TokenHeaderName: "foo"}}}), ShouldBeNil)
+			So(bf.AddEvents(context.Background(), []*event.Event{{Meta: map[interface{}]interface{}{sfxclient.TokenHeaderName: "bar"}}}), ShouldBeNil)
+			So(bf.AddEvents(context.Background(), []*event.Event{{}}), ShouldBeNil)
+			dps, ctx := bf.blockingDrainEventsUpTo()
+			So(len(dps), ShouldEqual, 1)
+			So(ctx.Value(sfxclient.TokenHeaderName).(string), ShouldEqual, "foo")
+			dps, ctx = bf.blockingDrainEventsUpTo()
+			So(len(dps), ShouldEqual, 1)
+			So(ctx.Value(sfxclient.TokenHeaderName).(string), ShouldEqual, "bar")
+			dps, ctx = bf.blockingDrainEventsUpTo()
+			So(len(dps), ShouldEqual, 1)
+			So(ctx.Value(sfxclient.TokenHeaderName), ShouldBeNil)
+			So(len(bf.holdEvents), ShouldEqual, 0)
+		})
+		Convey("test the trace stuff", func() {
+			So(bf.AddSpans(context.Background(), []*trace.Span{{Meta: map[interface{}]interface{}{sfxclient.TokenHeaderName: "foo"}}}), ShouldBeNil)
+			So(bf.AddSpans(context.Background(), []*trace.Span{{Meta: map[interface{}]interface{}{sfxclient.TokenHeaderName: "bar"}}}), ShouldBeNil)
+			So(bf.AddSpans(context.Background(), []*trace.Span{{}}), ShouldBeNil)
+			dps, ctx := bf.blockingDrainSpansUpTo()
+			So(len(dps), ShouldEqual, 1)
+			So(ctx.Value(sfxclient.TokenHeaderName).(string), ShouldEqual, "foo")
+			dps, ctx = bf.blockingDrainSpansUpTo()
+			So(len(dps), ShouldEqual, 1)
+			So(ctx.Value(sfxclient.TokenHeaderName).(string), ShouldEqual, "bar")
+			dps, ctx = bf.blockingDrainSpansUpTo()
+			So(len(dps), ShouldEqual, 1)
+			So(ctx.Value(sfxclient.TokenHeaderName), ShouldBeNil)
+			So(len(bf.holdSpans), ShouldEqual, 0)
+		})
+	})
 }

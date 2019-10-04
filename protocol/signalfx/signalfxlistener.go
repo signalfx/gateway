@@ -95,9 +95,18 @@ func (e *ErrorTrackerHandler) Datapoints() []*datapoint.Datapoint {
 	}
 }
 
+func addTokenToContext(ctx context.Context, req *http.Request) context.Context {
+	head := req.Header.Get(sfxclient.TokenHeaderName)
+	if head != "" {
+		ctx = context.WithValue(ctx, sfxclient.TokenHeaderName, head)
+	}
+	return ctx
+}
+
 // ServeHTTPC will serve the wrapped ErrorReader and return the error (if any) to rw if ErrorReader
 // fails
 func (e *ErrorTrackerHandler) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, req *http.Request) {
+	ctx = addTokenToContext(ctx, req)
 	if err := e.reader.Read(ctx, req); err != nil {
 		atomic.AddInt64(&e.TotalErrors, 1)
 		rw.WriteHeader(http.StatusBadRequest)

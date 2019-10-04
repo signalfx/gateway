@@ -10,20 +10,20 @@ type Trace []*Span
 
 // Span defines a span
 type Span struct {
-	TraceID        string                 `json:"traceId"` // required
-	Name           *string                `json:"name,omitempty"`
-	ParentID       *string                `json:"parentId,omitempty"`
-	ID             string                 `json:"id"` // required
-	Kind           *string                `json:"kind,omitempty"`
-	Timestamp      *int64                 `json:"timestamp,omitempty"`
-	Duration       *int64                 `json:"duration,omitempty"`
-	Debug          *bool                  `json:"debug,omitempty"`
-	Shared         *bool                  `json:"shared,omitempty"`
-	LocalEndpoint  *Endpoint              `json:"localEndpoint,omitempty"`
-	RemoteEndpoint *Endpoint              `json:"remoteEndpoint,omitempty"`
-	Annotations    []*Annotation          `json:"annotations,omitempty"`
-	Tags           map[string]string      `json:"tags,omitempty"`
-	Meta           map[string]interface{} `json:"-"` // non serializeable field to hold any meta data we want to keep around
+	TraceID        string                      `json:"traceId"` // required
+	Name           *string                     `json:"name,omitempty"`
+	ParentID       *string                     `json:"parentId,omitempty"`
+	ID             string                      `json:"id"` // required
+	Kind           *string                     `json:"kind,omitempty"`
+	Timestamp      *int64                      `json:"timestamp,omitempty"`
+	Duration       *int64                      `json:"duration,omitempty"`
+	Debug          *bool                       `json:"debug,omitempty"`
+	Shared         *bool                       `json:"shared,omitempty"`
+	LocalEndpoint  *Endpoint                   `json:"localEndpoint,omitempty"`
+	RemoteEndpoint *Endpoint                   `json:"remoteEndpoint,omitempty"`
+	Annotations    []*Annotation               `json:"annotations,omitempty"`
+	Tags           map[string]string           `json:"tags,omitempty"`
+	Meta           map[interface{}]interface{} `json:"-"` // non serializeable field to hold any meta data we want to keep around
 }
 
 // Endpoint is the network context of a node in the service graph

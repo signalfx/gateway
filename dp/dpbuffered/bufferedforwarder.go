@@ -29,10 +29,11 @@ type Config struct {
 	Checker            *dpsink.ItemFlagger
 	Cdim               *log.CtxDimensions
 	Name               *string
+	UseAuthFromRequest *bool
 }
 
 func (c *Config) String() string {
-	return fmt.Sprintf("Config [BufferSize: %d MaxTotalDatapoints: %d MaxTotalEvents: %d MaxTotalSpans: %d MaxDrainSize: %d NumDrainingThreads: %d", *c.BufferSize, *c.MaxTotalDatapoints, *c.MaxTotalEvents, *c.MaxTotalSpans, *c.MaxDrainSize, *c.NumDrainingThreads)
+	return fmt.Sprintf("Config [Name: %s BufferSize: %d MaxTotalDatapoints: %d MaxTotalEvents: %d MaxTotalSpans: %d MaxDrainSize: %d NumDrainingThreads: %d UseAuthFromRequest: %t", *c.Name, *c.BufferSize, *c.MaxTotalDatapoints, *c.MaxTotalEvents, *c.MaxTotalSpans, *c.MaxDrainSize, *c.NumDrainingThreads, *c.UseAuthFromRequest)
 }
 
 // DefaultConfig are default values for buffered forwarders
@@ -44,6 +45,7 @@ var DefaultConfig = &Config{
 	MaxDrainSize:       pointer.Int64(30000),
 	NumDrainingThreads: pointer.Int64(int64(runtime.NumCPU())),
 	Name:               pointer.String(""),
+	UseAuthFromRequest: pointer.Bool(false),
 }
 
 // Sink is a dpsink and trace.sink
@@ -69,14 +71,21 @@ type BufferedForwarder struct {
 	tChan                       chan []*trace.Span
 	config                      *Config
 	stats                       stats
+	useAuthFromRequest          bool
 	threadsWaitingToDie         sync.WaitGroup
 	blockingDrainWaitMutex      sync.Mutex
 	blockingEventDrainWaitMutex sync.Mutex
 	blockingTraceDrainWaitMutex sync.Mutex
-	logger                      log.Logger
-	checker                     *dpsink.ItemFlagger
-	cdim                        *log.CtxDimensions
-	identifier                  string
+	// these are where we hold stuff that weren't the correct token
+	// these are protected by the three mutexes above
+	holdDatapoints []*datapoint.Datapoint
+	holdEvents     []*event.Event
+	holdSpans      []*trace.Span
+
+	logger     log.Logger
+	checker    *dpsink.ItemFlagger
+	cdim       *log.CtxDimensions
+	identifier string
 
 	sendTo         Sink
 	stopContext    context.Context
@@ -195,82 +204,190 @@ func (forwarder *BufferedForwarder) Pipeline() int64 {
 	return int64(len(forwarder.dpChan)) + int64(len(forwarder.eChan)) + atomic.LoadInt64(&forwarder.stats.datapointsInFlight) + atomic.LoadInt64(&forwarder.stats.eventsInFlight) + int64(len(forwarder.tChan)) + atomic.LoadInt64(&forwarder.stats.tracesInFlight)
 }
 
-func (forwarder *BufferedForwarder) blockingDrainUpTo() []*datapoint.Datapoint {
+func (forwarder *BufferedForwarder) blockingDrainUpTo() ([]*datapoint.Datapoint, context.Context) {
 	// We block the mutex so we allow one drainer to fully drain until we use another
 	forwarder.blockingDrainWaitMutex.Lock()
 	defer forwarder.blockingDrainWaitMutex.Unlock()
 
-	// Block for at least one point
-	select {
-	case datapoints := <-forwarder.dpChan:
-	Loop:
-		for int64(len(datapoints)) < *forwarder.config.MaxDrainSize {
-			select {
-			case datapoint := <-forwarder.dpChan:
-				datapoints = append(datapoints, datapoint...)
-				continue
-			default:
-				// Nothing left.  Flush this.
-				break Loop
+	var currentToken string
+	var datapoints []*datapoint.Datapoint
+	if len(forwarder.holdDatapoints) > 0 {
+		// use hold, this means we hit a batch that wasn't the same token, next thread takes it
+		datapoints = forwarder.holdDatapoints
+		currentToken = forwarder.getTokenFromDatapoints(datapoints, currentToken)
+		forwarder.holdDatapoints = nil
+	} else {
+		// Block for at least one point
+		select {
+		case datapoints = <-forwarder.dpChan:
+			if forwarder.useAuthFromRequest {
+				// all points in a batch will have the same token
+				currentToken = forwarder.getTokenFromDatapoints(datapoints, currentToken)
 			}
+		case <-forwarder.stopContext.Done():
+			return []*datapoint.Datapoint{}, forwarder.stopContext
 		}
-		atomic.AddInt64(&forwarder.stats.totalDatapointsBuffered, int64(-len(datapoints)))
-		return datapoints
-	case <-forwarder.stopContext.Done():
-		return []*datapoint.Datapoint{}
 	}
+
+	datapoints, ctx := forwarder.blockingDrainUpToPost(datapoints, currentToken)
+	return datapoints, ctx
 }
 
-func (forwarder *BufferedForwarder) blockingDrainEventsUpTo() []*event.Event {
+func (forwarder *BufferedForwarder) blockingDrainUpToPost(datapoints []*datapoint.Datapoint, currentToken string) ([]*datapoint.Datapoint, context.Context) {
+Loop:
+	for int64(len(datapoints)) < *forwarder.config.MaxDrainSize {
+		select {
+		case datapoint := <-forwarder.dpChan:
+			if forwarder.useAuthFromRequest {
+				if forwarder.getTokenFromDatapoints(datapoint, "") != currentToken {
+					forwarder.holdDatapoints = datapoint
+					break Loop
+				}
+			}
+			datapoints = append(datapoints, datapoint...)
+			continue
+		default:
+			// Nothing left.  Flush this.
+			break Loop
+		}
+	}
+	atomic.AddInt64(&forwarder.stats.totalDatapointsBuffered, int64(-len(datapoints)))
+	ctx := forwarder.stopContext
+	if currentToken != "" {
+		ctx = context.WithValue(ctx, sfxclient.TokenHeaderName, currentToken)
+	}
+	return datapoints, ctx
+}
+
+func (forwarder *BufferedForwarder) getTokenFromDatapoints(datapoints []*datapoint.Datapoint, currentToken string) string {
+	if tok, ok := datapoints[0].Meta[sfxclient.TokenHeaderName]; ok {
+		currentToken = tok.(string) // all points in a batch will have the same token
+	}
+	return currentToken
+}
+
+func (forwarder *BufferedForwarder) blockingDrainEventsUpTo() ([]*event.Event, context.Context) {
 	// We block the mutex so we allow one drainer to fully drain until we use another
 	forwarder.blockingEventDrainWaitMutex.Lock()
 	defer forwarder.blockingEventDrainWaitMutex.Unlock()
 
-	// Block for at least one event
-	select {
-	case events := <-forwarder.eChan:
-	Loop:
-		for int64(len(events)) < *forwarder.config.MaxDrainSize {
-			select {
-			case event := <-forwarder.eChan:
-				events = append(events, event...)
-				continue
-			default:
-				// Nothing left.  Flush this.
-				break Loop
+	var currentToken string
+	var events []*event.Event
+	if len(forwarder.holdEvents) > 0 {
+		// use hold, this means we hit a batch that wasn't the same token, next thread takes it
+		events = forwarder.holdEvents
+		currentToken = forwarder.getTokenFromEvents(events, currentToken)
+		forwarder.holdEvents = nil
+	} else {
+		// Block for at least one point
+		select {
+		case events = <-forwarder.eChan:
+			if forwarder.useAuthFromRequest {
+				// all points in a batch will have the same token
+				currentToken = forwarder.getTokenFromEvents(events, currentToken)
 			}
+		case <-forwarder.stopContext.Done():
+			return []*event.Event{}, forwarder.stopContext
 		}
-		atomic.AddInt64(&forwarder.stats.totalEventsBuffered, int64(-len(events)))
-		return events
-	case <-forwarder.stopContext.Done():
-		return []*event.Event{}
 	}
+
+	events, ctx := forwarder.blockingDrainEventsUpToPost(events, currentToken)
+	return events, ctx
 }
 
-func (forwarder *BufferedForwarder) blockingDrainSpansUpTo() []*trace.Span {
+func (forwarder *BufferedForwarder) blockingDrainEventsUpToPost(events []*event.Event, currentToken string) ([]*event.Event, context.Context) {
+Loop:
+	for int64(len(events)) < *forwarder.config.MaxDrainSize {
+		select {
+		case event := <-forwarder.eChan:
+			if forwarder.useAuthFromRequest {
+				if forwarder.getTokenFromEvents(event, "") != currentToken {
+					forwarder.holdEvents = event
+					break Loop
+				}
+			}
+			events = append(events, event...)
+			continue
+		default:
+			// Nothing left.  Flush this.
+			break Loop
+		}
+	}
+	atomic.AddInt64(&forwarder.stats.totalEventsBuffered, int64(-len(events)))
+	ctx := forwarder.stopContext
+	if currentToken != "" {
+		ctx = context.WithValue(ctx, sfxclient.TokenHeaderName, currentToken)
+	}
+	return events, ctx
+}
+
+func (forwarder *BufferedForwarder) getTokenFromEvents(events []*event.Event, currentToken string) string {
+	if tok, ok := events[0].Meta[sfxclient.TokenHeaderName]; ok {
+		currentToken = tok.(string) // all points in a batch will have the same token
+	}
+	return currentToken
+}
+
+func (forwarder *BufferedForwarder) blockingDrainSpansUpTo() ([]*trace.Span, context.Context) {
 	// We block the mutex so we allow one drainer to fully drain until we use another
 	forwarder.blockingTraceDrainWaitMutex.Lock()
 	defer forwarder.blockingTraceDrainWaitMutex.Unlock()
 
-	// Block for at least one trace
-	select {
-	case traces := <-forwarder.tChan:
-	Loop:
-		for int64(len(traces)) < *forwarder.config.MaxDrainSize {
-			select {
-			case trace := <-forwarder.tChan:
-				traces = append(traces, trace...)
-				continue
-			default:
-				// Nothing left.  Flush this.
-				break Loop
+	var currentToken string
+	var spans []*trace.Span
+	if len(forwarder.holdSpans) > 0 {
+		// use hold, this means we hit a batch that wasn't the same token, next thread takes it
+		spans = forwarder.holdSpans
+		currentToken = forwarder.getTokenFromSpans(spans, currentToken)
+		forwarder.holdSpans = nil
+	} else {
+		// Block for at least one point
+		select {
+		case spans = <-forwarder.tChan:
+			if forwarder.useAuthFromRequest {
+				// all points in a batch will have the same token
+				currentToken = forwarder.getTokenFromSpans(spans, currentToken)
 			}
+		case <-forwarder.stopContext.Done():
+			return []*trace.Span{}, forwarder.stopContext
 		}
-		atomic.AddInt64(&forwarder.stats.totalTracesBuffered, int64(-len(traces)))
-		return traces
-	case <-forwarder.stopContext.Done():
-		return []*trace.Span{}
 	}
+
+	spans, ctx := forwarder.blockingDrainSpansUpToPost(spans, currentToken)
+	return spans, ctx
+}
+
+func (forwarder *BufferedForwarder) blockingDrainSpansUpToPost(spans []*trace.Span, currentToken string) ([]*trace.Span, context.Context) {
+Loop:
+	for int64(len(spans)) < *forwarder.config.MaxDrainSize {
+		select {
+		case span := <-forwarder.tChan:
+			if forwarder.useAuthFromRequest {
+				if forwarder.getTokenFromSpans(span, "") != currentToken {
+					forwarder.holdSpans = span
+					break Loop
+				}
+			}
+			spans = append(spans, span...)
+			continue
+		default:
+			// Nothing left.  Flush this.
+			break Loop
+		}
+	}
+	atomic.AddInt64(&forwarder.stats.totalTracesBuffered, int64(-len(spans)))
+	ctx := forwarder.stopContext
+	if currentToken != "" {
+		ctx = context.WithValue(ctx, sfxclient.TokenHeaderName, currentToken)
+	}
+	return spans, ctx
+}
+
+func (forwarder *BufferedForwarder) getTokenFromSpans(spans []*trace.Span, currentToken string) string {
+	if tok, ok := spans[0].Meta[sfxclient.TokenHeaderName]; ok {
+		currentToken = tok.(string) // all points in a batch will have the same token
+	}
+	return currentToken
 }
 
 // Close stops the threads that are flushing channel points to the next forwarder
@@ -284,13 +401,13 @@ func (forwarder *BufferedForwarder) doData(drainIndex int64) {
 	defer forwarder.threadsWaitingToDie.Done()
 	logger := log.NewContext(forwarder.logger).With("draining_index", drainIndex)
 	for forwarder.stopContext.Err() == nil {
-		datapoints := forwarder.blockingDrainUpTo()
+		datapoints, ctx := forwarder.blockingDrainUpTo()
 		if len(datapoints) == 0 {
 			continue
 		}
 		logDpIfFlag(logger, forwarder.checker, datapoints, "about to send datapoint")
 		atomic.AddInt64(&forwarder.stats.datapointsInFlight, int64(len(datapoints)))
-		err := forwarder.sendTo.AddDatapoints(forwarder.stopContext, datapoints)
+		err := forwarder.sendTo.AddDatapoints(ctx, datapoints)
 		atomic.AddInt64(&forwarder.stats.datapointsInFlight, -int64(len(datapoints)))
 		if err != nil {
 			logger.Log(log.Err, err, "error sending datapoints")
@@ -303,13 +420,13 @@ func (forwarder *BufferedForwarder) doEvent(drainIndex int64) {
 	defer forwarder.threadsWaitingToDie.Done()
 	logger := log.NewContext(forwarder.logger).With("draining_index", drainIndex)
 	for forwarder.stopContext.Err() == nil {
-		events := forwarder.blockingDrainEventsUpTo()
+		events, ctx := forwarder.blockingDrainEventsUpTo()
 		if len(events) == 0 {
 			continue
 		}
 		logEvIfFlag(logger, forwarder.checker, events, "about to send event")
 		atomic.AddInt64(&forwarder.stats.eventsInFlight, int64(len(events)))
-		err := forwarder.sendTo.AddEvents(forwarder.stopContext, events)
+		err := forwarder.sendTo.AddEvents(ctx, events)
 		atomic.AddInt64(&forwarder.stats.eventsInFlight, -int64(len(events)))
 		if err != nil {
 			logger.Log(log.Err, err, "error sending events")
@@ -322,12 +439,12 @@ func (forwarder *BufferedForwarder) doSpan(drainIndex int64) {
 	defer forwarder.threadsWaitingToDie.Done()
 	logger := log.NewContext(forwarder.logger).With("draining_index", drainIndex)
 	for forwarder.stopContext.Err() == nil {
-		traces := forwarder.blockingDrainSpansUpTo()
+		traces, ctx := forwarder.blockingDrainSpansUpTo()
 		if len(traces) == 0 {
 			continue
 		}
 		atomic.AddInt64(&forwarder.stats.tracesInFlight, int64(len(traces)))
-		err := forwarder.sendTo.AddSpans(forwarder.stopContext, traces)
+		err := forwarder.sendTo.AddSpans(ctx, traces)
 		atomic.AddInt64(&forwarder.stats.tracesInFlight, -int64(len(traces)))
 		if err != nil {
 			logger.Log(log.Err, err, "error sending traces")
@@ -384,20 +501,21 @@ func NewBufferedForwarder(ctx context.Context, config *Config, sendTo Sink, clos
 	logCtx.Log(logkey.Config, config)
 	context, cancel := context.WithCancel(ctx)
 	ret := &BufferedForwarder{
-		stopFunc:       cancel,
-		stopContext:    context,
-		dpChan:         make(chan []*datapoint.Datapoint, *config.BufferSize),
-		eChan:          make(chan []*event.Event, *config.BufferSize),
-		tChan:          make(chan []*trace.Span, *config.BufferSize),
-		config:         config,
-		sendTo:         sendTo,
-		closeSender:    closeIt,
-		afterStartup:   afterStartup,
-		logger:         logCtx,
-		checker:        config.Checker,
-		cdim:           config.Cdim,
-		identifier:     *config.Name,
-		debugEndpoints: debugEnpoints,
+		stopFunc:           cancel,
+		stopContext:        context,
+		dpChan:             make(chan []*datapoint.Datapoint, *config.BufferSize),
+		eChan:              make(chan []*event.Event, *config.BufferSize),
+		tChan:              make(chan []*trace.Span, *config.BufferSize),
+		config:             config,
+		sendTo:             sendTo,
+		closeSender:        closeIt,
+		afterStartup:       afterStartup,
+		logger:             logCtx,
+		checker:            config.Checker,
+		cdim:               config.Cdim,
+		identifier:         *config.Name,
+		debugEndpoints:     debugEnpoints,
+		useAuthFromRequest: *config.UseAuthFromRequest,
 	}
 	ret.start()
 	return ret

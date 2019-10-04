@@ -148,10 +148,18 @@ var (
 	XTracingID xKeyContextValue = "X-SF-Tracing-ID"
 )
 
+func (h *HTTPSink) setTokenHeader(ctx context.Context, req *http.Request) {
+	if tok := ctx.Value(TokenHeaderName); tok != nil {
+		req.Header.Set(TokenHeaderName, tok.(string))
+	} else {
+		req.Header.Set(TokenHeaderName, h.AuthToken)
+	}
+}
+
 func (h *HTTPSink) setHeadersOnBottom(ctx context.Context, req *http.Request, contentType string, compressed bool) {
 	// set these below so if someone accidentally uses the same as below we wil override appropriately
 	req.Header.Set("Content-Type", contentType)
-	req.Header.Set(TokenHeaderName, h.AuthToken)
+	h.setTokenHeader(ctx, req)
 	req.Header.Set("User-Agent", h.UserAgent)
 	req.Header.Set("Connection", "keep-alive")
 	if v := ctx.Value(XDebugID); v != nil {
@@ -419,7 +427,6 @@ func (h *HTTPSink) AddSpans(ctx context.Context, traces []*trace.Span) (err erro
 		return h.getReader(b)
 	}, "application/json", h.TraceEndpoint, spanResponseValidator)
 }
-
 func jsonMarshal(v []*trace.Span) ([]byte, error) {
 	// Yeah, i did that.
 	y := (*traceformat.Trace)(unsafe.Pointer(&v))
