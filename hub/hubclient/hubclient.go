@@ -2,7 +2,6 @@ package hubclient
 
 import (
 	"context"
-
 	"github.com/mailru/easyjson"
 )
 
@@ -20,9 +19,9 @@ type Client interface {
 	WatchConfig() (<-chan *Config, context.CancelFunc)
 }
 
-// Server represents a SmartGateway Server
+// ServerResponse represents a SmartGateway Server as returned by the hub api
 // easyjson:json
-type Server struct {
+type ServerResponse struct {
 	// Name is the name of the server
 	Name string `json:"name"`
 	// Version is the smart gateway version of the server
@@ -31,6 +30,43 @@ type Server struct {
 	Payload []byte `json:"payload"`
 	// LastHeartbeat is the timestamp of the last heartbeat
 	LastHeartbeat int `json:"lastHeartbeat"`
+}
+
+// String is the ToString method for ServerResponse
+func (v ServerResponse) String() string {
+	bts, _ := easyjson.Marshal(v)
+	return string(bts)
+}
+
+// ToServer returns a Server struct copying the fields of the ServerResponse with the payload unmarshalled
+func (v *ServerResponse) ToServer() Server {
+	s := Server{
+		ServerResponse: ServerResponse{
+			Name:          v.Name,
+			Version:       v.Version,
+			LastHeartbeat: v.LastHeartbeat,
+		},
+		Payload: ServerPayload(make(map[string][]byte)),
+	}
+
+	// Attempt to unmarshal the payload and ignore errors. Ignoring errors here is ok,
+	// because things reading from the Server.ServerPayload should handle the situation where
+	// their key doesn't exist.
+	easyjson.Unmarshal(v.Payload, &s.Payload)
+
+	return s
+}
+
+// ServerPayload is a map of payload byte arrays
+// easyjson:json
+type ServerPayload map[string][]byte
+
+// Server represents a SmartGateway Server with its payload decrypted and unmarshalled
+// easyjson:json
+type Server struct {
+	ServerResponse
+	// Payload is a map of payloads ([]byte) by forwarder/listener name
+	Payload ServerPayload `json:"payload"`
 }
 
 // String is the ToString method for Server
@@ -45,9 +81,9 @@ type Cluster struct {
 	// Name is the name of the cluster
 	Name string `json:"name"`
 	// Servers are the servers in the cluster
-	Servers []*Server `json:"servers"`
+	Servers []*ServerResponse `json:"servers"`
 	// Distributors are the distributors in the cluster
-	Distributors []*Server `json:"distributors"`
+	Distributors []*ServerResponse `json:"distributors"`
 }
 
 // String is the ToString method for Cluster

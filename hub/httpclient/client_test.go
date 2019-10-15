@@ -18,8 +18,8 @@ func TestHTTPClient_Register(t *testing.T) {
 		},
 		Cluster: &hubclient.Cluster{
 			Name:         "thisIsACluster",
-			Servers:      []*hubclient.Server{},
-			Distributors: []*hubclient.Server{},
+			Servers:      []*hubclient.ServerResponse{},
+			Distributors: []*hubclient.ServerResponse{},
 		},
 	}
 	type args struct {
