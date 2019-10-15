@@ -27,6 +27,8 @@ const (
 
 	// SFX Headers
 	authenticationToken = "X-SF-TOKEN"
+
+	Etag = "ETag"
 )
 
 // Client is a client for interacting with the SignalFx Gateway Hub API
@@ -104,7 +106,7 @@ func (h *HTTPClient) Register(cluster string, name string, version string, paylo
 		var respBody []byte
 		statusCode, respHeaders, respBody, err = h.request(registerV2, http.MethodPost, reqBody, headers)
 		if err == nil {
-			etag = respHeaders.Get("etag")
+			etag = respHeaders.Get(Etag)
 			switch statusCode {
 			case http.StatusOK:
 				// unmarshal payload when the request is successful

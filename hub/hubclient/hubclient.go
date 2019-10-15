@@ -33,7 +33,7 @@ type Server struct {
 	LastHeartbeat int `json:"lastHeartbeat"`
 }
 
-// String is the too ToString method for Server
+// String is the ToString method for Server
 func (v Server) String() string {
 	bts, _ := easyjson.Marshal(v)
 	return string(bts)
