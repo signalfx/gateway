@@ -174,6 +174,9 @@ func (h *Hub) register(registration *hubclient.Registration) error {
 	var err error
 	resp, h.etag, err = h.client.Register(registration.Cluster, registration.Name, registration.Version, registration.Payload, registration.Distributor)
 
+	// save the lease returned by the hub
+	h.lease = resp.Lease
+
 	// when registration errors out
 	if err != nil {
 		// wait a second if registration fails
