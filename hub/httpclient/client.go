@@ -80,6 +80,9 @@ func (h *HTTPClient) request(urlStr string, method string, body []byte, headers 
 // ErrServerNameConflict is a registration error
 var ErrServerNameConflict = errors.New("server name already exists within cluster")
 
+// ErrUnauthorized is an unauthorized error
+var ErrUnauthorized = errors.New("authorization failed (please verify auth token is correct)")
+
 // Register makes a request to register with the gateway hub
 func (h *HTTPClient) Register(cluster string, name string, version string, payload []byte, distributor bool) (reg hubclient.RegistrationResponse, etag string, err error) {
 	var reqBody []byte
@@ -115,6 +118,9 @@ func (h *HTTPClient) Register(cluster string, name string, version string, paylo
 			case http.StatusConflict:
 				// return a named error for status conflicts
 				err = ErrServerNameConflict
+			case http.StatusUnauthorized:
+				// return an error for unauthorized requests
+				err = ErrUnauthorized
 			default:
 				// The request didn't error out, but the server returned an unexpected status
 				err = fmt.Errorf(`%s %s %d %s`, http.MethodPost, registerV2, statusCode, string(respBody))
@@ -152,6 +158,9 @@ func (h *HTTPClient) Unregister(lease string) (err error) {
 		case http.StatusInternalServerError:
 			// return a named error when hub can't remove the instance
 			err = ErrCannotRemoveInstance
+		case http.StatusUnauthorized:
+			// return an error for unauthorized requests
+			err = ErrUnauthorized
 		default:
 			// The request didn't error out, but the server returned an unexpected status
 			err = fmt.Errorf(`%s %s %d %s`, http.MethodPost, unregisterV2, statusCode, string(respBody))
@@ -179,7 +188,7 @@ func NewClient(hubAddress string, authToken string, timeout time.Duration) (Clie
 	}
 
 	// auth token
-	if authToken == "" {
+	if err == nil && authToken == "" {
 		err = errors.New("auth token can not be empty")
 	}
 
