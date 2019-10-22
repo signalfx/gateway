@@ -312,6 +312,16 @@ func (h *Hub) Close() {
 	h.wg.Wait()
 }
 
+// IsOpen indicates whether the hub has been closed or not
+func (h *Hub) IsOpen() bool {
+	select {
+	case <-h.ctx.Done():
+	default:
+		return true
+	}
+	return false
+}
+
 // newHub returns a new hub but with out starting routines.  This is useful for testing
 func newHub(logger log.Logger, hubAddress string, authToken string, timeout time.Duration) (*Hub, error) {
 	var h *Hub
@@ -320,27 +330,26 @@ func newHub(logger log.Logger, hubAddress string, authToken string, timeout time
 	//  maybe do that in the NewClient() call?
 	client, err := httpclient.NewClient(hubAddress, authToken, timeout)
 
-	if err == nil {
-		h = &Hub{
-			logger:            logger,
-			tk:                timekeeper.RealTime{},
-			client:            client,
-			heartbeatMutex:    sync.Mutex{},
-			heartbeatInterval: defaultHeartBeatInterval,
-			// channels
-			// registerCh is used to signal registration and re-registration to the hub
-			registerCh: make(chan *hubclient.Registration, 10),
-			// unregisterCh is used to signal deregistration from the hub
-			unregisterCh: signalableErrCh(make(chan chan error, 10)),
-			// clusterCh is used to push cluster updates to the client routine
-			clusterCh: make(chan *hubclient.Cluster, 10),
-			// configCh is used to push config changes to the client routine
-			configCh: make(chan *hubclient.Config, 10),
-		}
-
-		// create context for servicing client requests
-		h.ctx, h.closeFn = context.WithCancel(context.Background())
+	h = &Hub{
+		logger:            logger,
+		tk:                timekeeper.RealTime{},
+		client:            client,
+		heartbeatMutex:    sync.Mutex{},
+		heartbeatInterval: defaultHeartBeatInterval,
+		// channels
+		// registerCh is used to signal registration and re-registration to the hub
+		registerCh: make(chan *hubclient.Registration, 10),
+		// unregisterCh is used to signal deregistration from the hub
+		unregisterCh: signalableErrCh(make(chan chan error, 10)),
+		// clusterCh is used to push cluster updates to the client routine
+		clusterCh: make(chan *hubclient.Cluster, 10),
+		// configCh is used to push config changes to the client routine
+		configCh: make(chan *hubclient.Config, 10),
 	}
+
+	// create context for servicing client requests
+	h.ctx, h.closeFn = context.WithCancel(context.Background())
+
 	return h, err
 }
 
@@ -361,12 +370,22 @@ func startHub(h *Hub) {
 	}()
 }
 
+// GatewayHub is an interface for interacting with the GatewayHub and should allow us to mock the hub in main gateway tests
+type GatewayHub interface {
+	Register(serverName string, clusterName string, version string, payload hubclient.ServerPayload, distributor bool) error
+	Unregister(ctx context.Context) error
+	IsOpen() bool
+	Close()
+}
+
 // NewHub returns a new hub instance with running routines
-func NewHub(logger log.Logger, hubAddress string, authToken string, timeout time.Duration) (*Hub, error) {
+func NewHub(logger log.Logger, hubAddress string, authToken string, timeout time.Duration) (GatewayHub, error) {
 	h, err := newHub(logger, hubAddress, authToken, timeout)
 
-	// start the routines that back the hub
-	if err == nil {
+	if err != nil {
+		h.Close()
+	} else {
+		// start the routines that back the hub
 		startHub(h)
 	}
 

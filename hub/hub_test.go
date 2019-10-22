@@ -270,7 +270,12 @@ func TestNewHub(t *testing.T) {
 				return
 			}
 			if err == nil {
-				got.Close()
+				if got.IsOpen() {
+					got.Close()
+					if got.IsOpen() {
+						t.Errorf("failed to close the hub")
+					}
+				}
 			}
 		})
 	}
