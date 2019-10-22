@@ -69,6 +69,23 @@ func TestHTTPClient_Register(t *testing.T) {
 			wantErr:  true,
 		},
 		{
+			name: "unauthorized error",
+			args: &hubclient.Registration{
+				Name:    "",
+				Version: "",
+				Payload: []byte{},
+			},
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte{})
+			},
+			wantResp: hubclient.RegistrationResponse{
+				Lease: "",
+			},
+			wantEtag: "",
+			wantErr:  true,
+		},
+		{
 			name: "unrecognized error",
 			args: &hubclient.Registration{
 				Name:    "",
@@ -151,6 +168,17 @@ func TestHTTPClient_UnRegister(t *testing.T) {
 			},
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte{})
+			},
+			wantErr: true,
+		},
+		{
+			name: "unsuccessful deregistration",
+			args: args{
+				lease: "hello",
+			},
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusUnauthorized)
 				w.Write([]byte{})
 			},
 			wantErr: true,
