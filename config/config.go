@@ -179,6 +179,12 @@ type GatewayConfig struct {
 	EtcdMaxWalFiles  *uint   `json:",omitempty"`
 
 	EmitDebugMetrics *bool `json:",omitempty"` // indicates whether debug metrics should be emitted or not
+
+	// Gateway Hub Configurations
+	Cluster          *bool          `json:",omitempty"`
+	HubAddress       *string        `json:",omitempty"`
+	AuthToken        *string        `json:",omitempty"`
+	HubClientTimeout *time.Duration `json:"-"`
 }
 
 func stringToURL(s string) (u *url.URL, err error) {
@@ -350,6 +356,10 @@ func DefaultGatewayConfig() *GatewayConfig {
 		StatsDelay:                    pointer.String("10s"),
 		StatsDelayDuration:            pointer.Duration(10 * time.Second),
 		EmitDebugMetrics:              pointer.Bool(false),
+		Cluster:                       pointer.Bool(false),
+		HubAddress:                    pointer.String(""),
+		AuthToken:                     pointer.String(""),
+		HubClientTimeout:              pointer.Duration(time.Second * 5),
 	}
 }
 func getDefaultName(osHostname func() (string, error)) string {
