@@ -5,7 +5,6 @@ import (
 	"expvar"
 	"flag"
 	"fmt"
-	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"io/ioutil"
 	"net"
@@ -19,6 +18,8 @@ import (
 	"syscall"
 	"time"
 
+	_ "net/http/pprof"
+
 	etcdcli "github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/embed"
 	"github.com/gorilla/mux"
@@ -28,6 +29,8 @@ import (
 	"github.com/signalfx/gateway/dp/dpbuffered"
 	"github.com/signalfx/gateway/etcdIntf"
 	"github.com/signalfx/gateway/flaghelpers"
+	"github.com/signalfx/gateway/hub"
+	"github.com/signalfx/gateway/hub/hubclient"
 	"github.com/signalfx/gateway/logkey"
 	"github.com/signalfx/gateway/protocol"
 	"github.com/signalfx/gateway/protocol/demultiplexer"
@@ -49,7 +52,7 @@ import (
 	_ "github.com/signalfx/ondiskencoding"
 	_ "github.com/signalfx/tdigest"
 	_ "github.com/spaolacci/murmur3"
-	_ "net/http/pprof"
+	"gopkg.in/natefinch/lumberjack.v2"
 	_ "stathat.com/c/consistent"
 )
 
@@ -139,6 +142,7 @@ type gateway struct {
 	ctxDims                 log.CtxDimensions
 	signalChan              chan os.Signal
 	config                  *config.GatewayConfig
+	hub                     hub.GatewayHub
 	etcdServer              *embetcd.Server
 	etcdClient              *embetcd.Client
 	versionMetric           reportsha.SHA1Reporter
@@ -172,7 +176,7 @@ func forwarderName(f *config.ForwardTo) string {
 
 var errDupeForwarder = errors.New("cannot duplicate forwarder names or types without names")
 
-func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, debugMetricsScheduler *sfxclient.Scheduler, metricsScheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, etcdServer *embetcd.Server, etcdClient *embetcd.Client) ([]protocol.Forwarder, error) {
+func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, debugMetricsScheduler *sfxclient.Scheduler, metricsScheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, etcdClient *embetcd.Client) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	nameMap := make(map[string]bool)
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
@@ -490,6 +494,13 @@ func (p *gateway) stop(ctx context.Context) (err error) {
 	timeout, cancel := context.WithTimeout(GetContext(ctx), *p.config.MaxGracefulWaitTimeDuration) // max graceful timeout context
 	defer cancel()
 
+	// unregister from the hub
+	if *p.config.Cluster && p.hub.IsOpen() {
+		er := p.hub.Unregister(timeout)
+		p.logger.Log("Unregistered from the hub with the following error", er)
+		errs = append(errs, er)
+	}
+
 	// wait for forwarder pipeline to drain
 	p.waitForForwardersToDrain(timeout, startTime)
 
@@ -520,6 +531,12 @@ func (p *gateway) stop(ctx context.Context) (err error) {
 	// close the etcd client if it is not nil
 	if p.etcdClient != nil {
 		errs = append(errs, p.etcdClient.Close())
+	}
+
+	// stop the GatewayHub instance
+	if *p.config.Cluster && p.hub.IsOpen() {
+		p.hub.Close()
+		p.logger.Log("Stopped gateway hub routines")
 	}
 
 	// stop debug server listener
@@ -580,7 +597,11 @@ func (p *gateway) configure(loadedConfig *config.GatewayConfig) error {
 	// setup logger on versionMetric which reports our SHA1
 	p.versionMetric.Logger = p.logger
 
-	return nil
+	// sets up the hub
+	err := p.setupHub(p.config)
+	log.IfErrWithKeys(p.logger, err, "Failed to set up gateway hub")
+
+	return err
 }
 
 func (p *gateway) createCommonHTTPChain(loadedConfig *config.GatewayConfig) web.NextConstructor {
@@ -611,10 +632,18 @@ func (p *gateway) setupScheduler(loadedConfig *config.GatewayConfig, prefix stri
 
 func (p *gateway) setupForwardersAndListeners(ctx context.Context, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, debugMetricsScheduler *sfxclient.Scheduler, metricsScheduler *sfxclient.Scheduler) (signalfx.Sink, map[string]http.Handler, error) {
 	var err error
-	p.forwarders, err = setupForwarders(ctx, p.tk, loader, loadedConfig, logger, debugMetricsScheduler, metricsScheduler, &p.debugSink, &p.ctxDims, p.etcdServer, p.etcdClient)
+	p.forwarders, err = setupForwarders(ctx, p.tk, loader, loadedConfig, logger, debugMetricsScheduler, metricsScheduler, &p.debugSink, &p.ctxDims, p.etcdClient)
 	if err != nil {
 		p.logger.Log(log.Err, err, "Unable to setup forwarders")
 		return nil, nil, errors.Annotate(err, "unable to setup forwarders")
+	}
+
+	// register with the hub
+	if *p.config.Cluster && p.hub.IsOpen() {
+		// TODO extract distributor status and pass that along
+		// TODO get ServerPayload for forwarders
+		err = p.hub.Register(*loadedConfig.ServerName, *loadedConfig.ClusterName, Version, hubclient.ServerPayload(make(map[string][]byte)), false)
+		p.logger.Log("Registered with the gateway hub with the following error", err)
 	}
 
 	dpSinks, eSinks, tSinks := splitSinks(p.forwarders)
@@ -782,6 +811,29 @@ func (p *gateway) setupEtcdServer(ctx context.Context, etcdCfg *embetcd.Config) 
 		timeout, cancel := context.WithTimeout(ctx, time.Second*120)
 		defer cancel()
 		err = p.etcdServer.Start(timeout, etcdCfg)
+	}
+
+	return err
+}
+
+func validateHubConfig(cfg *config.GatewayConfig) (err error) {
+	if cfg.HubAddress == nil {
+		err = errors.New("a hub address must be specified")
+	} else if cfg.AuthToken == nil {
+		err = errors.New("an auth token must be configured to connect to the hub")
+	} else if cfg.HubClientTimeout == nil {
+		err = errors.New("a hub client timeout must be specified")
+	}
+	return err
+}
+
+// setupHub creates a new hub
+func (p *gateway) setupHub(cfg *config.GatewayConfig) (err error) {
+	if *cfg.Cluster {
+		err = validateHubConfig(cfg)
+		if err == nil {
+			p.hub, err = hub.NewHub(p.logger, *cfg.HubAddress, *cfg.AuthToken, *cfg.HubClientTimeout)
+		}
 	}
 
 	return err

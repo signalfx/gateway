@@ -6,12 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/coreos/etcd/mvcc/mvccpb"
-	"github.com/signalfx/gateway/protocol/carbon"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/httpdebug"
-	"github.com/signalfx/golib/web"
 	"io"
 	"io/ioutil"
 	"net"
@@ -32,18 +26,25 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/embed"
+	"github.com/coreos/etcd/mvcc/mvccpb"
 	"github.com/signalfx/embetcd/embetcd"
 	"github.com/signalfx/gateway/config"
 	"github.com/signalfx/gateway/flaghelpers"
+	"github.com/signalfx/gateway/hub/hubclient"
+	"github.com/signalfx/gateway/protocol/carbon"
 	"github.com/signalfx/gateway/protocol/signalfx"
 	_ "github.com/signalfx/go-metrics"
+	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/datapoint/dptest"
 	"github.com/signalfx/golib/errors"
+	"github.com/signalfx/golib/httpdebug"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/nettest"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/timekeeper"
 	"github.com/signalfx/golib/timekeeper/timekeepertest"
+	"github.com/signalfx/golib/web"
 	_ "github.com/signalfx/ondiskencoding"
 	. "github.com/smartystreets/goconvey/convey"
 	_ "github.com/spaolacci/murmur3"
@@ -614,6 +615,28 @@ func formatTargetAddresses(targetClusters []string) (targetAddresses string) {
 }
 
 /* Cluster Tests */
+// The following functions are test fixtures for TestProxyCluster
+
+func setHubConfig(proxyConf string, serverName string, clusterName string, hubAddress string, max int, min int, check int) (configFilePath string) {
+
+	// get a temporary filename for the config file
+	fileObj, err := ioutil.TempFile("", "TestProxyClusterConfig")
+	So(err, ShouldBeNil)
+	configFilePath = fileObj.Name()
+	// remove the temp file so we can overwrite it
+	So(os.Remove(configFilePath), ShouldBeNil)
+
+	//// remove the temp dir so we can recreate it
+	proxyConf = strings.Replace(proxyConf, "<<MAX>>", strconv.FormatInt(int64(max), 10), -1)
+	proxyConf = strings.Replace(proxyConf, "<<MIN>>", strconv.FormatInt(int64(min), 10), -1)
+	proxyConf = strings.Replace(proxyConf, "<<CHECK>>", strconv.FormatInt(int64(check), 10), -1)
+	proxyConf = strings.Replace(proxyConf, "<<SERVERNAME>>", serverName, -1)
+	proxyConf = strings.Replace(proxyConf, "<<CLUSTERNAME>>", clusterName, -1)
+	proxyConf = strings.Replace(proxyConf, "<<HUBADDRESS>>", hubAddress, -1)
+
+	So(ioutil.WriteFile(path.Join(configFilePath), []byte(proxyConf), os.FileMode(0666)), ShouldBeNil)
+	return configFilePath
+}
 
 // The following functions are test fixtures for TestProxyCluster
 func setConfigFile(etcdConf *embetcd.Config, max int, min int, check int) (configFilePath string, tempDir string) {
@@ -698,6 +721,141 @@ func TestGetTempEtcdClient(t *testing.T) {
 		})
 		So(err, ShouldNotBeNil)
 	})
+}
+
+type mockHub struct {
+	lock         sync.Mutex
+	isRunning    bool
+	servers      []hubclient.ServerResponse
+	distributors []hubclient.ServerResponse
+	register     func(serverName string, clusterName string, version string, payload hubclient.ServerPayload, distributor bool) error
+	unregister   func(ctx context.Context) error
+	isOpen       func() bool
+	close        func()
+}
+
+// nolint: vet
+func (m mockHub) Register(serverName string, clusterName string, version string, payload hubclient.ServerPayload, distributor bool) error {
+	return m.register(serverName, clusterName, version, payload, distributor)
+}
+
+// nolint: vet
+func (m *mockHub) Unregister(ctx context.Context) error {
+	return m.unregister(ctx)
+}
+
+// nolint: vet
+func (m *mockHub) IsOpen() bool {
+	return m.isOpen()
+}
+
+// nolint: vet
+func (m *mockHub) Close() { m.close() }
+
+func newMockHub() *mockHub {
+	m := &mockHub{
+		lock:      sync.Mutex{},
+		isRunning: true,
+	}
+	m.register = func(serverName string, clusterName string, version string, payload hubclient.ServerPayload, distributor bool) error {
+		m.lock.Lock()
+		defer m.lock.Unlock()
+		return nil
+	}
+	m.unregister = func(ctx context.Context) error {
+		m.lock.Lock()
+		defer m.lock.Unlock()
+		return nil
+	}
+	m.isOpen = func() bool {
+		m.lock.Lock()
+		defer m.lock.Unlock()
+		return m.isRunning
+	}
+	m.close = func() {
+		m.lock.Lock()
+		m.isRunning = false
+		m.lock.Unlock()
+	}
+	return m
+}
+
+func TestGatewayHub(t *testing.T) {
+	Convey("test", t, func() {
+		var config = `
+		  {
+			"LogFormat": "logfmt",
+			"LogDir": "-",
+			"NumProcs":4,
+			"DebugFlag": "debugme",
+			"ListenFrom":[],
+			"ForwardTo":[],
+			"MaxGracefulWaitTime":     "<<MAX>>ms",
+			"GracefulCheckInterval":   "<<CHECK>>ms",
+			"MinimalGracefulWaitTime": "<<MIN>>ms",
+			"SilentGracefulTime": "50ms",
+			"Cluster": true,
+			"ClusterName": "<<CLUTERNAME>>",
+			"ServerName": "<<SERVERNAME>>",
+			"AuthToken": "<<AUTHTOKEN>>",
+			"HubAddress": "<<HUBADDRESS>>",
+			"HubClientTimeout": "5s"
+		  }
+		`
+		// set up logger
+		logBuf := &ConcurrentByteBuffer{&bytes.Buffer{}, sync.Mutex{}}
+		logger := log.NewHierarchy(log.NewLogfmtLogger(io.MultiWriter(logBuf, os.Stderr), log.Panic))
+
+		// test context
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		configFile := setHubConfig(config, "testServer", "testCluster", "http://localhost:8080", 5000, 0, 25)
+
+		// create gateway struct with config file path set as a flag
+		gw := &gateway{
+			logger:          logger.CreateChild(),
+			stdout:          os.Stdout,
+			tk:              timekeeper.RealTime{},
+			setupDoneSignal: make(chan struct{}),
+			signalChan:      make(chan os.Signal),
+		}
+		flags = &gatewayFlags{}
+
+		Convey("", func() {
+			loadedConfig, _ := loadConfig(configFile, logger)
+			loadedConfig.EtcdServerStartTimeout = pointer.Duration(time.Second * 60)
+
+			gw.configure(loadedConfig)
+
+			// swap out the hub with a mock hub
+			mock := newMockHub()
+
+			gw.hub = mock
+
+			// start the gateway
+			mainErrCh := startTestGateway(ctx, gw)
+
+			fmt.Println("signaling server: ", *gw.config.ServerName)
+			gw.signalChan <- syscall.SIGTERM
+			val := <-mainErrCh
+			fmt.Println(*gw.config.ServerName, "returned", val)
+
+			// This is a little hacky but it lets us avoid writing a dedicated
+			// test to get coverage for the runningLoop() case where etcdStopCh returns
+			gw.signalChan = make(chan os.Signal, 5)
+
+			// if the etcd server is nil the next statement out side of this if will block forever
+			if gw.etcdServer == nil {
+				close(gw.signalChan)
+			}
+		})
+
+		Reset(func() {
+			tearDownClusterTest(cancel, []string{configFile}, []string{})
+		})
+	})
+
 }
 
 func TestProxyCluster(t *testing.T) {
@@ -1307,6 +1465,62 @@ func TestInternalMetricsServer(t *testing.T) {
 			// look for a specific metric name in the gathered datapoints
 			if c.want.metricNameToTestFor != nil {
 				So(isMetricInList(dps, *c.want.metricNameToTestFor), c.want.metricNameTestAssertion)
+			}
+		})
+	}
+}
+
+func Test_validateHubConfig(t *testing.T) {
+	type args struct {
+		cfg *config.GatewayConfig
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "nil hub address returns error",
+			args: args{
+				cfg: &config.GatewayConfig{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "nil auth token returns error",
+			args: args{
+				cfg: &config.GatewayConfig{
+					HubAddress: pointer.String("testAddress"),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "nil hub timeout returns error",
+			args: args{
+				cfg: &config.GatewayConfig{
+					HubAddress: pointer.String("testAddress"),
+					AuthToken:  pointer.String("testAuthToken"),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "no error when all 3 required settings are set",
+			args: args{
+				cfg: &config.GatewayConfig{
+					HubAddress:       pointer.String("testAddress"),
+					AuthToken:        pointer.String("testAuthToken"),
+					HubClientTimeout: pointer.Duration(time.Second * 5),
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateHubConfig(tt.args.cfg); (err != nil) != tt.wantErr {
+				t.Errorf("validateHubConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
