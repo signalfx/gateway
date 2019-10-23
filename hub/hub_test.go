@@ -20,6 +20,7 @@ type mockHTTPClient struct {
 	registerCounter int64
 	register        func(cluster string, name string, version string, payload []byte, distributor bool) (reg hubclient.RegistrationResponse, etag string, err error)
 	unregister      func(lease string) error
+	heartbeat       func(lease string, etag string) (*hubclient.HeartbeatResponse, string, error)
 }
 
 // nolint: vet
@@ -29,6 +30,10 @@ func (m mockHTTPClient) Register(cluster string, name string, version string, pa
 
 func (m *mockHTTPClient) Unregister(lease string) error {
 	return m.unregister(lease)
+}
+
+func (m *mockHTTPClient) Heartbeat(lease string, etag string) (*hubclient.HeartbeatResponse, string, error) {
+	return m.heartbeat(lease, etag)
 }
 
 func TestHub_Unregister(t *testing.T) {

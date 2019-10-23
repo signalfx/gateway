@@ -222,3 +222,101 @@ func TestHTTPClient_UnRegister(t *testing.T) {
 		})
 	}
 }
+
+func TestHTTPClient_Heartbeat(t *testing.T) {
+	response := hubclient.HeartbeatResponse{
+		Config: &hubclient.Config{
+			Budget: &hubclient.Budget{},
+		},
+		Cluster: &hubclient.Cluster{
+			Name:         "thisIsACluster",
+			Servers:      []*hubclient.ServerResponse{},
+			Distributors: []*hubclient.ServerResponse{},
+		},
+	}
+	type args struct {
+		lease string
+		etag  string
+	}
+	tests := []struct {
+		name     string
+		args     args
+		handler  func(w http.ResponseWriter, r *http.Request)
+		wantResp *hubclient.HeartbeatResponse
+		wantEtag string
+		wantErr  bool
+	}{
+		{
+			name: "successful heartbeat with new content",
+			args: args{lease: "thisIsALease", etag: "thisIsAnETag"},
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("etag", "thisIsAnETag")
+				bts, _ := response.MarshalJSON()
+				w.WriteHeader(http.StatusOK)
+				w.Write(bts)
+			},
+			wantResp: &response,
+			wantEtag: "thisIsAnETag",
+			wantErr:  false,
+		},
+		{
+			name: "successful heartbeat without new content",
+			args: args{lease: "thisIsALease", etag: "thisIsAnETag"},
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("etag", "thisIsAnETag")
+				bts, _ := response.MarshalJSON()
+				w.WriteHeader(http.StatusNoContent)
+				w.Write(bts)
+			},
+			wantResp: nil,
+			wantEtag: "",
+			wantErr:  false,
+		},
+		{
+			name: "unauthorized error",
+			args: args{lease: "thisIsALease", etag: "thisIsAnETag"},
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte{})
+			},
+			wantResp: nil,
+			wantEtag: "",
+			wantErr:  true,
+		},
+		{
+			name: "unrecognized error",
+			args: args{},
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte{})
+			},
+			wantResp: nil,
+			wantEtag: "",
+			wantErr:  true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// set up a test server
+			mux := http.NewServeMux()
+			mux.HandleFunc(heartbeatV2+"/", tt.handler)
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			// setup client
+			cli, _ := NewClient(server.URL, "", 5*time.Second)
+
+			// execute register
+			state, etag, err := cli.Heartbeat(tt.args.lease, tt.args.etag)
+
+			// check returned values
+			if (err != nil) != tt.wantErr {
+				t.Errorf("HTTPClient_Heartbeat() error = %v, wantErr %v", err, tt.wantErr)
+			} else if etag != tt.wantEtag {
+				t.Errorf("HTTPClient_Heartbeat() etag = %v, wantEtag %v", etag, tt.wantEtag)
+			} else if !reflect.DeepEqual(state, tt.wantResp) {
+				t.Errorf("HTTPClient_Heartbeat() state = %v, wantResp %v", state, tt.wantResp)
+			}
+		})
+	}
+}
