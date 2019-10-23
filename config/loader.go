@@ -7,6 +7,7 @@ import (
 	"github.com/signalfx/gateway/protocol/carbon/metricdeconstructor"
 	"github.com/signalfx/gateway/protocol/collectd"
 	"github.com/signalfx/gateway/protocol/csv"
+	"github.com/signalfx/gateway/protocol/opencensus"
 	"github.com/signalfx/gateway/protocol/prometheus"
 	"github.com/signalfx/gateway/protocol/signalfx"
 	"github.com/signalfx/gateway/protocol/wavefront"
@@ -16,6 +17,7 @@ import (
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/web"
+	"time"
 )
 
 type forwarderLoader interface {
@@ -49,6 +51,9 @@ func NewLoader(ctx context.Context, logger log.Logger, version string, debugCont
 				logger: logger,
 			},
 			"csv": &csvLoader{},
+			"opencensus": &opencensusLoader{
+				logger: logger,
+			},
 		},
 		listeners: map[string]listenerLoader{
 			"signalfx": sfxL,
@@ -167,6 +172,33 @@ func (s *collectdLoader) Listener(sink signalfx.Sink, conf *ListenFrom) (protoco
 		Logger:          s.logger,
 	}
 	return collectd.NewListener(sink, &sfConf)
+}
+
+type opencensusLoader struct {
+	logger log.Logger
+}
+
+func (s *opencensusLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) {
+	ocConf := opencensus.ForwarderConfig{
+		TraceEndpoint:     conf.TraceURL,
+		AdditionalHeaders: conf.AdditionalHeaders,
+		NumWorkers:        conf.DrainingThreads,
+		Compression:       conf.Compression,
+		Logger:            s.logger,
+		Retries:           conf.Retries,
+		ClusterName:       conf.ClusterName,
+	}
+	if conf.ReconnectionDelay != nil {
+		delay, err := time.ParseDuration(*conf.ReconnectionDelay)
+		if err != nil {
+			return nil, err
+		}
+		ocConf.ReconnectionDelay = &delay
+	}
+	if conf.DisableCompression != nil {
+		ocConf.UseSecure = pointer.Bool(!*conf.DisableCompression)
+	}
+	return opencensus.NewForwarder(&ocConf)
 }
 
 type signalFxLoader struct {

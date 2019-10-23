@@ -138,14 +138,18 @@ func (f LoggerFunc) Log(keyvals ...interface{}) {
 // IfErr is a shorthand that will log an error if err is not nil
 func IfErr(l Logger, err error) {
 	if err != nil {
-		l.Log(Err, err)
+		if logCtx := NewContext(l); logCtx != nil && !IsDisabled(logCtx) {
+			logCtx.Logger.Log(addArrays(copyIfDynamic(logCtx.KeyVals), []interface{}{err})...)
+		}
 	}
 }
 
 // IfErrAndReturn is a shorthand that will log an error if err is not nil and returns the original err
 func IfErrAndReturn(l Logger, err error) error {
 	if err != nil {
-		l.Log(Err, err)
+		if logCtx := NewContext(l); logCtx != nil && !IsDisabled(logCtx) {
+			logCtx.Logger.Log(addArrays(copyIfDynamic(logCtx.KeyVals), []interface{}{err})...)
+		}
 	}
 	return err
 }
@@ -153,16 +157,20 @@ func IfErrAndReturn(l Logger, err error) error {
 // IfErrWithKeys logs an error with the supplied logger if it is not nil.
 // The error will be appended to the end of the supplied keys/messages
 func IfErrWithKeys(l Logger, err error, intf ...interface{}) {
-	if err != nil && l != nil {
-		l.Log(append(intf, err)...)
+	if err != nil {
+		if logCtx := NewContext(l); logCtx != nil && !IsDisabled(logCtx) {
+			logCtx.Logger.Log(addArrays(copyIfDynamic(logCtx.KeyVals), addArrays(intf, []interface{}{err}))...)
+		}
 	}
 }
 
 // IfErrWithKeysAndReturn logs an error with the supplied logger if it is not nil and then returns the original error.
 // The error will be appended to the end of the supplied keys/messages
 func IfErrWithKeysAndReturn(l Logger, err error, intf ...interface{}) error {
-	if err != nil && l != nil {
-		l.Log(append(intf, err)...)
+	if err != nil {
+		if logCtx := NewContext(l); logCtx != nil && !IsDisabled(logCtx) {
+			logCtx.Logger.Log(addArrays(copyIfDynamic(logCtx.KeyVals), addArrays(intf, []interface{}{err}))...)
+		}
 	}
 	return err
 }

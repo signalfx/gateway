@@ -26,7 +26,7 @@ type Span struct {
 	Meta           map[interface{}]interface{} `json:"-"` // non serializeable field to hold any meta data we want to keep around
 }
 
-// Endpoint is the network context of a node in the service graph
+// TraceEndpoint is the network context of a node in the service graph
 type Endpoint struct {
 	ServiceName *string `json:"serviceName,omitempty"`
 	Ipv4        *string `json:"ipv4,omitempty"`

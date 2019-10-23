@@ -125,7 +125,7 @@ func (t *TDigest) process() {
 }
 
 func (t *TDigest) processIt(updateCumulative bool) {
-	if t.unprocessed.Len() > 0 || t.processed.Len() > t.maxProcessed {
+	if t.unprocessed.Len() > 0 || t.processed.Len() >= t.maxProcessed {
 		// Append all processed centroids to the unprocessed list and sort
 		t.unprocessed = append(t.unprocessed, t.processed...)
 		sort.Sort(&t.unprocessed)
@@ -181,7 +181,6 @@ func (t *TDigest) updateCumulative() {
 }
 
 func (t *TDigest) Quantile(q float64) float64 {
-	t.process()
 	if q < 0 || q > 1 || t.processed.Len() == 0 {
 		return math.NaN()
 	}
@@ -209,7 +208,6 @@ func (t *TDigest) Quantile(q float64) float64 {
 }
 
 func (t *TDigest) CDF(x float64) float64 {
-	t.process()
 	switch t.processed.Len() {
 	case 0:
 		return 0.0
@@ -369,12 +367,10 @@ func (t *TDigest) Count() int64 {
 }
 
 func (t *TDigest) Min() float64 {
-	t.process()
 	return t.min
 }
 
 func (t *TDigest) Max() float64 {
-	t.process()
 	return t.max
 }
 

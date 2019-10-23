@@ -25,7 +25,7 @@ type Config struct {
 	MaxTotalEvents     *int64
 	MaxTotalSpans      *int64
 	MaxDrainSize       *int64
-	NumDrainingThreads *int64
+	NumDrainingThreads *int
 	Checker            *dpsink.ItemFlagger
 	Cdim               *log.CtxDimensions
 	Name               *string
@@ -43,7 +43,7 @@ var DefaultConfig = &Config{
 	MaxTotalEvents:     pointer.Int64(1000000),
 	MaxTotalSpans:      pointer.Int64(1000000),
 	MaxDrainSize:       pointer.Int64(30000),
-	NumDrainingThreads: pointer.Int64(int64(runtime.NumCPU())),
+	NumDrainingThreads: pointer.Int(runtime.NumCPU()),
 	Name:               pointer.String(""),
 	UseAuthFromRequest: pointer.Bool(false),
 }
@@ -397,7 +397,7 @@ func (forwarder *BufferedForwarder) Close() error {
 	return forwarder.closeSender()
 }
 
-func (forwarder *BufferedForwarder) doData(drainIndex int64) {
+func (forwarder *BufferedForwarder) doData(drainIndex int) {
 	defer forwarder.threadsWaitingToDie.Done()
 	logger := log.NewContext(forwarder.logger).With("draining_index", drainIndex)
 	for forwarder.stopContext.Err() == nil {
@@ -416,7 +416,7 @@ func (forwarder *BufferedForwarder) doData(drainIndex int64) {
 	}
 }
 
-func (forwarder *BufferedForwarder) doEvent(drainIndex int64) {
+func (forwarder *BufferedForwarder) doEvent(drainIndex int) {
 	defer forwarder.threadsWaitingToDie.Done()
 	logger := log.NewContext(forwarder.logger).With("draining_index", drainIndex)
 	for forwarder.stopContext.Err() == nil {
@@ -435,7 +435,7 @@ func (forwarder *BufferedForwarder) doEvent(drainIndex int64) {
 	}
 }
 
-func (forwarder *BufferedForwarder) doSpan(drainIndex int64) {
+func (forwarder *BufferedForwarder) doSpan(drainIndex int) {
 	defer forwarder.threadsWaitingToDie.Done()
 	logger := log.NewContext(forwarder.logger).With("draining_index", drainIndex)
 	for forwarder.stopContext.Err() == nil {
@@ -454,7 +454,7 @@ func (forwarder *BufferedForwarder) doSpan(drainIndex int64) {
 
 func (forwarder *BufferedForwarder) start() {
 	forwarder.threadsWaitingToDie.Add(int(*forwarder.config.NumDrainingThreads) * 3)
-	for i := int64(0); i < *forwarder.config.NumDrainingThreads; i++ {
+	for i := 0; i < *forwarder.config.NumDrainingThreads; i++ {
 		go forwarder.doData(i)
 		go forwarder.doEvent(i)
 		go forwarder.doSpan(i)

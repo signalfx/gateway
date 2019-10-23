@@ -44,7 +44,7 @@ type ForwardTo struct {
 	AuthTokenEnvVar      *string                     `json:",omitempty"`
 	BufferSize           *int64                      `json:",omitempty"`
 	Name                 *string                     `json:",omitempty"`
-	DrainingThreads      *int64                      `json:",omitempty"`
+	DrainingThreads      *int                        `json:",omitempty"`
 	MetricCreationURL    *string                     `json:",omitempty"`
 	MaxDrainSize         *int64                      `json:",omitempty"`
 	Filename             *string                     `json:",omitempty"`
@@ -55,9 +55,14 @@ type ForwardTo struct {
 	TraceSample          *sampling.SmartSampleConfig `json:",omitempty"`
 	TraceDistributor     *sampling.SmartSampleConfig `json:",omitempty"`
 	AdditionalDimensions map[string]string           `json:",omitempty"`
+	AdditionalHeaders    map[string]string           `json:",omitempty"`
 	DisableCompression   *bool                       `json:",omitempty"`
-	Client               etcdIntf.Client             `json:"-"`
-	ClusterName          *string                     `json:"-"`
+	Compression          *string                     `json:",omitempty"`
+	ReconnectionDelay    *string                     `json:",omitempty"`
+
+	Client      etcdIntf.Client `json:"-"`
+	ClusterName *string         `json:"-"`
+	Retries     *int            `json:",omitempty"`
 }
 
 // ListenFrom configures how we listen for datapoints to forward

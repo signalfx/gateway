@@ -34,6 +34,21 @@ func GetID(s string) (ID, error) {
 	return [2]uint64{low, high}, err
 }
 
+func (id *ID) Zero() bool {
+	if id == nil || (id[0] == 0 && id[1] == 0) {
+		return true
+	}
+	return false
+}
+
+func (id *ID) High() uint64 {
+	return id[1]
+}
+
+func (id *ID) Low() uint64 {
+	return id[0]
+}
+
 func (id *ID) String() string {
 	if id[1] == 0 {
 		return fmt.Sprintf("%016x", id[0])

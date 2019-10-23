@@ -61,7 +61,7 @@ type ForwarderConfig struct {
 	Timeout            *time.Duration
 	SourceDimensions   *string
 	GatewayVersion     *string
-	MaxIdleConns       *int64
+	MaxIdleConns       *int
 	AuthToken          *string
 	ProtoMarshal       func(pb proto.Message) ([]byte, error)
 	JSONMarshal        func(v interface{}) ([]byte, error)
@@ -78,7 +78,7 @@ var defaultForwarderConfig = &ForwarderConfig{
 	AuthToken:          pointer.String(""),
 	Timeout:            pointer.Duration(time.Second * 30),
 	GatewayVersion:     pointer.String("UNKNOWN_VERSION"),
-	MaxIdleConns:       pointer.Int64(20),
+	MaxIdleConns:       pointer.Int(20),
 	JSONMarshal:        json.Marshal,
 	Logger:             log.Discard,
 	DisableCompression: pointer.Bool(false),
