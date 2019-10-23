@@ -11,7 +11,7 @@ import (
 )
 
 func TestHTTPClient_Register(t *testing.T) {
-	response := hubclient.RegistrationResponse{
+	response := &hubclient.RegistrationResponse{
 		Lease: "thisIsALease",
 		Config: &hubclient.Config{
 			Budget: &hubclient.Budget{},
@@ -29,7 +29,7 @@ func TestHTTPClient_Register(t *testing.T) {
 		name     string
 		args     *hubclient.Registration
 		handler  func(w http.ResponseWriter, r *http.Request)
-		wantResp hubclient.RegistrationResponse
+		wantResp *hubclient.RegistrationResponse
 		wantEtag string
 		wantErr  bool
 	}{
@@ -62,9 +62,7 @@ func TestHTTPClient_Register(t *testing.T) {
 				w.WriteHeader(http.StatusConflict)
 				w.Write(bts)
 			},
-			wantResp: hubclient.RegistrationResponse{
-				Lease: "",
-			},
+			wantResp: nil,
 			wantEtag: "",
 			wantErr:  true,
 		},
@@ -79,9 +77,7 @@ func TestHTTPClient_Register(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 				w.Write([]byte{})
 			},
-			wantResp: hubclient.RegistrationResponse{
-				Lease: "",
-			},
+			wantResp: nil,
 			wantEtag: "",
 			wantErr:  true,
 		},
@@ -96,9 +92,7 @@ func TestHTTPClient_Register(t *testing.T) {
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Write([]byte{})
 			},
-			wantResp: hubclient.RegistrationResponse{
-				Lease: "",
-			},
+			wantResp: nil,
 			wantEtag: "",
 			wantErr:  true,
 		},
