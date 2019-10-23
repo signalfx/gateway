@@ -18,7 +18,7 @@ const (
 	// endpoints
 	registerV2   = "/v2/gatewayhub/register"
 	unregisterV2 = "/v2/gatewayhub/unregister"
-	//heartbeatV2  = "/v2/gatewayhub/heartbeat"
+	heartbeatV2  = "/v2/gatewayhub/heartbeat"
 	//clusterV2    = "/v2/gatewayhub/cluster"
 
 	// Content Types
@@ -33,7 +33,8 @@ const (
 
 // Client is a client for interacting with the SignalFx Gateway Hub API
 type Client interface {
-	Register(cluster string, name string, version string, payload []byte, distributor bool) (reg hubclient.RegistrationResponse, etag string, err error)
+	Heartbeat(lease string, etag string) (state *hubclient.HeartbeatResponse, newEtag string, err error)
+	Register(cluster string, name string, version string, payload []byte, distributor bool) (reg *hubclient.RegistrationResponse, etag string, err error)
 	Unregister(lease string) error
 }
 
@@ -84,11 +85,12 @@ var ErrServerNameConflict = errors.New("server name already exists within cluste
 var ErrUnauthorized = errors.New("authorization failed (please verify auth token is correct)")
 
 // Register makes a request to register with the gateway hub
-func (h *HTTPClient) Register(cluster string, name string, version string, payload []byte, distributor bool) (reg hubclient.RegistrationResponse, etag string, err error) {
-	var reqBody []byte
+func (h *HTTPClient) Register(cluster string, name string, version string, payload []byte, distributor bool) (*hubclient.RegistrationResponse, string, error) {
+	var reg *hubclient.RegistrationResponse
+	var etag string
 
 	// marshal registration
-	reqBody, err = easyjson.Marshal(
+	reqBody, err := easyjson.Marshal(
 		&hubclient.Registration{
 			Cluster:     cluster,
 			Name:        name,
@@ -109,11 +111,12 @@ func (h *HTTPClient) Register(cluster string, name string, version string, paylo
 		var respBody []byte
 		statusCode, respHeaders, respBody, err = h.request(registerV2, http.MethodPost, reqBody, headers)
 		if err == nil {
-			etag = respHeaders.Get(eTag)
 			switch statusCode {
 			case http.StatusOK:
+				etag = respHeaders.Get(eTag)
+				reg = &hubclient.RegistrationResponse{}
 				// unmarshal payload when the request is successful
-				err = easyjson.Unmarshal(respBody, &reg)
+				err = easyjson.Unmarshal(respBody, reg)
 				// TODO: decrypt each server payload if err is nil and encryption key is not empty
 			case http.StatusConflict:
 				// return a named error for status conflicts
@@ -128,7 +131,7 @@ func (h *HTTPClient) Register(cluster string, name string, version string, paylo
 		}
 	}
 
-	return
+	return reg, etag, err
 }
 
 // ErrLeaseDoesNotMatch means the lease does not match an existing cluster member
@@ -168,6 +171,37 @@ func (h *HTTPClient) Unregister(lease string) (err error) {
 	}
 
 	return err
+}
+
+// Heartbeat makes a heart beat request to the hub with a lease and etag
+func (h *HTTPClient) Heartbeat(lease string, etag string) (*hubclient.HeartbeatResponse, string, error) {
+	var state *hubclient.HeartbeatResponse
+	var newEtag string
+
+	headers := map[string]string{
+		contentTypeHeader:   applicationJSON,
+		authenticationToken: h.authToken,
+		eTag:                etag,
+	}
+
+	statusCode, respHeaders, respBody, err := h.request(path.Join(heartbeatV2, lease), http.MethodPost, []byte{}, headers)
+
+	if err == nil {
+		switch statusCode {
+		case http.StatusNoContent: // successful heart beat but no changes to state
+		case http.StatusOK: // means that the heart beat was successful but the state changed
+			newEtag = respHeaders.Get(eTag)
+			state = &hubclient.HeartbeatResponse{}
+			err = easyjson.Unmarshal(respBody, state)
+		case http.StatusUnauthorized:
+			err = ErrUnauthorized
+		default:
+			// The request didn't error out, but the server returned an unexpected status
+			err = fmt.Errorf(`%s %s %d %s`, http.MethodPost, heartbeatV2, statusCode, string(respBody))
+		}
+	}
+
+	return state, newEtag, err
 }
 
 // NewClient returns a new http client for interacting with the SignalFx gateway hub

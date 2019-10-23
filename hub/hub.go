@@ -149,7 +149,7 @@ type Hub struct {
 	heartbeatInterval int64
 }
 
-func (h *Hub) handleRegistrationResponse(resp hubclient.RegistrationResponse) {
+func (h *Hub) handleRegistrationResponse(resp *hubclient.RegistrationResponse) {
 
 	// push config to client routine
 	if resp.Config != nil {
@@ -170,12 +170,9 @@ func (h *Hub) register(registration *hubclient.Registration) error {
 	h.heartbeatCount = 0
 
 	// send registration request to hub
-	var resp hubclient.RegistrationResponse
+	var resp *hubclient.RegistrationResponse
 	var err error
 	resp, h.etag, err = h.client.Register(registration.Cluster, registration.Name, registration.Version, registration.Payload, registration.Distributor)
-
-	// save the lease returned by the hub
-	h.lease = resp.Lease
 
 	// when registration errors out
 	if err != nil {
@@ -186,6 +183,9 @@ func (h *Hub) register(registration *hubclient.Registration) error {
 		h.registerCh <- registration
 		return err
 	}
+
+	// save the lease returned by the hub
+	h.lease = resp.Lease
 
 	// extract the heartbeat interval from the config
 	if resp.Config != nil && resp.Config.Heartbeat > 0 {

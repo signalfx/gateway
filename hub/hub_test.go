@@ -18,17 +18,22 @@ import (
 type mockHTTPClient struct {
 	lock            sync.Mutex
 	registerCounter int64
-	register        func(cluster string, name string, version string, payload []byte, distributor bool) (reg hubclient.RegistrationResponse, etag string, err error)
+	register        func(cluster string, name string, version string, payload []byte, distributor bool) (reg *hubclient.RegistrationResponse, etag string, err error)
 	unregister      func(lease string) error
+	heartbeat       func(lease string, etag string) (*hubclient.HeartbeatResponse, string, error)
 }
 
 // nolint: vet
-func (m mockHTTPClient) Register(cluster string, name string, version string, payload []byte, distributor bool) (reg hubclient.RegistrationResponse, etag string, err error) {
+func (m mockHTTPClient) Register(cluster string, name string, version string, payload []byte, distributor bool) (reg *hubclient.RegistrationResponse, etag string, err error) {
 	return m.register(cluster, name, version, payload, distributor)
 }
 
 func (m *mockHTTPClient) Unregister(lease string) error {
 	return m.unregister(lease)
+}
+
+func (m *mockHTTPClient) Heartbeat(lease string, etag string) (*hubclient.HeartbeatResponse, string, error) {
+	return m.heartbeat(lease, etag)
 }
 
 func TestHub_Unregister(t *testing.T) {
@@ -43,27 +48,8 @@ func TestHub_Unregister(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(h, ShouldNotBeNil)
 
-		mock.register = func(cluster string, name string, version string, payload []byte, distributor bool) (reg hubclient.RegistrationResponse, etag string, err error) {
-			mock.lock.Lock()
-			defer mock.lock.Unlock()
-			mock.registerCounter++
-			if mock.registerCounter > 1 {
-				return hubclient.RegistrationResponse{
-					Lease: "testLease",
-					Config: &hubclient.Config{
-						Heartbeat: 1000,
-					},
-					Cluster: &hubclient.Cluster{},
-				}, "testEtag", nil
-			}
-			return hubclient.RegistrationResponse{
-				Lease:   "testLease",
-				Config:  &hubclient.Config{},
-				Cluster: &hubclient.Cluster{},
-			}, "testEtag", errors.New("we haven't hit register enough times")
-		}
-		mock.register = func(cluster string, name string, version string, payload []byte, distributor bool) (reg hubclient.RegistrationResponse, etag string, err error) {
-			return hubclient.RegistrationResponse{
+		mock.register = func(cluster string, name string, version string, payload []byte, distributor bool) (reg *hubclient.RegistrationResponse, etag string, err error) {
+			return &hubclient.RegistrationResponse{
 				Lease: "testLease",
 				Config: &hubclient.Config{
 					Heartbeat: 1000,
@@ -126,12 +112,12 @@ func TestHub_Register(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(h, ShouldNotBeNil)
 
-		mock.register = func(cluster string, name string, version string, payload []byte, distributor bool) (reg hubclient.RegistrationResponse, etag string, err error) {
+		mock.register = func(cluster string, name string, version string, payload []byte, distributor bool) (reg *hubclient.RegistrationResponse, etag string, err error) {
 			mock.lock.Lock()
 			defer mock.lock.Unlock()
 			mock.registerCounter++
 			if mock.registerCounter > 1 {
-				return hubclient.RegistrationResponse{
+				return &hubclient.RegistrationResponse{
 					Lease: "testLease",
 					Config: &hubclient.Config{
 						Heartbeat: 1000,
@@ -139,7 +125,7 @@ func TestHub_Register(t *testing.T) {
 					Cluster: &hubclient.Cluster{},
 				}, "testEtag", nil
 			}
-			return hubclient.RegistrationResponse{
+			return &hubclient.RegistrationResponse{
 				Lease:   "testLease",
 				Config:  &hubclient.Config{},
 				Cluster: &hubclient.Cluster{},

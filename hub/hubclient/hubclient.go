@@ -29,6 +29,7 @@ type ServerResponse struct {
 	// Payload is the payload for the server
 	Payload []byte `json:"payload"`
 	// LastHeartbeat is the timestamp of the last heartbeat
+	// TODO this should be a string that we parse out a timestamp from
 	LastHeartbeat int `json:"lastHeartbeat"`
 }
 
@@ -46,6 +47,7 @@ func (v *ServerResponse) ToServer() Server {
 			Version:       v.Version,
 			LastHeartbeat: v.LastHeartbeat,
 		},
+		// TODO parse out a date from lastHeartBeat
 		Payload: ServerPayload(make(map[string][]byte)),
 	}
 
@@ -162,6 +164,20 @@ type RegistrationResponse struct {
 
 // String is the ToString method for RegistrationResponse
 func (v RegistrationResponse) String() string {
+	bts, _ := easyjson.Marshal(v)
+	return string(bts)
+}
+
+// HeartbeatResponse is the response returned when heartbeating
+// easyjson:json
+type HeartbeatResponse struct {
+	// Config is the configuration struct returned by the hub
+	Config *Config `json:"config,omitempty"`
+	// Cluster is the state of the cluster known by the hub
+	Cluster *Cluster `json:"cluster,omitempty"`
+}
+
+func (v HeartbeatResponse) String() string {
 	bts, _ := easyjson.Marshal(v)
 	return string(bts)
 }
