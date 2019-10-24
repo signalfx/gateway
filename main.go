@@ -496,9 +496,7 @@ func (p *gateway) stop(ctx context.Context) (err error) {
 
 	// unregister from the hub
 	if *p.config.Cluster && p.hub.IsOpen() {
-		er := p.hub.Unregister(timeout)
-		p.logger.Log("Unregistered from the hub with the following error", er)
-		errs = append(errs, er)
+		errs = append(errs, log.IfErrWithKeysAndReturn(p.logger, p.hub.Unregister(timeout), log.Msg, "unable to deregister from hub"))
 	}
 
 	// wait for forwarder pipeline to drain
@@ -832,7 +830,10 @@ func (p *gateway) setupHub(cfg *config.GatewayConfig) (err error) {
 	if *cfg.Cluster {
 		err = validateHubConfig(cfg)
 		if err == nil {
-			p.hub, err = hub.NewHub(p.logger, *cfg.HubAddress, *cfg.AuthToken, *cfg.HubClientTimeout)
+			rateLimited := log.NewOnePerSecond(p.logger)
+			userAgent := fmt.Sprintf("gateway/%s (gover %s)", Version, runtime.Version())
+			p.hub, err = hub.NewHub(rateLimited, *cfg.HubAddress, *cfg.AuthToken, *cfg.HubClientTimeout, userAgent)
+			p.logger.Log("setupHub()", err)
 		}
 	}
 
@@ -1091,7 +1092,7 @@ func main() {
 
 	// when main completes stop sending sigterms to the channel
 	defer func() {
-		//signal.Stop(mainInstance.signalChan)
+		signal.Stop(mainInstance.signalChan)
 		close(mainInstance.signalChan)
 	}()
 

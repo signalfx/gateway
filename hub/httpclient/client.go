@@ -27,6 +27,13 @@ const (
 	contentTypeHeader = "Content-Type"
 	applicationJSON   = "application/json"
 
+	// Connection Header
+	connectionHeader = "Connection"
+	keepAlive        = "keep-alive"
+
+	// UserAgent Header
+	userAgentHeader = "UserAgent"
+
 	// SFX Headers
 	authenticationToken = "X-SF-TOKEN"
 
@@ -60,6 +67,7 @@ type HTTPClient struct {
 	client    *http.Client
 	authToken string
 	baseURL   string
+	userAgent string
 }
 
 // request is a method for making http requests against the configured baseURL with the configured authToken
@@ -118,6 +126,8 @@ func (h *HTTPClient) Register(cluster string, name string, version string, paylo
 	if err == nil {
 		// get headers
 		headers := map[string]string{
+			userAgentHeader:     h.userAgent,
+			connectionHeader:    keepAlive,
 			contentTypeHeader:   applicationJSON,
 			authenticationToken: h.authToken,
 		}
@@ -159,6 +169,8 @@ func (h *HTTPClient) Unregister(lease string) (err error) {
 
 	// get headers
 	headers := map[string]string{
+		userAgentHeader:     h.userAgent,
+		connectionHeader:    keepAlive,
 		contentTypeHeader:   applicationJSON,
 		authenticationToken: h.authToken,
 	}
@@ -184,12 +196,17 @@ func (h *HTTPClient) Unregister(lease string) (err error) {
 	return err
 }
 
+// ErrExpiredLease is returned when the hub says the client's lease has expired
+var ErrExpiredLease = errors.New("lease cannot be found")
+
 // Heartbeat makes a heart beat request to the hub with a lease and etag
 func (h *HTTPClient) Heartbeat(lease string, etag string) (*hubclient.HeartbeatResponse, string, error) {
-	var state *hubclient.HeartbeatResponse
+	var state = &hubclient.HeartbeatResponse{}
 	var newEtag string
 
 	headers := map[string]string{
+		userAgentHeader:     h.userAgent,
+		connectionHeader:    keepAlive,
 		contentTypeHeader:   applicationJSON,
 		authenticationToken: h.authToken,
 		eTag:                etag,
@@ -202,8 +219,9 @@ func (h *HTTPClient) Heartbeat(lease string, etag string) (*hubclient.HeartbeatR
 		case http.StatusNoContent: // successful heart beat but no changes to state
 		case http.StatusOK: // means that the heart beat was successful but the state changed
 			newEtag = respHeaders.Get(eTag)
-			state = &hubclient.HeartbeatResponse{}
 			err = easyjson.Unmarshal(respBody, state)
+		case http.StatusGone:
+			err = ErrExpiredLease // means that the lease couldn't be found (this means we must reregister)
 		default:
 			// The request didn't error out, but the server returned an unexpected status
 			err = handleCommonHTTPErrorCodes(statusCode, http.MethodPost, heartbeatV2, respBody)
@@ -222,6 +240,8 @@ func (h *HTTPClient) Clusters() (*hubclient.ListClustersResponse, error) {
 
 	// get headers
 	headers := map[string]string{
+		userAgentHeader:     h.userAgent,
+		connectionHeader:    keepAlive,
 		contentTypeHeader:   applicationJSON,
 		authenticationToken: h.authToken,
 	}
@@ -249,6 +269,8 @@ func (h *HTTPClient) Cluster(clusterName string) (*hubclient.Cluster, error) {
 
 	// get headers
 	headers := map[string]string{
+		userAgentHeader:     h.userAgent,
+		connectionHeader:    keepAlive,
 		contentTypeHeader:   applicationJSON,
 		authenticationToken: h.authToken,
 	}
@@ -278,6 +300,8 @@ func (h *HTTPClient) Config(clusterName string) (*hubclient.Config, error) {
 
 	// get headers
 	headers := map[string]string{
+		userAgentHeader:     h.userAgent,
+		connectionHeader:    keepAlive,
 		contentTypeHeader:   applicationJSON,
 		authenticationToken: h.authToken,
 	}
@@ -303,6 +327,8 @@ func (h *HTTPClient) Config(clusterName string) (*hubclient.Config, error) {
 
 func (h *HTTPClient) validAccessToken() error {
 	headers := map[string]string{
+		userAgentHeader:     h.userAgent,
+		connectionHeader:    keepAlive,
 		contentTypeHeader:   applicationJSON,
 		authenticationToken: h.authToken,
 	}
@@ -323,12 +349,13 @@ func (h *HTTPClient) validAccessToken() error {
 
 // NewClient returns a new http client for interacting with the SignalFx gateway hub
 // TODO: add encryption key to client, this http client will be responsible for encyrpting and decrypting server payloads
-func NewClient(hubAddress string, authToken string, timeout time.Duration) (Client, error) {
+func NewClient(hubAddress string, authToken string, timeout time.Duration, userAgent string) (Client, error) {
 	var cli = &HTTPClient{
 		client: &http.Client{
 			Timeout: timeout,
 		},
 		authToken: authToken,
+		userAgent: userAgent,
 	}
 
 	// validate url

@@ -106,7 +106,7 @@ func TestHTTPClient_Register(t *testing.T) {
 			defer server.Close()
 
 			// setup client
-			cli, _ := NewClient(server.URL, "", 5*time.Second)
+			cli, _ := NewClient(server.URL, "", 5*time.Second, "userAgent")
 
 			// execute register
 			resp, etag, err := cli.Register(tt.args.Cluster, tt.args.Name, tt.args.Version, tt.args.Payload, tt.args.Distributor)
@@ -209,7 +209,7 @@ func TestHTTPClient_UnRegister(t *testing.T) {
 			defer server.Close()
 
 			// setup client
-			cli, _ := NewClient(server.URL, "", 5*time.Second)
+			cli, _ := NewClient(server.URL, "", 5*time.Second, "userAgent")
 			if err := cli.Unregister(tt.args.lease); (err != nil) != tt.wantErr {
 				t.Errorf("HTTPClient_Unregister() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -262,9 +262,20 @@ func TestHTTPClient_Heartbeat(t *testing.T) {
 				w.WriteHeader(http.StatusNoContent)
 				w.Write(bts)
 			},
-			wantResp: nil,
+			wantResp: &hubclient.HeartbeatResponse{},
 			wantEtag: "",
 			wantErr:  false,
+		},
+		{
+			name: "missing from cluster",
+			args: args{lease: "thisIsALease", etag: "thisIsAnETag"},
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusGone)
+				w.Write([]byte{})
+			},
+			wantResp: &hubclient.HeartbeatResponse{},
+			wantEtag: "",
+			wantErr:  true,
 		},
 		{
 			name: "unauthorized error",
@@ -273,7 +284,7 @@ func TestHTTPClient_Heartbeat(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 				w.Write([]byte{})
 			},
-			wantResp: nil,
+			wantResp: &hubclient.HeartbeatResponse{},
 			wantEtag: "",
 			wantErr:  true,
 		},
@@ -284,7 +295,7 @@ func TestHTTPClient_Heartbeat(t *testing.T) {
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Write([]byte{})
 			},
-			wantResp: nil,
+			wantResp: &hubclient.HeartbeatResponse{},
 			wantEtag: "",
 			wantErr:  true,
 		},
@@ -298,7 +309,7 @@ func TestHTTPClient_Heartbeat(t *testing.T) {
 			defer server.Close()
 
 			// setup client
-			cli, _ := NewClient(server.URL, "", 5*time.Second)
+			cli, _ := NewClient(server.URL, "", 5*time.Second, "userAgent")
 
 			// execute register
 			state, etag, err := cli.Heartbeat(tt.args.lease, tt.args.etag)
@@ -380,7 +391,7 @@ func TestHTTPClient_Config(t *testing.T) {
 			defer server.Close()
 
 			// setup client
-			cli, _ := NewClient(server.URL, "", 5*time.Second)
+			cli, _ := NewClient(server.URL, "", 5*time.Second, "userAgent")
 
 			// execute register
 			state, err := cli.Config(tt.args.clusterName)
@@ -465,7 +476,7 @@ func TestHTTPClient_Cluster(t *testing.T) {
 			defer server.Close()
 
 			// setup client
-			cli, _ := NewClient(server.URL, "", 5*time.Second)
+			cli, _ := NewClient(server.URL, "", 5*time.Second, "userAgent")
 
 			// execute register
 			state, err := cli.Cluster(tt.args.clusterName)
@@ -526,7 +537,7 @@ func TestHTTPClient_Clusters(t *testing.T) {
 			defer server.Close()
 
 			// setup client
-			cli, _ := NewClient(server.URL, "", 5*time.Second)
+			cli, _ := NewClient(server.URL, "", 5*time.Second, "userAgent")
 
 			// execute register
 			state, err := cli.Clusters()
@@ -622,7 +633,7 @@ func TestNewClient(t *testing.T) {
 				hubAddress = server.URL
 			}
 			// setup client
-			_, err := NewClient(hubAddress, tt.args.authToken, 5*time.Second)
+			_, err := NewClient(hubAddress, tt.args.authToken, 5*time.Second, "userAgent")
 
 			// check returned values
 			if (err != nil) != tt.wantErr {
