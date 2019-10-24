@@ -29,7 +29,6 @@ type ServerResponse struct {
 	// Payload is the payload for the server
 	Payload []byte `json:"payload"`
 	// LastHeartbeat is the timestamp of the last heartbeat
-	// TODO this should be a string that we parse out a timestamp from
 	LastHeartbeat int `json:"lastHeartbeat"`
 }
 
@@ -90,6 +89,33 @@ type Cluster struct {
 
 // String is the ToString method for Cluster
 func (v Cluster) String() string {
+	bts, _ := easyjson.Marshal(v)
+	return string(bts)
+}
+
+// ClusterOverview is part of the ListClustersResponse returned by the /clusters api
+//easyjson:json
+type ClusterOverview struct {
+	// Servers are the servers in the cluster
+	Servers []string `json:"servers"`
+	// Distributors are the distributors in the cluster
+	Distributors []string `json:"distributors"`
+}
+
+// String is the ToString method for ClusterOverview
+func (v ClusterOverview) String() string {
+	bts, _ := easyjson.Marshal(v)
+	return string(bts)
+}
+
+// ListClustersResponse is the response returned by the /clusters api
+// easyjson:json
+type ListClustersResponse struct {
+	Clusters map[string]ClusterOverview `json:"clusters"`
+}
+
+// String is the ToString method for ListClusterResponse
+func (v ListClustersResponse) String() string {
 	bts, _ := easyjson.Marshal(v)
 	return string(bts)
 }

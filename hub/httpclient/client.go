@@ -19,7 +19,9 @@ const (
 	registerV2   = "/v2/gatewayhub/register"
 	unregisterV2 = "/v2/gatewayhub/unregister"
 	heartbeatV2  = "/v2/gatewayhub/heartbeat"
-	//clusterV2    = "/v2/gatewayhub/cluster"
+	clusterV2    = "/v2/gatewayhub/cluster"
+	clustersV2   = "/v2/gatewayhub/clusters"
+	configV2     = "/v2/gatewayhub/config"
 
 	// Content Types
 	contentTypeHeader = "Content-Type"
@@ -36,6 +38,9 @@ type Client interface {
 	Heartbeat(lease string, etag string) (state *hubclient.HeartbeatResponse, newEtag string, err error)
 	Register(cluster string, name string, version string, payload []byte, distributor bool) (reg *hubclient.RegistrationResponse, etag string, err error)
 	Unregister(lease string) error
+	Cluster(serverName string) (*hubclient.Cluster, error)
+	Clusters() (*hubclient.ListClustersResponse, error)
+	Config(clusterName string) (*hubclient.Config, error)
 }
 
 // HTTPClient is an implementation of the Client interface
@@ -204,10 +209,125 @@ func (h *HTTPClient) Heartbeat(lease string, etag string) (*hubclient.HeartbeatR
 	return state, newEtag, err
 }
 
+// ErrClusterNotFound is returned when a cluster can't be found in the hub
+var ErrClusterNotFound = errors.New("could not find cluster")
+
+// Clusters returns all of the clusters under the account
+func (h *HTTPClient) Clusters() (*hubclient.ListClustersResponse, error) {
+	var resp *hubclient.ListClustersResponse
+
+	// get headers
+	headers := map[string]string{
+		contentTypeHeader:   applicationJSON,
+		authenticationToken: h.authToken,
+	}
+
+	// make the request
+	statusCode, _, respBody, err := h.request(clustersV2, http.MethodGet, []byte{}, headers)
+
+	if err == nil {
+		switch statusCode {
+		case http.StatusOK: // means that the heart beat was successful but the state changed
+			resp = &hubclient.ListClustersResponse{}
+			err = easyjson.Unmarshal(respBody, resp)
+		case http.StatusUnauthorized:
+			err = ErrUnauthorized
+		default:
+			// The request didn't error out, but the server returned an unexpected status
+			err = fmt.Errorf(`%s %s %d %s`, http.MethodGet, clustersV2, statusCode, string(respBody))
+		}
+	}
+
+	return resp, err
+}
+
+// Cluster returns information about a cluster
+func (h *HTTPClient) Cluster(clusterName string) (*hubclient.Cluster, error) {
+	var resp *hubclient.Cluster
+
+	// get headers
+	headers := map[string]string{
+		contentTypeHeader:   applicationJSON,
+		authenticationToken: h.authToken,
+	}
+
+	// make the request
+	statusCode, _, respBody, err := h.request(path.Join(clusterV2, clusterName), http.MethodGet, []byte{}, headers)
+
+	if err == nil {
+		switch statusCode {
+		case http.StatusOK: // means that the heart beat was successful but the state changed
+			resp = &hubclient.Cluster{Name: clusterName}
+			err = easyjson.Unmarshal(respBody, resp)
+		case http.StatusNotFound:
+			err = ErrClusterNotFound
+		case http.StatusUnauthorized:
+			err = ErrUnauthorized
+		default:
+			// The request didn't error out, but the server returned an unexpected status
+			err = fmt.Errorf(`%s %s %d %s`, http.MethodGet, clustersV2, statusCode, string(respBody))
+		}
+	}
+
+	return resp, err
+}
+
+// Config returns configuration information
+func (h *HTTPClient) Config(clusterName string) (*hubclient.Config, error) {
+	var resp *hubclient.Config
+
+	// get headers
+	headers := map[string]string{
+		contentTypeHeader:   applicationJSON,
+		authenticationToken: h.authToken,
+	}
+
+	// make the request
+	statusCode, _, respBody, err := h.request(path.Join(configV2, clusterName), http.MethodGet, []byte{}, headers)
+
+	if err == nil {
+		switch statusCode {
+		case http.StatusOK:
+			resp = &hubclient.Config{}
+			err = easyjson.Unmarshal(respBody, resp)
+		case http.StatusNotFound:
+			err = ErrClusterNotFound
+		case http.StatusUnauthorized:
+			err = ErrUnauthorized
+		default:
+			// The request didn't error out, but the server returned an unexpected status
+			err = fmt.Errorf(`%s %s %d %s`, http.MethodGet, configV2, statusCode, string(respBody))
+		}
+	}
+
+	return resp, err
+}
+
+func (h *HTTPClient) validAccessToken() error {
+	headers := map[string]string{
+		contentTypeHeader:   applicationJSON,
+		authenticationToken: h.authToken,
+	}
+
+	// make the request
+	statusCode, _, respBody, err := h.request(clustersV2, http.MethodGet, []byte{}, headers)
+
+	if err == nil {
+		switch statusCode {
+		case http.StatusOK:
+		case http.StatusUnauthorized:
+			err = ErrUnauthorized
+		default:
+			// The request didn't error out, but the server returned an unexpected status
+			err = fmt.Errorf(`%s %s %d %s`, http.MethodGet, clustersV2, statusCode, string(respBody))
+		}
+	}
+	return err
+}
+
 // NewClient returns a new http client for interacting with the SignalFx gateway hub
 // TODO: add encryption key to client, this http client will be responsible for encyrpting and decrypting server payloads
 func NewClient(hubAddress string, authToken string, timeout time.Duration) (Client, error) {
-	var err error
 	var cli = &HTTPClient{
 		client: &http.Client{
 			Timeout: timeout,
@@ -216,15 +336,23 @@ func NewClient(hubAddress string, authToken string, timeout time.Duration) (Clie
 	}
 
 	// validate url
-	var parsedURL *url.URL
-	if parsedURL, err = url.Parse(hubAddress); err == nil {
-		cli.baseURL = parsedURL.String()
+	parsedURL, err := url.ParseRequestURI(hubAddress)
+	if err != nil {
+		return cli, err
+	}
+	cli.baseURL = parsedURL.String()
+
+	// validate that the auth token isn't empty
+	if authToken == "" {
+		return cli, errors.New("auth token can not be empty")
 	}
 
-	// auth token
-	if err == nil && authToken == "" {
-		err = errors.New("auth token can not be empty")
+	// validate auth token with a request.  If it is unauthorized we'll throw an error.
+	// Otherwise we've vetted about as much as we can.  Maybe the service is totally down?
+	// we don't want to prevent the client from being created under those circumstances.
+	if err := cli.validAccessToken(); err == ErrUnauthorized {
+		return cli, err
 	}
 
-	return cli, err
+	return cli, nil
 }

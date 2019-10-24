@@ -21,6 +21,9 @@ type mockHTTPClient struct {
 	register        func(cluster string, name string, version string, payload []byte, distributor bool) (reg *hubclient.RegistrationResponse, etag string, err error)
 	unregister      func(lease string) error
 	heartbeat       func(lease string, etag string) (*hubclient.HeartbeatResponse, string, error)
+	cluster         func(serverName string) (*hubclient.Cluster, error)
+	clusters        func(*hubclient.ListClustersResponse, error)
+	config          func(clusterName string) (*hubclient.Config, error)
 }
 
 // nolint: vet
@@ -34,6 +37,18 @@ func (m *mockHTTPClient) Unregister(lease string) error {
 
 func (m *mockHTTPClient) Heartbeat(lease string, etag string) (*hubclient.HeartbeatResponse, string, error) {
 	return m.heartbeat(lease, etag)
+}
+
+func (m *mockHTTPClient) Cluster(serverName string) (*hubclient.Cluster, error) {
+	return m.cluster(serverName)
+}
+
+func (m *mockHTTPClient) Clusters() (*hubclient.ListClustersResponse, error) {
+	return m.Clusters()
+}
+
+func (m *mockHTTPClient) Config(clusterName string) (*hubclient.Config, error) {
+	return m.Config(clusterName)
 }
 
 func TestHub_Unregister(t *testing.T) {
@@ -241,9 +256,10 @@ func TestNewHub(t *testing.T) {
 		{
 			name: "new hub should be returned with out error",
 			args: args{
-				logger:    log.Discard,
-				authToken: "authToken",
-				timeout:   time.Second * 5,
+				logger:     log.Discard,
+				authToken:  "authToken",
+				hubAddress: "http://thisIsAHubAddress",
+				timeout:    time.Second * 5,
 			},
 			wantErr: false,
 		},
@@ -289,7 +305,7 @@ func Test_signalableErrCh_signalAndWaitForError(t *testing.T) {
 	}{
 		{
 			name: "canceled context return an error",
-			e:    signalableErrCh(make(chan chan error, 1)),
+			e:    signalableErrCh(make(chan chan error, 0)),
 			args: args{
 				ctx: canceldCtx,
 			},
