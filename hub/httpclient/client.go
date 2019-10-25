@@ -43,6 +43,18 @@ type Client interface {
 	Config(clusterName string) (*hubclient.Config, error)
 }
 
+// handleCommonHTTPErrorCodes handles common http status codes for errors and returns a formatted error
+func handleCommonHTTPErrorCodes(statusCode int, method string, endpoint string, body []byte) (err error) {
+	switch statusCode {
+	case http.StatusUnauthorized:
+		err = ErrUnauthorized
+	default:
+		// return an error for the uncaught error
+		err = fmt.Errorf(`%s %s %d %s`, method, endpoint, statusCode, string(body))
+	}
+	return err
+}
+
 // HTTPClient is an implementation of the Client interface
 type HTTPClient struct {
 	client    *http.Client
@@ -126,12 +138,9 @@ func (h *HTTPClient) Register(cluster string, name string, version string, paylo
 			case http.StatusConflict:
 				// return a named error for status conflicts
 				err = ErrServerNameConflict
-			case http.StatusUnauthorized:
-				// return an error for unauthorized requests
-				err = ErrUnauthorized
 			default:
 				// The request didn't error out, but the server returned an unexpected status
-				err = fmt.Errorf(`%s %s %d %s`, http.MethodPost, registerV2, statusCode, string(respBody))
+				err = handleCommonHTTPErrorCodes(statusCode, http.MethodPost, registerV2, respBody)
 			}
 		}
 	}
@@ -166,12 +175,9 @@ func (h *HTTPClient) Unregister(lease string) (err error) {
 		case http.StatusInternalServerError:
 			// return a named error when hub can't remove the instance
 			err = ErrCannotRemoveInstance
-		case http.StatusUnauthorized:
-			// return an error for unauthorized requests
-			err = ErrUnauthorized
 		default:
 			// The request didn't error out, but the server returned an unexpected status
-			err = fmt.Errorf(`%s %s %d %s`, http.MethodPost, unregisterV2, statusCode, string(respBody))
+			err = handleCommonHTTPErrorCodes(statusCode, http.MethodPost, unregisterV2, respBody)
 		}
 	}
 
@@ -198,11 +204,9 @@ func (h *HTTPClient) Heartbeat(lease string, etag string) (*hubclient.HeartbeatR
 			newEtag = respHeaders.Get(eTag)
 			state = &hubclient.HeartbeatResponse{}
 			err = easyjson.Unmarshal(respBody, state)
-		case http.StatusUnauthorized:
-			err = ErrUnauthorized
 		default:
 			// The request didn't error out, but the server returned an unexpected status
-			err = fmt.Errorf(`%s %s %d %s`, http.MethodPost, heartbeatV2, statusCode, string(respBody))
+			err = handleCommonHTTPErrorCodes(statusCode, http.MethodPost, heartbeatV2, respBody)
 		}
 	}
 
@@ -227,14 +231,12 @@ func (h *HTTPClient) Clusters() (*hubclient.ListClustersResponse, error) {
 
 	if err == nil {
 		switch statusCode {
-		case http.StatusOK: // means that the heart beat was successful but the state changed
+		case http.StatusOK:
 			resp = &hubclient.ListClustersResponse{}
 			err = easyjson.Unmarshal(respBody, resp)
-		case http.StatusUnauthorized:
-			err = ErrUnauthorized
 		default:
 			// The request didn't error out, but the server returned an unexpected status
-			err = fmt.Errorf(`%s %s %d %s`, http.MethodGet, clustersV2, statusCode, string(respBody))
+			err = handleCommonHTTPErrorCodes(statusCode, http.MethodGet, clustersV2, respBody)
 		}
 	}
 
@@ -256,16 +258,14 @@ func (h *HTTPClient) Cluster(clusterName string) (*hubclient.Cluster, error) {
 
 	if err == nil {
 		switch statusCode {
-		case http.StatusOK: // means that the heart beat was successful but the state changed
+		case http.StatusOK:
 			resp = &hubclient.Cluster{Name: clusterName}
 			err = easyjson.Unmarshal(respBody, resp)
 		case http.StatusNotFound:
 			err = ErrClusterNotFound
-		case http.StatusUnauthorized:
-			err = ErrUnauthorized
 		default:
 			// The request didn't error out, but the server returned an unexpected status
-			err = fmt.Errorf(`%s %s %d %s`, http.MethodGet, clustersV2, statusCode, string(respBody))
+			err = handleCommonHTTPErrorCodes(statusCode, http.MethodGet, clusterV2, respBody)
 		}
 	}
 
@@ -292,11 +292,9 @@ func (h *HTTPClient) Config(clusterName string) (*hubclient.Config, error) {
 			err = easyjson.Unmarshal(respBody, resp)
 		case http.StatusNotFound:
 			err = ErrClusterNotFound
-		case http.StatusUnauthorized:
-			err = ErrUnauthorized
 		default:
 			// The request didn't error out, but the server returned an unexpected status
-			err = fmt.Errorf(`%s %s %d %s`, http.MethodGet, configV2, statusCode, string(respBody))
+			err = handleCommonHTTPErrorCodes(statusCode, http.MethodGet, configV2, respBody)
 		}
 	}
 
@@ -315,11 +313,9 @@ func (h *HTTPClient) validAccessToken() error {
 	if err == nil {
 		switch statusCode {
 		case http.StatusOK:
-		case http.StatusUnauthorized:
-			err = ErrUnauthorized
 		default:
 			// The request didn't error out, but the server returned an unexpected status
-			err = fmt.Errorf(`%s %s %d %s`, http.MethodGet, clustersV2, statusCode, string(respBody))
+			err = handleCommonHTTPErrorCodes(statusCode, http.MethodGet, clustersV2, respBody)
 		}
 	}
 	return err
