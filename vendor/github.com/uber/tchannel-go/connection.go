@@ -24,14 +24,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/uber/tchannel-go/tos"
 
-	"github.com/uber-go/atomic"
+	"go.uber.org/atomic"
 	"golang.org/x/net/context"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
@@ -140,6 +139,10 @@ type ConnectionOptions struct {
 	// HealthChecks configures active connection health checking for this channel.
 	// By default, health checks are not enabled.
 	HealthChecks HealthCheckOptions
+
+	// MaxCloseTime controls how long we allow a connection to complete pending
+	// calls before shutting down. Only used if it is non-zero.
+	MaxCloseTime time.Duration
 }
 
 // connectionEvents are the events that can be triggered by a connection.
@@ -159,6 +162,7 @@ type Connection struct {
 	channelConnectionCommon
 
 	connID          uint32
+	connDirection   connectionDirection
 	opts            ConnectionOptions
 	conn            net.Conn
 	localPeerInfo   LocalPeerInfo
@@ -182,11 +186,9 @@ type Connection struct {
 
 	// closeNetworkCalled is used to avoid errors from being logged
 	// when this side closes a connection.
-	closeNetworkCalled atomic.Int32
+	closeNetworkCalled atomic.Bool
 	// stoppedExchanges is atomically set when exchanges are stopped due to error.
-	stoppedExchanges atomic.Uint32
-	// pendingMethods is the number of methods running that may block closing of sendCh.
-	pendingMethods atomic.Int64
+	stoppedExchanges atomic.Bool
 	// remotePeerAddress is used as a cache for remote peer address parsed into individual
 	// components that can be used to set peer tags on OpenTracing Span.
 	remotePeerAddress peerAddressComponents
@@ -276,6 +278,7 @@ func (ch *Channel) newConnection(conn net.Conn, initialID uint32, outboundHP str
 	opts := ch.connectionOptions.withDefaults()
 
 	connID := _nextConnID.Inc()
+	connDirection := inbound
 	log := ch.log.WithFields(LogFields{
 		{"connID", connID},
 		{"localAddr", conn.LocalAddr().String()},
@@ -285,13 +288,11 @@ func (ch *Channel) newConnection(conn net.Conn, initialID uint32, outboundHP str
 		{"remoteProcess", remotePeer.ProcessName},
 	}...)
 	if outboundHP != "" {
-		log = log.WithFields(LogFields{
-			{"outboundHP", outboundHP},
-			{"connectionDirection", outbound},
-		}...)
-	} else {
-		log = log.WithFields(LogField{"connectionDirection", inbound})
+		connDirection = outbound
+		log = log.WithFields(LogField{"outboundHP", outboundHP})
 	}
+
+	log = log.WithFields(LogField{"connectionDirection", connDirection})
 	peerInfo := ch.PeerInfo()
 
 	c := &Connection{
@@ -299,6 +300,7 @@ func (ch *Channel) newConnection(conn net.Conn, initialID uint32, outboundHP str
 
 		connID:             connID,
 		conn:               conn,
+		connDirection:      connDirection,
 		opts:               opts,
 		state:              connectionActive,
 		sendCh:             make(chan *Frame, opts.SendBufferSize),
@@ -386,12 +388,6 @@ func (c *Connection) callOnExchangeChange() {
 
 // ping sends a ping message and waits for a ping response.
 func (c *Connection) ping(ctx context.Context) error {
-	if !c.pendingExchangeMethodAdd() {
-		// Connection is closed, no need to do anything.
-		return ErrInvalidConnectionState
-	}
-	defer c.pendingExchangeMethodDone()
-
 	req := &pingReq{id: c.NextMessageID()}
 	mex, err := c.outbound.newExchange(ctx, c.opts.FramePool, req.messageType(), req.ID(), 1)
 	if err != nil {
@@ -418,12 +414,6 @@ func (c *Connection) handlePingRes(frame *Frame) bool {
 
 // handlePingReq responds to the pingReq message with a pingRes.
 func (c *Connection) handlePingReq(frame *Frame) {
-	if !c.pendingExchangeMethodAdd() {
-		// Connection is closed, no need to do anything.
-		return
-	}
-	defer c.pendingExchangeMethodDone()
-
 	if state := c.readState(); state != connectionActive {
 		c.protocolError(frame.Header.ID, errConnNotActive{"ping on incoming", state})
 		return
@@ -494,7 +484,7 @@ func (c *Connection) SendSystemError(id uint32, span Span, err error) error {
 			LogField{"id", id},
 			ErrField(err),
 		).Warn("Couldn't create outbound frame.")
-		return fmt.Errorf("failed to create outbound error frame")
+		return fmt.Errorf("failed to create outbound error frame: %v", err)
 	}
 
 	// When sending errors, we hold the state rlock to ensure that sendCh is not closed
@@ -532,9 +522,12 @@ func (c *Connection) logConnectionError(site string, err error) error {
 			LogField{"site", site},
 			ErrField(err),
 		)
+
 		if se, ok := err.(SystemError); ok && se.Code() != ErrCodeNetwork {
 			errCode = se.Code()
 			logger.Error("Connection error.")
+		} else if ne, ok := err.(net.Error); ok && ne.Timeout() {
+			logger.Warn("Connection error due to timeout.")
 		} else {
 			logger.Info("Connection error.")
 		}
@@ -559,10 +552,13 @@ func (c *Connection) connectionError(site string, err error) error {
 	c.close(closeLogFields...)
 
 	// On any connection error, notify the exchanges of this error.
-	if c.stoppedExchanges.CAS(0, 1) {
+	if c.stoppedExchanges.CAS(false, true) {
 		c.outbound.stopExchanges(err)
 		c.inbound.stopExchanges(err)
 	}
+
+	// checkExchanges will close the connection due to stoppedExchanges.
+	c.checkExchanges()
 	return err
 }
 
@@ -577,7 +573,7 @@ func (c *Connection) protocolError(id uint32, err error) error {
 	)
 
 	// On any connection error, notify the exchanges of this error.
-	if c.stoppedExchanges.CAS(0, 1) {
+	if c.stoppedExchanges.CAS(false, true) {
 		c.outbound.stopExchanges(sysErr)
 		c.inbound.stopExchanges(sysErr)
 	}
@@ -618,7 +614,7 @@ func (c *Connection) readFrames(_ uint32) {
 	headerBuf := make([]byte, FrameHeaderSize)
 
 	handleErr := func(err error) {
-		if c.closeNetworkCalled.Load() == 0 {
+		if !c.closeNetworkCalled.Load() {
 			c.connectionError("read frames", err)
 		} else {
 			c.log.Debugf("Ignoring error after connection was closed: %v", err)
@@ -739,31 +735,16 @@ func (c *Connection) updateLastActivity(frame *Frame) {
 	}
 }
 
-// pendingExchangeMethodAdd returns whether the method that is trying to
-// add a message exchange can continue.
-func (c *Connection) pendingExchangeMethodAdd() bool {
-	return c.pendingMethods.Inc() > 0
-}
-
-// pendingExchangeMethodDone should be deferred by a method called
-// pendingExchangeMessageAdd.
-func (c *Connection) pendingExchangeMethodDone() {
-	c.pendingMethods.Dec()
-}
-
-// closeSendCh waits till there are no other goroutines that may try to write
-// to sendCh.
-// We accept connID on the stack so can more easily debug panics or leaked goroutines.
-func (c *Connection) closeSendCh(connID uint32) {
-	// Wait till all methods that may add exchanges are done running.
-	// When they are done, we set the value to a negative value which
-	// will ensure that if any other methods start that may add exchanges
-	// they will fail due to closed connection.
-	for !c.pendingMethods.CAS(0, math.MinInt32) {
-		time.Sleep(time.Millisecond)
+// hasPendingCalls returns whether there's any pending inbound or outbound calls on this connection.
+func (c *Connection) hasPendingCalls() bool {
+	if c.inbound.count() > 0 || c.outbound.count() > 0 {
+		return true
+	}
+	if !c.relay.canClose() {
+		return true
 	}
 
-	close(c.stopCh)
+	return false
 }
 
 // checkExchanges is called whenever an exchange is removed, and when Close is called.
@@ -781,21 +762,25 @@ func (c *Connection) checkExchanges() {
 		return err == nil
 	}
 
-	var updated connectionState
-	if c.readState() == connectionStartClose {
+	curState := c.readState()
+	origState := curState
+
+	if curState != connectionClosed && c.stoppedExchanges.Load() {
+		if moveState(curState, connectionClosed) {
+			curState = connectionClosed
+		}
+	}
+
+	if curState == connectionStartClose {
 		if !c.relay.canClose() {
 			return
 		}
 		if c.inbound.count() == 0 && moveState(connectionStartClose, connectionInboundClosed) {
-			updated = connectionInboundClosed
-		}
-		// If there was no update to the state, there's no more processing to do.
-		if updated == 0 {
-			return
+			curState = connectionInboundClosed
 		}
 	}
 
-	if c.readState() == connectionInboundClosed {
+	if curState == connectionInboundClosed {
 		// Safety check -- this should never happen since we already did the check
 		// when transitioning to connectionInboundClosed.
 		if !c.relay.canClose() {
@@ -804,18 +789,20 @@ func (c *Connection) checkExchanges() {
 		}
 
 		if c.outbound.count() == 0 && moveState(connectionInboundClosed, connectionClosed) {
-			updated = connectionClosed
+			curState = connectionClosed
 		}
 	}
 
-	if updated != 0 {
-		// If the connection is closed, we can safely close the channel.
-		if updated == connectionClosed {
-			go c.closeSendCh(c.connID)
+	if curState != origState {
+		// If the connection is closed, we can notify writeFrames to stop which
+		// closes the underlying network connection. We never close sendCh to avoid
+		// races causing panics, see 93ef5c112c8b321367ae52d2bd79396e2e874f31
+		if curState == connectionClosed {
+			close(c.stopCh)
 		}
 
 		c.log.WithFields(
-			LogField{"newState", updated},
+			LogField{"newState", curState},
 		).Debug("Connection state updated during shutdown.")
 		c.callOnCloseStateChange()
 	}
@@ -826,15 +813,21 @@ func (c *Connection) close(fields ...LogField) error {
 
 	// Update the state which will start blocking incoming calls.
 	if err := c.withStateLock(func() error {
-		switch c.state {
+		switch s := c.state; s {
 		case connectionActive:
 			c.state = connectionStartClose
 		default:
-			return fmt.Errorf("connection must be Active to Close")
+			return fmt.Errorf("connection must be Active to Close, but it is %v", s)
 		}
 		return nil
 	}); err != nil {
 		return err
+	}
+
+	// Set a read deadline with any close timeout. This will cause a i/o timeout
+	// if the connection isn't closed by then.
+	if c.opts.MaxCloseTime > 0 {
+		c.conn.SetReadDeadline(c.timeNow().Add(c.opts.MaxCloseTime))
 	}
 
 	c.log.WithFields(
@@ -863,7 +856,7 @@ func (c *Connection) closeNetwork() {
 	// channel would be dangerous since other goroutine might be sending)
 	c.log.Debugf("Closing underlying network connection")
 	c.stopHealthCheck()
-	c.closeNetworkCalled.Inc()
+	c.closeNetworkCalled.Store(true)
 	if err := c.conn.Close(); err != nil {
 		c.log.WithFields(
 			LogField{"remotePeer", c.remotePeerInfo},

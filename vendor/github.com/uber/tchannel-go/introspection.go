@@ -383,14 +383,14 @@ func (r *Relayer) IntrospectState(opts *IntrospectionOptions) RelayerRuntimeStat
 
 // IntrospectState returns the runtime state for this relayItems.
 func (ri *relayItems) IntrospectState(opts *IntrospectionOptions, name string) RelayItemSetState {
-	ri.RLock()
-	defer ri.RUnlock()
-
 	setState := RelayItemSetState{
 		Name:  name,
 		Count: ri.Count(),
 	}
 	if opts.IncludeExchanges {
+		ri.RLock()
+		defer ri.RUnlock()
+
 		setState.Items = make(map[string]RelayItemState, len(ri.items))
 		for k, v := range ri.items {
 			if !opts.IncludeTombstones && v.tomb {
@@ -400,7 +400,7 @@ func (ri *relayItems) IntrospectState(opts *IntrospectionOptions, name string) R
 				ID:                      k,
 				RemapID:                 v.remapID,
 				DestinationConnectionID: v.destination.conn.connID,
-				Tomb: v.tomb,
+				Tomb:                    v.tomb,
 			}
 			setState.Items[strconv.Itoa(int(k))] = state
 		}

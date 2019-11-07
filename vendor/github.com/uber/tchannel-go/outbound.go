@@ -65,12 +65,6 @@ func (c *Connection) beginCall(ctx context.Context, serviceName, methodName stri
 		return nil, GetContextError(err)
 	}
 
-	if !c.pendingExchangeMethodAdd() {
-		// Connection is closed, no need to do anything.
-		return nil, ErrInvalidConnectionState
-	}
-	defer c.pendingExchangeMethodDone()
-
 	requestID := c.NextMessageID()
 	mex, err := c.outbound.newExchange(ctx, c.opts.FramePool, messageTypeCallReq, requestID, mexChannelBufferSize)
 	if err != nil {
@@ -83,6 +77,8 @@ func (c *Connection) beginCall(ctx context.Context, serviceName, methodName stri
 		return nil, ErrConnectionClosed
 	}
 
+	// Note: We don't verify number of transport headers as the library doesn't
+	// allow adding arbitrary headers. Ensure we never add >= 256 headers here.
 	headers := transportHeaders{
 		CallerName: c.localPeerInfo.ServiceName,
 	}
