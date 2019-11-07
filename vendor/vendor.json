@@ -1074,10 +1074,8 @@
 		{
 			"checksumSHA1": "y7F7c5fLaVPVlxsX6Zfpz+Or86Q=",
 			"path": "github.com/signalfx/embetcd/embetcd",
-			"revision": "3f369f70e26472d97b7f761a9c19103883199c73",
-			"revisionTime": "2019-04-29T17:39:57Z",
-			"version": "v0.0.8",
-			"versionExact": "v0.0.8"
+			"revision": "54b28d4edeac22caf3e677fb01753ff87656745d",
+			"revisionTime": "2019-11-07T14:28:04Z"
 		},
 		{
 			"checksumSHA1": "NKWpwtNg6Z1yvSxCE+0WZjb8CdI=",
