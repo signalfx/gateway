@@ -6,16 +6,17 @@ import (
 
 	"context"
 	"fmt"
-	"github.com/signalfx/gateway/logkey"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/event"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/trace"
 	"net/http"
 	"runtime"
+
+	"github.com/signalfx/gateway/logkey"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/event"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/sfxclient"
+	"github.com/signalfx/golib/v3/trace"
 )
 
 // Config controls BufferedForwarder limits
@@ -111,7 +112,7 @@ func (e errDPBufferFull) Error() string {
 // AddDatapoints sends the datapoints to a chan buffer that eventually is flushed in big groups
 func (forwarder *BufferedForwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) error {
 	if forwarder.checker.CtxFlagCheck.HasFlag(ctx) {
-		forwarder.cdim.With(ctx, forwarder.logger).Log("Datapoint call recieved in buffered forwarder")
+		forwarder.cdim.With(ctx, forwarder.logger).Log("Datapoint call received in buffered forwarder")
 	}
 	atomic.AddInt64(&forwarder.stats.totalDatapointsBuffered, int64(len(points)))
 	if *forwarder.config.MaxTotalDatapoints <= atomic.LoadInt64(&forwarder.stats.totalDatapointsBuffered) {
@@ -254,7 +255,7 @@ Loop:
 	atomic.AddInt64(&forwarder.stats.totalDatapointsBuffered, int64(-len(datapoints)))
 	ctx := forwarder.stopContext
 	if currentToken != "" {
-		ctx = context.WithValue(ctx, sfxclient.TokenHeaderName, currentToken)
+		ctx = context.WithValue(ctx, sfxclient.TokenHeaderName, currentToken) //nolint:golint
 	}
 	return datapoints, ctx
 }
@@ -316,7 +317,7 @@ Loop:
 	atomic.AddInt64(&forwarder.stats.totalEventsBuffered, int64(-len(events)))
 	ctx := forwarder.stopContext
 	if currentToken != "" {
-		ctx = context.WithValue(ctx, sfxclient.TokenHeaderName, currentToken)
+		ctx = context.WithValue(ctx, sfxclient.TokenHeaderName, currentToken) //nolint:golint
 	}
 	return events, ctx
 }
@@ -378,7 +379,7 @@ Loop:
 	atomic.AddInt64(&forwarder.stats.totalTracesBuffered, int64(-len(spans)))
 	ctx := forwarder.stopContext
 	if currentToken != "" {
-		ctx = context.WithValue(ctx, sfxclient.TokenHeaderName, currentToken)
+		ctx = context.WithValue(ctx, sfxclient.TokenHeaderName, currentToken) //nolint:golint
 	}
 	return spans, ctx
 }

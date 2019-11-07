@@ -12,18 +12,19 @@ import (
 	"strings"
 
 	"context"
+
 	"github.com/mailru/easyjson"
 	"github.com/signalfx/gateway/protocol"
-	"github.com/signalfx/gateway/protocol/collectd/format"
+	collectdformat "github.com/signalfx/gateway/protocol/collectd/format"
 	"github.com/signalfx/gateway/protocol/zipper"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/event"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/web"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/errors"
+	"github.com/signalfx/golib/v3/event"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/sfxclient"
+	"github.com/signalfx/golib/v3/web"
 )
 
 // ListenerServer will listen for collectd datapoint connections
@@ -128,7 +129,7 @@ func (decoder *JSONDecoder) Read(ctx context.Context, req *http.Request) error {
 
 func (decoder *JSONDecoder) defaultDims(req *http.Request) map[string]string {
 	params := req.URL.Query()
-	defaultDims := make(map[string]string, 0)
+	defaultDims := make(map[string]string)
 	for key := range params {
 		if strings.HasPrefix(key, sfxDimQueryParamPrefix) {
 			value := params.Get(key)

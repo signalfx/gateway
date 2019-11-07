@@ -3,10 +3,11 @@ package metricdeconstructor
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/signalfx/golib/datapoint"
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/signalfx/golib/v3/datapoint"
 )
 
 type configurableRegexMetricRule struct {

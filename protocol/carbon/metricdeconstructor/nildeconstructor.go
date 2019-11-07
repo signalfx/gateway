@@ -3,7 +3,7 @@ package metricdeconstructor
 import (
 	"errors"
 
-	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/v3/datapoint"
 )
 
 type nilDeconstructor struct{}

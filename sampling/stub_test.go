@@ -1,16 +1,18 @@
 package sampling
 
 import (
-	"github.com/signalfx/golib/sfxclient"
 	"testing"
 
+	"github.com/signalfx/golib/v3/sfxclient"
+
 	"context"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/event"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/trace"
-	. "github.com/smartystreets/goconvey/convey"
 	"net/http"
+
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/event"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/trace"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 type end struct {

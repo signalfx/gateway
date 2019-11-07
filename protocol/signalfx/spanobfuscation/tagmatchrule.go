@@ -2,6 +2,7 @@ package spanobfuscation
 
 import (
 	"fmt"
+
 	"github.com/gobwas/glob"
 	"github.com/signalfx/gateway/config/globbing"
 )

@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"context"
+
 	"github.com/signalfx/gateway/dp/dpdimsort"
 	"github.com/signalfx/gateway/protocol/filtering"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/timekeeper"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/errors"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/timekeeper"
 )
 
 // Forwarder is a sink that forwards points to a carbon endpoint
@@ -157,7 +158,7 @@ func (f *Forwarder) AddDatapoints(ctx context.Context, points []*datapoint.Datap
 		}
 	}()
 
-	if err := f.setMinTime(ctx, openConnection); err != nil {
+	if err = f.setMinTime(ctx, openConnection); err != nil {
 		return err
 	}
 

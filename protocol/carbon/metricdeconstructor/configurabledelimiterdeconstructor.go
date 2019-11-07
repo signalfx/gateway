@@ -7,7 +7,7 @@ import (
 
 	"errors"
 
-	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/v3/datapoint"
 )
 
 func split(path string, delimiter string) []string {
@@ -90,10 +90,7 @@ type idMatcher struct {
 
 // idMatcher matches iff the term is exactly equal to s.Term
 func (s *idMatcher) match(term string) bool {
-	if s.Term == term {
-		return true
-	}
-	return false
+	return s.Term == term
 }
 
 type notMatcher struct {
@@ -102,10 +99,7 @@ type notMatcher struct {
 
 // notMatcher matches iff the term is not exactly equal to s.Term
 func (s *notMatcher) match(term string) bool {
-	if s.Term != term {
-		return true
-	}
-	return false
+	return s.Term != term
 }
 
 type termMatcher struct {
@@ -276,14 +270,14 @@ func (m *configurableDelimiterMetricDeconstructor) verify() error {
 	m.MetricsMap = make(map[int][]*configurableDelimiterMetricRule)
 	for _, t := range m.TypeRules {
 		t.P = m
-		err := t.verify()
+		err = t.verify()
 		if err != nil {
 			return err
 		}
 	}
 	for _, metric := range m.MetricRules {
 		metric.P = m
-		err := metric.verify()
+		err = metric.verify()
 		if err != nil {
 			return err
 		}

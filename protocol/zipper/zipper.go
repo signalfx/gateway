@@ -3,13 +3,14 @@ package zipper
 import (
 	"bytes"
 	"compress/gzip"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/sfxclient"
 	"io"
 	"net/http"
 	"sync"
 	"sync/atomic"
+
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/sfxclient"
 )
 
 // ReadZipper creates a Pool that contains previously used Readers and can create new ones if we run out.
@@ -26,7 +27,7 @@ type ReadZipper struct {
 func (z *ReadZipper) GzipHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var err error
-		if "gzip" == r.Header.Get("Content-Encoding") {
+		if r.Header.Get("Content-Encoding") == "gzip" {
 			gzi := z.zippers.Get()
 			if gzi != nil {
 				gz := gzi.(*gzip.Reader)
@@ -46,7 +47,7 @@ func (z *ReadZipper) GzipHandler(h http.Handler) http.Handler {
 		if err != nil {
 			atomic.AddInt64(&z.ErrCount, 1)
 			w.WriteHeader(http.StatusBadRequest)
-			_, err := w.Write([]byte("error handling gzip compressed request " + err.Error()))
+			_, err = w.Write([]byte("error handling gzip compressed request " + err.Error()))
 			log.IfErr(z.Log, err)
 			return
 		}

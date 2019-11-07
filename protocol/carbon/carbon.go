@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/signalfx/gateway/protocol/carbon/metricdeconstructor"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/errors"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/errors"
 )
 
 type carbonMetadata int
@@ -47,11 +47,13 @@ func NewCarbonDatapoint(line string, metricDeconstructor metricdeconstructor.Met
 	}
 
 	v, err := func() (datapoint.Value, error) {
-		metricValueInt, err := strconv.ParseInt(parts[1], 10, 64)
+		var metricValueInt int64
+		metricValueInt, err = strconv.ParseInt(parts[1], 10, 64)
 		if err == nil {
 			return datapoint.NewIntValue(metricValueInt), nil
 		}
-		metricValueFloat, err := strconv.ParseFloat(parts[1], 64)
+		var metricValueFloat float64
+		metricValueFloat, err = strconv.ParseFloat(parts[1], 64)
 		if err != nil {
 			return nil, errors.Annotatef(err, "unable to parse carbon metric value on line %s", line)
 		}

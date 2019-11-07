@@ -4,21 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/golang/protobuf/proto"
-	"github.com/signalfx/gateway/protocol/filtering"
-	"github.com/signalfx/gateway/sampling"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/event"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/trace"
 	"net"
 	"net/http"
 	"runtime"
 	"sync/atomic"
 	"time"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/signalfx/gateway/protocol/filtering"
+	"github.com/signalfx/gateway/sampling"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/event"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/sfxclient"
+	"github.com/signalfx/golib/v3/trace"
 )
 
 // Forwarder controls forwarding datapoints to SignalFx
@@ -171,7 +172,7 @@ func (connector *Forwarder) AddDatapoints(ctx context.Context, datapoints []*dat
 	start := time.Now()
 	atomic.AddInt64(&connector.stats.pipeline, int64(len(datapoints)))
 	defer atomic.AddInt64(&connector.stats.pipeline, -int64(len(datapoints)))
-	defer connector.stats.requests.Add(float64(time.Now().Sub(start).Nanoseconds()))
+	defer connector.stats.requests.Add(float64(time.Since(start).Nanoseconds()))
 	defer connector.stats.drainSize.Add(float64(len(datapoints)))
 	atomic.AddInt64(&connector.stats.totalDatapointsForwarded, int64(len(datapoints)))
 	datapoints = connector.emptyMetricNameFilter.FilterDatapoints(datapoints)

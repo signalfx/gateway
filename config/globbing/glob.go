@@ -1,8 +1,9 @@
 package globbing
 
 import (
-	"github.com/gobwas/glob"
 	"strings"
+
+	"github.com/gobwas/glob"
 )
 
 // GetGlob takes a config and returns a gobwas Glob that has all other glob/regex operators escaped besides "*".

@@ -2,16 +2,17 @@ package demultiplexer
 
 import (
 	"context"
-	"github.com/signalfx/gateway/logkey"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/event"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/trace"
 	"sync/atomic"
 	"time"
+
+	"github.com/signalfx/gateway/logkey"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/errors"
+	"github.com/signalfx/golib/v3/event"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/sfxclient"
+	"github.com/signalfx/golib/v3/trace"
 )
 
 // Demultiplexer is a sink that forwards points it sees to multiple sinks

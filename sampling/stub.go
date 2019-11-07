@@ -3,13 +3,14 @@ package sampling
 import (
 	"context"
 
-	"github.com/signalfx/gateway/etcdIntf"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/trace"
 	"net/http"
+
+	"github.com/signalfx/gateway/etcdIntf"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/errors"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/sfxclient"
+	"github.com/signalfx/golib/v3/trace"
 )
 
 // SmartSampleConfig is not here
@@ -66,6 +67,8 @@ type dtsink interface {
 
 // ConfigureHTTPSink does nothing
 func (f *SmartSampler) ConfigureHTTPSink(sink *sfxclient.HTTPSink) {
+	//nolint
+	return
 }
 
 // New returns you nothing

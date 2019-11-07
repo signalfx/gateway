@@ -2,10 +2,11 @@ package collectorhandler
 
 import (
 	"encoding/json"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/sfxclient"
 	"net/http"
 	"strconv"
+
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/sfxclient"
 )
 
 // CollectorHandler collects datapoints

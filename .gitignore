@@ -8,3 +8,4 @@ gateway.pid
 /sf
 /.go
 /.idea
+coverage.out

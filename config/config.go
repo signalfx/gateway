@@ -20,11 +20,11 @@ import (
 	"github.com/signalfx/gateway/protocol/signalfx/spanobfuscation"
 	"github.com/signalfx/gateway/sampling"
 	"github.com/signalfx/gohelpers/stringhelper"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/env"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/env"
+	"github.com/signalfx/golib/v3/errors"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/pointer"
 	"github.com/signalfx/xdgbasedir"
 )
 

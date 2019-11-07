@@ -3,8 +3,9 @@ package protocol
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"net/http"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUneventfulForwarder(t *testing.T) {

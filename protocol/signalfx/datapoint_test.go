@@ -1,11 +1,12 @@
 package signalfx
 
 import (
-	"github.com/signalfx/gateway/logkey"
-	"github.com/signalfx/golib/sfxclient"
-	. "github.com/smartystreets/goconvey/convey"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/signalfx/gateway/logkey"
+	"github.com/signalfx/golib/v3/sfxclient"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestGetLogTokenFormat(t *testing.T) {

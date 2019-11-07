@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"github.com/coreos/etcd/embed"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -11,9 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/etcd/embed"
+
 	"github.com/signalfx/embetcd/embetcd"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/pointer"
 	"github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
 )

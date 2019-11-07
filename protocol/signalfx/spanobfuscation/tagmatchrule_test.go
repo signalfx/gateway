@@ -5,7 +5,7 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/gobwas/glob/match"
-	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/v3/pointer"
 	. "github.com/smartystreets/goconvey/convey"
 )
 

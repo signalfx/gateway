@@ -4,9 +4,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/signalfx/gateway/protocol/collectd/format"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/event"
+	collectdformat "github.com/signalfx/gateway/protocol/collectd/format"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/event"
 )
 
 var dsTypeToMetricType = map[string]datapoint.MetricType{
@@ -105,7 +105,7 @@ func GetDimensionsFromName(val *string) (instanceName string, toAddDims map[stri
 				}
 				piece := dimensions[prev:cindex]
 				tindex := strings.Index(piece, "=")
-				if tindex == -1 || strings.Index(piece[tindex+1:], "=") > -1 {
+				if tindex == -1 || strings.Contains(piece[tindex+1:], "=") {
 					return
 				}
 				working[piece[:tindex]] = piece[tindex+1:]
@@ -119,13 +119,14 @@ func GetDimensionsFromName(val *string) (instanceName string, toAddDims map[stri
 			instanceName = left + rest
 		}
 	}
-	return
+	return instanceName, toAddDims
 }
 
 func parseNameForDimensions(dimensions map[string]string, key string, val *string) {
 	instanceName, toAddDims := GetDimensionsFromName(val)
 
-	for k, v := range toAddDims {
+	for k := range toAddDims {
+		v := toAddDims[k]
 		if _, exists := dimensions[k]; !exists {
 			addIfNotNullOrEmpty(dimensions, k, true, &v)
 		}
@@ -142,7 +143,8 @@ func pointTypeInstance(point *JSONWriteFormat, dimensions map[string]string, par
 			}
 			parts = append(parts, instanceName...)
 		}
-		for k, v := range toAddDims {
+		for k := range toAddDims {
+			v := toAddDims[k]
 			if _, exists := dimensions[k]; !exists {
 				addIfNotNullOrEmpty(dimensions, k, true, &v)
 			}

@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/signalfx/gateway/protocol/filtering"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dptest"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/nettest"
-	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dptest"
+	"github.com/signalfx/golib/v3/errors"
+	"github.com/signalfx/golib/v3/nettest"
+	"github.com/signalfx/golib/v3/pointer"
 	. "github.com/smartystreets/goconvey/convey"
 )
 

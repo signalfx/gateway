@@ -1,6 +1,6 @@
 package metricdeconstructor
 
-import "github.com/signalfx/golib/datapoint"
+import "github.com/signalfx/golib/v3/datapoint"
 
 // IdentityMetricDeconstructor returns a zero dimension gauge of a metric
 type IdentityMetricDeconstructor struct {

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
+	signalfxformat "github.com/signalfx/gateway/protocol/signalfx/format"
 	"github.com/signalfx/gohelpers/workarounds"
 	. "github.com/smartystreets/goconvey/convey"
 
@@ -11,9 +12,8 @@ import (
 	"math"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/signalfx/gateway/protocol/signalfx/format"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/pointer"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/pointer"
 )
 
 func TestValueToValue(t *testing.T) {

@@ -3,20 +3,21 @@ package signalfx
 import (
 	"context"
 	"fmt"
-	"github.com/signalfx/golib/datapoint/dpsink"
 	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
 
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+
 	"github.com/gorilla/mux"
 	"github.com/mailru/easyjson"
-	"github.com/signalfx/gateway/protocol/signalfx/format"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/trace"
-	"github.com/signalfx/golib/web"
+	signalfxformat "github.com/signalfx/gateway/protocol/signalfx/format"
+	"github.com/signalfx/golib/v3/errors"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/sfxclient"
+	"github.com/signalfx/golib/v3/trace"
+	"github.com/signalfx/golib/v3/web"
 )
 
 const (
@@ -402,8 +403,7 @@ func (sb *spanBuilder) pullOutSpecialBinaryAnnotations(is *InputSpan) (*trace.En
 		if ba.Value == nil || ba.Key == nil {
 			continue
 		}
-		switch val := (*ba.Value).(type) {
-		case bool:
+		if val, ok := (*ba.Value).(bool); ok {
 			if *ba.Key == "ca" {
 				ca = ba.Endpoint
 			} else if *ba.Key == "sa" {

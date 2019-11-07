@@ -1,12 +1,13 @@
 package protocol
 
 import (
-	"github.com/gorilla/mux"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/sfxclient"
 	"net/http"
 	"sync/atomic"
+
+	"github.com/gorilla/mux"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/sfxclient"
 )
 
 // CloseableHealthCheck is a helper class intended to be used as an anonymous field
