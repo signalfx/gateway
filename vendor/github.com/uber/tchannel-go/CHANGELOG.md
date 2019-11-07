@@ -1,6 +1,29 @@
 Changelog
 =========
 
+## [1.14.0] - 2019-05-20
+### Added
+ * Expose `CallOptions` caller name for transparent proxying (#741)
+
+## [1.13.0] - 2019-04-04
+### Added
+ * Add `MaxCloseTime` which sets a timeout for graceful connection close. (#724)
+
+### Changed
+ * Optimize Thrift string field serialization by eliminating `[]byte(string)` allocation. (#729)
+
+### Fixed
+ * Return an error if transport header keys/values exceed the  maximum allowed string length. (#728)
+
+## [1.12.0] - 2018-11-13
+### Added
+ * Add a channel, `ClosedCh`, to wait for a channel to close. (#718)
+ * Add a Code of Conduct. (#711)
+
+### Changed
+ * Tweak error message when sending a large error to  mention that we're out of space. (#716)
+ * Idle sweeper now skips connections that have pending calls. (#712)
+
 ## [1.11.0] - 2018-06-25
 ### Added
  * thrift: Support health check type in Health endpoint. (#696)
@@ -239,6 +262,9 @@ Changelog
 * Thrift support, including includes.
 
 [//]: # (Version Links)
+[1.14.0]: https://github.com/uber/tchannel-go/compare/v1.13.0...v1.14.0
+[1.13.0]: https://github.com/uber/tchannel-go/compare/v1.12.0...v1.13.0
+[1.12.0]: https://github.com/uber/tchannel-go/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/uber/tchannel-go/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/uber/tchannel-go/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/uber/tchannel-go/compare/v1.8.1...v1.9.0

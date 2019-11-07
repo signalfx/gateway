@@ -27,7 +27,7 @@ import (
 
 	"github.com/uber/tchannel-go/typed"
 
-	"github.com/uber-go/atomic"
+	"go.uber.org/atomic"
 	"golang.org/x/net/context"
 )
 
@@ -50,7 +50,7 @@ const (
 type errNotifier struct {
 	c        chan struct{}
 	err      error
-	notified atomic.Int32
+	notified atomic.Bool
 }
 
 func newErrNotifier() errNotifier {
@@ -65,7 +65,7 @@ func (e *errNotifier) Notify(err error) error {
 	}
 
 	// There may be some sort of race where we try to notify the mex twice.
-	if !e.notified.CAS(0, 1) {
+	if !e.notified.CAS(false, true) {
 		return fmt.Errorf("cannot broadcast error: %v, already have: %v", err, e.err)
 	}
 
@@ -97,8 +97,8 @@ type messageExchange struct {
 	mexset    *messageExchangeSet
 	framePool FramePool
 
-	shutdownAtomic atomic.Uint32
-	errChNotified  atomic.Uint32
+	shutdownAtomic atomic.Bool
+	errChNotified  atomic.Bool
 }
 
 // checkError is called before waiting on the mex channels.
@@ -235,11 +235,11 @@ func (mex *messageExchange) recvPeerFrameOfType(msgType messageType) (*Frame, er
 func (mex *messageExchange) shutdown() {
 	// The reader and writer side can both hit errors and try to shutdown the mex,
 	// so we ensure that it's only shut down once.
-	if !mex.shutdownAtomic.CAS(0, 1) {
+	if !mex.shutdownAtomic.CAS(false, true) {
 		return
 	}
 
-	if mex.errChNotified.CAS(0, 1) {
+	if mex.errChNotified.CAS(false, true) {
 		mex.errCh.Notify(errMexShutdown)
 	}
 
@@ -265,11 +265,10 @@ func (mex *messageExchange) inboundExpired() {
 type messageExchangeSet struct {
 	sync.RWMutex
 
-	log        Logger
-	name       string
-	onRemoved  func()
-	onAdded    func()
-	sendChRefs sync.WaitGroup
+	log       Logger
+	name      string
+	onRemoved func()
+	onAdded   func()
 
 	// maps are mutable, and are protected by the mutex.
 	exchanges        map[uint32]*messageExchange
@@ -298,7 +297,6 @@ func (mexset *messageExchangeSet) addExchange(mex *messageExchange) error {
 	}
 
 	mexset.exchanges[mex.msgID] = mex
-	mexset.sendChRefs.Add(1)
 	return nil
 }
 
@@ -361,8 +359,6 @@ func (mexset *messageExchangeSet) deleteExchange(msgID uint32) (found, timedOut 
 }
 
 // removeExchange removes a message exchange from the set, if it exists.
-// It decrements the sendChRefs wait group, signalling that this exchange no longer has
-// any active goroutines that will try to send to sendCh.
 func (mexset *messageExchangeSet) removeExchange(msgID uint32) {
 	if mexset.log.Enabled(LogLevelDebug) {
 		mexset.log.Debugf("Removing %s message exchange %d", mexset.name, msgID)
@@ -381,13 +377,11 @@ func (mexset *messageExchangeSet) removeExchange(msgID uint32) {
 
 	// If the message exchange was found, then we perform clean up actions.
 	// These clean up actions can only be run once per exchange.
-	mexset.sendChRefs.Done()
 	mexset.onRemoved()
 }
 
-// expireExchange is similar to removeExchange, however it does not decrement
-// the sendChRefs wait group, since there could still be a handler running that
-// will write to the send channel.
+// expireExchange is similar to removeExchange, but it marks the exchange as
+// expired.
 func (mexset *messageExchangeSet) expireExchange(msgID uint32) {
 	mexset.log.Debugf(
 		"Removing %s message exchange %d due to timeout, cancellation or blackhole",
@@ -409,11 +403,6 @@ func (mexset *messageExchangeSet) expireExchange(msgID uint32) {
 	}
 
 	mexset.onRemoved()
-}
-
-// waitForSendCh waits for all goroutines with references to sendCh to complete.
-func (mexset *messageExchangeSet) waitForSendCh() {
-	mexset.sendChRefs.Wait()
 }
 
 func (mexset *messageExchangeSet) count() int {
@@ -496,7 +485,7 @@ func (mexset *messageExchangeSet) stopExchanges(err error) {
 		// on sendChRefs that there's no references to sendCh is violated since
 		// readers/writers could still have a reference to sendCh even though
 		// we shutdown the exchange and called Done on sendChRefs.
-		if mex.errChNotified.CAS(0, 1) {
+		if mex.errChNotified.CAS(false, true) {
 			mex.errCh.Notify(err)
 		}
 	}

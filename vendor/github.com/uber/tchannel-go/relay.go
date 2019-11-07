@@ -29,7 +29,7 @@ import (
 
 	"github.com/uber/tchannel-go/relay"
 
-	"github.com/uber-go/atomic"
+	"go.uber.org/atomic"
 )
 
 const (
@@ -40,6 +40,13 @@ const (
 	_relayTombTTL = 3 * time.Second
 	// _defaultRelayMaxTimeout is the default max TTL for relayed calls.
 	_defaultRelayMaxTimeout = 2 * time.Minute
+)
+
+// Error strings.
+const (
+	_relayErrorNotFound       = "relay-not-found"
+	_relayErrorDestConnSlow   = "relay-dest-conn-slow"
+	_relayErrorSourceConnSlow = "relay-source-conn-slow"
 )
 
 var (
@@ -117,7 +124,6 @@ func (r *relayItems) Delete(id uint32) (relayItem, bool) {
 	}
 	r.Unlock()
 
-	item.timeout.Stop()
 	item.timeout.Release()
 	return item, !item.tomb
 }
@@ -184,10 +190,11 @@ type Relayer struct {
 	// It allows timer re-use, while allowing timers to be created and started separately.
 	timeouts *relayTimerPool
 
-	peers   *RootPeerList
-	conn    *Connection
-	logger  Logger
-	pending atomic.Uint32
+	peers     *RootPeerList
+	conn      *Connection
+	relayConn *relay.Conn
+	logger    Logger
+	pending   atomic.Uint32
 }
 
 // NewRelayer constructs a Relayer.
@@ -200,7 +207,12 @@ func NewRelayer(ch *Channel, conn *Connection) *Relayer {
 		inbound:      newRelayItems(conn.log.WithFields(LogField{"relayItems", "inbound"})),
 		peers:        ch.RootPeers(),
 		conn:         conn,
-		logger:       conn.log,
+		relayConn: &relay.Conn{
+			RemoteAddr:        conn.conn.RemoteAddr().String(),
+			RemoteProcessName: conn.RemotePeerInfo().ProcessName,
+			IsOutbound:        conn.connDirection == outbound,
+		},
+		logger: conn.log,
 	}
 	r.timeouts = newRelayTimerPool(r.timeoutRelayItem, ch.relayTimerVerify)
 	return r
@@ -237,7 +249,7 @@ func (r *Relayer) Receive(f *Frame, fType frameType) (sent bool, failureReason s
 		r.logger.WithFields(
 			LogField{"id", id},
 		).Warn("Received a frame without a RelayItem.")
-		return false, "relay-not-found"
+		return false, _relayErrorNotFound
 	}
 
 	finished := finishesCall(f)
@@ -246,8 +258,11 @@ func (r *Relayer) Receive(f *Frame, fType frameType) (sent bool, failureReason s
 		// TODO: metrics for late-arriving frames.
 		return true, ""
 	}
+
+	// If the call is finished, we stop the timeout to ensure
+	// we don't have concurrent calls to end the call.
 	if finished && !item.timeout.Stop() {
-		// Timeout is firing, so no point proxying this frame
+		// Timeout goroutine is already ending this call.
 		return true, ""
 	}
 
@@ -268,11 +283,18 @@ func (r *Relayer) Receive(f *Frame, fType frameType) (sent bool, failureReason s
 		// Buffer is full, so drop this frame and cancel the call.
 		r.logger.WithFields(
 			LogField{"id", id},
-		).Warn("Dropping call due to slow connection to destination.")
+		).Warn("Dropping call due to slow connection.")
 
 		items := r.receiverItems(fType)
-		r.failRelayItem(items, id, "relay-dest-conn-slow")
-		return false, "relay-dest-conn-slow"
+
+		err := _relayErrorDestConnSlow
+		// If we're dealing with a response frame, then the client is slow.
+		if fType == responseFrame {
+			err = _relayErrorSourceConnSlow
+		}
+
+		r.failRelayItem(items, id, err)
+		return false, err
 	}
 
 	if finished {
@@ -343,7 +365,7 @@ func (r *Relayer) handleCallReq(f lazyCallReq) error {
 		return nil
 	}
 
-	call, err := r.relayHost.Start(f, r.conn)
+	call, err := r.relayHost.Start(f, r.relayConn)
 	if err != nil {
 		// If we have a RateLimitDropError we record the statistic, but
 		// we *don't* send an error frame back to the client.
@@ -440,8 +462,11 @@ func (r *Relayer) handleNonCallReq(f *Frame) error {
 		// TODO: metrics for late-arriving frames.
 		return nil
 	}
+
+	// If the call is finished, we stop the timeout to ensure
+	// we don't have concurrent calls to end the call.
 	if finished && !item.timeout.Stop() {
-		// Timeout is firing, so no point proxying this frame
+		// Timeout goroutine is already ending this call.
 		return nil
 	}
 
@@ -516,7 +541,10 @@ func (r *Relayer) failRelayItem(items *relayItems, id uint32, failure string) {
 		return
 	}
 	if item.call != nil {
-		r.conn.SendSystemError(id, item.span, errFrameNotSent)
+		// If the client is too slow, then there's no point sending an error frame.
+		if failure != _relayErrorSourceConnSlow {
+			r.conn.SendSystemError(id, item.span, errFrameNotSent)
+		}
 		item.call.Failed(failure)
 		item.call.End()
 	}

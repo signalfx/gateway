@@ -1376,16 +1376,10 @@
 			"revisionTime": "2019-01-09T14:27:13Z"
 		},
 		{
-			"checksumSHA1": "/2JFqgFUE7tTkl7l5ydBoiZcZas=",
-			"path": "github.com/uber-go/atomic",
-			"revision": "1ea20fb1cbb1cc08cbd0d913a96dead89aa18289",
-			"revisionTime": "2018-05-01T17:38:09Z"
-		},
-		{
-			"checksumSHA1": "UVbKbWVD3bdxgQsyf2dDv7Ob/8g=",
+			"checksumSHA1": "uTuGjW8leEe+dizBGEHlG92uOMI=",
 			"path": "github.com/uber/tchannel-go",
-			"revision": "7f5c12c66261f3ac3c5dde959d65eed59e3b63af",
-			"revisionTime": "2018-06-25T23:58:32Z"
+			"revision": "58b01ae38cfff68102223e374c580a40c1d91dda",
+			"revisionTime": "2019-05-20T21:26:26Z"
 		},
 		{
 			"checksumSHA1": "DbsGhP/AZ3af1FBcK4H5iN1Pw6c=",
@@ -1394,16 +1388,22 @@
 			"revisionTime": "2018-06-25T23:58:32Z"
 		},
 		{
-			"checksumSHA1": "NzqIA7roD4UC9tiOPzzx0jbpNWM=",
+			"checksumSHA1": "mjUCShNRfNS7NnjubwUyA9OmeR4=",
 			"path": "github.com/uber/tchannel-go/relay",
-			"revision": "7f5c12c66261f3ac3c5dde959d65eed59e3b63af",
-			"revisionTime": "2018-06-25T23:58:32Z"
+			"revision": "58b01ae38cfff68102223e374c580a40c1d91dda",
+			"revisionTime": "2019-05-20T21:26:26Z"
 		},
 		{
 			"checksumSHA1": "wQrlRSEI1BMkIftWKB5KH5V8tjg=",
 			"path": "github.com/uber/tchannel-go/thrift",
 			"revision": "7f5c12c66261f3ac3c5dde959d65eed59e3b63af",
 			"revisionTime": "2018-06-25T23:58:32Z"
+		},
+		{
+			"checksumSHA1": "Hvf4LP/QJ0ih93HCgRA1kICe5P0=",
+			"path": "github.com/uber/tchannel-go/thrift/arg2",
+			"revision": "e6bc214d794a9d6062045dd672de210cf211994d",
+			"revisionTime": "2019-10-14T23:18:41Z"
 		},
 		{
 			"checksumSHA1": "VTeZRY6WypU0K1OTR0uld+ptiIQ=",
@@ -1524,6 +1524,18 @@
 			"revisionTime": "2019-03-19T22:29:04Z"
 		},
 		{
+			"checksumSHA1": "N6OFs/2hIAHvGHKF6nJTtffNgCM=",
+			"path": "golang.org/x/lint",
+			"revision": "16217165b5de779cb6a5e4fc81fa9c1166fda457",
+			"revisionTime": "2019-09-30T21:53:33Z"
+		},
+		{
+			"checksumSHA1": "543dY7RKJCSNiqYONDu1O2aD8s8=",
+			"path": "golang.org/x/lint/golint",
+			"revision": "16217165b5de779cb6a5e4fc81fa9c1166fda457",
+			"revisionTime": "2019-09-30T21:53:33Z"
+		},
+		{
 			"checksumSHA1": "NjyXtXsaf0ulRJn6HQSP1FqGL4A=",
 			"path": "golang.org/x/net/bpf",
 			"revision": "a680a1efc54dd51c040b3b5ce4939ea3cf2ea0d1",
@@ -1642,6 +1654,24 @@
 			"path": "golang.org/x/time/rate",
 			"revision": "9d24e82272b4f38b78bc8cff74fa936d31ccd8ef",
 			"revisionTime": "2019-02-15T22:48:40Z"
+		},
+		{
+			"checksumSHA1": "LHHkpIoYHpQiBc7y0JaTmf3VbVQ=",
+			"path": "golang.org/x/tools/go/ast/astutil",
+			"revision": "f79515f338230420deefba76e168cfd29f52942d",
+			"revisionTime": "2019-10-11T03:06:52Z"
+		},
+		{
+			"checksumSHA1": "PKdfZOiW2rMqjcO1tybN+qXEyAw=",
+			"path": "golang.org/x/tools/go/gcexportdata",
+			"revision": "f79515f338230420deefba76e168cfd29f52942d",
+			"revisionTime": "2019-10-11T03:06:52Z"
+		},
+		{
+			"checksumSHA1": "tT4NXHPdRKJuPVEuHCZRkTVApjY=",
+			"path": "golang.org/x/tools/go/internal/gcimporter",
+			"revision": "f79515f338230420deefba76e168cfd29f52942d",
+			"revisionTime": "2019-10-11T03:06:52Z"
 		},
 		{
 			"checksumSHA1": "B22iMMY2vi1Q9kseWb/ZznpW8lQ=",
