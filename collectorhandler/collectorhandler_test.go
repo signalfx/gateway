@@ -2,10 +2,11 @@ package collectorhandler
 
 import (
 	"errors"
-	"github.com/signalfx/golib/sfxclient"
-	. "github.com/smartystreets/goconvey/convey"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/signalfx/golib/v3/sfxclient"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 func Test(t *testing.T) {

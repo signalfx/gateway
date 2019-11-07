@@ -2,18 +2,6 @@ package prometheus
 
 import (
 	"context"
-	"github.com/gogo/protobuf/proto"
-	"github.com/golang/snappy"
-	"github.com/gorilla/mux"
-	"github.com/prometheus/common/model"
-	"github.com/prometheus/prometheus/prompb"
-	"github.com/signalfx/gateway/protocol"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/web"
 	"io"
 	"io/ioutil"
 	"math"
@@ -22,6 +10,19 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/gogo/protobuf/proto"
+	"github.com/golang/snappy"
+	"github.com/gorilla/mux"
+	"github.com/prometheus/common/model"
+	"github.com/prometheus/prometheus/prompb"
+	"github.com/signalfx/gateway/protocol"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/sfxclient"
+	"github.com/signalfx/golib/v3/web"
 )
 
 // Server is the prometheus server
@@ -137,7 +138,7 @@ func (d *decoder) getDatapoints(ts *prompb.TimeSeries) []*datapoint.Datapoint {
 // ServeHTTPC decodes datapoints for the connection and sends them to the decoder's sink
 func (d *decoder) ServeHTTPC(ctx context.Context, rw http.ResponseWriter, req *http.Request) {
 	start := time.Now()
-	defer d.Bucket.Add(float64(time.Now().Sub(start).Nanoseconds()))
+	defer d.Bucket.Add(float64(time.Since(start).Nanoseconds()))
 	var err error
 	var compressed []byte
 	defer func() {
@@ -229,7 +230,7 @@ func NewListener(sink dpsink.Sink, passedConf *Config) (*Server, error) {
 		fullHandler.Add(web.NextHTTP(metricTracking.ServeHTTP))
 		fullHandler.Add(conf.HTTPChain)
 	}
-	decoder := decoder{
+	sinkDecoder := decoder{
 		SendTo:  sink,
 		Logger:  conf.Logger,
 		readAll: ioutil.ReadAll,
@@ -250,10 +251,10 @@ func NewListener(sink dpsink.Sink, passedConf *Config) (*Server, error) {
 			ReadTimeout:  *conf.Timeout,
 			WriteTimeout: *conf.Timeout,
 		},
-		decoder: &decoder,
+		decoder: &sinkDecoder,
 		collector: sfxclient.NewMultiCollector(
 			metricTracking,
-			&decoder),
+			&sinkDecoder),
 	}
 	listenServer.SetupHealthCheck(conf.HealthCheck, r, conf.Logger)
 	httpHandler := web.NewHandler(conf.StartingContext, listenServer.decoder)

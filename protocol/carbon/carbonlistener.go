@@ -13,15 +13,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+
 	"github.com/signalfx/gateway/logkey"
 	"github.com/signalfx/gateway/protocol"
 	"github.com/signalfx/gateway/protocol/carbon/metricdeconstructor"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/sfxclient"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/errors"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/sfxclient"
 )
 
 // Listener once setup will listen for carbon protocol points to forward on
@@ -143,7 +144,8 @@ func (listener *Listener) handleTCPConnection(ctx context.Context, conn carbonLi
 		}
 		line := strings.TrimSpace(string(bytes))
 		if line != "" {
-			dp, err := NewCarbonDatapoint(line, listener.metricDeconstructor)
+			var dp *datapoint.Datapoint
+			dp, err = NewCarbonDatapoint(line, listener.metricDeconstructor)
 			if err != nil {
 				atomic.AddInt64(&listener.stats.invalidDatapoints, 1)
 				connLogger.Log(logkey.CarbonLine, line, log.Err, err, "Received data on a carbon port, but it doesn't look like carbon data")

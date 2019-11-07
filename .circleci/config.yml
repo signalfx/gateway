@@ -1,151 +1,75 @@
-version: 2.0
+version: 2.1
+
+executors:
+  machine_image:
+    machine:
+      image: ubuntu-1604:201903-01
+
+  go1_13:
+    working_directory: /code
+    docker:
+      - image: golang:1.13.4
+        environment:
+          GOPATH: /go
+          CIRCLE_ARTIFACTS: /tmp/circleci-artifacts
+          CIRCLE_TEST_REPORTS: /tmp/circleci-test-results
+
+commands:
+  go_setup:
+    steps:
+      - checkout
+      - run: mkdir -p $CIRCLE_ARTIFACTS $CIRCLE_TEST_REPORTS
+      - go_mod_download
+  go_mod_download:
+    steps:
+      - restore_cache:
+          key: v1-go-mod-{{ checksum "go.mod" }}-{{ checksum "go.sum" }}
+      - run:
+          name: go mod download
+          command: |
+            [[ -d /go/pkg/mod/cache ]] && exit 0
+            go mod download
+      - save_cache:
+          key: v1-go-mod-{{ checksum "go.mod" }}-{{ checksum "go.sum" }}
+          paths:
+            - /go/pkg/mod
 
 jobs:
-  build:
+  lint:
     resource_class: xlarge
-    working_directory: ~/signalfx/gateway
-    parallelism: 1
-    shell: /bin/bash --login
-
-    environment:
-      CIRCLE_ARTIFACTS: /tmp/circleci-artifacts
-      CIRCLE_TEST_REPORTS: /tmp/circleci-test-results
-      DOCKER_HOST: tcp://localhost:2375
-      DOCKER_PUSH: 1
-
-    docker:
-      - image: circleci/build-image:ubuntu-14.04-XXL-upstart-1189-5614f37
-        command: /bin/bash
-
+    executor: go1_13
     steps:
-      - checkout
+      - go_setup
+      - run: "curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.21.0"
+      - run: golangci-lint run
 
-      - run: mkdir -p $CIRCLE_ARTIFACTS $CIRCLE_TEST_REPORTS
-
-      - setup_remote_docker:
-          docker_layer_caching: true
-
-      - run:
-          working_directory: ~/signalfx/gateway
-          command: echo 'DOCKER_OPTS="${DOCKER_OPTS} -H tcp://127.0.0.1:2375 -H unix:///var/run/docker.sock"' | sudo tee -a /etc/default/docker
-
-      - run:
-          working_directory: ~/signalfx/gateway
-          command: 'docker info >/dev/null 2>&1 || sudo service docker start; '
-
-      - restore_cache:
-          keys:
-          # This branch if available
-            - v1-dep-{{ .Branch }}-
-          # Default branch if not
-            - v1-dep-master-
-          # Any branch if there are none on the default branch - this should be unnecessary if you have your default branch configured correctly
-            - v1-dep-
-
-      - run: ./scripts/circle.sh cache > >(tee $CIRCLE_ARTIFACTS/cache.stdout.txt) 2> >(tee $CIRCLE_ARTIFACTS/cache.stderr.txt >&2)
-
-      # Save dependency cache
-      - save_cache:
-          key: v1-dep-{{ .Branch }}-{{ epoch }}
-          paths:
-          - vendor/bundle
-          - ~/virtualenvs
-          - ~/.ivy2
-          - ~/.bundle
-          - ~/.go_workspace
-          # These cache paths were specified in the 1.0 config
-          - ~/gover
-          - ~/lints
-          - ~/docker_images
-
-      # Test
-      - run: ./scripts/circle.sh test > >(tee $CIRCLE_ARTIFACTS/test.stdout.txt) 2> >(tee $CIRCLE_ARTIFACTS/test.stderr.txt >&2)
-
-      - store_test_results:
-          path: /tmp/circleci-test-results
-      # Save artifacts
-      - store_artifacts:
-          path: /tmp/circleci-artifacts
-      - store_artifacts:
-          path: /tmp/circleci-test-results
+  test:
+    resource_class: xlarge
+    executor: go1_13
+    steps:
+      - go_setup
+      - run: |
+          python -m json.tool < exampleGateway.conf > /dev/null
+          go test -v -covermode atomic -race -timeout 120s -cpu 4 -parallel 8 -coverprofile ./coverage.out ./...
+          ! go tool cover -func coverage.out | grep -v 100.0%
 
   deploy:
-    resource_class: xlarge
-    working_directory: ~/signalfx/gateway
-    parallelism: 1
-    shell: /bin/bash --login
-
+    executor: machine_image
     environment:
-      CIRCLE_ARTIFACTS: /tmp/circleci-artifacts
-      CIRCLE_TEST_REPORTS: /tmp/circleci-test-results
-      DOCKER_HOST: tcp://localhost:2375
       DOCKER_PUSH: 1
-
-    docker:
-      - image: circleci/build-image:ubuntu-14.04-XXL-upstart-1189-5614f37
-        command: /bin/bash
-
     steps:
       - checkout
-
-      - run: mkdir -p $CIRCLE_ARTIFACTS $CIRCLE_TEST_REPORTS
-
       - setup_remote_docker:
           docker_layer_caching: true
-
-      - run:
-          working_directory: ~/signalfx/gateway
-          command: echo 'DOCKER_OPTS="${DOCKER_OPTS} -H tcp://127.0.0.1:2375 -H unix:///var/run/docker.sock"' | sudo tee -a /etc/default/docker
-
-      - run:
-          working_directory: ~/signalfx/gateway
-          command: 'docker info >/dev/null 2>&1 || sudo service docker start; '
-
-      - restore_cache:
-          keys:
-          # This branch if available
-            - v1-dep-{{ .Branch }}-
-          # Default branch if not
-            - v1-dep-master-
-          # Any branch if there are none on the default branch - this should be unnecessary if you have your default branch configured correctly
-            - v1-dep-
-
-      - run: ./scripts/circle.sh cache > >(tee $CIRCLE_ARTIFACTS/cache.stdout.txt) 2> >(tee $CIRCLE_ARTIFACTS/cache.stderr.txt >&2)
-
-      # Save dependency cache
-      - save_cache:
-          key: v1-dep-{{ .Branch }}-{{ epoch }}
-          paths:
-          - vendor/bundle
-          - ~/virtualenvs
-          - ~/.ivy2
-          - ~/.bundle
-          - ~/.go_workspace
-          # These cache paths were specified in the 1.0 config
-          - ~/gover
-          - ~/lints
-          - ~/docker_images
-
-      # Test
-      - run: ./scripts/circle.sh test > >(tee $CIRCLE_ARTIFACTS/test.stdout.txt) 2> >(tee $CIRCLE_ARTIFACTS/test.stderr.txt >&2)
-
-      - store_test_results:
-          path: /tmp/circleci-test-results
-      # Save artifacts
-      - store_artifacts:
-          path: /tmp/circleci-artifacts
-      - store_artifacts:
-          path: /tmp/circleci-test-results
-
       - run: docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS quay.io
-
-      - run: ./scripts/circle.sh deploy > >(tee $CIRCLE_ARTIFACTS/cache.deploy.txt) 2> >(tee $CIRCLE_ARTIFACTS/cache.deploy.txt >&2)
+      - run: ./scripts/deploy.sh
 
 workflows:
   version: 2
   buildtest-and-deploy:
     jobs:
-      - build
+      - lint
+      - test
       - deploy:
           filters:
             branches:

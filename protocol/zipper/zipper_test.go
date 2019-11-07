@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"github.com/signalfx/golib/errors"
-	. "github.com/smartystreets/goconvey/convey"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/signalfx/golib/v3/errors"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 type foo struct {

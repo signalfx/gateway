@@ -6,12 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/coreos/etcd/mvcc/mvccpb"
-	"github.com/signalfx/gateway/protocol/carbon"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/httpdebug"
-	"github.com/signalfx/golib/web"
 	"io"
 	"io/ioutil"
 	"net"
@@ -30,6 +24,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/etcd/mvcc/mvccpb"
+	"github.com/signalfx/gateway/protocol/carbon"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/httpdebug"
+	"github.com/signalfx/golib/v3/web"
+
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/embed"
 	"github.com/signalfx/embetcd/embetcd"
@@ -37,13 +38,13 @@ import (
 	"github.com/signalfx/gateway/flaghelpers"
 	"github.com/signalfx/gateway/protocol/signalfx"
 	_ "github.com/signalfx/go-metrics"
-	"github.com/signalfx/golib/datapoint/dptest"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/nettest"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/timekeeper"
-	"github.com/signalfx/golib/timekeeper/timekeepertest"
+	"github.com/signalfx/golib/v3/datapoint/dptest"
+	"github.com/signalfx/golib/v3/errors"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/nettest"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/timekeeper"
+	"github.com/signalfx/golib/v3/timekeeper/timekeepertest"
 	_ "github.com/signalfx/ondiskencoding"
 	. "github.com/smartystreets/goconvey/convey"
 	_ "github.com/spaolacci/murmur3"
@@ -215,7 +216,7 @@ const emptyConfig = `
   }
 `
 
-const badInnternalMetrics = `
+const badInternalMetrics = `
   {
     "ListenFrom":[
     ],
@@ -387,7 +388,7 @@ func TestConfigs(t *testing.T) {
 		{name: "invalidForwarderConfig", config: invalidForwarderConfig, closeAfterSetup: false, expectedLog: "", expectedErr: "cannot find config unkndfdown"},
 		{name: "invalidDebugAddr", config: invalidDebugServerAddr, closeAfterSetup: false, expectedLog: "", expectedErr: "cannot setup debug server"},
 		{name: "validInternalMetrics", config: internalMetrics, closeAfterSetup: true, expectedLog: "", expectedErr: ""},
-		{name: "invalidInternalMetrics", config: badInnternalMetrics, closeAfterSetup: false, expectedLog: "", expectedErr: "listen tcp: address 999999: invalid port"},
+		{name: "invalidInternalMetrics", config: badInternalMetrics, closeAfterSetup: false, expectedLog: "", expectedErr: "listen tcp: address 999999: invalid port"},
 		{name: "invalidJSON", config: "__INVALID__JSON__", closeAfterSetup: false, expectedLog: "", expectedErr: "cannot unmarshal config JSON"},
 		{name: "invalidListenerConfig", config: invalidListenerConfig, closeAfterSetup: false, expectedLog: "", expectedErr: "cannot setup listeners from configuration"},
 		{name: "invalidPIDfile", config: invalidPIDfile, closeAfterSetup: true, expectedLog: "cannot store pid in pid file", expectedErr: ""},

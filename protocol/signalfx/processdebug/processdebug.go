@@ -2,12 +2,13 @@ package processdebug
 
 import (
 	"context"
+
 	"github.com/opentracing/opentracing-go/ext"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/event"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/trace"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/event"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/trace"
 )
 
 type sink interface {
@@ -44,7 +45,7 @@ func (p *ProcessDebug) AddSpans(ctx context.Context, spans []*trace.Span) error 
 			s.Tags[spTagName] = "1"
 			continue
 		}
-		if s.Tags != nil && "1" == s.Tags[spTagName] {
+		if s.Tags != nil && s.Tags[spTagName] == "1" {
 			s.Debug = pointer.Bool(true)
 		}
 	}

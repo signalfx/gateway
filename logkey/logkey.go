@@ -1,12 +1,6 @@
 package logkey
 
-import "github.com/signalfx/golib/log"
-
-// ignored exists so that I can get some kind of coverage for this package
-func ignored() string {
-	// ignored
-	return ""
-}
+import "github.com/signalfx/golib/v3/log"
 
 var (
 	// Filename is a system file name

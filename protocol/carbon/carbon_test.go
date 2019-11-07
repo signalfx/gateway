@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/signalfx/gateway/protocol/carbon/metricdeconstructor"
-	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/v3/datapoint"
 	"github.com/stretchr/testify/assert"
 )
 

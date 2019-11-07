@@ -20,13 +20,13 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
 	"github.com/signalfx/gateway/logkey"
-	"github.com/signalfx/gateway/protocol/signalfx/format"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/web"
+	signalfxformat "github.com/signalfx/gateway/protocol/signalfx/format"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/errors"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/sfxclient"
+	"github.com/signalfx/golib/v3/web"
 )
 
 // JSONDatapointV1 is an alias

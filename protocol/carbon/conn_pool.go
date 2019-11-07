@@ -1,12 +1,13 @@
 package carbon
 
 import (
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/sfxclient"
 	"net"
 	"sync"
 	"sync/atomic"
+
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/errors"
+	"github.com/signalfx/golib/v3/sfxclient"
 )
 
 // connPool pools connections for reuse

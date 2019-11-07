@@ -2,13 +2,14 @@ package processdebug
 
 import (
 	"context"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/event"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/trace"
+	"testing"
+
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/event"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/trace"
 	"github.com/smartystreets/assertions"
 	. "github.com/smartystreets/goconvey/convey"
-	"testing"
 )
 
 type end struct {

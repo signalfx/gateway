@@ -12,8 +12,8 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 	jThrift "github.com/jaegertracing/jaeger/thrift-gen/jaeger"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/trace"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/trace"
 	. "github.com/smartystreets/goconvey/convey"
 )
 

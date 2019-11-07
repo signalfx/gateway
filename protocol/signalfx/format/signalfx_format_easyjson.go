@@ -8,7 +8,7 @@ import (
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
-	trace "github.com/signalfx/golib/trace"
+	trace "github.com/signalfx/golib/v3/trace"
 )
 
 // suppress unused package warning

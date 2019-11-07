@@ -9,13 +9,13 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/mailru/easyjson"
 	"github.com/signalfx/com_signalfx_metrics_protobuf"
-	"github.com/signalfx/gateway/protocol/signalfx/format"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/event"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/web"
+	signalfxformat "github.com/signalfx/gateway/protocol/signalfx/format"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/event"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/sfxclient"
+	"github.com/signalfx/golib/v3/web"
 )
 
 // ProtobufEventDecoderV2 decodes protocol buffers in signalfx's v2 format and sends them to Sink

@@ -5,7 +5,6 @@ import (
 	"expvar"
 	"flag"
 	"fmt"
-	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"io/ioutil"
 	"net"
@@ -18,6 +17,10 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"gopkg.in/natefinch/lumberjack.v2"
+
+	_ "net/http/pprof"
 
 	etcdcli "github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/embed"
@@ -34,22 +37,21 @@ import (
 	"github.com/signalfx/gateway/protocol/signalfx"
 	_ "github.com/signalfx/go-distribute"
 	_ "github.com/signalfx/go-metrics"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/eventcounter"
-	"github.com/signalfx/golib/httpdebug"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/reportsha"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/timekeeper"
-	"github.com/signalfx/golib/trace"
-	"github.com/signalfx/golib/web"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/errors"
+	"github.com/signalfx/golib/v3/eventcounter"
+	"github.com/signalfx/golib/v3/httpdebug"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/reportsha"
+	"github.com/signalfx/golib/v3/sfxclient"
+	"github.com/signalfx/golib/v3/timekeeper"
+	"github.com/signalfx/golib/v3/trace"
+	"github.com/signalfx/golib/v3/web"
 	_ "github.com/signalfx/ondiskencoding"
 	_ "github.com/signalfx/tdigest"
 	_ "github.com/spaolacci/murmur3"
-	_ "net/http/pprof"
 	_ "stathat.com/c/consistent"
 )
 
@@ -172,7 +174,7 @@ func forwarderName(f *config.ForwardTo) string {
 
 var errDupeForwarder = errors.New("cannot duplicate forwarder names or types without names")
 
-func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, debugMetricsScheduler *sfxclient.Scheduler, metricsScheduler *sfxclient.Scheduler, Checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, etcdServer *embetcd.Server, etcdClient *embetcd.Client) ([]protocol.Forwarder, error) {
+func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *config.Loader, loadedConfig *config.GatewayConfig, logger log.Logger, debugMetricsScheduler *sfxclient.Scheduler, metricsScheduler *sfxclient.Scheduler, checker *dpsink.ItemFlagger, cdim *log.CtxDimensions, etcdServer *embetcd.Server, etcdClient *embetcd.Client) ([]protocol.Forwarder, error) {
 	allForwarders := make([]protocol.Forwarder, 0, len(loadedConfig.ForwardTo))
 	nameMap := make(map[string]bool)
 	for idx, forwardConfig := range loadedConfig.ForwardTo {
@@ -208,7 +210,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 		count := signalfx.UnifyNextSinkWrap(dcount)
 		endingSink := signalfx.FromChain(forwarder, signalfx.NextWrap(count))
 		bconf := &dpbuffered.Config{
-			Checker:            Checker,
+			Checker:            checker,
 			BufferSize:         forwardConfig.BufferSize,
 			MaxTotalDatapoints: forwardConfig.BufferSize,
 			MaxTotalEvents:     forwardConfig.BufferSize,
@@ -264,7 +266,7 @@ func setupListeners(tk timekeeper.TimeKeeper, hostname string, loadedConfig *con
 			return listenConfig.Type
 		}()
 		if nameMap[name] {
-			logger.Log(fmt.Sprintf("Cannot add two listeners with name '%s' or two unnamed listners of same type", name))
+			logger.Log(fmt.Sprintf("Cannot add two listeners with name '%s' or two unnamed listeners of same type", name))
 			return nil, errDupeListener
 		}
 		nameMap[name] = true
@@ -947,9 +949,9 @@ func (p *gateway) start(ctx context.Context) error {
 		stopSchedulers := p.scheduleStatCollection(ctx, schedulers, multiplexer)
 
 		// setup the internal metrics server
-		if err := p.setupInternalMetricsServer(p.config, p.logger, schedulers); err != nil {
-			p.logger.Log(log.Err, "internal metrics server failed", err)
-			return err
+		if err2 := p.setupInternalMetricsServer(p.config, p.logger, schedulers); err2 != nil {
+			p.logger.Log(log.Err, "internal metrics server failed", err2)
+			return err2
 		}
 
 		// wait for setup to complete

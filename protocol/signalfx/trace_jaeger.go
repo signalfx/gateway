@@ -6,22 +6,23 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"github.com/signalfx/golib/datapoint/dpsink"
 	"io"
 	"net"
 	"net/http"
 	"strconv"
 	"sync"
 
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/gorilla/mux"
 	jThrift "github.com/jaegertracing/jaeger/thrift-gen/jaeger"
 	"github.com/opentracing/opentracing-go/ext"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/trace"
-	"github.com/signalfx/golib/web"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/sfxclient"
+	"github.com/signalfx/golib/v3/trace"
+	"github.com/signalfx/golib/v3/web"
 )
 
 // JaegerThriftTraceDecoderV1 decodes Jaeger thrift spans to structs

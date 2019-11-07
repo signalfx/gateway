@@ -3,7 +3,7 @@ package signalfxformat
 import (
 	"fmt"
 
-	"github.com/signalfx/golib/trace"
+	"github.com/signalfx/golib/v3/trace"
 )
 
 // JSONDatapointV1 is the JSON API format for /v1/datapoint
@@ -68,7 +68,7 @@ func (a *InputAnnotation) ToV2() *trace.Annotation {
 	}
 }
 
-// GetpointerToInt64 does that
+// GetPointerToInt64 does that
 func GetPointerToInt64(p *float64) *int64 {
 	if p == nil {
 		return nil

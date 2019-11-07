@@ -2,18 +2,19 @@ package config
 
 import (
 	"context"
-	"github.com/signalfx/gateway/protocol/carbon"
-	"github.com/signalfx/gateway/sampling"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/datapoint/dptest"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/nettest"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/web"
-	. "github.com/smartystreets/goconvey/convey"
 	"os"
 	"testing"
+
+	"github.com/signalfx/gateway/protocol/carbon"
+	"github.com/signalfx/gateway/sampling"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/datapoint/dptest"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/nettest"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/web"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 func getLoader() *Loader {

@@ -1,15 +1,17 @@
 package protocol
 
 import (
-	"github.com/signalfx/golib/datapoint"
 	"io"
 
+	"github.com/signalfx/golib/v3/datapoint"
+
 	"context"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/event"
-	"github.com/signalfx/golib/sfxclient"
-	"github.com/signalfx/golib/trace"
 	"net/http"
+
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/event"
+	"github.com/signalfx/golib/v3/sfxclient"
+	"github.com/signalfx/golib/v3/trace"
 )
 
 // DatapointForwarder can send datapoints and not events

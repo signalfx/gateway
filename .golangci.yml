@@ -1,0 +1,105 @@
+run:
+  deadline: 1m
+  tests: false
+  skip-dirs:
+  skip-files:
+    - ".*\\.pb\\.go"
+    - ".*\\.gen\\.go"
+  modules-download-mode: readonly
+
+issues:
+  # Independently from option `exclude` we use default exclude patterns,
+  # it can be disabled by this option. To list all
+  # excluded by default patterns execute `golangci-lint run --help`.
+  # Default value for this option is true.
+  exclude-use-default: false
+  exclude:
+    - package
+
+linters-settings:
+  govet:
+    check-shadowing: true
+  golint:
+    min-confidence: 0.3
+  gocyclo:
+    min-complexity: 10
+  maligned:
+    suggest-new: true
+  gofmt:
+    # simplify code: gofmt with `-s` option, true by default
+    simplify: true
+  # settings per analyzer
+  settings:
+    printf: # analyzer name, run `go tool vet help` to see all analyzers
+      funcs: # run `go tool vet help printf` to see available settings for `printf` analyzer
+      - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
+      - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
+      - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
+      - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
+  enabled-tags:
+    - performance
+  gocritic:
+    # Which checks should be enabled; can't be combined with 'disabled-checks';
+    # See https://go-critic.github.io/overview#checks-overview
+    # To check which checks are enabled run `GL_DEBUG=gocritic golangci-lint run`
+    # By default list of stable checks is used.
+    # Which checks should be disabled; can't be combined with 'enabled-checks'; default is empty
+    disabled-checks:
+      - regexpMust
+      - ifElseChain
+      - elseif
+      - unlambda
+
+    # Enable multiple checks by tags, run `GL_DEBUG=gocritic golangci-lint run` to see all tags and checks.
+    # Empty list by default. See https://github.com/go-critic/go-critic#usage -> section "Tags".
+    enabled-tags:
+      - performance
+
+    settings: # settings passed to gocritic
+      captLocal: # must be valid enabled check name
+        paramsOnly: true
+      rangeValCopy:
+        sizeThreshold: 64
+  unparam:
+    # Inspect exported functions, default is false. Set to true if no external program/library imports your code.
+    # XXX: if you enable this setting, un-param will report a lot of false-positives in text editors:
+    # if it's called for subdir of a project it can't find external interfaces. All text editor integrations
+    # with golangci-lint call it on a directory with the changed file.
+    check-exported: false
+  godox:
+    # report any comments starting with keywords, this is useful for TODO or FIXME comments that
+    # might be left in the code accidentally and should be resolved before merging
+    keywords: # default keywords are TODO, BUG, and FIXME, these can be overwritten by this setting
+    - OPTIMIZE # marks code that should be optimized before merging
+    - HACK # marks hack-arounds that should be removed before merging
+  funlen:
+    lines: 500 # TODO: need to set this to 150 statements and work on it
+    statements: 150
+
+linters:
+  enable-all: true
+  disable:
+    - lll
+    - prealloc
+    - gochecknoinits
+    - gochecknoglobals
+    - errcheck
+    - unparam
+    - gosec
+    - interfacer
+    - dupl
+    # TODO: need to enable this two for better coding guidelines in terms of space between condition
+    - whitespace
+    - wsl
+  fast: true
+
+# output configuration options
+output:
+  # colored-line-number|line-number|json|tab|checkstyle|code-climate, default is "colored-line-number"
+  format: colored-line-number
+
+  # print lines of code with issue, default is true
+  print-issued-lines: true
+
+  # print linter name in the end of issue text, default is true
+  print-linter-name: true

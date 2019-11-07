@@ -4,16 +4,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dptest"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/web"
-	. "github.com/smartystreets/goconvey/convey"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dptest"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/web"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 const testCollectdBody = `[

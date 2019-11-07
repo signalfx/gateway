@@ -1,10 +1,11 @@
 package filtering
 
 import (
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/sfxclient"
 	"regexp"
 	"sync/atomic"
+
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/sfxclient"
 )
 
 // FilteredForwarder is a struct to hold the filtering logic

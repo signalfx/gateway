@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+
 	"github.com/signalfx/gateway/protocol"
 	"github.com/signalfx/gateway/protocol/carbon"
 	"github.com/signalfx/gateway/protocol/carbon/metricdeconstructor"
@@ -10,12 +11,12 @@ import (
 	"github.com/signalfx/gateway/protocol/prometheus"
 	"github.com/signalfx/gateway/protocol/signalfx"
 	"github.com/signalfx/gateway/protocol/wavefront"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/web"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/errors"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/web"
 )
 
 type forwarderLoader interface {

@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/signalfx/golib/datapoint"
+	"strings"
+
+	"github.com/signalfx/golib/v3/datapoint"
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/assert"
-	"strings"
 )
 
 var validConfig = `{

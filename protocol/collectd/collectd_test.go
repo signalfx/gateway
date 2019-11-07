@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/signalfx/gohelpers/workarounds"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/stretchr/testify/assert"
 	"math"
 	"math/rand"
 	"strconv"
+
+	"github.com/signalfx/gohelpers/workarounds"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/stretchr/testify/assert"
 )
 
 const testDecodeCollectdBody = `[

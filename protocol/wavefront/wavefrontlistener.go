@@ -3,15 +3,6 @@ package wavefront
 import (
 	"bufio"
 	"context"
-	"github.com/signalfx/gateway/logkey"
-	"github.com/signalfx/gateway/protocol"
-	"github.com/signalfx/gateway/protocol/collectd"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/datapoint/dpsink"
-	"github.com/signalfx/golib/errors"
-	"github.com/signalfx/golib/log"
-	"github.com/signalfx/golib/pointer"
-	"github.com/signalfx/golib/sfxclient"
 	"io"
 	"net"
 	"strconv"
@@ -20,6 +11,16 @@ import (
 	"sync/atomic"
 	"time"
 	"unicode"
+
+	"github.com/signalfx/gateway/logkey"
+	"github.com/signalfx/gateway/protocol"
+	"github.com/signalfx/gateway/protocol/collectd"
+	"github.com/signalfx/golib/v3/datapoint"
+	"github.com/signalfx/golib/v3/datapoint/dpsink"
+	"github.com/signalfx/golib/v3/errors"
+	"github.com/signalfx/golib/v3/log"
+	"github.com/signalfx/golib/v3/pointer"
+	"github.com/signalfx/golib/v3/sfxclient"
 )
 
 // Listener once setup will listen for wavefront protocol points to forward on
@@ -118,7 +119,7 @@ func extractCollectdDimensions(doit bool, metricName string) (string, map[string
 	}
 }
 
-// i always wonder about passing strings around and if it's worth it to use thier address
+// i always wonder about passing strings around and if it's worth it to use their address
 // TODO write a benchmark to test performance and garbage generation here
 func stripQuotes(s string) string {
 	if s[0] == '"' {

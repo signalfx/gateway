@@ -3,7 +3,7 @@ package metricdeconstructor
 import (
 	"fmt"
 
-	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/v3/datapoint"
 )
 
 // MetricDeconstructor is an object that can deconstruct a single metric name into what dimensions

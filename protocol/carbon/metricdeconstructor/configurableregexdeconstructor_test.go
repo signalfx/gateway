@@ -2,11 +2,12 @@ package metricdeconstructor
 
 import (
 	"encoding/json"
-	"github.com/signalfx/golib/datapoint"
-	. "github.com/smartystreets/goconvey/convey"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+
+	"github.com/signalfx/golib/v3/datapoint"
+	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
 )
 
 var validRegexConfig = `{
