@@ -2,9 +2,9 @@
 set -ex
 
 CIRCLEUTIL_TAG="v1.41"
-DEFAULT_GOLANG_VERSION="1.11.5"
+DEFAULT_GOLANG_VERSION="1.13.4"
 
-export GOLANG_VERSION="1.11.5"
+export GOLANG_VERSION="1.13.4"
 export GOROOT="$HOME/go_circle"
 export GOPATH="$HOME/.go_circle"
 export GOPATH_INTO="$HOME/lints"
