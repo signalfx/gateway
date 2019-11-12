@@ -22,6 +22,10 @@ import (
 const (
 	// DefaultTracePathV1 is the default listen path
 	DefaultTracePathV1 = "/v1/trace"
+	// ZipkinTracePathV1 adds /api/v1/spans endpoint
+	ZipkinTracePathV1 = "/api/v1/spans"
+	// ZipkinTracePathV2 adds /api/vw/spans endpoint
+	ZipkinTracePathV2 = "/api/v2/spans"
 	// ZipkinV1 is a constant used for protocol naming
 	ZipkinV1 = "zipkin_json_v1"
 )
@@ -595,6 +599,6 @@ func setupJSONTraceV1(ctx context.Context, r *mux.Router, sink Sink, logger log.
 	handler, st := SetupChain(ctx, sink, ZipkinV1, func(s Sink) ErrorReader {
 		return &JSONTraceDecoderV1{Logger: logger, Sink: sink}
 	}, httpChain, logger, counter)
-	SetupJSONByPaths(r, handler, DefaultTracePathV1)
+	SetupJSONByPathsN(r, handler, DefaultTracePathV1, ZipkinTracePathV1, ZipkinTracePathV2)
 	return st
 }
