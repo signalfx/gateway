@@ -334,6 +334,14 @@ func SetupJSONByPaths(r *mux.Router, handler http.Handler, endpoint string) {
 	r.Path(endpoint).Methods("POST").Handler(handler)
 }
 
+// SetupJSONByPathsN tells the router which paths the given handler (which should handle the given
+// endpoint) should see
+func SetupJSONByPathsN(r *mux.Router, handler http.Handler, endpoints ...string) {
+	for _, endpoint := range endpoints {
+		SetupJSONByPaths(r, handler, endpoint)
+	}
+}
+
 func setupCollectd(ctx context.Context, r *mux.Router, sink dpsink.Sink, debugContext *web.HeaderCtxFlag, httpChain web.NextConstructor, logger log.Logger, counter *dpsink.Counter) sfxclient.Collector {
 	finalSink := dpsink.FromChain(sink, dpsink.NextWrap(counter))
 	decoder := collectd.JSONDecoder{
