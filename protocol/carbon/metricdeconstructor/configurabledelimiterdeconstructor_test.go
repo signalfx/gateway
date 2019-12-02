@@ -254,7 +254,7 @@ func TestFallbackNil(t *testing.T) {
 			_, _, _, err = m.Parse("one.two.three.four.five.six.seven")
 			Convey("should parse giving an error", func() {
 				So(err, ShouldNotBeNil)
-				So(err.Error(), ShouldEqual, "nilDeconstructor always returns an error")
+				So(err, ShouldEqual, SkipMetricErr)
 			})
 		})
 	})
