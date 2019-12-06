@@ -73,10 +73,6 @@ func TestCarbonForwarderNormal(t *testing.T) {
 		l, err := net.Listen("tcp", "127.0.0.1:0")
 		So(err, ShouldBeNil)
 
-		Convey("Using nil deconstructor skips message", func() {
-
-		})
-
 		Convey("Invalid regexes should cause an error", func() {
 			forwardConfig := &ForwarderConfig{
 				Port:    pointer.Uint16(nettest.TCPPort(l)),
@@ -279,7 +275,7 @@ func TestCarbonListenerNormalTCP(t *testing.T) {
 		})
 	})
 
-	Convey("using nil deconstrutor skips message", t, func() {
+	Convey("using nil deconstructor skips message", t, func() {
 		listenFrom := &ListenerConfig{
 			ListenAddr:          pointer.String("127.0.0.1:0"),
 			MetricDeconstructor: &metricdeconstructor.NilDeconstructor{},
@@ -298,6 +294,8 @@ func TestCarbonListenerNormalTCP(t *testing.T) {
 		for atomic.LoadInt64(&listener.stats.skippedDatapoints) != 1 {
 			time.Sleep(time.Millisecond)
 		}
+
+		So(listener.Close(), ShouldBeNil)
 	})
 }
 
@@ -407,7 +405,7 @@ func TestCarbonListenerNormalUDP(t *testing.T) {
 		})
 	})
 
-	Convey("using nil deconstrutor skips message", t, func() {
+	Convey("using nil deconstructor skips message", t, func() {
 		listenFrom := &ListenerConfig{
 			ListenAddr:          pointer.String("127.0.0.1:0"),
 			Protocol:            pointer.String("udp"),
@@ -425,6 +423,8 @@ func TestCarbonListenerNormalUDP(t *testing.T) {
 		for atomic.LoadInt64(&listener.stats.skippedDatapoints) != 1 {
 			time.Sleep(time.Millisecond)
 		}
+
+		So(listener.Close(), ShouldBeNil)
 	})
 }
 
