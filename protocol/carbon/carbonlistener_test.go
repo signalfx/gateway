@@ -3,6 +3,7 @@ package carbon
 import (
 	"context"
 	"fmt"
+	"github.com/signalfx/gateway/protocol/carbon/metricdeconstructor"
 	"io"
 	"net"
 	"sync/atomic"
@@ -71,6 +72,10 @@ func TestCarbonForwarderNormal(t *testing.T) {
 	Convey("A do nothing port", t, func() {
 		l, err := net.Listen("tcp", "127.0.0.1:0")
 		So(err, ShouldBeNil)
+
+		Convey("Using nil deconstructor skips message", func() {
+
+		})
 
 		Convey("Invalid regexes should cause an error", func() {
 			forwardConfig := &ForwarderConfig{
@@ -273,6 +278,27 @@ func TestCarbonListenerNormalTCP(t *testing.T) {
 			So(listener.Close(), ShouldBeNil)
 		})
 	})
+
+	Convey("using nil deconstrutor skips message", t, func() {
+		listenFrom := &ListenerConfig{
+			ListenAddr:          pointer.String("127.0.0.1:0"),
+			MetricDeconstructor: &metricdeconstructor.NilDeconstructor{},
+		}
+		sendTo := dptest.NewBasicSink()
+		listener, err := NewListener(sendTo, listenFrom)
+		So(err, ShouldBeNil)
+
+		connAddr := fmt.Sprintf("127.0.0.1:%d", nettest.TCPPort(listener))
+		s, err := net.Dial("tcp", connAddr)
+		So(err, ShouldBeNil)
+		_, err = io.WriteString(s, "dice.roll 3 3\n")
+		So(err, ShouldBeNil)
+		So(s.Close(), ShouldBeNil)
+
+		for atomic.LoadInt64(&listener.stats.skippedDatapoints) != 1 {
+			time.Sleep(time.Millisecond)
+		}
+	})
 }
 
 func TestCarbonListenerNormalUDP(t *testing.T) {
@@ -379,6 +405,26 @@ func TestCarbonListenerNormalUDP(t *testing.T) {
 		Reset(func() {
 			So(listener.Close(), ShouldBeNil)
 		})
+	})
+
+	Convey("using nil deconstrutor skips message", t, func() {
+		listenFrom := &ListenerConfig{
+			ListenAddr:          pointer.String("127.0.0.1:0"),
+			Protocol:            pointer.String("udp"),
+			MetricDeconstructor: &metricdeconstructor.NilDeconstructor{},
+		}
+		sendTo := dptest.NewBasicSink()
+		listener, err := NewListener(sendTo, listenFrom)
+		So(err, ShouldBeNil)
+
+		s, err := net.DialUDP("udp", nil, listener.Addr().(*net.UDPAddr))
+		So(err, ShouldBeNil)
+		_, err = io.WriteString(s, "dice.roll 3 3\n")
+		So(err, ShouldBeNil)
+
+		for atomic.LoadInt64(&listener.stats.skippedDatapoints) != 1 {
+			time.Sleep(time.Millisecond)
+		}
 	})
 }
 

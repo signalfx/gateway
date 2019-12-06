@@ -43,6 +43,7 @@ var _ protocol.Listener = &Listener{}
 
 type listenerStats struct {
 	totalDatapoints     int64
+	skippedDatapoints   int64
 	idleTimeouts        int64
 	retriedListenErrors int64
 	totalEOFCloses      int64
@@ -119,6 +120,7 @@ func (listener *Listener) handleUDPConnection(ctx context.Context, addr *net.UDP
 				}
 
 				if dp == nil {
+					atomic.AddInt64(&listener.stats.skippedDatapoints, 1)
 					continue
 				}
 
@@ -156,6 +158,7 @@ func (listener *Listener) handleTCPConnection(ctx context.Context, conn carbonLi
 				continue
 			}
 			if dp == nil {
+				atomic.AddInt64(&listener.stats.skippedDatapoints, 1)
 				continue
 			}
 			log.IfErr(connLogger, listener.sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp}))

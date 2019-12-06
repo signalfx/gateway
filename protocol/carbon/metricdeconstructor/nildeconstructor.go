@@ -7,13 +7,13 @@ import (
 
 var SkipMetricErr = errors.New("skip metric")
 
-type nilDeconstructor struct{}
+type NilDeconstructor struct{}
 
 // Parse always returns an error
-func (m *nilDeconstructor) Parse(originalMetric string) (string, datapoint.MetricType, map[string]string, error) {
+func (m *NilDeconstructor) Parse(originalMetric string) (string, datapoint.MetricType, map[string]string, error) {
 	return "", datapoint.Gauge, nil, SkipMetricErr
 }
 
 func nilLoader(options string) (MetricDeconstructor, error) {
-	return &nilDeconstructor{}, nil
+	return &NilDeconstructor{}, nil
 }
