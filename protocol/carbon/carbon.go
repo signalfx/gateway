@@ -38,7 +38,7 @@ func NewCarbonDatapoint(line string, metricDeconstructor metricdeconstructor.Met
 	originalMetricName := parts[0]
 	metricName, mtype, dimensions, err := metricDeconstructor.Parse(originalMetricName)
 
-	if err == metricdeconstructor.SkipMetricErr {
+	if err == metricdeconstructor.ErrSkipMetric {
 		return nil, nil
 	}
 	if err != nil {
