@@ -43,6 +43,7 @@ var _ protocol.Listener = &Listener{}
 
 type listenerStats struct {
 	totalDatapoints     int64
+	skippedDatapoints   int64
 	idleTimeouts        int64
 	retriedListenErrors int64
 	totalEOFCloses      int64
@@ -111,11 +112,18 @@ func (listener *Listener) handleUDPConnection(ctx context.Context, addr *net.UDP
 			line := strings.TrimSpace(string(bytes))
 			if line != "" {
 				dp, err := NewCarbonDatapoint(line, listener.metricDeconstructor)
+
 				if err != nil {
 					atomic.AddInt64(&listener.stats.invalidDatapoints, 1)
 					connLogger.Log(logkey.CarbonLine, line, log.Err, err, "Received data on a carbon udp port, but it doesn't look like carbon data")
-					return err
+					continue
 				}
+
+				if dp == nil {
+					atomic.AddInt64(&listener.stats.skippedDatapoints, 1)
+					continue
+				}
+
 				log.IfErr(connLogger, listener.sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp}))
 				atomic.AddInt64(&listener.stats.totalDatapoints, 1)
 			}
@@ -147,7 +155,11 @@ func (listener *Listener) handleTCPConnection(ctx context.Context, conn carbonLi
 			if err != nil {
 				atomic.AddInt64(&listener.stats.invalidDatapoints, 1)
 				connLogger.Log(logkey.CarbonLine, line, log.Err, err, "Received data on a carbon port, but it doesn't look like carbon data")
-				return err
+				continue
+			}
+			if dp == nil {
+				atomic.AddInt64(&listener.stats.skippedDatapoints, 1)
+				continue
 			}
 			log.IfErr(connLogger, listener.sink.AddDatapoints(ctx, []*datapoint.Datapoint{dp}))
 			atomic.AddInt64(&listener.stats.totalDatapoints, 1)

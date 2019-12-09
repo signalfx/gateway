@@ -3,6 +3,7 @@ package carbon
 import (
 	"context"
 	"fmt"
+	"github.com/signalfx/gateway/protocol/carbon/metricdeconstructor"
 	"io"
 	"net"
 	"sync/atomic"
@@ -143,6 +144,28 @@ func TestCarbonListenerNormalTCP(t *testing.T) {
 		sendTo := dptest.NewBasicSink()
 		listener, err := NewListener(sendTo, listenFrom)
 		So(err, ShouldBeNil)
+
+		Convey("sending invalid datapoint with a valid datapoint still emits valid datapoint", func() {
+			connAddr := fmt.Sprintf("127.0.0.1:%d", nettest.TCPPort(listener))
+			s, err := net.Dial("tcp", connAddr)
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(s, "hello world bob\ndice.roll 3 3\n")
+			So(err, ShouldBeNil)
+			So(s.Close(), ShouldBeNil)
+
+			// Check valid datapoint came through.
+			m := sendTo.Next()
+			So(m.Metric, ShouldEqual, "dice.roll")
+			So(m.Value.String(), ShouldEqual, "3")
+
+			for atomic.LoadInt64(&listener.stats.invalidDatapoints) == 0 {
+				time.Sleep(time.Millisecond)
+			}
+
+			// Check invalid atapoint was processed.
+			dps := listener.Datapoints()
+			So(dptest.ExactlyOne(dps, "invalid_datapoints").Value.String(), ShouldEqual, "1")
+		})
 		Convey("should eventually time out idle connections", func() {
 			listenFrom.ConnectionTimeout = pointer.Duration(time.Millisecond)
 			listenFrom.ServerAcceptDeadline = pointer.Duration(time.Millisecond)
@@ -251,6 +274,29 @@ func TestCarbonListenerNormalTCP(t *testing.T) {
 			So(listener.Close(), ShouldBeNil)
 		})
 	})
+
+	Convey("using nil deconstructor skips message", t, func() {
+		listenFrom := &ListenerConfig{
+			ListenAddr:          pointer.String("127.0.0.1:0"),
+			MetricDeconstructor: &metricdeconstructor.NilDeconstructor{},
+		}
+		sendTo := dptest.NewBasicSink()
+		listener, err := NewListener(sendTo, listenFrom)
+		So(err, ShouldBeNil)
+
+		connAddr := fmt.Sprintf("127.0.0.1:%d", nettest.TCPPort(listener))
+		s, err := net.Dial("tcp", connAddr)
+		So(err, ShouldBeNil)
+		_, err = io.WriteString(s, "dice.roll 3 3\n")
+		So(err, ShouldBeNil)
+		So(s.Close(), ShouldBeNil)
+
+		for atomic.LoadInt64(&listener.stats.skippedDatapoints) != 1 {
+			time.Sleep(time.Millisecond)
+		}
+
+		So(listener.Close(), ShouldBeNil)
+	})
 }
 
 func TestCarbonListenerNormalUDP(t *testing.T) {
@@ -263,6 +309,27 @@ func TestCarbonListenerNormalUDP(t *testing.T) {
 		listener, err := NewListener(sendTo, listenFrom)
 		So(err, ShouldBeNil)
 
+		Convey("sending invalid datapoint with a valid datapoint still emits valid datapoint", func() {
+			connAddr := fmt.Sprintf("127.0.0.1:%d", (uint16)(listener.Addr().(*net.UDPAddr).Port))
+			s, err := net.Dial("udp", connAddr)
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(s, "hello world bob\ndice.roll 3 3\n")
+			So(err, ShouldBeNil)
+			So(s.Close(), ShouldBeNil)
+
+			// Check valid datapoint came through.
+			m := sendTo.Next()
+			So(m.Metric, ShouldEqual, "dice.roll")
+			So(m.Value.String(), ShouldEqual, "3")
+
+			for atomic.LoadInt64(&listener.stats.invalidDatapoints) == 0 {
+				time.Sleep(time.Millisecond)
+			}
+
+			// Check invalid atapoint was processed.
+			dps := listener.Datapoints()
+			So(dptest.ExactlyOne(dps, "invalid_datapoints").Value.String(), ShouldEqual, "1")
+		})
 		Convey("should error invalid lines", func() {
 			dps := listener.Datapoints()
 			So(dptest.ExactlyOne(dps, "invalid_datapoints").Value.String(), ShouldEqual, "0")
@@ -336,6 +403,28 @@ func TestCarbonListenerNormalUDP(t *testing.T) {
 		Reset(func() {
 			So(listener.Close(), ShouldBeNil)
 		})
+	})
+
+	Convey("using nil deconstructor skips message", t, func() {
+		listenFrom := &ListenerConfig{
+			ListenAddr:          pointer.String("127.0.0.1:0"),
+			Protocol:            pointer.String("udp"),
+			MetricDeconstructor: &metricdeconstructor.NilDeconstructor{},
+		}
+		sendTo := dptest.NewBasicSink()
+		listener, err := NewListener(sendTo, listenFrom)
+		So(err, ShouldBeNil)
+
+		s, err := net.DialUDP("udp", nil, listener.Addr().(*net.UDPAddr))
+		So(err, ShouldBeNil)
+		_, err = io.WriteString(s, "dice.roll 3 3\n")
+		So(err, ShouldBeNil)
+
+		for atomic.LoadInt64(&listener.stats.skippedDatapoints) != 1 {
+			time.Sleep(time.Millisecond)
+		}
+
+		So(listener.Close(), ShouldBeNil)
 	})
 }
 
