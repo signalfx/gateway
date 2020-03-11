@@ -3,13 +3,14 @@ package sampling
 import (
 	"context"
 
+	"net/http"
+
 	"github.com/signalfx/gateway/etcdIntf"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
-	"net/http"
 )
 
 // SmartSampleConfig is not here
@@ -19,6 +20,7 @@ type SmartSampleConfig struct {
 	AdditionalDimensions map[string]string `json:",omitempty"`
 	ClusterName          *string           `json:"-"`
 	Distributor          *bool             `json:"-"`
+	Idx                  int               `json:"-"`
 }
 
 // SmartSampler is not here

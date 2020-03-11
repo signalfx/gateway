@@ -4,6 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/http"
+	"runtime"
+	"sync/atomic"
+	"time"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/signalfx/gateway/protocol/filtering"
 	"github.com/signalfx/gateway/sampling"
@@ -14,11 +20,6 @@ import (
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
-	"net"
-	"net/http"
-	"runtime"
-	"sync/atomic"
-	"time"
 )
 
 // Forwarder controls forwarding datapoints to SignalFx
@@ -132,7 +133,9 @@ func NewForwarder(conf *ForwarderConfig) (ret *Forwarder, err error) {
 			ret.sampler, err = sampling.New(conf.TraceSample, conf.Logger, sendingSink)
 			ret.sampler.ConfigureHTTPSink(sendingSink)
 		}
-		return ret, err
+		if err == nil {
+			return ret, err
+		}
 	}
 	return nil, err
 }
