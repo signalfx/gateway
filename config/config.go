@@ -58,6 +58,7 @@ type ForwardTo struct {
 	DisableCompression   *bool                       `json:",omitempty"`
 	Client               etcdIntf.Client             `json:"-"`
 	ClusterName          *string                     `json:"-"`
+	Idx                  int                         `json:"-"`
 }
 
 // ListenFrom configures how we listen for datapoints to forward

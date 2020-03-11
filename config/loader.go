@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+
 	"github.com/signalfx/gateway/protocol"
 	"github.com/signalfx/gateway/protocol/carbon"
 	"github.com/signalfx/gateway/protocol/carbon/metricdeconstructor"
@@ -218,12 +219,14 @@ func (s *signalFxLoader) Forwarder(conf *ForwardTo) (protocol.Forwarder, error) 
 	}
 	if conf.TraceSample != nil {
 		sfConf.TraceSample = conf.TraceSample
+		sfConf.TraceSample.Idx = conf.Idx
 		sfConf.TraceSample.EtcdClient = conf.Client
 		sfConf.TraceSample.AdditionalDimensions = datapoint.AddMaps(conf.AdditionalDimensions, conf.TraceSample.AdditionalDimensions)
 		sfConf.TraceSample.ClusterName = conf.ClusterName
 	}
 	if conf.TraceDistributor != nil {
 		sfConf.TraceSample = conf.TraceDistributor
+		sfConf.TraceSample.Idx = conf.Idx
 		sfConf.TraceSample.Distributor = pointer.Bool(true)
 		sfConf.TraceSample.EtcdClient = conf.Client
 		sfConf.TraceSample.AdditionalDimensions = datapoint.AddMaps(conf.AdditionalDimensions, conf.TraceDistributor.AdditionalDimensions)

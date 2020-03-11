@@ -184,6 +184,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 		}
 		forwardConfig.ClusterName = loadedConfig.ClusterName
 		forwardConfig.AdditionalDimensions = datapoint.AddMaps(loadedConfig.AdditionalDimensions, forwardConfig.AdditionalDimensions)
+		forwardConfig.Idx = idx
 		forwarder, err := loader.Forwarder(forwardConfig)
 		if err != nil {
 			return nil, err
