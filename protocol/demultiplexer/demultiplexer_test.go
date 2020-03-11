@@ -3,9 +3,12 @@ package demultiplexer
 import (
 	"testing"
 
+	"github.com/signalfx/gateway/protocol/signalfx"
+
 	"time"
 
 	"context"
+
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/datapoint/dptest"
@@ -61,5 +64,13 @@ func TestNew(t *testing.T) {
 	assert.NoError(t, demux.AddDatapoints(context.Background(), []*datapoint.Datapoint{}))
 	assert.NoError(t, demux.AddEvents(context.Background(), []*event.Event{}))
 	assert.NoError(t, demux.AddSpans(context.Background(), []*trace.Span{}))
+
+	// prove we only send do the first one
+	sendTo3.Resize(3)
+	sendTo2.Resize(3)
+	assert.Equal(t, len(sendTo2.TracesChan), len(sendTo3.TracesChan))
+	assert.NoError(t, demux.AddSpans(context.WithValue(context.Background(), signalfx.Distributed, "1"), traces))
+	assert.NotEqual(t, len(sendTo2.TracesChan), len(sendTo3.TracesChan))
+
 	cancelFunc()
 }

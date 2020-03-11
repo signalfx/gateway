@@ -2,7 +2,11 @@ package demultiplexer
 
 import (
 	"context"
+	"sync/atomic"
+	"time"
+
 	"github.com/signalfx/gateway/logkey"
+	"github.com/signalfx/gateway/protocol/signalfx"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
@@ -10,8 +14,6 @@ import (
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
-	"sync/atomic"
-	"time"
 )
 
 // Demultiplexer is a sink that forwards points it sees to multiple sinks
@@ -127,8 +129,14 @@ func (streamer *Demultiplexer) AddSpans(ctx context.Context, spans []*trace.Span
 			addMeta(&s.Meta, sfxclient.TokenHeaderName, v)
 		}
 	}
+
+	hasDistributedHeader := ctx.Value(signalfx.Distributed) != nil
 	var errs []error
 	for i, sendTo := range streamer.TraceSinks {
+		if i > 0 && hasDistributedHeader {
+			// only pass re-distributed spans to first sampler which would be the smart sampler
+			continue
+		}
 		toSend := spans
 		if i < len(streamer.TraceSinks)-1 {
 			// this is because of smart samplers

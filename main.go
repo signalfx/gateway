@@ -5,7 +5,6 @@ import (
 	"expvar"
 	"flag"
 	"fmt"
-	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"io/ioutil"
 	"net"
@@ -18,6 +17,10 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"gopkg.in/natefinch/lumberjack.v2"
+
+	_ "net/http/pprof"
 
 	etcdcli "github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/embed"
@@ -49,7 +52,6 @@ import (
 	_ "github.com/signalfx/ondiskencoding"
 	_ "github.com/signalfx/tdigest"
 	_ "github.com/spaolacci/murmur3"
-	_ "net/http/pprof"
 	_ "stathat.com/c/consistent"
 )
 
@@ -200,6 +202,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 			Logger:       logCtx,
 			Now:          tk.Now,
 		}
+		// TODO ugh, this is busted, downstream loses the name here... not ideal, probably has delta rollover issues
 		dcount := &dpsink.Counter{
 			Logger:        limitedLogger,
 			DroppedReason: "downstream",

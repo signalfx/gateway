@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/signalfx/gateway/protocol/signalfx/format"
+	signalfxformat "github.com/signalfx/gateway/protocol/signalfx/format"
+
 	"github.com/signalfx/golib/pointer"
 	"github.com/signalfx/golib/trace"
 	. "github.com/smartystreets/goconvey/convey"
@@ -196,10 +198,9 @@ func TestZipkinTraceDecoder(t *testing.T) {
 		},
 	}
 
-	req := http.Request{
-		Body: reqBody,
-	}
-	err := decoder.Read(context.Background(), &req)
+	req := httptest.NewRequest("get", "/v2/trace", reqBody)
+	req.Header.Add(string(Distributed), "1")
+	err := decoder.Read(context.Background(), req)
 
 	Convey("Valid spans should be sent even if some error", t, func() {
 		So(err.Error(), ShouldContainSubstring, "invalid binary annotation type")

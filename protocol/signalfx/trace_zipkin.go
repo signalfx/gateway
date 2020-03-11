@@ -3,21 +3,24 @@ package signalfx
 import (
 	"context"
 	"fmt"
-	"github.com/signalfx/golib/datapoint/dpsink"
 	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
 
+	signalfxformat "github.com/signalfx/gateway/protocol/signalfx/format"
+
 	"github.com/gorilla/mux"
 	"github.com/mailru/easyjson"
-	"github.com/signalfx/gateway/protocol/signalfx/format"
+	"github.com/signalfx/golib/datapoint/dpsink"
 	"github.com/signalfx/golib/errors"
 	"github.com/signalfx/golib/log"
 	"github.com/signalfx/golib/sfxclient"
 	"github.com/signalfx/golib/trace"
 	"github.com/signalfx/golib/web"
 )
+
+type ctxValue string
 
 const (
 	// DefaultTracePathV1 is the default listen path
@@ -28,6 +31,8 @@ const (
 	ZipkinTracePathV2 = "/api/v2/spans"
 	// ZipkinV1 is a constant used for protocol naming
 	ZipkinV1 = "zipkin_json_v1"
+	// Distributed is used as a context and header to tell us not duplicate spans
+	Distributed = ctxValue("X-SF-DISTRIBUTED")
 )
 
 // Constants as variables so it is easy to get a pointer to them
@@ -591,6 +596,9 @@ func (decoder *JSONTraceDecoderV1) Read(ctx context.Context, req *http.Request) 
 		}
 	}
 
+	if req.Header.Get(string(Distributed)) != "" {
+		ctx = context.WithValue(ctx, Distributed, "1")
+	}
 	err := decoder.Sink.AddSpans(ctx, spans)
 	return conversionErrs.ToError(err)
 }
