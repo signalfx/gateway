@@ -203,12 +203,10 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 			Logger:       logCtx,
 			Now:          tk.Now,
 		}
-		// TODO ugh, this is busted, downstream loses the name here... not ideal, probably has delta rollover issues
 		dcount := &dpsink.Counter{
 			Logger:        limitedLogger,
 			DroppedReason: "downstream",
 		}
-		metricsScheduler.AddCallback(dcount)
 		count := signalfx.UnifyNextSinkWrap(dcount)
 		endingSink := signalfx.FromChain(forwarder, signalfx.NextWrap(count))
 		bconf := &dpbuffered.Config{
@@ -238,6 +236,7 @@ func setupForwarders(ctx context.Context, tk timekeeper.TimeKeeper, loader *conf
 		}))
 		metricsScheduler.AddGroupedCallback(groupName, sfxclient.CollectorFunc(forwarder.DefaultDatapoints))
 		metricsScheduler.AddGroupedCallback(groupName, sfxclient.CollectorFunc(bf.DefaultDatapoints))
+		metricsScheduler.AddGroupedCallback(groupName, dcount)
 
 		debugMetricsScheduler.GroupedDefaultDimensions(groupName, datapoint.AddMaps(loadedConfig.AdditionalDimensions, map[string]string{
 			"name":      name,
