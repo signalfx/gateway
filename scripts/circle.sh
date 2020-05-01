@@ -87,7 +87,6 @@ function do_test() {
     )
   done
   install_go_version "$GO_COMPILER_PATH" "$GOLANG_VERSION"
-  env
   (
     cd "$SRC_PATH"
     go clean -x ./...
