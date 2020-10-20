@@ -1,3 +1,12 @@
+# Deprecation Notice
+
+:warning: **Please be advised this project is deprecated. Only critical security
+fixes and bugs will be provided.** :warning:
+
+We recommend using our [Splunk Distribution of OpenTelemetry
+Collector](https://github.com/signalfx/splunk-otel-collector) going forward, which offers
+the same capabilities and fully supports the OpenTelemetry standard.
+
 # Gateway [![Circle CI](https://circleci.com/gh/signalfx/gateway.svg?style=svg)](https://circleci.com/gh/signalfx/gateway)
 
 The SignalFx Gateway lets you aggregate metrics and send them to
