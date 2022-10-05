@@ -7,6 +7,8 @@ We recommend using our [Splunk Distribution of OpenTelemetry
 Collector](https://github.com/signalfx/splunk-otel-collector) going forward, which offers
 the same capabilities and fully supports the OpenTelemetry standard.
 
+>ℹ️&nbsp;&nbsp;SignalFx was acquired by Splunk in October 2019. See [Splunk SignalFx](https://www.splunk.com/en_us/investor-relations/acquisitions/signalfx.html) for more information.
+
 # Gateway [![Circle CI](https://circleci.com/gh/signalfx/gateway.svg?style=svg)](https://circleci.com/gh/signalfx/gateway)
 
 The SignalFx Gateway lets you aggregate metrics and send them to
