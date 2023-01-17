@@ -1,6 +1,6 @@
 # Deprecation Notice
 
-:warning: **Please be advised this project is deprecated. Only critical security
+:warning: **Please be advised this project is deprecated. The SignalFx Gateway will reach End of Support on June 30th, 2023. Until then, only critical security
 fixes and bugs will be provided.** :warning:
 
 We recommend using our [Splunk Distribution of OpenTelemetry
