@@ -1,12 +1,10 @@
-# Deprecation Notice
-
-:warning: **Please be advised this project is deprecated. The SignalFx Gateway will reach End of Support on June 30th, 2023. Until then, only critical security
-fixes and bugs will be provided.** :warning:
-
-We recommend using our [Splunk Distribution of OpenTelemetry
+> # :warning: End of Support (EoS) Notice
+> **The SignalFx Gateway has reached End of Support.**
+>
+> We recommend using our [Splunk Distribution of OpenTelemetry
 Collector](https://github.com/signalfx/splunk-otel-collector) going forward, which offers
 the same capabilities and fully supports the OpenTelemetry standard.
-
+>
 >ℹ️&nbsp;&nbsp;SignalFx was acquired by Splunk in October 2019. See [Splunk SignalFx](https://www.splunk.com/en_us/investor-relations/acquisitions/signalfx.html) for more information.
 
 # Gateway [![Circle CI](https://circleci.com/gh/signalfx/gateway.svg?style=svg)](https://circleci.com/gh/signalfx/gateway)
